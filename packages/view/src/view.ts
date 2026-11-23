@@ -6,6 +6,7 @@ import {
   type Command,
   type ControlRange,
   cellsAsTable,
+  changeIndent,
   closeHistory,
   controlAt,
   controlProperties,
@@ -34,6 +35,7 @@ import {
   insertText,
   isSafeHref,
   joinHistory,
+  listBookmarks,
   type Node as ModelNode,
   marksAt,
   type NavigationRequest,
@@ -46,6 +48,7 @@ import {
   type OpenStory,
   pageVariant,
   parseContentV2,
+  parseFieldInstruction,
   pasteCells,
   type ResourceJSON,
   type ReviewView,
@@ -1098,7 +1101,7 @@ export class EditorView {
   private scrollToSelection(): void {
     if (this.composing || !this.hasFocus()) return;
     const doc = this.host.ownerDocument;
-    const sel = doc.getSelection();
+    const sel = this.domSelection();
     const node = sel?.focusNode;
     if (!sel || !node || !this.host.contains(node)) return;
     const range = doc.createRange();
@@ -1133,6 +1136,8 @@ export class EditorView {
       // What it had changed is not input: read back, it would render and fail again, for ever.
       this.observer.takeRecords();
       this.pending = [];
+      // Half drawn: nothing of it is reused, the next render draws every block again.
+      this.word = null;
       throw error;
     }
   }
@@ -2470,7 +2475,7 @@ export class EditorView {
     // Shift extends by itself: an extended DOM selection would lose its anchor to the same spot.
     if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return false;
     const stop = caretStop(this.state, selection.head, forward);
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (stop === selection.head || !sel) return false;
     if (this.fieldCodes) {
       this.dispatch(this.state.tr.setSelection(TextSelection.create(doc, stop)));
@@ -2611,13 +2616,21 @@ export class EditorView {
     const region = { element, drawing: {}, section: 0, id: story };
     const texts = () =>
       noteTexts(noteNumbers(this.state.doc, (wordContext(this.state) as WordContext).envelope));
-    this.mountStory(
-      editor,
-      { id: story, side: "note", variant: "default", section: 0, page, region },
-      "Note",
-      () => texts().get(story) ?? "",
-      focus,
-    );
+    try {
+      this.mountStory(
+        editor,
+        { id: story, side: "note", variant: "default", section: 0, page, region },
+        "Note",
+        () => texts().get(story) ?? "",
+        focus,
+      );
+    } catch (error) {
+      // Not open after all: the note drawn closed again.
+      notes.open = null;
+      this.flowed = null;
+      this.render();
+      throw error;
+    }
     editor.select(Selection.atEnd(editor.state.doc).from);
     return true;
   }
@@ -2668,12 +2681,21 @@ export class EditorView {
       wrapper.style.paddingBottom = shown.style.paddingBottom;
     }
     region.element.append(wrapper);
-    const view = new EditorView(inner, editor, {
-      paged: false,
-      upload: this.upload ?? null,
-      resource: this.resource ?? null,
-      ...(noteMark ? { noteMark } : {}),
-    });
+    let view: EditorView;
+    try {
+      view = new EditorView(inner, editor, {
+        paged: false,
+        upload: this.upload ?? null,
+        resource: this.resource ?? null,
+        ...(noteMark ? { noteMark } : {}),
+      });
+    } catch (error) {
+      // No story open after all: the body as it was, editable.
+      wrapper.remove();
+      if (shown) shown.style.display = "";
+      this.bodyEditable();
+      throw error;
+    }
     wrapper.addEventListener("keydown", (event) => {
       if (event.isComposing || view.composing) return;
       // Unless the story's view ran a user's binding of the key.
@@ -2718,14 +2740,19 @@ export class EditorView {
       this.flowed = null;
       if (!this.destroyed) this.render();
     }
+    this.bodyEditable();
+    if (focus && !this.destroyed) this.focus();
+    if (!this.destroyed) this.drawMatches();
+    this.editor.storyChanged();
+  }
+
+  /** The host editable again, its changes read back, as before a story opened. */
+  private bodyEditable(): void {
     this.host.classList.remove("foli-in-story");
     this.host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) this.host.removeAttribute("aria-readonly");
     this.observer.takeRecords();
     this.observer.observe(this.host, { childList: true, characterData: true, subtree: true });
-    if (focus && !this.destroyed) this.focus();
-    if (!this.destroyed) this.drawMatches();
-    this.editor.storyChanged();
   }
 
   /** The page's own story, after what was open is shown nowhere any more. */
@@ -2820,10 +2847,17 @@ export class EditorView {
       caretPositionFromPoint?: (
         x: number,
         y: number,
+        options?: { shadowRoots: ShadowRoot[] },
       ) => { offsetNode: Node; offset: number } | null;
       caretRangeFromPoint?: (x: number, y: number) => Range | null;
     };
-    const point = doc.caretPositionFromPoint?.(x, y);
+    const root = this.host.getRootNode();
+    // Inside a shadow root the engine stops at its host unless it is told of the root.
+    const shadow =
+      root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+        ? { shadowRoots: [root as ShadowRoot] }
+        : undefined;
+    const point = doc.caretPositionFromPoint?.(x, y, shadow);
     const range = point ? null : doc.caretRangeFromPoint?.(x, y);
     const node = point?.offsetNode ?? range?.startContainer;
     const offset = point?.offset ?? range?.startOffset ?? 0;
@@ -3304,7 +3338,7 @@ export class EditorView {
 
   /** The live DOM selection as a model selection, or null if it is not inside the host. */
   private readSelection(): Selection | null {
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel?.anchorNode || !sel.focusNode) return null;
     if (this.mount?.wrapper.contains(sel.anchorNode)) return null;
     // A range around exactly one block leaf element (a rule): the node selection that wrote it.
@@ -3468,8 +3502,24 @@ export class EditorView {
     return same(dom.anchor, shown.anchor) && same(dom.head, shown.head);
   }
 
+  /**
+   * The selection the host's text is in. In a shadow root the document's is retargeted to the
+   * shadow host: the root's own where the engine has one (Chromium). Firefox's document
+   * selection reaches inside.
+   * shortcut: WebKit has neither; `getComposedRanges` would give the range there, not the
+   * selection's direction or `modify`: editing in a shadow root is not supported in WebKit.
+   */
+  private domSelection(): ReturnType<Document["getSelection"]> {
+    const root = this.host.getRootNode() as Partial<Pick<Document, "getSelection">>;
+    return root !== this.host.ownerDocument && typeof root.getSelection === "function"
+      ? root.getSelection()
+      : this.host.ownerDocument.getSelection();
+  }
+
   private hasFocus(): boolean {
-    const active = this.host.ownerDocument.activeElement;
+    // A shadow root's own: the document's is the shadow host.
+    const root = this.host.getRootNode() as Partial<Pick<Document, "activeElement">>;
+    const active = root.activeElement ?? this.host.ownerDocument.activeElement;
     return (
       (active === this.host || this.host.contains(active)) && !this.mount?.wrapper.contains(active)
     );
@@ -3478,7 +3528,7 @@ export class EditorView {
   /** Writes the model selection to the DOM unless the DOM already shows it (keeps native affinity). */
   private writeSelection(force: boolean): void {
     if (this.composing || !this.hasFocus()) return;
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel) return;
     const { selection, doc } = this.state;
     if (!force) {
@@ -3564,6 +3614,9 @@ export class EditorView {
     if (!selection.eq(this.state.selection)) this.dispatch(this.state.tr.setSelection(selection));
   }
 
+  /** The `beforeinput` types already warned about (`onBeforeInput`). */
+  private readonly unhandledInput = new Set<string>();
+
   private onBeforeInput = (event: InputEvent): void => {
     // During composition the browser owns the DOM; it is reconciled at compositionend. A
     // composition event that arrives after it must not fall through to a delete or insert.
@@ -3574,6 +3627,8 @@ export class EditorView {
     const text = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
     switch (type) {
       case "insertText":
+      // macOS's Ctrl+Y: what Ctrl+K cut, as text.
+      case "insertFromYank":
         this.run(insertText(text));
         return;
       case "insertReplacementText":
@@ -3601,8 +3656,20 @@ export class EditorView {
         this.run(toggleMark(mark));
         return;
       }
+      case "formatIndent":
+      case "formatOutdent":
+        this.run(changeIndent(type === "formatIndent" ? 1 : -1));
+        return;
     }
-    if (!type.startsWith("delete") || type === "deleteByDrag") return;
+    if (!type.startsWith("delete")) {
+      // The browser's own editing would change the DOM, which is never the truth: said, once.
+      if (!ELSEWHERE_INPUT.has(type) && !this.unhandledInput.has(type)) {
+        this.unhandledInput.add(type);
+        console.warn(`Foli: the browser's "${type}" input is not supported; nothing was changed.`);
+      }
+      return;
+    }
+    if (type === "deleteByDrag") return;
     // Android keyboards send Backspace at a paragraph's start as a delete of the boundary
     // before it (a target range from the paragraph before's end to the caret): that is the key
     // at a caret, so a numbered paragraph loses its number rather than joining the one before.
@@ -3612,7 +3679,7 @@ export class EditorView {
     if (this.state.selection.empty && type.includes("Line")) {
       // No target range: let the browser find the line edge, never delete a character instead.
       // shortcut: hard-line deletes also stop at the visual line edge here; Chromium, Firefox and WebKit all give a range.
-      const sel = this.host.ownerDocument.getSelection();
+      const sel = this.domSelection();
       if (type === "deleteEntireSoftLine") {
         sel?.modify?.("move", "backward", "lineboundary");
         sel?.modify?.("extend", "forward", "lineboundary");
@@ -4164,18 +4231,63 @@ export class EditorView {
 
   /**
    * A click on a link in the document does not navigate (it places the caret, also in read-only
-   * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`.
+   * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`,
+   * and goes to the bookmark a link to one names (a table of contents' entry, a cross-reference).
    */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
     if (event.type === "click" && !event.shiftKey && this.controlChrome.click(event)) return;
     const element = target instanceof Element ? target.closest("a") : null;
+    if (!element && event.type === "click" && (IS_MAC ? event.metaKey : event.ctrlKey)) {
+      const name = target instanceof Node ? this.bookmarkLinked(target) : null;
+      if (name !== null) {
+        event.preventDefault();
+        // By name, capitals not counting, as Word finds a bookmark; its hidden ones too (`_Toc…`).
+        const found = listBookmarks(this.editor, { hidden: true }).find(
+          (b) => b.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (found) this.reveal(found, { focus: true });
+      }
+      return;
+    }
     if (!element || !this.host.contains(element)) return;
     event.preventDefault();
     if (event.type !== "click" || !(IS_MAC ? event.metaKey : event.ctrlKey)) return;
     const href = this.linkHref(element);
     if (href) this.host.ownerDocument.defaultView?.open(href, "_blank", "noopener,noreferrer");
   };
+
+  /**
+   * The bookmark `node` links to, read from the model: a link to a bookmark (`w:anchor`), a
+   * `HYPERLINK \l` field's result, a `REF`, `PAGEREF` or `NOTEREF` field's with `\h`.
+   */
+  private bookmarkLinked(node: Node): string | null {
+    if (!this.host.contains(node)) return null;
+    const pos = this.posFromDOM(node, 0);
+    if (pos === null) return null;
+    const $pos = this.state.doc.resolve(pos);
+    const anchor = this.state.schema.marks.link?.isInSet(
+      $pos.parent.maybeChild($pos.index())?.marks ?? [],
+    )?.attrs.anchor;
+    if (typeof anchor === "string" && anchor) return anchor;
+    // The innermost field around it: a table of contents' entry is a HYPERLINK inside the TOC.
+    let found: string | null = null;
+    let size = Number.POSITIVE_INFINITY;
+    for (const field of fieldsIn(this.state.doc)) {
+      if (pos < field.resultFrom || pos > field.resultTo || field.to - field.from >= size) continue;
+      const { args, switches } = parseFieldInstruction(field.instruction);
+      const name =
+        field.name === "HYPERLINK"
+          ? switches.get("l")?.[0]
+          : ["REF", "PAGEREF", "NOTEREF"].includes(field.name) && switches.has("h")
+            ? args[0]
+            : undefined;
+      if (name === undefined) continue;
+      found = name;
+      size = field.to - field.from;
+    }
+    return found;
+  }
 
   /** The href of the link an `<a>` shows, read from the model (the DOM is never the truth). */
   private linkHref(element: Element): string | null {
@@ -4294,7 +4406,7 @@ export class EditorView {
    * block's first or last fragment (a block split across pages has several).
    */
   private caretOnEdgeLine(dir: -1 | 1, focusOnly = false): boolean {
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     // `focusOnly`: a range's head (Shift+arrows), else only a caret.
     if (!sel?.rangeCount || (!focusOnly && !sel.isCollapsed) || !sel.focusNode) return false;
     const element = this.blockElement(sel.focusNode);
@@ -4330,7 +4442,7 @@ export class EditorView {
     // this view knows (Cmd+arrows go to the line edge, Alt+arrows navigate history on Windows).
     const word = IS_MAC ? event.altKey : event.ctrlKey;
     if (event.metaKey || (IS_MAC ? event.ctrlKey : event.altKey)) return false;
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel?.focusNode || !sel.anchorNode || !sel.modify) return false;
     if (!event.shiftKey && !sel.isCollapsed) return false;
     const element = this.blockElement(sel.focusNode);
@@ -4474,7 +4586,7 @@ export class EditorView {
       for (const leaf of desc.leaves)
         if (leaf.dom.nodeType !== Node.TEXT_NODE) hardBreaks.add(leaf.dom);
 
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     let caret = -1;
     let domText = "";
     const walk = (node: Node): void => {
@@ -4746,7 +4858,7 @@ export class EditorView {
       return;
     }
     // Not the selected text (a link or an image the browser drags): the browser's own drag.
-    const range = this.host.ownerDocument.getSelection();
+    const range = this.domSelection();
     const target = event.target as Node | null;
     const fromSelection =
       !!target &&
@@ -5325,8 +5437,8 @@ function wordBox(
     marginTop: before,
     marginBottom: after,
     keepWithNext: desc.word.keepNext,
-    // A node view's parts are not lines: no widow or orphan control.
-    anyLine: !!desc.parts,
+    // A node view's parts are not lines, and `w:widowControl="0"` turns it off: any line.
+    anyLine: !!desc.parts || desc.word.widowControl === false,
     pageHeight,
     section: section.flow,
     sectionMark: !!desc.node.attrs.section && desc.word.empty,
@@ -5634,6 +5746,13 @@ const HARD_BREAK = "\uFFFC";
 function isHighSurrogate(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff;
 }
+
+/** `beforeinput` types the view's paste and drop handlers carry out. */
+const ELSEWHERE_INPUT = new Set([
+  "insertFromPaste",
+  "insertFromPasteAsQuotation",
+  "insertFromDrop",
+]);
 
 const COMPOSITION_INPUT = new Set([
   "insertCompositionText",

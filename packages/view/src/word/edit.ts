@@ -101,6 +101,8 @@ export interface WordInfo {
   after: number;
   keepNext: boolean;
   keepLines: boolean;
+  /** `w:widowControl`: false splits it at any line, as Word does. */
+  widowControl?: boolean;
   pageBreakBefore: boolean;
   /** The paragraph's style and whether it drops spacing next to the same style. */
   style: string | null;
@@ -527,6 +529,7 @@ export class WordRenderer {
       after: display.gone ? 0 : (paragraph.spacing.afterAutospacing ? 280 : after) * PX_PER_TWIP,
       keepNext: paragraph.keepNext,
       keepLines: paragraph.keepLines,
+      widowControl: paragraph.widowControl,
       pageBreakBefore: paragraph.pageBreakBefore,
       style: paragraph.style,
       contextual: paragraph.contextualSpacing,

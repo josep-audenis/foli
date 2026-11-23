@@ -520,6 +520,8 @@ export declare class EditorView {
     endComposition(): void;
     /** Leaves the story being edited; `focus`: the body takes the focus, with its selection back. */
     closeStory(focus?: boolean): void;
+    /** The host editable again, its changes read back, as before a story opened. */
+    private bodyEditable;
     /** The page's own story, after what was open is shown nowhere any more. */
     private reopenStory;
     /** The margin of a page a mouse event is in, if it is on the page itself. */
@@ -612,6 +614,14 @@ export declare class EditorView {
      * shown as the text range between its snapped ends, so reading it back must not replace it.
      */
     private shows;
+    /**
+     * The selection the host's text is in. In a shadow root the document's is retargeted to the
+     * shadow host: the root's own where the engine has one (Chromium). Firefox's document
+     * selection reaches inside.
+     * shortcut: WebKit has neither; `getComposedRanges` would give the range there, not the
+     * selection's direction or `modify`: editing in a shadow root is not supported in WebKit.
+     */
+    private domSelection;
     private hasFocus;
     /** Writes the model selection to the DOM unless the DOM already shows it (keeps native affinity). */
     private writeSelection;
@@ -629,6 +639,8 @@ export declare class EditorView {
     private boundaryOnly;
     /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
     private selectTargetRange;
+    /** The `beforeinput` types already warned about (`onBeforeInput`). */
+    private readonly unhandledInput;
     private onBeforeInput;
     /**
      * Runs the first command bound to `name` that applies, through the view's dispatch; the view's
@@ -716,9 +728,15 @@ export declare class EditorView {
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
-     * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`.
+     * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`,
+     * and goes to the bookmark a link to one names (a table of contents' entry, a cross-reference).
      */
     private onClick;
+    /**
+     * The bookmark `node` links to, read from the model: a link to a bookmark (`w:anchor`), a
+     * `HYPERLINK \l` field's result, a `REF`, `PAGEREF` or `NOTEREF` field's with `\h`.
+     */
+    private bookmarkLinked;
     /** The href of the link an `<a>` shows, read from the model (the DOM is never the truth). */
     private linkHref;
     private onKeyDown;

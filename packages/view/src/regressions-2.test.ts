@@ -9,7 +9,7 @@ import {
   type StoryJSON,
 } from "@folijs/core";
 import { Resolver } from "@folijs/core/internal";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { htmlToDoc } from "./clipboard.js";
 import { EditorView } from "./index.js";
 import { headerHeight } from "./word/pages.js";
@@ -154,5 +154,151 @@ describe("page fields in a header", () => {
     const own = "ab";
     expect(header([text(own), ...field(" PAGE ")])).toBe(`${own}3`);
     expect(header([text(own)])).toBe(own);
+  });
+});
+
+describe("Ctrl+click on a link to a bookmark (21.8)", () => {
+  const target = (): NodeJSON[] => [
+    { type: "bookmarkStart", attrs: { id: 1, name: "_Toc1" } },
+    text("Target"),
+    { type: "bookmarkEnd", attrs: { id: 1 } },
+  ];
+  const field = (code: string, shown: string): NodeJSON[] => [
+    { type: "fieldStart" },
+    { type: "fieldCode", attrs: { text: code } },
+    { type: "fieldSeparator" },
+    text(shown),
+    { type: "fieldEnd" },
+  ];
+  const click = (host: HTMLElement, shown: string, ctrlKey = true) => {
+    const span = [...host.querySelectorAll("span")].find((s) => s.textContent === shown);
+    span?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey }));
+  };
+  const selected = (editor: ReturnType<typeof createEditor>) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it.each([
+    [
+      "a link's anchor",
+      p({ type: "text", text: "Go", marks: [{ type: "link", attrs: { anchor: "_toc1" } }] }),
+    ],
+    ["a table of contents' HYPERLINK", p(...field(' HYPERLINK \\l "_Toc1" ', "Go"))],
+    ["a cross-reference with \\h", p(...field(" REF _Toc1 \\h ", "Go"))],
+  ])("goes to the bookmark from %s", (_, link) => {
+    const { host, editor } = mount(link, p(text("between")), p(...target()));
+    click(host, "Go", false);
+    expect(selected(editor)).toBe("");
+    click(host, "Go");
+    expect(selected(editor)).toBe("Target");
+  });
+
+  it("not from a cross-reference without \\h", () => {
+    const { host, editor } = mount(p(...field(" REF _Toc1 ", "Go")), p(...target()));
+    click(host, "Go");
+    expect(selected(editor)).toBe("");
+  });
+});
+
+describe("beforeinput types the view does not carry out (21.8)", () => {
+  const input = (host: HTMLElement, inputType: string, data: string | null = null) => {
+    const event = new InputEvent("beforeinput", { inputType, data, cancelable: true });
+    host.dispatchEvent(event);
+    return event;
+  };
+
+  it("are said once each, never silently dropped; the DOM stays the view's", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { host, editor } = mount(p(text("abc")));
+      const before = JSON.stringify(editor.state.doc.toJSON());
+      expect(input(host, "formatJustifyCenter").defaultPrevented).toBe(true);
+      input(host, "formatJustifyCenter");
+      input(host, "insertTranspose");
+      expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+        `Foli: the browser's "formatJustifyCenter" input is not supported; nothing was changed.`,
+        `Foli: the browser's "insertTranspose" input is not supported; nothing was changed.`,
+      ]);
+      // Paste and drop have their own handlers: nothing said.
+      input(host, "insertFromPaste");
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(editor.state.doc.toJSON())).toBe(before);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("indents, outdents and yanks", () => {
+    const { host, editor } = mount(p(text("abc")));
+    input(host, "formatIndent");
+    const indent = () =>
+      (editor.state.doc.firstChild?.attrs.indent as { left?: number } | null)?.left ?? 0;
+    expect(indent()).toBeGreaterThan(0);
+    input(host, "formatOutdent");
+    expect(indent()).toBe(0);
+    input(host, "insertFromYank", "Y");
+    expect(editor.state.doc.textContent).toContain("Y");
+  });
+});
+
+describe("a story's view that fails to open (21.8)", () => {
+  it("leaves the body editable, with no half-open story", () => {
+    const { host, view } = mount(p(text("body")));
+    type Renders = { render(this: { paged: boolean }): void };
+    const proto = EditorView.prototype as unknown as Renders;
+    const original = proto.render;
+    const spy = vi.spyOn(proto, "render").mockImplementation(function (this: { paged: boolean }) {
+      // Only the story's own view, which is not paged, fails.
+      if (!this.paged) throw new Error("broken");
+      original.call(this);
+    });
+    try {
+      expect(() => view.openStory("header", 0, true)).toThrow("broken");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(host.getAttribute("contenteditable")).toBe("true");
+    expect(host.classList.contains("foli-in-story")).toBe(false);
+    expect(host.querySelector(".foli-story-mount")).toBeNull();
+    // It opens once it can.
+    expect(view.openStory("header", 0, true)).toBe(true);
+    expect(host.querySelectorAll(".foli-story-mount")).toHaveLength(1);
+  });
+});
+
+describe("a drop-down's options (21.8)", () => {
+  it("have ids no other view's list has", () => {
+    const optionIds = () => {
+      const host = document.createElement("div");
+      document.body.append(host);
+      const editor = createEditor({
+        document: parseDocument({
+          ...createDocument({
+            type: "doc",
+            content: [
+              p({ type: "controlStart", attrs: { id: "c" } }, text("one"), {
+                type: "controlEnd",
+                attrs: { id: "c" },
+              }),
+            ],
+          }),
+          controls: { c: { kind: "dropDown", items: [{ value: "one" }, { value: "two" }] } },
+        }),
+      });
+      const view = new EditorView(host, editor);
+      views.push(view);
+      view.focus();
+      editor.select(3);
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }),
+      );
+      const ids = [...document.querySelectorAll('[role="option"]')].map((o) => o.id);
+      view.destroy();
+      return ids;
+    };
+    const first = optionIds();
+    const second = optionIds();
+    expect(first).toHaveLength(2);
+    expect(second).toHaveLength(2);
+    expect(second.filter((id) => first.includes(id))).toEqual([]);
   });
 });

@@ -151,7 +151,7 @@ const DEFAULT_PARAGRAPH: Merging = {
   },
   keepNext: false,
   keepLines: false,
-  widowControl: false,
+  widowControl: true,
   pageBreakBefore: false,
   contextualSpacing: false,
   outlineLevel: null,

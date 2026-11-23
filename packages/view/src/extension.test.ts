@@ -416,3 +416,23 @@ describe("custom content on read-only pages (19.3)", () => {
     again.container.remove();
   });
 });
+
+describe("renderDocument's print rules (21.8)", () => {
+  it("are its own pages', not another output's in the same web page", () => {
+    const draw = () => {
+      const container = document.createElement("div");
+      document.body.append(container);
+      return renderDocument(createDocument(), container);
+    };
+    const [one, two] = [draw(), draw()];
+    const scope = (page: HTMLElement | undefined) => page?.getAttribute("data-foli-output");
+    expect(scope(one.pages[0])).toBeTruthy();
+    expect(scope(two.pages[0])).not.toBe(scope(one.pages[0]));
+    expect(one.printStyles()).toContain(`[data-foli-output="${scope(one.pages[0])}"]`);
+    expect(one.printStyles()).not.toContain(`[data-foli-output="${scope(two.pages[0])}"]`);
+    // Its sheets named its own: the web page's `@page` size is shared by every output.
+    expect(one.printStyles()).toContain(`@page foli-word-${scope(one.pages[0])}-0{`);
+    one.destroy();
+    two.destroy();
+  });
+});

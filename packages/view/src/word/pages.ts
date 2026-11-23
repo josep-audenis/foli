@@ -81,6 +81,10 @@ export interface DocumentPages {
   destroy(): void;
 }
 
+/** Which `renderDocument` call drew a page: its print rules are scoped to it. */
+const OUTPUT_ATTR = "data-foli-output";
+let outputs = 0;
+
 /** Word's defaults for what a section leaves out: Letter, 1 inch margins. */
 const PAGE_DEFAULTS = { width: 12240, height: 15840, margin: 1440 };
 
@@ -247,6 +251,7 @@ export function renderDocument(
   const { extensions, ...rest } = given;
   const options = { ...rest, custom: customDrawing(extensions) };
   const doc = container.ownerDocument;
+  const output = String(++outputs);
   // What notes show: numbers depend on the pages only where they restart on each.
   const model = document.stories ? parseContent(document.content) : null;
   const hideDeleted = (options.review ?? "markup") !== "markup";
@@ -430,8 +435,8 @@ export function renderDocument(
       marginTop: block.before,
       marginBottom: block.after,
       repeat,
-      // A table splits at any line: no widow and orphan control across its rows.
-      anyLine: !!block.element.querySelector(":scope > table"),
+      // A table splits between rows; a paragraph without widow control at any line.
+      anyLine: !!block.element.querySelector(":scope > table") || block.widowControl === false,
       keepWithNext: block.keepNext,
       section: section.flow,
       sectionMark:
@@ -515,6 +520,7 @@ export function renderDocument(
   const created = pageSetups.map((section, p) => {
     const made = createPage(doc, section.geometry);
     made.page.setAttribute(SHEET_ATTR, String(section.flow.index ?? 0));
+    made.page.setAttribute(OUTPUT_ATTR, output);
     const page = facts[p];
     // Word's blank page before an even or odd page section has no header or footer (its PDF).
     if (!page?.sectionPages) return made;
@@ -698,15 +704,17 @@ export function renderDocument(
     fieldLayout,
     printStyles: () => {
       const last = (sections.at(-1) as Section).geometry;
+      // This output's pages only: another `renderDocument` in the web page keeps its own sizes.
       return printStyles(
-        `.${WORD_PAGE_CLASS}`,
+        `.${WORD_PAGE_CLASS}[${OUTPUT_ATTR}="${output}"]`,
         { width: px(last.width), height: px(last.height) },
         sections.map(({ geometry: g, flow }) => ({
           width: px(g.width),
           height: px(g.height),
           index: flow.index ?? 0,
         })),
-        "word",
+        `word-${output}`,
+        true,
       );
     },
     pageOf: (index) => firstPage.get(index),

@@ -3056,7 +3056,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   `ordinal`, `roman` and `letters` given negative or fractional numbers; a reply whose parent
   is missing cannot be resolved (`comments.ts`, `rootOf`); a string `schemaVersion` gets a
   message saying it must be a number.
-- [ ] 21.8 View, smaller bugs: `w:widowControl="0"` honoured by the editor's flow and
+- [x] 21.8 View, smaller bugs: `w:widowControl="0"` honoured by the editor's flow and
   `renderDocument` (core resolves it; `layout/flow.ts` keeps two lines always); Ctrl+click on a
   link to a bookmark goes there (TOC entries, cross-references); `beforeinput` types the view
   does not handle are left to the browser or warned about, not cancelled silently
@@ -3065,6 +3065,10 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   popup option ids unique per view; `renderDocument`'s print rules scoped to their own output.
   Verify first, in a browser test: editing inside a shadow root (`hasFocus`, `getSelection`)
   and in a same-origin iframe (`instanceof Element` across realms, `observeSizes`).
+  (Done: all fixed. Verified: a same-origin iframe works in the three engines; a shadow root
+  did not (focus and selection read from the document): fixed for Chromium, Firefox worked,
+  WebKit has no selection inside a shadow root and is written down in limitations.md for the
+  owner to accept. Core's `widowControl` set nowhere now resolves as on, as Word does.)
 - [ ] 21.9 React: `FoliComments` does no work while hidden or without threads, and none per
   keystroke beyond what a change to its threads needs (today `measure()` queries every page and
   forces a layout on each `doc` change); `upload` and `resource` held in refs so an inline
