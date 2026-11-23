@@ -373,7 +373,7 @@ function fit(
     }
     const ids = new Set(styles.map((s) => s.id));
     let next = id;
-    for (let i = 1; ids.has(next); i++) next = `${id}${i}`;
+    for (let i = freshId(state, 0); ids.has(next); i = freshId(state, i)) next = `${id}${i}`;
     // Reserved first: styles name each other (a paragraph style and its linked character style).
     styleIds.set(id, next);
     const copy: StyleJSON = { ...style, id: next };
@@ -523,7 +523,11 @@ function fit(
   const takenKeys = new Set<string>();
   const freeKey = (key: string) => {
     let next = key;
-    for (let i = 2; (resources && Object.hasOwn(resources, next)) || takenKeys.has(next); i++)
+    for (
+      let i = freshId(state, 1);
+      (resources && Object.hasOwn(resources, next)) || takenKeys.has(next);
+      i = freshId(state, i)
+    )
       next = `${key}-${i}`;
     takenKeys.add(next);
     return next;
