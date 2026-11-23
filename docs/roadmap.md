@@ -3075,7 +3075,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   function does not reset the view each render (`FoliCanvas.tsx`); a built-in dialog closed by
   an outside transaction gives the focus back; the font, size and style boxes apply on Enter,
   not on each arrow. Tests counting renders and subscriptions.
-- [ ] 21.10 Docx export correctness: a new package writes `w:compat` with
+- [x] 21.10 Docx export correctness: a new package writes `w:compat` with
   `compatibilityMode=15` (today Word opens it in compatibility mode); `withSettings` writes
   `doNotUseHTMLParagraphAutoSpacing` to an existing part; an existing relationship whose part is
   missing is reused, not doubled; `xml:space` inherited from an ancestor; a border with both
@@ -3083,6 +3083,8 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   `.dotm` and `.dotx` can be exported as `.docx` (an option, the content type changed, macros
   dropped and reported). Checked against Phase 20's state first: what it fixed meanwhile is
   struck here.
+  (Done: Phase 20 had fixed none of these, its fixes were the import's (20.5), so nothing is
+  struck. The macro option is `asDocument`, its report the `dropped` callback.)
 - [ ] 21.11 Agent and MCP, what costs a model retries: `find` loosens the soft hyphen (U+00AD),
   the non-breaking hyphen (U+2011) and the zero-width space, and a refusal quotes invisible and
   look-alike characters escaped; the 200 000-character cut keeps the `more:` line and cuts at a

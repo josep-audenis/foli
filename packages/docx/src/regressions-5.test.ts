@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { docPrIds } from "./export/pictures.js";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 import { docx } from "./testing/package.js";
+import { deflateEntry, writeZip } from "./zip.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const load = (name: string) => importDocx(new Uint8Array(readFileSync(new URL(name, CORPUS))));
@@ -93,5 +94,49 @@ describe("21.10", () => {
 
   it("finds wp:docPr ids in single quotes", () => {
     expect(docPrIds(`<wp:docPr id='12' name="a"/><docPr name="b" id = "13"/>`)).toEqual([12, 13]);
+  });
+});
+
+describe("a .docm written as a .docx (21.10)", () => {
+  const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const OFFICE = "http://schemas.microsoft.com/office/2006/relationships";
+  const docm = async () => {
+    const files: Record<string, string> = {
+      "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/><Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/><Override PartName="/word/vbaData.xml" ContentType="application/vnd.ms-word.vbaData+xml"/></Types>`,
+      "_rels/.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+      "word/document.xml": `<w:document xmlns:w="${W_NS}"><w:body><w:p><w:r><w:t>Macro text</w:t></w:r></w:p></w:body></w:document>`,
+      "word/_rels/document.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId9" Type="${OFFICE}/vbaProject" Target="vbaProject.bin"/></Relationships>`,
+      "word/vbaProject.bin": "VBA",
+      "word/_rels/vbaProject.bin.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${OFFICE}/wordVbaData" Target="vbaData.xml"/></Relationships>`,
+      "word/vbaData.xml": `<wne:vbaSuppData xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"/>`,
+    };
+    const entries = [];
+    for (const [name, text] of Object.entries(files))
+      entries.push(await deflateEntry(name, new TextEncoder().encode(text)));
+    return writeZip(entries);
+  };
+
+  it("leaves the macros out, says which, and is a document", async () => {
+    const { document, package: pkg } = await importDocx(await docm());
+    const kept = await readPackage(await exportDocx(document, pkg));
+    expect(kept.part("/word/vbaProject.bin")).toBeDefined();
+    let dropped: readonly string[] = [];
+    const bytes = await exportDocx(document, pkg, {
+      asDocument: true,
+      dropped: (parts) => {
+        dropped = parts;
+      },
+    });
+    expect([...dropped].sort()).toEqual([
+      "/word/_rels/vbaProject.bin.rels",
+      "/word/vbaData.xml",
+      "/word/vbaProject.bin",
+    ]);
+    const out = await readPackage(bytes);
+    expect(out.parts.map((p) => p.name).filter((n) => /vba/i.test(n))).toEqual([]);
+    expect(out.part("/word/document.xml")?.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    );
+    expect(out.text("/word/_rels/document.xml.rels")).not.toContain("vbaProject");
   });
 });
