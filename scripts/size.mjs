@@ -131,6 +131,8 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 175.8 and 80.1 allowed): steps read from JSON as untrusted input (every step's parser, the
  * envelope's and stories' checks), which every package that loads the editor carries, with room
  * for Phase 22's envelope steps, story steps and the collab plugin.
+ * Agent raised again in 22.6 (80.1 kB, 84.0 allowed): core's story edits, ids per client and
+ * received transactions, which the session's editor carries.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 94_000 },
@@ -139,7 +141,7 @@ const BUNDLES = [
   { name: "FoliEditor only", entry: appEntry, budget: 180_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 82_000 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 86_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
 const BUILT = [
