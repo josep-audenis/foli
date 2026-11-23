@@ -134,6 +134,10 @@ export class DocxPackage {
     entries.forEach((entry, i) => {
       if (i === index || entry.name.endsWith("/")) return;
       const name = partName(entry.name);
+      // `word/%64ocument.xml` is `word/document.xml`: one of them would silently stand in.
+      const taken =
+        key(name) === key(CONTENT_TYPES) ? CONTENT_TYPES : this.#byName.get(key(name))?.name;
+      if (taken) throw new DocxError(`Damaged .docx: ${name} and ${taken} name one part`);
       const contentType =
         types.overrides.get(key(name)) ?? types.defaults.get(extension(name)) ?? "";
       const part = { name, contentType, data: data[i] as Uint8Array };
@@ -302,12 +306,17 @@ function contentTypes(root: XmlElement): {
   if (root.local !== "Types") throw new DocxError("Not a .docx: [Content_Types].xml has no Types");
   for (const child of root.children) {
     if (child.kind !== "element") continue;
-    const type = attribute(child, "ContentType");
-    if (child.local === "Default") {
-      defaults.set((attribute(child, "Extension") ?? "").toLowerCase(), type ?? "");
-    } else if (child.local === "Override") {
-      overrides.set(key(attribute(child, "PartName") ?? ""), type ?? "");
-    }
+    const type = attribute(child, "ContentType") ?? "";
+    const [map, name] =
+      child.local === "Default"
+        ? [defaults, (attribute(child, "Extension") ?? "").toLowerCase()]
+        : child.local === "Override"
+          ? [overrides, key(attribute(child, "PartName") ?? "")]
+          : [null, ""];
+    // Two types for one part: which one Word takes is not ours to guess.
+    if (map?.has(name) && map.get(name) !== type)
+      throw new DocxError(`Damaged .docx: [Content_Types].xml gives ${name} two types`);
+    map?.set(name, type);
   }
   return { defaults, overrides };
 }
