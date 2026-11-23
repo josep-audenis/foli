@@ -1290,6 +1290,10 @@ The authority of a shared document (0.x, unstable; ADR-0012; [package README](..
 - `authority.stepsSince(version)`: `CatchUp`, the steps since `version` (a `Broadcast`) or
   `{ snapshot }` when the log no longer has them. `authority.snapshot()`: `Snapshot` (`version`,
   `document`, `package`). `authority.version`, `authority.log`.
+- Word's rules concurrent edits can break and the schema does not hold (two tables two people
+  inserted at one place meet; a table ends the body) are restored by the authority: a paragraph
+  goes between, its steps broadcast after the client's under the client id `AUTHORITY`
+  (`"@folijs/collab"`; never give a client that id).
 
 ## `@folijs/pdf`
 

@@ -5,6 +5,7 @@
  * size does not change while tracking (Foli does not record it yet); alt text, which Word does
  * not track either, changes any time.
  */
+
 import type { Node } from "../model/index.js";
 import { TransformError } from "../transform/index.js";
 import type { ResourceJSON } from "../v3/document.js";
@@ -12,6 +13,7 @@ import { checkResource } from "../v3/document.js";
 import { attempt } from "./attempt.js";
 import { deleteSelectionKeepingTables } from "./commands.js";
 import { closeHistory } from "./history.js";
+import { freshId } from "./ids.js";
 import { typedMarks } from "./mark.js";
 import { marksAt, NodeSelection, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
@@ -77,8 +79,8 @@ export function insertPicture(
     };
     if (checkResource(resource) !== undefined) return false;
     const resources = context.envelope.resources ?? {};
-    let n = Object.keys(resources).length + 1;
-    while (Object.hasOwn(resources, `foli-picture-${n}`)) n++;
+    let n = freshId(state, Object.keys(resources).length);
+    while (Object.hasOwn(resources, `foli-picture-${n}`)) n = freshId(state, n);
     const key = `foli-picture-${n}`;
     const node = type.create({
       resource: key,

@@ -3,7 +3,14 @@ import { type Mappable, Mapping, type MapResult, type StepMap } from "../transfo
 import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
-import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import {
+  type Command,
+  type EditorState,
+  isRemote,
+  Plugin,
+  PluginKey,
+  type Transaction,
+} from "./state.js";
 import {
   StoryEditStep,
   StoryStep,
@@ -102,12 +109,20 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         }
 
         if (!tr.addToHistory || (root && !root.addToHistory)) {
-          return {
-            done: rebase(hist.done, tr.mapping, tr.doc),
-            undone: rebase(hist.undone, tr.mapping, tr.doc),
-            prevTime: 0,
-            prevRanges: null,
-          };
+          const done = rebase(hist.done, tr.mapping, tr.doc);
+          const undone = rebase(hist.undone, tr.mapping, tr.doc);
+          // Another editor's steps between two keys: the typing goes on as one undo step.
+          if (isRemote(tr)) {
+            const story = hist.prevStory ?? null;
+            const mapping = story === null ? tr.mapping : tr.mapping.storyMapping(story);
+            return {
+              ...hist,
+              done,
+              undone,
+              prevRanges: mapRanges(hist.prevRanges, mapping),
+            };
+          }
+          return { done, undone, prevTime: 0, prevRanges: null };
         }
 
         const last = hist.done[hist.done.length - 1];
@@ -209,9 +224,20 @@ class RebaseMapping implements Mappable {
 
   constructor(private readonly base: Mappable) {}
 
-  /** shortcut: a story's positions through the base only, not mirrored over the rebased steps. */
+  /** A story's positions through the same path: the originals taken back, the base, the rebased. */
   storyMapping(id: string): Mapping | undefined {
-    return this.base.storyMapping?.(id);
+    const m = new Mapping();
+    const count = this.inverted.length;
+    for (let i = count - 1; i >= 0; i--) m.appendMap(this.inverted[i] as StepMap);
+    if (this.base instanceof Mapping) m.appendMapping(this.base);
+    else {
+      const story = this.base.storyMapping?.(id);
+      if (story) m.appendMapping(story);
+    }
+    this.rebased.forEach((map, i) => {
+      if (map) m.appendMap(map, count - 1 - i);
+    });
+    return m.storyMapping(id);
   }
 
   push(original: Step, rebased: Step | null): void {
