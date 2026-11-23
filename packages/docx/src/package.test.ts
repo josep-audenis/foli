@@ -262,6 +262,14 @@ describe("readPackage", () => {
       await expect(readPackage(await zip({ ...files, [other]: "<other/>" }))).rejects.toThrow(
         DocxError,
       );
+    // Nor two types for one part (the same one twice is only redundant).
+    const typed = (...overrides: string[]) =>
+      TYPES.replace("</Types>", `${overrides.join("")}</Types>`);
+    const doc = (type: string) =>
+      `<Override PartName="/WORD/%64ocument.xml" ContentType="${type}"/>`;
+    await expect(
+      readPackage(await zip({ ...files, "[Content_Types].xml": typed(doc("text/plain")) })),
+    ).rejects.toThrow(DocxError);
   });
 
   it("requires the main part to be WordprocessingML", async () => {
