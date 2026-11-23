@@ -8,6 +8,7 @@ import {
   type NodeJSON,
   replyToComment,
   resolveComment,
+  trackState,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
@@ -23,6 +24,11 @@ export interface FoliCommentsProps {
   className?: string | undefined;
   /** Not shown (still following the editor: a comment made meanwhile opens for writing). */
   hidden?: boolean | undefined;
+  /**
+   * Edit and delete only the editor's author's comments (`createEditor({ author })`, by name).
+   * It hides the buttons, it does not guard the document: commands still change any comment.
+   */
+  onlyOwnComments?: boolean | undefined;
 }
 
 /** A comment and its replies, where its range starts in the document. */
@@ -137,6 +143,7 @@ export function FoliComments({
   label = "Comments",
   className,
   hidden = false,
+  onlyOwnComments = false,
 }: FoliCommentsProps) {
   const editor = useEditorOrContext(editorProp, "FoliComments");
   const comments = useEditorState((state) => wordContext(state)?.envelope.comments ?? EMPTY, {
@@ -145,11 +152,15 @@ export function FoliComments({
   const documentId = useEditorState((state) => wordContext(state)?.id ?? "", { editor });
   const doc = useEditorState((state) => state.doc, { editor });
   const head = useEditorState((state) => state.selection.head, { editor });
+  const me = useEditorState((state) => trackState(state)?.author, { editor });
+  const own = (c: CommentJSON) => !onlyOwnComments || c.author === me;
   const threads = threadsOf(editor.state, comments);
   const pane = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
-  const [written, setWriting] = useState<{ id: number; reply: boolean } | null>(null);
+  const [written, setWriting] = useState<{ id: number; reply: boolean; from?: number } | null>(
+    null,
+  );
   // A form open when the editor turns read-only goes: it could still save.
   const writing = readOnly ? null : written;
   const [focused, setFocused] = useState<number | null>(null);
@@ -263,14 +274,20 @@ export function FoliComments({
   }, [focused, doc]);
 
   const run = (command: Parameters<Editor["run"]>[0]) => editor.run(command);
-  /** Focus the thread of `id` (its first button), else the pane, else the document. */
-  const focusThread = (id: number | undefined) => {
+  /**
+   * Focus the thread of `id` (comment `from`'s first button, else the thread's), else the pane,
+   * else the document.
+   */
+  const focusThread = (id: number | undefined, from?: number) => {
     refocus.current = () => {
       const root = pane.current;
       const thread =
         id === undefined ? null : root?.querySelector<HTMLElement>(`[data-thread="${id}"]`);
       const document = root && pagesAround(root)?.querySelector<HTMLElement>('[role="textbox"]');
       (
+        (from === undefined
+          ? null
+          : thread?.querySelector<HTMLElement>(`[data-comment="${from}"] button`)) ??
         thread?.querySelector<HTMLElement>("button") ??
         thread ??
         (root?.hidden ? document : root)
@@ -315,10 +332,11 @@ export function FoliComments({
                 root={c === comment}
                 readOnly={readOnly}
                 canReply={canReply}
-                canDelete={!readOnly && editor.can(deleteComment(c.id))}
+                canEdit={own(c) && plain(c)}
+                canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
                 editing={writing?.id === c.id && !writing.reply}
                 onEdit={() => setWriting({ id: c.id, reply: false })}
-                onReply={() => setWriting({ id: comment.id, reply: true })}
+                onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
                 onResolve={() => {
                   run(resolveComment(comment.id, !comment.done));
                   focusThread(comment.id);
@@ -351,12 +369,12 @@ export function FoliComments({
                 onSave={(text) => {
                   if (text.trim() && !run(replyToComment(comment.id, text))) return false;
                   setWriting(null);
-                  focusThread(comment.id);
+                  focusThread(comment.id, writing.from);
                   return true;
                 }}
                 onCancel={() => {
                   setWriting(null);
-                  focusThread(comment.id);
+                  focusThread(comment.id, writing.from);
                 }}
               />
             )}
@@ -372,6 +390,7 @@ function CommentView({
   root,
   readOnly,
   canReply,
+  canEdit,
   canDelete,
   editing,
   onEdit,
@@ -385,6 +404,7 @@ function CommentView({
   root: boolean;
   readOnly: boolean;
   canReply: boolean;
+  canEdit: boolean;
   canDelete: boolean;
   editing: boolean;
   onEdit(): void;
@@ -397,7 +417,7 @@ function CommentView({
   const author = comment.author || "Unknown author";
   const what = root ? "comment" : "reply";
   return (
-    <div className="foli-comment">
+    <div className="foli-comment" data-comment={comment.id}>
       <p className="foli-comment-meta">
         <strong>{author}</strong> <span>{dateOf(comment.date)}</span>
       </p>
@@ -418,12 +438,17 @@ function CommentView({
       )}
       {!readOnly && !editing && (
         <div className="foli-comment-actions">
-          {root && canReply && (
-            <button type="button" onClick={onReply}>
+          {/* A reply to a reply goes at the end of the thread, as Word keeps them. */}
+          {canReply && (
+            <button
+              type="button"
+              onClick={onReply}
+              aria-label={root ? undefined : `Reply to ${nameOf(comment)}`}
+            >
               Reply
             </button>
           )}
-          {plain(comment) && (
+          {canEdit && (
             <button
               type="button"
               onClick={onEdit}
