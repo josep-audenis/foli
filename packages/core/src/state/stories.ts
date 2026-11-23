@@ -22,6 +22,7 @@ import {
   withTrackState,
 } from "./track.js";
 import {
+  afterEnvelopeSteps,
   CommentStep,
   EnvelopeStep,
   type Story,
@@ -80,9 +81,11 @@ function carryStoryChange(
   // What belongs to the document, not to the story (comments, the envelope): the body takes it.
   for (const t of transactions)
     for (const step of t.steps)
-      if (step instanceof CommentStep || step instanceof EnvelopeStep) {
-        bodyTr.step(step);
-        patched ||= step instanceof EnvelopeStep;
+      if (step instanceof CommentStep) bodyTr.step(step);
+      else if (step instanceof EnvelopeStep) {
+        // Made from the story's copy, which may be behind what `bodyTr` holds (several trees).
+        bodyTr.step(step.rebase(afterEnvelopeSteps(bodyContext.envelope, bodyTr.steps)));
+        patched = true;
       }
   return { after, patched };
 }
