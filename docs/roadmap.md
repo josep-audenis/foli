@@ -3257,7 +3257,7 @@ lets the agent library return steps); 22.7 onwards build it.
   CSS Custom Highlight API, as find does, and the name beside the caret; nothing added to the
   document or its undo; reduced motion respected. A presence list for apps
   (`presence(state)`).
-- [ ] 22.10 Authorship: each client's tracked changes and comments carry its user's name; a
+- [x] 22.10 Authorship: each client's tracked changes and comments carry its user's name; a
   received step keeps its author.
 - [ ] 22.11 Example and e2e: `examples/collab`, a Node WebSocket server (the authority, a JSON
   file as storage) and a page with the editor; the playground shows two editors side by side
