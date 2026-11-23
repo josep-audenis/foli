@@ -3230,7 +3230,7 @@ lets the agent library return steps); 22.7 onwards build it.
   instead of the whole story, so two edits in one header rebase. `StoryStep` kept for
   creating and removing a story. Tests: two transactions in one footer, applied in either order,
   give the same footer.
-- [ ] 22.5 Ids unique across clients: revision, comment, note, control ids and bookmark names
+- [x] 22.5 Ids unique across clients: revision, comment, note, control ids and bookmark names
   never collide between two editors of one document (an id space per client, from its
   `clientID`). Export unchanged for a single editor. Test: two editors tracking changes at once,
   exported, have unique `w:id`s.

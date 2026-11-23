@@ -10,6 +10,7 @@
  * Built-in styles a document has not used yet (headings, List Paragraph, Hyperlink) are added
  * with Word's definitions when first applied.
  */
+
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
 import type { Alignment } from "../schema.js";
 import { NodeMarkupBatchStep, NodeMarkupStep } from "../transform/index.js";
@@ -21,6 +22,7 @@ import type {
 } from "../v3/document.js";
 import type { RunFormat } from "../v3/resolve.js";
 import { attempt } from "./attempt.js";
+import { idsOf } from "./ids.js";
 import { marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import {
@@ -907,7 +909,11 @@ function plainList(context: WordContext, id: number): boolean {
  * new definition); a numbered list starts at 1 in a new instance (of a definition of Foli's,
  * made once). Returns the instance id and the envelope with what it added (unchanged if none).
  */
-function newList(envelope: WordEnvelope, kind: ListKind): { id: number; envelope: WordEnvelope } {
+function newList(
+  envelope: WordEnvelope,
+  kind: ListKind,
+  fresh: (after: number) => number,
+): { id: number; envelope: WordEnvelope } {
   const { abstracts, instances } = envelope.numbering;
   const format = (a: AbstractNumberingJSON) => a.levels.find((l) => l.level === 0)?.format;
   const found =
@@ -918,14 +924,14 @@ function newList(envelope: WordEnvelope, kind: ListKind): { id: number; envelope
         })
       : undefined;
   if (found) return { id: found.id, envelope };
-  const nextId = (ids: number[]) => Math.max(0, ...ids) + 1;
+  const nextId = (ids: number[]) => fresh(Math.max(0, ...ids));
   let abstract = abstracts.find(
     (a) => plain(a) && format(a) === (kind === "bulletList" ? "bullet" : "decimal"),
   );
   const added: AbstractNumberingJSON[] = [];
   if (!abstract) {
     abstract = {
-      id: Math.max(-1, ...abstracts.map((a) => a.id)) + 1,
+      id: fresh(Math.max(-1, ...abstracts.map((a) => a.id))),
       multiLevelType: "hybridMultilevel",
       levels: levels(kind),
     };
@@ -996,7 +1002,7 @@ export function wrapInWordList(kind: ListKind): Command {
       plainList(context, previous)
     )
       id = previous;
-    else ({ id, envelope } = newList(envelope, kind));
+    else ({ id, envelope } = newList(envelope, kind, idsOf(state)));
     return updateParagraphs(
       state,
       dispatch,

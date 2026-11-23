@@ -23,6 +23,7 @@
  * shortcut: ids inside opaque content (a table's bookmarks and paragraph ids) and tracked-change
  * ids are pasted as they are; Word tolerates repeats of both. Map them when a file shows otherwise.
  */
+
 import { DEFAULT_SETTINGS } from "../document.js";
 import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
 import { type DocJSON, isSafeLink } from "../schema.js";
@@ -45,6 +46,7 @@ import {
 import { migrateToV3 } from "../v3/migrate.js";
 import { Resolver } from "../v3/resolve.js";
 import { controlsIn, copiedControl, freshControlId } from "./controls.js";
+import { freshId, idsOf } from "./ids.js";
 import { noteIds, noteKindOf } from "./notes.js";
 import type { EditorState } from "./state.js";
 import {
@@ -371,7 +373,7 @@ function fit(
     }
     const ids = new Set(styles.map((s) => s.id));
     let next = id;
-    for (let i = 1; ids.has(next); i++) next = `${id}${i}`;
+    for (let i = freshId(state, 0); ids.has(next); i = freshId(state, i)) next = `${id}${i}`;
     // Reserved first: styles name each other (a paragraph style and its linked character style).
     styleIds.set(id, next);
     const copy: StyleJSON = { ...style, id: next };
@@ -415,7 +417,7 @@ function fit(
     // Reserved first: a level's style may be numbered by this list.
     const copy: NumberingInstanceJSON = {
       ...instance,
-      id: Math.max(0, ...instances.map((n) => n.id)) + 1,
+      id: freshId(state, Math.max(0, ...instances.map((n) => n.id))),
     };
     numberingIds.set(id, copy.id);
     instances = [...instances, copy];
@@ -431,7 +433,7 @@ function fit(
     }
     let existing = abstracts.find((a) => equal({ ...a, id: 0 }, { ...mapped, id: 0 }));
     if (!existing) {
-      existing = { ...mapped, id: Math.max(-1, ...abstracts.map((a) => a.id)) + 1 };
+      existing = { ...mapped, id: freshId(state, Math.max(-1, ...abstracts.map((a) => a.id))) };
       abstracts = [...abstracts, existing];
     }
     copy.abstract = existing.id;
@@ -460,14 +462,15 @@ function fit(
   }
 
   // New ids start above the target's; a pasted bookmark whose name it uses is left out.
-  const nextId = { comment: 0, bookmark: 0 };
-  for (const c of target.comments) nextId.comment = Math.max(nextId.comment, c.id + 1);
+  // The largest id in use (`fresh` takes the next of this editor's).
+  const nextId = { comment: -1, bookmark: -1 };
+  for (const c of target.comments) nextId.comment = Math.max(nextId.comment, c.id);
   const names = new Set<string>();
   const { from, to } = state.selection;
   /** What every tree says about ids and names in use (ids are allocated across them). */
   const scan = (tree: Node, inSelection: (pos: number) => boolean) =>
     tree.descendants((node, pos) => {
-      const id = (node.attrs.id as number) + 1;
+      const id = node.attrs.id as number;
       if (COMMENT_ANCHORS.has(node.type.name)) nextId.comment = Math.max(nextId.comment, id);
       // A bookmark in the selection goes with it.
       if (node.type.name === "bookmarkStart" && !inSelection(pos))
@@ -482,7 +485,7 @@ function fit(
   const fresh = (kind: keyof typeof nextId, map: Map<number, number>, id: number) => {
     let next = map.get(id);
     if (next === undefined) {
-      next = nextId[kind]++;
+      next = nextId[kind] = freshId(state, nextId[kind]);
       map.set(id, next);
     }
     return next;
@@ -504,7 +507,7 @@ function fit(
     if (!staying.has(id)) return id;
     let copy = copiedControls.get(id);
     if (!copy) {
-      copy = freshControlId(controls);
+      copy = freshControlId(controls, idsOf(state));
       copiedControls.set(id, copy);
       controls = { ...controls, [copy]: copiedControl(target.controls?.[id] as ControlJSON) };
     }
@@ -520,7 +523,11 @@ function fit(
   const takenKeys = new Set<string>();
   const freeKey = (key: string) => {
     let next = key;
-    for (let i = 2; (resources && Object.hasOwn(resources, next)) || takenKeys.has(next); i++)
+    for (
+      let i = freshId(state, 1);
+      (resources && Object.hasOwn(resources, next)) || takenKeys.has(next);
+      i = freshId(state, i)
+    )
       next = `${key}-${i}`;
     takenKeys.add(next);
     return next;

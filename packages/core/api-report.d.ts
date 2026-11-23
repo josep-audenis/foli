@@ -47,6 +47,7 @@ export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
+export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryEditStep, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export { withTrackState } from "./state/track.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
@@ -1245,6 +1246,13 @@ export declare function sameSpot(tree: Node, a: number, b: number): boolean;
 export declare function caretStop(state: EditorState, pos: number, forward: boolean): number;
 
 // state/fieldupdate.d.ts
+/**
+ * Updating and inserting Word's fields (ADR-0007, 11.8). A field's result is worked out from its
+ * instruction, as Word's switches say, and put between its separator and end; a table of contents
+ * is rebuilt from the headings as Word builds it. Everything happens in one transaction, recorded
+ * as tracked changes when tracking is on; what cannot be worked out keeps its result and is
+ * reported. Page numbers come from `FieldLayout`, which only a view has.
+ */
 import type { Editor } from "./editor.js";
 import { type Field } from "./fields.js";
 import type { Command, EditorState } from "./state.js";
@@ -1515,6 +1523,20 @@ export declare const undo: Command;
 export declare const redo: Command;
 export declare function undoDepth(state: EditorState): number;
 export declare function redoDepth(state: EditorState): number;
+
+// state/ids.d.ts
+/**
+ * Ids unique across clients (22.5, ADR-0012). New revision, comment, note, control and numbering
+ * ids and the numbers of generated bookmark names are the next free number after the largest in
+ * the document; with an id slot (the collab plugin's, from its client id) only numbers of the
+ * client's own class are taken, `id ≡ slot (mod ID_SPACE)`, so two editors of one document never
+ * give two changes one id. Without a slot nothing changes.
+ */
+import { Plugin } from "./state.js";
+/** How many id classes there are: the live clients of one document each take one. */
+export declare const ID_SPACE = 256;
+/** Gives an editor's new ids `clientID`'s class (what `collab` does, without the rest). */
+export declare const idSlotPlugin: (clientID: string | number) => Plugin<number>;
 
 // state/index.d.ts
 export { arrowAcrossLeaf, baseKeymap, type DeleteUnit, deleteBackward, deleteForward, deleteSelection, deleteSelectionKeepingTables, insertColumnBreak, insertHardBreak, insertPageBreak, insertTab, insertText, isMarkActive, joinBackward, joinForward, selectAll, setBlockType, splitBlock, toggleMark, } from "./commands.js";
@@ -2531,6 +2553,31 @@ export declare function withEnvelope(tr: Transaction, envelope: WordEnvelope): T
 export declare function wordContext(state: EditorState): WordContext | null;
 
 // state/wordclip.d.ts
+/**
+ * Copy and paste of schema v3 content (8.7c). A copy carries the definitions its content
+ * references (styles, numbering, comments); a paste fits them to the target document, as Word
+ * does with its default "use destination styles":
+ * - A style the target has by name is used; any other is added (a free id if its id is taken).
+ * - A list copied inside one document (the copy carries the document's id, `WordContext.id`)
+ *   goes on; otherwise it gets an instance of its own (the target's definition when one is the
+ *   same). Lists of different documents are never taken for each other: Foli makes equal ids
+ *   and definitions in every document.
+ * - Comments are copied with new ids, as Word duplicates them; an anchor without its comment
+ *   is left out.
+ * - A bookmark whose name the target already uses (outside the selection the paste replaces)
+ *   is left out, as in Word; others get new ids.
+ * - From another document, a style or list the copy does not define is not one: the text is in
+ *   the default style, not numbered (not the target's style or list of that id).
+ * - Paragraph ids (`w14:paraId`, `w14:textId`) are left out: export makes the ones it needs.
+ * - A note reference brings its note, carried by the copy, as a new story with a new id: a copy
+ *   is a second note, and what was cut was removed with its reference (ADR-0007).
+ * - A content control copied inside its document is a new control with the same properties while
+ *   the original stays (cut and pasted, it is the same one). From elsewhere its content comes
+ *   without it.
+ *
+ * shortcut: ids inside opaque content (a table's bookmarks and paragraph ids) and tracked-change
+ * ids are pasted as they are; Word tolerates repeats of both. Map them when a file shows otherwise.
+ */
 import type { Node } from "../model/index.js";
 import { type AbstractNumberingJSON, type CommentJSON, type NumberingInstanceJSON, type ResourceJSON, type StoryJSON, type StyleJSON } from "../v3/document.js";
 import type { EditorState } from "./state.js";
@@ -2586,6 +2633,18 @@ export declare function fitPastedV2(state: EditorState, content: Node): {
 export declare function fitPaste(state: EditorState, content: unknown, definitions?: unknown): FittedPaste;
 
 // state/wordformat.d.ts
+/**
+ * Word formatting on a schema v3 document (8.7b): paragraph styles, font family and size, text
+ * color and highlight, alignment, line spacing, indentation, and lists as Word's numbering. The
+ * generic commands (`setAlign`, `setTextColor`, `toggleList`…) call these on a v3 document;
+ * the others are v3 only (they do not apply to schema v2).
+ *
+ * Run properties, alignment and line spacing are written as direct formatting only where the
+ * paragraph's or run's styles do not already give the value (picking a heading's own size
+ * leaves no direct size), as Word does; space before and after and indents are always written.
+ * Built-in styles a document has not used yet (headings, List Paragraph, Hyperlink) are added
+ * with Word's definitions when first applied.
+ */
 import type { Command, EditorState } from "./state.js";
 /**
  * The paragraph styles a style picker offers: the document's, its default first, then Word's

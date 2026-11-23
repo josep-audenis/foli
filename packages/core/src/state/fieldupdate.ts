@@ -5,6 +5,7 @@
  * as tracked changes when tracking is on; what cannot be worked out keeps its result and is
  * reported. Page numbers come from `FieldLayout`, which only a view has.
  */
+
 import {
   Fragment,
   type Mark,
@@ -21,6 +22,7 @@ import { controlEdit } from "./controls.js";
 import type { Editor } from "./editor.js";
 import { type Field, fieldAround, fieldsIn } from "./fields.js";
 import { closeHistory, joinHistory } from "./history.js";
+import { freshId, idsOf } from "./ids.js";
 import { marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { trackState, trackTransaction, untracked } from "./track.js";
@@ -408,7 +410,7 @@ const quotedName = (name: string) =>
   /[\s"\\]/.test(name) ? `"${name.replace(/["\\]/g, "\\$&")}"` : name;
 
 /** Makes names `prefix` + a number that no bookmark of `tree` has. */
-function bookmarkNames(tree: Node, prefix: string): () => string {
+function bookmarkNames(tree: Node, prefix: string, fresh: (after: number) => number): () => string {
   const taken = bookmarksIn(tree);
   let serial = 200_000_000;
   for (const { name } of taken.values()) {
@@ -420,8 +422,10 @@ function bookmarkNames(tree: Node, prefix: string): () => string {
   }
   return () => {
     let name: string;
-    do name = `${prefix}${++serial}`;
-    while (taken.has(name.toLowerCase()));
+    do {
+      serial = fresh(serial);
+      name = `${prefix}${serial}`;
+    } while (taken.has(name.toLowerCase()));
     return name;
   };
 }
@@ -1376,12 +1380,18 @@ function rebuildContents(run: Run, index: number): void {
   report.updated++;
   report.rebuilt++;
   // Every heading gets its `_Toc` bookmark, Word's way.
-  const nextName = bookmarkNames(tr.doc, "_Toc");
+  const nextName = bookmarkNames(tr.doc, "_Toc", idsOf(run.state));
   let id = nextBookmarkId(run.state, tr);
   const start = schema.nodes.bookmarkStart as NodeType;
   const end = schema.nodes.bookmarkEnd as NodeType;
   const missing = entries.filter((entry) => !entry.bookmark);
-  const ids = new Map(missing.map((entry) => [entry, id++]));
+  const ids = new Map(
+    missing.map((entry) => {
+      const mine = id;
+      id = freshId(run.state, id);
+      return [entry, mine];
+    }),
+  );
   for (const entry of missing) entry.bookmark = nextName();
   for (const entry of missing.reverse()) {
     const mark = ids.get(entry) as number;
@@ -1514,7 +1524,7 @@ export function nextBookmarkId(state: EditorState, tr: Transaction): number {
       if (node.type.name.startsWith("bookmark")) max = Math.max(max, node.attrs.id as number);
       return !node.isInline;
     });
-  return max + 1;
+  return freshId(state, max);
 }
 
 // ---------- updating ----------
@@ -1762,7 +1772,7 @@ export function insertCrossReference(reference: CrossReference): Command {
             name ??= child.attrs.name as string;
         });
         if (!name) {
-          name = bookmarkNames(tr.doc, "_Ref")();
+          name = bookmarkNames(tr.doc, "_Ref", idsOf(state))();
           const id = nextBookmarkId(state, tr);
           const { bookmarkStart, bookmarkEnd } = tr.doc.type.schema.nodes as Record<
             string,
