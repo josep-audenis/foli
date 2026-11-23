@@ -430,7 +430,7 @@ describe("renderDocument's print rules (21.8)", () => {
     expect(scope(two.pages[0])).not.toBe(scope(one.pages[0]));
     expect(one.printStyles()).toContain(`[data-foli-output="${scope(one.pages[0])}"]`);
     expect(one.printStyles()).not.toContain(`[data-foli-output="${scope(two.pages[0])}"]`);
-`    // Its sheets named its own: the web page's \`@page\` size is shared by every output.
+    // Its sheets named its own: the web page's `@page` size is shared by every output.
     expect(one.printStyles()).toContain(`@page foli-word-${scope(one.pages[0])}-0{`);
     one.destroy();
     two.destroy();
