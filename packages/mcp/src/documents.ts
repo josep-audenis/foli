@@ -53,10 +53,10 @@ export class Documents {
   readonly #author: () => string;
   readonly #open = new Map<string, OpenDocument>();
   /**
-   * The files this server wrote, each as it left it (`stamp`): a save may write over one again
-   * while it is still that file.
+   * The files this server wrote, each as it left it (`stamp`) and by which document: that
+   * document's save may write over one again while it is still that file.
    */
-  readonly #written = new Map<string, string | null>();
+  readonly #written = new Map<string, { stamp: string | null; by: string }>();
   readonly #budget: number;
   #issued = 0;
 
@@ -131,6 +131,9 @@ export class Documents {
       if (transactions.some((tr) => tr.docChanged)) document.dirty = true;
     });
     this.#open.set(document.id, document);
+    // A copy this server saved, opened: it holds all of it, so its saves may write over it now.
+    for (const [file, left] of this.#written)
+      if (same(file, checked.file) && left.stamp === stamp(file)) left.by = document.id;
     return document;
   }
 
@@ -145,10 +148,13 @@ export class Documents {
       const beside = (n: number) =>
         join(dirname(document.file), `${base}.agent${n > 1 ? `-${n}` : ""}.docx`);
       let n = 1;
-      // The first name that is free, or the server's own from an earlier save.
-      while (n < 100 && standing(beside(n)) !== "nothing" && !this.#mine(beside(n))) n++;
+      const taken = (file: string) =>
+        this.#openAs(file, document) !== undefined ||
+        (standing(file) !== "nothing" && !this.#mine(file, document));
+      // The first name that is free, or this document's own from an earlier save.
+      while (n < 100 && taken(beside(n))) n++;
       // All taken: the last is not the server's to write over for having run out of names.
-      if (standing(beside(n)) !== "nothing" && !this.#mine(beside(n)))
+      if (taken(beside(n)))
         return refusal(
           `The names beside ${shown(this.#rules, document.file)} are taken, up to .agent-${n}.docx: save with a path.`,
         );
@@ -158,6 +164,12 @@ export class Documents {
     const checked = target(this.#rules, wanted);
     if (!checked.ok) return refusal(checked.message);
     const file = checked.file;
+    // Another open document's own file: writing it would lose that document's saved edits.
+    const other = this.#openAs(file, document);
+    if (other)
+      return refusal(
+        `${shown(this.#rules, file)} is open as ${other.id}: saving ${document.id} there would write over it. Save with another path.`,
+      );
     let bytes: Uint8Array;
     try {
       bytes = await exportDocx(document.session.document(), document.package);
@@ -165,19 +177,29 @@ export class Documents {
       const why = error instanceof Error ? oneLine(error.message) : "it could not be written";
       return refusal(`${document.id} could not be saved: ${why}`);
     }
-    const written = write(file, bytes, this.#rules.overwrite || this.#mine(file));
+    const written = write(file, bytes, this.#rules.overwrite || this.#mine(file, document));
     if (!written.ok) return refusal(written.message);
-    this.#written.set(file, stamp(file));
+    for (const known of this.#written.keys()) if (same(known, file)) this.#written.delete(known);
+    this.#written.set(file, { stamp: stamp(file), by: document.id });
     document.dirty = false;
     return { text: `Saved ${document.id} as ${shown(this.#rules, file)}.` };
   }
 
-  /** Whether `file` is as the server wrote it in this run: it may write over it again. */
-  #mine(file: string): boolean {
+  /**
+   * Whether `file` is as `document` wrote it in this run: it may write over it again. Not when
+   * another document wrote it since, even one closed now: that would lose its saved edits.
+   */
+  #mine(file: string, document: OpenDocument): boolean {
     // By `same`: in other capitals (Windows, macOS) it is still the file the server wrote.
     for (const [written, left] of this.#written)
-      if (left !== null && same(written, file) && left === stamp(file)) return true;
+      if (left.stamp !== null && same(written, file) && left.stamp === stamp(file))
+        return left.by === document.id;
     return false;
+  }
+
+  /** The other open document read from `file`, whose saved edits a save there would lose. */
+  #openAs(file: string, document: OpenDocument): OpenDocument | undefined {
+    return [...this.#open.values()].find((d) => d !== document && same(d.file, file));
   }
 
   close(document: OpenDocument, discard: boolean): ToolResult {

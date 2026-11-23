@@ -159,4 +159,36 @@ describe("regressions", () => {
     expect((await call("save", { path: NDA })).refused).toBe(true);
     await client.close();
   });
+
+  it("never saves over the file another open document came from", async () => {
+    const root = folder();
+    const { client, call } = await server(root);
+    await call("open", { path: NDA });
+    expect((await call("save")).text).toBe("Saved d1 as 01-mutual-nda.agent.docx.");
+    await call("open", { path: "01-mutual-nda.agent.docx" });
+    await call("replace_text", {
+      document: "d2",
+      handle: "b1",
+      find: "MUTUAL",
+      replacement: "BILATERAL",
+    });
+    expect((await call("save", { document: "d2" })).refused).toBe(false);
+    const again = await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" });
+    expect(again.refused).toBe(true);
+    expect(again.text).toContain("open as d2");
+    // With no path, the next name; closed, d2's saved file is still not d1's to write over.
+    expect((await call("save", { document: "d1" })).text).toBe(
+      "Saved d1 as 01-mutual-nda.agent-2.docx.",
+    );
+    await call("close", { document: "d2" });
+    expect((await call("save", { document: "d1" })).text).toBe(
+      "Saved d1 as 01-mutual-nda.agent-2.docx.",
+    );
+    expect((await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" })).refused).toBe(
+      true,
+    );
+    const { document } = await importDocx(readFileSync(join(root, "01-mutual-nda.agent.docx")));
+    expect(JSON.stringify(document)).toContain("BILATERAL");
+    await client.close();
+  });
 });
