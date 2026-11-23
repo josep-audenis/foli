@@ -422,8 +422,10 @@ function bookmarkNames(tree: Node, prefix: string, fresh: (after: number) => num
   }
   return () => {
     let name: string;
-    do name = `${prefix}${(serial = fresh(serial))}`;
-    while (taken.has(name.toLowerCase()));
+    do {
+      serial = fresh(serial);
+      name = `${prefix}${serial}`;
+    } while (taken.has(name.toLowerCase()));
     return name;
   };
 }
