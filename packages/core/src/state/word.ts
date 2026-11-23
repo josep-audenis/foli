@@ -694,8 +694,11 @@ function storyJSON({ doc, ...rest }: Story): StoryJSON {
   return { ...rest, content: doc.toJSON() };
 }
 
-/** `envelope` after the envelope steps among `steps`. */
-function afterEnvelopeSteps(envelope: WordEnvelope, steps: readonly Step[]): WordEnvelope {
+/**
+ * `envelope` after the envelope steps among `steps`.
+ * @internal
+ */
+export function afterEnvelopeSteps(envelope: WordEnvelope, steps: readonly Step[]): WordEnvelope {
   let current = envelope;
   for (const step of steps)
     if (step instanceof EnvelopeStep)

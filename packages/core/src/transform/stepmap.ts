@@ -182,6 +182,15 @@ export class Mapping implements Mappable {
     }
   }
 
+  /**
+   * Marks maps `a` and `b` as mirrors (one undoes the other), after they were appended.
+   * @internal
+   */
+  setMirror(a: number, b: number): void {
+    this.mirror.set(a, b);
+    this.mirror.set(b, a);
+  }
+
   getMirror(n: number): number | undefined {
     return this.mirror.get(n);
   }

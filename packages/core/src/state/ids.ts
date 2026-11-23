@@ -11,7 +11,13 @@ import { storyBody } from "./word.js";
 /** How many id classes there are: the live clients of one document each take one. */
 export const ID_SPACE = 256;
 
-const key = new PluginKey<number>("idSlot");
+/** @internal What gives an editor its id class: the collab plugin's state. */
+export interface SlotState {
+  readonly slot: number;
+}
+
+/** @internal The collab plugin's key (`collab.ts`). */
+export const collabKey = new PluginKey<SlotState>("collab");
 
 /**
  * The class of `clientID`'s ids: an integer's remainder, a string's hash.
@@ -33,15 +39,18 @@ export function idSlot(clientID: string | number): number {
  * Gives an editor's new ids `clientID`'s class.
  * @internal
  */
-export const idSlotPlugin = (clientID: string | number): Plugin<number> =>
-  new Plugin({ key, state: { init: () => idSlot(clientID), apply: (_tr, slot) => slot } });
+export const idSlotPlugin = (clientID: string | number): Plugin<SlotState> =>
+  new Plugin({
+    key: collabKey,
+    state: { init: () => ({ slot: idSlot(clientID) }), apply: (_tr, value) => value },
+  });
 
 /**
  * The next id after `after` an editor of `state` may take (a story's: its body's class).
  * @internal
  */
 export function freshId(state: EditorState, after: number): number {
-  const slot = key.getState(storyBody(state)?.state ?? state);
+  const slot = collabKey.getState(storyBody(state)?.state ?? state)?.slot;
   const next = Math.floor(after) + 1;
   return slot === undefined ? next : next + ((slot - (next % ID_SPACE) + ID_SPACE) % ID_SPACE);
 }
