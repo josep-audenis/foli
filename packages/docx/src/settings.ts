@@ -66,6 +66,7 @@ export function readSettings(settings: XmlElement | undefined): WordSettingsJSON
     ...(isOn(settings, "evenAndOddHeaders") ? { evenAndOddHeaders: true } : {}),
     ...(Object.keys(footnotes).length ? { footnotes } : {}),
     ...(Object.keys(endnotes).length ? { endnotes } : {}),
+    ...(trackRevisionsOf(settings) ? { trackRevisions: true } : {}),
   };
   return Object.keys(out).length ? out : undefined;
 }

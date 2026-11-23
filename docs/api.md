@@ -546,7 +546,10 @@ break, and a paragraph left with nothing by a join or a deletion from its start 
 (the next one keeps its properties, as in Word); typed text never takes a tracked-change mark (except its own `insertion` when tracking).
 
 Tracked changes: `createEditor({ author?, trackChanges?, reviewView? })` (author default "Author"; tracking
-off by default; a `.docx`'s setting is `DocxImport.trackRevisions`). With tracking on, every
+off by default). Whether edits are tracked is the document's setting `settings.trackRevisions`
+(schema 7, since 1.6): `setTrackChanges(on)` writes it (a step, kept out of undo, which other
+editors receive); `trackChanges` holds while the document says nothing; an imported `.docx`
+that tracks changes has it on. With tracking on, every
 edit the editor dispatches is rebuilt as Word records it (`trackTransaction(state, tr)`): what it
 removes stays with a `deletion` mark and what it adds gets an `insertion` mark (author, date,
 Word's next free id; typing on joins the change next to it); a paragraph mark removed or
@@ -633,8 +636,9 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `{ doc, envelope }`, the content fitted to the document and its envelope with what it added;
   `fitPastedV2(state, content)` does the same for schema v2 content (pasted HTML). Apply the
   envelope with `withEnvelope(tr, envelope)` and its comments with
-  `setComments(tr, current.comments, envelope.comments)` (`withEnvelope` ignores comments: they
-  change only through `CommentStep`s, which undo and redo take back); `wordContext(state)` gives
+  `setComments(tr, current.comments, envelope.comments)` (`withEnvelope` makes an `EnvelopeStep`
+  for each entry that differs, which undo takes back, and ignores comments: they change only
+  through `CommentStep`s, which undo and redo take back); `wordContext(state)` gives
   the current one. `WordContext`, `WordEnvelope`, `FittedPaste`, `WordDefinitions`, `Story`,
   `StoryStep` and `EnvelopeStep`, named elsewhere on this page, are internal too.
 
@@ -1153,13 +1157,15 @@ Details (what import keeps, what export writes, limits): the
   schema v5 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
   validated document, the package it was read from (keep it with the document for export),
   `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`, `picturesWithoutAlt`) and whether Word tracks
-  changes in it (`w:trackRevisions`: the editor's `trackChanges`). `options` are `readPackage`'s.
+  changes in it (`w:trackRevisions`; since 1.6 also the document's `settings.trackRevisions`,
+  which makes it schema 7). `options` are `readPackage`'s.
 - `importPackage(pkg): DocxImport`: the same from a package already read.
 - `exportDocx(document, package?, options?): Promise<Uint8Array>`: the document as a `.docx`.
   With the package it was imported from, the parts Foli does not edit come back byte for byte
   and unchanged elements verbatim; without one, a new package is made (a document that refers
   to parts of its original package then fails). `ExportOptions`: `trackRevisions` (whether Word
-  tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
+  tracks changes in the file; left out, as the document's `settings.trackRevisions` says, else
+  as the package has it), `resource(key, resource)` (the
   bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
   upload; without them the export fails), `extensions` (the custom types: their `text(attrs)`
   is what a node's control shows), `asDocument` (a `.docm`, `.dotm` or `.dotx` written as a

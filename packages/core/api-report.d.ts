@@ -48,6 +48,7 @@ export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, t
 
 // internal.d.ts
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
+export { withTrackState } from "./state/track.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
 export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, schemaWith, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
@@ -953,8 +954,9 @@ export interface EditorOptions {
     /** Who edits: tracked changes are made in this name. Default "Author". */
     author?: string;
     /**
-     * Record edits as tracked changes from the start (a `.docx`'s `w:trackRevisions`:
-     * `DocxImport.trackRevisions`). Schema v3 only. Default false.
+     * Record edits as tracked changes from the start, while the document's settings say nothing
+     * (`settings.trackRevisions`, which an imported `.docx` that tracks changes has, wins). Schema
+     * v3 only. Default false.
      */
     trackChanges?: boolean;
     /** How the editor's views show tracked changes at first (default `markup`). */
@@ -2384,7 +2386,13 @@ export interface TrackState {
 export declare const untracked = "untracked";
 /** Whether `state` records edits as tracked changes, and in whose name. */
 export declare function trackState(state: EditorState): TrackState | null;
-/** Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. */
+/** Makes `tr` set the tracking state (a story's editor passes its change to the body). */
+export declare const withTrackState: (tr: Transaction, state: TrackState) => Transaction;
+/**
+ * Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. The switch
+ * is the document's (`settings.trackRevisions`, a step other editors receive, kept out of undo);
+ * the author is this editor's.
+ */
 export declare function setTrackChanges(on: boolean, author?: string): Command;
 /** Shows tracked changes as `view` in the editor's views. Applies only to a schema v3 editor. */
 export declare function setReviewView(view: ReviewView): Command;
@@ -2446,21 +2454,26 @@ export declare class CommentStep extends Step {
  * keep their order (a new one goes at its index in `to`).
  */
 export declare function setComments(tr: Transaction, from: readonly CommentJSON[], to: readonly CommentJSON[]): Transaction;
-/** What `EnvelopeStep` can change (ADR-0007). */
-export type EnvelopeKey = "section" | "settings" | "controls";
+/** What `EnvelopeStep` can change (ADR-0012). */
+export type EnvelopeKey = "section" | "settings" | "defaults" | "theme" | "styles" | "numbering" | "resources" | "controls";
 /**
- * Changes one value of the envelope (the last section's setup, the document's settings) from
- * `before` to `after`. A step, unlike `withEnvelope`, so undo and redo take it with the edit it
- * belongs to. It leaves the tree as it is; history refuses an undo whose `before` no longer holds.
+ * Changes one part of the envelope (`key`; at `path` inside it: one setting, one style by id,
+ * one resource…) from `before` to `after` (undefined: none). A step, so undo and redo take it with
+ * the edit it belongs to and other editors receive it. It leaves the tree as it is; a transaction
+ * whose `before` no longer holds is refused (the word plugin's filter), and history drops an undo
+ * whose `before` no longer holds.
  */
-export declare class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends Step {
-    readonly key: K;
-    readonly before: WordEnvelope[K];
-    readonly after: WordEnvelope[K];
-    constructor(key: K, before: WordEnvelope[K], after: WordEnvelope[K]);
+export declare class EnvelopeStep extends Step {
+    readonly key: EnvelopeKey;
+    readonly before: unknown;
+    readonly after: unknown;
+    readonly path: readonly string[];
+    constructor(key: EnvelopeKey, before: unknown, after: unknown, path?: readonly string[]);
     apply(doc: Node): StepResult;
     invert(): Step;
     map(): Step;
+    /** This step made from `envelope` instead: its change merged over what is there now. */
+    rebase(envelope: WordEnvelope): EnvelopeStep;
     toJSON(): StepJSON;
 }
 /**
@@ -2483,8 +2496,9 @@ export declare class StoryStep extends Step {
     merge(next: StoryStep): StoryStep | null;
 }
 /**
- * Makes `tr` change the document's envelope to `envelope` (styles, numbering…). Its comments
- * are ignored: those change through `setComments`, so undo takes them back.
+ * Makes `tr` change the document's envelope to `envelope` (styles, numbering…): an
+ * `EnvelopeStep` for each entry that differs from what it holds after `tr` so far. Its comments
+ * and stories are ignored: those change through their own steps (`setComments`, `StoryStep`).
  */
 export declare function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction;
 /** The envelope and resolver of the v3 document in `state`, or null for a v2 editor. */
@@ -2942,9 +2956,10 @@ import { type Check } from "./check.js";
 import { type ContentOptions, type ParseOptions } from "./extensions.js";
 /**
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
- * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007).
+ * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
+ * crop; v7 the tracking switch in the settings, ADR-0012).
  */
-export declare const SCHEMA_VERSION = 6;
+export declare const SCHEMA_VERSION = 7;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -3308,6 +3323,11 @@ export interface WordSettingsJSON {
     evenAndOddHeaders?: boolean;
     footnotes?: NotePropertiesJSON;
     endnotes?: NotePropertiesJSON;
+    /**
+     * `w:trackRevisions`: edits are recorded as tracked changes (schema 7). Left out: the document
+     * never said (an editor tracks when told to; `exportDocx` keeps the package's).
+     */
+    trackRevisions?: boolean;
 }
 /** A document in the Word model: the content tree and what Word keeps beside it. */
 export interface FoliDocument {
@@ -3315,7 +3335,7 @@ export interface FoliDocument {
      * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
      * added (6: a picture's rotation or crop, 1.4).
      */
-    schemaVersion: 5 | typeof SCHEMA_VERSION;
+    schemaVersion: 5 | 6 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */

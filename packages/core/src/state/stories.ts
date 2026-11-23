@@ -22,9 +22,9 @@ import {
   withTrackState,
 } from "./track.js";
 import {
+  afterEnvelopeSteps,
   CommentStep,
   EnvelopeStep,
-  envelopeChange,
   type Story,
   type StoryBody,
   StoryStep,
@@ -32,7 +32,6 @@ import {
   storyBodyKey,
   type WordContext,
   withContext,
-  withEnvelope,
   wordContext,
 } from "./word.js";
 
@@ -79,28 +78,15 @@ function carryStoryChange(
     );
   }
   let patched = false;
-  for (const t of transactions) {
-    // What belongs to the document, not to the story: the body takes it.
+  // What belongs to the document, not to the story (comments, the envelope): the body takes it.
+  for (const t of transactions)
     for (const step of t.steps)
-      if (step instanceof CommentStep || step instanceof EnvelopeStep) bodyTr.step(step);
-    patched ||= envelopeChange(t) !== undefined;
-  }
-  // Only these: the story's copy of the rest of the envelope may be behind the body's.
-  if (patched) {
-    const { numbering, styles, resources, controls } = (wordContext(next) as WordContext).envelope;
-    const {
-      resources: _resources,
-      controls: _controls,
-      ...rest
-    } = envelopeChange(bodyTr) ?? bodyContext.envelope;
-    withEnvelope(bodyTr, {
-      ...rest,
-      numbering,
-      styles,
-      ...(resources ? { resources } : {}),
-      ...(controls ? { controls } : {}),
-    });
-  }
+      if (step instanceof CommentStep) bodyTr.step(step);
+      else if (step instanceof EnvelopeStep) {
+        // Made from the story's copy, which may be behind what `bodyTr` holds (several trees).
+        bodyTr.step(step.rebase(afterEnvelopeSteps(bodyContext.envelope, bodyTr.steps)));
+        patched = true;
+      }
   return { after, patched };
 }
 

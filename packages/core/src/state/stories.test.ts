@@ -165,14 +165,13 @@ describe("editing a story", () => {
     expect(textOf(editor)).toBe("body");
   });
 
-  it("hoists a story's envelope patch, not its stale copy of the rest", () => {
+  it("hoists a story's envelope change as steps, which undo takes back with its edit", () => {
     const editor = createEditor({ document: documentOf() });
     const head = story(editor);
     const envelope = wordContext(head.state)?.envelope as NonNullable<
       ReturnType<typeof wordContext>
     >["envelope"];
     const styles = [...envelope.styles, { id: "New", type: "paragraph" as const, name: "New" }];
-    // Stale everywhere but in what is patched.
     head.dispatch(
       withEnvelope(head.state.tr.insertText("x", 1, 1), {
         ...envelope,
@@ -182,8 +181,12 @@ describe("editing a story", () => {
     );
     const next = wordContext(editor.state)?.envelope;
     expect(next?.styles.at(-1)?.id).toBe("New");
-    expect(next?.section.titlePage).toBeUndefined();
+    expect(next?.section.titlePage).toBe(true);
     expect(wordContext(head.state)).toBe(wordContext(editor.state));
+    editor.commands.undo();
+    const undone = wordContext(editor.state)?.envelope;
+    expect(undone?.styles.at(-1)?.id).not.toBe("New");
+    expect(undone?.section.titlePage).toBeUndefined();
   });
 
   it("tracks across trees: one on switch, ids not reused, accept and reject reach stories", () => {

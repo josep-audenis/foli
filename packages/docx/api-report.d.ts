@@ -28,7 +28,8 @@ import { type DocxPackage } from "../package.js";
 export interface ExportOptions {
     /**
      * Whether Word records edits as tracked changes (`w:trackRevisions`). Left out: as the
-     * original package has it (off in a new one).
+     * document's settings say (`settings.trackRevisions`), else as the original package has it
+     * (off in a new one).
      */
     trackRevisions?: boolean;
     /**
@@ -147,8 +148,9 @@ export interface DocxImport {
     readonly package: DocxPackage;
     readonly report: ImportReport;
     /**
-     * Whether Word records edits to it as tracked changes (`w:trackRevisions` in its settings):
-     * pass it to the editor (`trackChanges`), and back to `exportDocx` when it changes.
+     * Whether Word records edits to it as tracked changes (`w:trackRevisions` in its settings).
+     * Also the document's `settings.trackRevisions` (schema 7), which the editor and `exportDocx`
+     * read: passing it to them is no longer needed.
      */
     readonly trackRevisions: boolean;
 }

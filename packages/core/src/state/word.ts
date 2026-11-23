@@ -23,7 +23,14 @@ import { writeCustom } from "../v3/extensions.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, type SelectionJSON, TextSelection } from "./selection.js";
-import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import {
+  type Command,
+  EditorState,
+  Plugin,
+  PluginKey,
+  stateBefore,
+  type Transaction,
+} from "./state.js";
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
 export type WordEnvelope = Omit<FoliDocument, "content">;
@@ -169,19 +176,162 @@ export function setComments(
   return tr;
 }
 
-/** What `EnvelopeStep` can change (ADR-0007). */
-export type EnvelopeKey = "section" | "settings" | "controls";
+/**
+ * The envelope's parts an `EnvelopeStep` changes (ADR-0012); comments and stories have steps of
+ * their own.
+ * @internal
+ */
+export const ENVELOPE_KEYS: readonly EnvelopeKey[] = [
+  "section",
+  "settings",
+  "defaults",
+  "theme",
+  "styles",
+  "numbering",
+  "resources",
+  "controls",
+];
+/** What `EnvelopeStep` can change (ADR-0012). */
+export type EnvelopeKey =
+  | "section"
+  | "settings"
+  | "defaults"
+  | "theme"
+  | "styles"
+  | "numbering"
+  | "resources"
+  | "controls";
+
+/** How deep a step's path goes into each key: one setting, one style, one resource… */
+const DEPTH: Readonly<Record<EnvelopeKey, number>> = {
+  section: 0,
+  settings: 1,
+  defaults: 0,
+  theme: 0,
+  styles: 1,
+  numbering: 2,
+  resources: 1,
+  controls: 1,
+};
+/** Keys the formatting resolver reads: a change rebuilds it. */
+const FORMATTING = new Set<EnvelopeKey>(["defaults", "theme", "styles", "numbering", "settings"]);
+
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const hasIds = (v: unknown): v is { id: unknown }[] =>
+  Array.isArray(v) &&
+  v.every((x) => isObject(x) && (typeof x.id === "string" || typeof x.id === "number"));
+
+/** The value at `path` in `value`: an object's by key, a list's entry by id. */
+function getIn(value: unknown, path: readonly string[]): unknown {
+  let current = value;
+  for (const segment of path) {
+    if (Array.isArray(current))
+      current = current.find((x) => isObject(x) && String(x.id) === segment);
+    else if (isObject(current))
+      current = Object.hasOwn(current, segment) ? current[segment] : undefined;
+    else return undefined;
+  }
+  return current;
+}
+
+/** `value` with `next` at `path` (undefined: removed; a list's new entry goes last). */
+function setIn(value: unknown, path: readonly string[], next: unknown): unknown {
+  const [segment, ...rest] = path;
+  if (segment === undefined) return next;
+  if (Array.isArray(value)) {
+    const at = value.findIndex((x) => isObject(x) && String(x.id) === segment);
+    const inner = setIn(at < 0 ? undefined : value[at], rest, next);
+    if (at < 0) return inner === undefined ? value : [...value, inner];
+    return inner === undefined
+      ? [...value.slice(0, at), ...value.slice(at + 1)]
+      : [...value.slice(0, at), inner, ...value.slice(at + 1)];
+  }
+  const record = isObject(value) ? value : {};
+  return withKey(record, segment, setIn(record[segment], rest, next));
+}
+
+/** `record` with `key` set to `value` (undefined: removed), keeping the order of its keys. */
+function withKey<T extends object>(record: T, key: string, value: unknown): T {
+  if (!Object.hasOwn(record, key))
+    return value === undefined ? record : { ...record, [key]: value };
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (k !== key) out[k] = v;
+    else if (value !== undefined) out[k] = value;
+  }
+  return out as T;
+}
+
+/** The envelope with `key` at `path` set to `value`. */
+function envelopeWith(
+  envelope: WordEnvelope,
+  key: EnvelopeKey,
+  path: readonly string[],
+  value: unknown,
+): WordEnvelope {
+  return withKey(envelope, key, setIn(envelope[key], path, value));
+}
+
+/** The changes from `before` to `after`, one per entry down to `depth` levels. */
+function entries(
+  before: unknown,
+  after: unknown,
+  depth: number,
+  path: readonly string[] = [],
+): { path: readonly string[]; before: unknown; after: unknown }[] {
+  if (deepEqual(before, after)) return [];
+  const keys =
+    depth === 0
+      ? null
+      : isObject(before) && isObject(after)
+        ? new Set([...Object.keys(before), ...Object.keys(after)])
+        : hasIds(before) && hasIds(after)
+          ? new Set([...before, ...after].map((x) => String(x.id)))
+          : null;
+  if (!keys) return [{ path, before, after }];
+  return [...keys].flatMap((k) =>
+    entries(getIn(before, [k]), getIn(after, [k]), depth - 1, [...path, k]),
+  );
+}
 
 /**
- * Changes one value of the envelope (the last section's setup, the document's settings) from
- * `before` to `after`. A step, unlike `withEnvelope`, so undo and redo take it with the edit it
- * belongs to. It leaves the tree as it is; history refuses an undo whose `before` no longer holds.
+ * `mine` (changed from `base`) moved over `theirs` (changed from `base` by someone else): where
+ * one side changed something, that side's; where both did, key by key (lists: entry by id), mine
+ * winning a property both changed.
+ * @internal
  */
-export class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends Step {
+export function merge3(base: unknown, mine: unknown, theirs: unknown): unknown {
+  if (deepEqual(mine, base)) return theirs;
+  if (deepEqual(theirs, base) || deepEqual(mine, theirs)) return mine;
+  const keys =
+    isObject(mine) && isObject(theirs)
+      ? [...new Set([...Object.keys(theirs), ...Object.keys(mine)])]
+      : hasIds(mine) && hasIds(theirs)
+        ? [...new Set([...theirs, ...mine].map((x) => String(x.id)))]
+        : null;
+  if (!keys) return mine;
+  let out: unknown = Array.isArray(theirs) ? [] : {};
+  for (const k of keys) {
+    const value = merge3(getIn(base, [k]), getIn(mine, [k]), getIn(theirs, [k]));
+    if (value !== undefined) out = setIn(out, [k], value);
+  }
+  return out;
+}
+
+/**
+ * Changes one part of the envelope (`key`; at `path` inside it: one setting, one style by id,
+ * one resource…) from `before` to `after` (undefined: none). A step, so undo and redo take it with
+ * the edit it belongs to and other editors receive it. It leaves the tree as it is; a transaction
+ * whose `before` no longer holds is refused (the word plugin's filter), and history drops an undo
+ * whose `before` no longer holds.
+ */
+export class EnvelopeStep extends Step {
   constructor(
-    readonly key: K,
-    readonly before: WordEnvelope[K],
-    readonly after: WordEnvelope[K],
+    readonly key: EnvelopeKey,
+    readonly before: unknown,
+    readonly after: unknown,
+    readonly path: readonly string[] = [],
   ) {
     super();
   }
@@ -191,33 +341,45 @@ export class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends Step {
   }
 
   invert(): Step {
-    return new EnvelopeStep(this.key, this.after, this.before);
+    return new EnvelopeStep(this.key, this.after, this.before, this.path);
   }
 
   map(): Step {
     return this;
   }
 
+  /** This step made from `envelope` instead: its change merged over what is there now. */
+  rebase(envelope: WordEnvelope): EnvelopeStep {
+    const current = getIn(envelope[this.key], this.path);
+    if (deepEqual(current, this.before)) return this;
+    return new EnvelopeStep(this.key, current, merge3(this.before, this.after, current), this.path);
+  }
+
   override toJSON(): StepJSON {
-    return { stepType: "envelope", key: this.key, before: this.before, after: this.after };
+    return {
+      stepType: "envelope",
+      key: this.key,
+      ...(this.path.length ? { path: this.path } : {}),
+      before: this.before,
+      after: this.after,
+    };
   }
 }
 
-const ENVELOPE_KEYS: readonly string[] = ["section", "settings", "controls"];
-
 Step.jsonID("envelope", (_schema, value) => {
-  const json = record(value, "$", ["stepType", "key", "before", "after"]);
+  const json = record(value, "$", ["stepType", "key", "path", "before", "after"]);
   const key = json.key as EnvelopeKey;
   if (!ENVELOPE_KEYS.includes(key)) fail("$.key", `unknown envelope key ${JSON.stringify(key)}`);
+  const path = json.path ?? [];
+  if (!Array.isArray(path) || !path.every((p) => typeof p === "string" && p))
+    fail("$.path", "expected an array of names");
   for (const side of ["before", "after"]) {
-    const error = envelopeValueError(key, [], json[side]);
+    const error = envelopeValueError(key, path as string[], json[side]);
     if (error) fail(`$.${side}`, error);
   }
-  return new EnvelopeStep(
-    key,
-    structuredClone(json.before) as never,
-    structuredClone(json.after) as never,
-  );
+  return new EnvelopeStep(key, structuredClone(json.before), structuredClone(json.after), [
+    ...(path as string[]),
+  ]);
 });
 
 /**
@@ -347,15 +509,15 @@ function storyJSON({ doc, ...rest }: Story): StoryJSON {
   return { ...rest, content: doc.toJSON() };
 }
 
-/** The value of `key` as `steps` leave it, from `value`. */
-function afterEnvelopeSteps<K extends EnvelopeKey>(
-  key: K,
-  value: WordEnvelope[K],
-  steps: readonly Step[],
-): WordEnvelope[K] {
-  let current = value;
+/**
+ * `envelope` after the envelope steps among `steps`.
+ * @internal
+ */
+export function afterEnvelopeSteps(envelope: WordEnvelope, steps: readonly Step[]): WordEnvelope {
+  let current = envelope;
   for (const step of steps)
-    if (step instanceof EnvelopeStep && step.key === key) current = step.after as WordEnvelope[K];
+    if (step instanceof EnvelopeStep)
+      current = envelopeWith(current, step.key, step.path, step.after);
   return current;
 }
 
@@ -371,7 +533,33 @@ export function setEnvelopeValue<K extends EnvelopeKey>(
 ): Transaction {
   const envelope = wordContext(state)?.envelope;
   if (!envelope) return tr;
-  return tr.step(new EnvelopeStep(key, afterEnvelopeSteps(key, envelope[key], tr.steps), value));
+  const current = afterEnvelopeSteps(envelope, tr.steps);
+  for (const step of envelopeChanges(key, current[key], value)) tr.step(step);
+  return tr;
+}
+
+/**
+ * The steps that change `key` from `now` to `value`: one per entry, or one for the whole value
+ * when entries would not give it (a list reordered).
+ */
+function envelopeChanges(key: EnvelopeKey, now: unknown, value: unknown): EnvelopeStep[] {
+  if (deepEqual(now, value)) return [];
+  let changes = entries(now, value, DEPTH[key]);
+  let check: unknown = now;
+  for (const c of changes) check = setIn(check, c.path, c.after);
+  if (!deepEqual(check, value)) changes = [{ path: [], before: now, after: value }];
+  return changes.map((c) => new EnvelopeStep(key, c.before, c.after, c.path));
+}
+
+/** Whether every envelope step of `steps` finds its `before`, given the ones before it. */
+function envelopeStepsHold(envelope: WordEnvelope, steps: readonly Step[]): boolean {
+  let current = envelope;
+  for (const step of steps) {
+    if (!(step instanceof EnvelopeStep)) continue;
+    if (!deepEqual(getIn(current[step.key], step.path), step.before)) return false;
+    current = envelopeWith(current, step.key, step.path, step.after);
+  }
+  return true;
 }
 
 /**
@@ -380,21 +568,15 @@ export function setEnvelopeValue<K extends EnvelopeKey>(
  * @internal
  */
 export function storedStepsApply(context: WordContext, steps: readonly Step[]): boolean {
-  const values = new Map<EnvelopeKey, unknown>();
+  if (!envelopeStepsHold(context.envelope, steps)) return false;
   const stories = new Map<string, Story | null>();
   for (const step of steps) {
-    if (step instanceof EnvelopeStep) {
-      const key = step.key as EnvelopeKey;
-      const current = values.has(key) ? values.get(key) : context.envelope[key];
-      if (!deepEqual(current, step.before)) return false;
-      values.set(key, step.after);
-    } else if (step instanceof StoryStep) {
-      const current = stories.has(step.id)
-        ? stories.get(step.id)
-        : (context.stories.get(step.id) ?? null);
-      if (!sameStory(current, step.before)) return false;
-      stories.set(step.id, step.after);
-    }
+    if (!(step instanceof StoryStep)) continue;
+    const current = stories.has(step.id)
+      ? stories.get(step.id)
+      : (context.stories.get(step.id) ?? null);
+    if (!sameStory(current, step.before)) return false;
+    stories.set(step.id, step.after);
   }
   return true;
 }
@@ -467,11 +649,10 @@ function storyTrees(envelope: WordEnvelope, schema: Schema): Map<string, Story> 
 }
 
 /**
- * The plugin that gives commands a v3 document's envelope. A transaction changes it with
- * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
- * Comments change only through `CommentStep`s, the last section, the settings and the controls'
- * properties through `EnvelopeStep`s and stories through `StoryStep`s, which undo takes back (a
- * paste adds the properties of the controls it copies with `withEnvelope`). A story's editor is
+ * The plugin that gives commands a v3 document's envelope. Every change of it is a step:
+ * comments through `CommentStep`s, stories through `StoryStep`s, the rest through
+ * `EnvelopeStep`s (`withEnvelope` makes them), which undo takes back and other editors receive.
+ * A transaction whose envelope step no longer finds its `before` is refused. A story's editor is
  * given its body's `context` as it stands.
  * @internal
  */
@@ -480,6 +661,10 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
   return new Plugin({
     key,
+    filterTransaction: (tr, state) => {
+      const current = wordContext(state);
+      return !current || envelopeStepsHold(current.envelope, tr.steps);
+    },
     state: {
       init: (state) =>
         context ?? {
@@ -491,12 +676,8 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
       apply: (tr, value) => {
         const adopted = tr.getMeta(ADOPT) as WordContext | undefined;
         if (adopted) return adopted;
-        const next = tr.getMeta(key) as WordEnvelope | undefined;
         const comments = applyCommentSteps(value.envelope.comments, tr.steps);
-        const base = next ?? value.envelope;
-        const section = afterEnvelopeSteps("section", base.section, tr.steps);
-        const settings = afterEnvelopeSteps("settings", value.envelope.settings, tr.steps);
-        const controls = afterEnvelopeSteps("controls", base.controls, tr.steps);
+        const changed = afterEnvelopeSteps(value.envelope, tr.steps);
         let { stories } = value;
         let storiesJSON = value.envelope.stories;
         for (const step of tr.steps) {
@@ -514,37 +695,41 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
           storiesJSON = json;
         }
         if (
-          !next &&
+          changed === value.envelope &&
           comments === value.envelope.comments &&
-          section === base.section &&
-          settings === value.envelope.settings &&
-          controls === value.envelope.controls &&
           stories === value.stories
         )
           return value;
-        const { stories: _stories, settings: _settings, controls: _controls, ...rest } = base;
-        const envelope: WordEnvelope = {
+        const { stories: _stories, ...rest } = changed;
+        const next: WordEnvelope = {
           ...rest,
-          section,
           comments: comments as CommentJSON[],
           ...(storiesJSON && Object.keys(storiesJSON).length ? { stories: storiesJSON } : {}),
-          ...(settings ? { settings } : {}),
-          ...(controls ? { controls } : {}),
         };
-        // Only comments, stories or steps changed: they do not affect formatting.
-        const resolver = next ? new Resolver(envelope) : value.resolver;
-        return { envelope, resolver, stories, id: value.id };
+        const formatting = tr.steps.some(
+          (step) => step instanceof EnvelopeStep && FORMATTING.has(step.key),
+        );
+        // Comments, stories, the section, settings, controls and resources do not affect it.
+        const resolver = formatting ? new Resolver(next) : value.resolver;
+        return { envelope: next, resolver, stories, id: value.id };
       },
     },
   });
 }
 
 /**
- * Makes `tr` change the document's envelope to `envelope` (styles, numbering…). Its comments
- * are ignored: those change through `setComments`, so undo takes them back.
+ * Makes `tr` change the document's envelope to `envelope` (styles, numbering…): an
+ * `EnvelopeStep` for each entry that differs from what it holds after `tr` so far. Its comments
+ * and stories are ignored: those change through their own steps (`setComments`, `StoryStep`).
  */
 export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction {
-  return tr.setMeta(key, envelope);
+  const from = stateBefore(tr);
+  const current = from && wordContext(from)?.envelope;
+  if (!current) return tr;
+  const now = afterEnvelopeSteps(current, tr.steps);
+  for (const key of ENVELOPE_KEYS)
+    for (const step of envelopeChanges(key, now[key], envelope[key])) tr.step(step);
+  return tr;
 }
 
 const ADOPT = "adoptWordContext";
@@ -555,13 +740,6 @@ const ADOPT = "adoptWordContext";
  */
 export const withContext = (tr: Transaction, context: WordContext): Transaction =>
   tr.setMeta(ADOPT, context);
-
-/**
- * The envelope `tr` gives the document through `withEnvelope`, if any.
- * @internal
- */
-export const envelopeChange = (tr: Transaction): WordEnvelope | undefined =>
-  tr.getMeta(key) as WordEnvelope | undefined;
 
 /** The envelope and resolver of the v3 document in `state`, or null for a v2 editor. */
 export function wordContext(state: EditorState): WordContext | null {

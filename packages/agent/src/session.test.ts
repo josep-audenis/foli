@@ -22,6 +22,21 @@ describe("openSession", () => {
     expect(JSON.stringify(session.document().content)).toContain("Draft. ");
   });
 
+  it("tracks a document whose own setting is off, leaving the setting as it is (22.3)", async () => {
+    const { document } = await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)));
+    const off = {
+      ...document,
+      schemaVersion: 7 as const,
+      settings: { ...document.settings, trackRevisions: false },
+    };
+    const session = openSession(off, { author: "Agent" });
+    expect(session.editor.trackingChanges).toBe(true);
+    session.editor.select(1);
+    session.editor.run(insertText("Draft. "));
+    expect(trackedChanges(session.editor.state.doc).some((c) => c.author === "Agent")).toBe(true);
+    expect(session.document().settings?.trackRevisions).toBe(false);
+  });
+
   it("refuses an empty author", async () => {
     const { document } = await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)));
     expect(() => openSession(document, { author: " " })).toThrow(/author/);

@@ -106,8 +106,9 @@ export interface EditorOptions {
   /** Who edits: tracked changes are made in this name. Default "Author". */
   author?: string;
   /**
-   * Record edits as tracked changes from the start (a `.docx`'s `w:trackRevisions`:
-   * `DocxImport.trackRevisions`). Schema v3 only. Default false.
+   * Record edits as tracked changes from the start, while the document's settings say nothing
+   * (`settings.trackRevisions`, which an imported `.docx` that tracks changes has, wins). Schema
+   * v3 only. Default false.
    */
   trackChanges?: boolean;
   /** How the editor's views show tracked changes at first (default `markup`). */
