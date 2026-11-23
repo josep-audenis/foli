@@ -26,7 +26,8 @@ export function idSlot(clientID: string | number): number {
     hash ^= char.codePointAt(0) as number;
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return hash % ID_SPACE;
+  // Folded: every byte of the hash counts, not only the low one.
+  return (hash ^ (hash >>> 8) ^ (hash >>> 16) ^ (hash >>> 24)) & (ID_SPACE - 1);
 }
 
 /** Gives an editor's new ids `clientID`'s class (what `collab` does, without the rest). */
