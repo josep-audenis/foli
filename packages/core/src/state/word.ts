@@ -404,6 +404,15 @@ export class StoryStep extends Step {
     return StepResult.ok(doc);
   }
 
+  /** The story replaced whole: edits of it made before map to deleted. */
+  override getMap(): StepMap {
+    const size = (story: Story | null) => story?.doc.content.size ?? 0;
+    return new StepMap([], false, {
+      id: this.id,
+      maps: [new StepMap([0, size(this.before), size(this.after)])],
+    });
+  }
+
   invert(): Step {
     return new StoryStep(
       this.id,
@@ -560,7 +569,8 @@ export class StoryEditStep extends Step {
 
   invert(): Step {
     const base = storyBases.get(this);
-    if (!base) throw new RangeError(`The story edit of ${this.id} has no tree to invert against`);
+    // Its story is gone (removed by another editor): it changed nothing, nor does its inverse.
+    if (!base) return new StoryEditStep(this.id, [], this.selectionAfter, this.selectionBefore);
     const inverted: Step[] = [];
     let doc = base;
     for (const step of this.steps) {
@@ -586,7 +596,11 @@ export class StoryEditStep extends Step {
         m.appendMap(mapped.getMap(), count - 1 - i);
       }
     });
-    return steps.length ? new StoryEditStep(this.id, steps) : null;
+    const map = (s: SelectionJSON | null): SelectionJSON | null =>
+      s && { ...s, anchor: through.map(s.anchor, -1), head: through.map(s.head, -1) };
+    return steps.length
+      ? new StoryEditStep(this.id, steps, map(this.selectionBefore), map(this.selectionAfter))
+      : null;
   }
 
   /** This edit followed by `next`, an edit of the same story. */
@@ -665,8 +679,10 @@ export function storyStepsApply(
       current.set(step.id, step.after);
     } else if (step instanceof StoryEditStep) {
       const story = at(step.id);
-      const doc = story && storyEditResult(step, story.doc);
-      if (!story || !doc) return false;
+      // A story removed since (by another editor): the edit has nothing to change.
+      if (!story) continue;
+      const doc = storyEditResult(step, story.doc);
+      if (!doc) return false;
       current.set(step.id, { ...story, doc });
     }
   }
