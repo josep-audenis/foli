@@ -48,6 +48,7 @@ export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, t
 
 // internal.d.ts
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
+export { withTrackState } from "./state/track.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
 export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, schemaWith, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
@@ -2385,6 +2386,8 @@ export interface TrackState {
 export declare const untracked = "untracked";
 /** Whether `state` records edits as tracked changes, and in whose name. */
 export declare function trackState(state: EditorState): TrackState | null;
+/** Makes `tr` set the tracking state (a story's editor passes its change to the body). */
+export declare const withTrackState: (tr: Transaction, state: TrackState) => Transaction;
 /**
  * Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. The switch
  * is the document's (`settings.trackRevisions`, a step other editors receive, kept out of undo);

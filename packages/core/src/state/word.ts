@@ -216,7 +216,7 @@ const DEPTH: Readonly<Record<EnvelopeKey, number>> = {
   controls: 1,
 };
 /** Keys the formatting resolver reads: a change rebuilds it. */
-const FORMATTING = new Set<EnvelopeKey>(["defaults", "theme", "styles", "numbering"]);
+const FORMATTING = new Set<EnvelopeKey>(["defaults", "theme", "styles", "numbering", "settings"]);
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -719,9 +719,21 @@ export function setEnvelopeValue<K extends EnvelopeKey>(
   const envelope = wordContext(state)?.envelope;
   if (!envelope) return tr;
   const current = afterEnvelopeSteps(envelope, tr.steps);
-  for (const change of entries(current[key], value, DEPTH[key]))
-    tr.step(new EnvelopeStep(key, change.before, change.after, change.path));
+  for (const step of envelopeChanges(key, current[key], value)) tr.step(step);
   return tr;
+}
+
+/**
+ * The steps that change `key` from `now` to `value`: one per entry, or one for the whole value
+ * when entries would not give it (a list reordered).
+ */
+function envelopeChanges(key: EnvelopeKey, now: unknown, value: unknown): EnvelopeStep[] {
+  if (deepEqual(now, value)) return [];
+  let changes = entries(now, value, DEPTH[key]);
+  let check: unknown = now;
+  for (const c of changes) check = setIn(check, c.path, c.after);
+  if (!deepEqual(check, value)) changes = [{ path: [], before: now, after: value }];
+  return changes.map((c) => new EnvelopeStep(key, c.before, c.after, c.path));
 }
 
 /** Whether every envelope step of `steps` finds its `before`, given the ones before it. */
@@ -908,16 +920,8 @@ export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transacti
   const current = from && wordContext(from)?.envelope;
   if (!current) return tr;
   const now = afterEnvelopeSteps(current, tr.steps);
-  for (const key of ENVELOPE_KEYS) {
-    if (deepEqual(now[key], envelope[key])) continue;
-    let changes = entries(now[key], envelope[key], DEPTH[key]);
-    // Entries that would not give `envelope`'s value (a list reordered): the whole value.
-    let check: unknown = now[key];
-    for (const c of changes) check = setIn(check, c.path, c.after);
-    if (!deepEqual(check, envelope[key]))
-      changes = [{ path: [], before: now[key], after: envelope[key] }];
-    for (const c of changes) tr.step(new EnvelopeStep(key, c.before, c.after, c.path));
-  }
+  for (const key of ENVELOPE_KEYS)
+    for (const step of envelopeChanges(key, now[key], envelope[key])) tr.step(step);
   return tr;
 }
 

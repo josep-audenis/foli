@@ -9,9 +9,10 @@ import {
   type Node,
   Slice,
   type Step,
+  trackState,
   untracked,
 } from "@folijs/core";
-import { withEnvelope, wordContext } from "@folijs/core/internal";
+import { withEnvelope, withTrackState, wordContext } from "@folijs/core/internal";
 import { Handles } from "./handles.js";
 import {
   type Changed,
@@ -179,6 +180,12 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     reviewView: "final",
     ...(extensions ? { extensions } : {}),
   });
+  // On whatever the document's setting (`settings.trackRevisions`) says, without changing it.
+  const track = trackState(editor.state);
+  if (track)
+    editor.dispatch(
+      withTrackState(editor.state.tr, Object.assign({ ...track, on: true }, { pinned: true })),
+    );
   const handles = new Handles(editor);
 
   const context: Context = { editor, handles, author };
@@ -258,7 +265,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
           // Undo as it was: neither this change nor those it takes back are steps of it.
           if (history) tr.setMeta(history.key, undo);
           else tr.setMeta("addToHistory", false);
-          // A style the edits added to the document is no step: the envelope is put back whole.
+          // The inverted envelope steps put the envelope back; this only makes sure of it.
           if (envelope && wordContext(editor.state)?.envelope !== envelope)
             withEnvelope(tr, envelope);
           editor.dispatch(tr);

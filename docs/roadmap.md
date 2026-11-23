@@ -32,7 +32,7 @@ place that says what is in progress; check it before starting work.
 | 18 Hint                   | ✅ Done                  | —                 | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                 | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
 | 20 Corpus run             | ✅ Done                  | —                 | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
-| 21 Hardening              | ✅ Done                  | —                 | Merged in #220–#236; the release (1.5.0: a pending React changeset is minor; `@folijs/agent` 0.3.2, `@folijs/mcp` 0.2.3) waits for the owner's approval                                       |
+| 21 Hardening              | ✅ Done                  | —                 | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | In progress              | `phase-22/collab` | Claimed 2026-11-23; tasks 22.1–22.13 merged one PR each                                                                                                                                       |
 | 23 Agent editing parity   | Ready                    | —                 | Planned 2026-11-23, nothing built: the agent edits tables, formatting, lists, pictures, headers and review as a user can                                                                      |
 
@@ -3105,8 +3105,9 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   fixed or accepted), the stale `shortcut:` comments the audit found (`core/src/state/word.ts`
   v2, `mark.ts` Phase 9) removed or rewritten, changesets per package; patch releases
   (packages at 1.4.x, agent, mcp) published with the owner's approval.
-  (Done but the release: docs, limitations.md and changesets ready; the shortcuts rewritten.
-  Waiting for the owner: approval to publish, and acceptance of two limits written down in
+  (Done: docs, limitations.md and changesets; the shortcuts rewritten. Published 2026-11-23
+  with the owner's approval by the Release workflow, its Windows browser job green first.
+  Waiting for the owner: acceptance of two limits written down in
   limitations.md, editing in a shadow root in WebKit and Russian and Ukrainian date controls.
   The new options (`exportPdf`'s `signal` and `timeout`, `exportDocx`'s `asDocument` and
   `dropped`) are under patch changesets; the owner may prefer minor versions.)
