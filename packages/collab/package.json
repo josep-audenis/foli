@@ -1,0 +1,49 @@
+{
+  "name": "@folijs/collab",
+  "version": "0.0.0",
+  "description": "The authority for real-time editing of a Foli document by several people: orders every step, validates it by applying it, gives what to broadcast, to catch up and to store. No transport, no storage, no DOM, no Node built-ins.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josep-audenis/foli.git",
+    "directory": "packages/collab"
+  },
+  "homepage": "https://github.com/josep-audenis/foli#readme",
+  "bugs": "https://github.com/josep-audenis/foli/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@folijs/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "src",
+    "!src/**/*.test.*"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "@folijs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@folijs/core": "workspace:*",
+    "@folijs/docx": "workspace:*",
+    "@types/node": "^20.19.43",
+    "fast-check": "^4.10.2"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  }
+}

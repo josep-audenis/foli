@@ -3245,7 +3245,7 @@ lets the agent library return steps); 22.7 onwards build it.
   Unconfirmed steps are rebased over received ones through mapping; history takes received
   steps as not undoable and maps its own events over them. The convergence property test of the
   acceptance list lives here.
-- [ ] 22.8 `@folijs/collab`, the authority: `createAuthority({ document, package?, limits })`
+- [x] 22.8 `@folijs/collab`, the authority: `createAuthority({ document, package?, limits })`
   with `receive(version, steps, clientID)` → accepted or refused with the reason,
   `stepsSince(version)` (or a snapshot), a snapshot (document, package, resources) and
   compaction of the log. It validates every step by applying it with `packages/core`; an

@@ -132,10 +132,13 @@ export is the same as before.
 **Received transactions are applied as they are.** They carry the meta `remote`: kept out of
 history and of tracking, let through the clients' filters, and the plugins that append transactions (comments, controls, fields,
 notes) add nothing, since the sender already sent the steps they appended. The authority does
-not trust them that way: it applies a client's steps to an `EditorState` with the document's
-plugins as a local transaction would be (filters on: locked content controls, the envelope's
-`before`), after the app's `authorize`, and refuses a transaction a filter drops as `invalid`.
-Clients then apply only what the authority accepted.
+not trust them that way: it reads each step as untrusted JSON, asks the app's `authorize`, and
+applies them to its own editor of the document: a step that does not apply, or an envelope or
+story step that no longer finds what it changes (the word plugin's filter), is refused as
+`invalid`. Clients then apply only what the authority accepted. (Built in 22.8: the locked
+content controls' rules are not run again there. They depend on the command that made the edit
+(filling a control's placeholder, updating a field), which steps do not carry; an app that must
+enforce locks against a hostile client checks the steps in `authorize`.)
 
 **History.** Received steps are not undoable. The user's own events are mapped over them (the
 existing rebase, which drops steps that no longer apply one by one). Undo of an event whose
