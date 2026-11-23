@@ -1136,6 +1136,8 @@ export class EditorView {
       // What it had changed is not input: read back, it would render and fail again, for ever.
       this.observer.takeRecords();
       this.pending = [];
+      // Half drawn: nothing of it is reused, the next render draws every block again.
+      this.word = null;
       throw error;
     }
   }
@@ -2671,12 +2673,21 @@ export class EditorView {
       wrapper.style.paddingBottom = shown.style.paddingBottom;
     }
     region.element.append(wrapper);
-    const view = new EditorView(inner, editor, {
-      paged: false,
-      upload: this.upload ?? null,
-      resource: this.resource ?? null,
-      ...(noteMark ? { noteMark } : {}),
-    });
+    let view: EditorView;
+    try {
+      view = new EditorView(inner, editor, {
+        paged: false,
+        upload: this.upload ?? null,
+        resource: this.resource ?? null,
+        ...(noteMark ? { noteMark } : {}),
+      });
+    } catch (error) {
+      // No story open after all: the body as it was, editable.
+      wrapper.remove();
+      if (shown) shown.style.display = "";
+      this.bodyEditable();
+      throw error;
+    }
     wrapper.addEventListener("keydown", (event) => {
       if (event.isComposing || view.composing) return;
       // Unless the story's view ran a user's binding of the key.
@@ -2721,14 +2732,19 @@ export class EditorView {
       this.flowed = null;
       if (!this.destroyed) this.render();
     }
+    this.bodyEditable();
+    if (focus && !this.destroyed) this.focus();
+    if (!this.destroyed) this.drawMatches();
+    this.editor.storyChanged();
+  }
+
+  /** The host editable again, its changes read back, as before a story opened. */
+  private bodyEditable(): void {
     this.host.classList.remove("foli-in-story");
     this.host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) this.host.removeAttribute("aria-readonly");
     this.observer.takeRecords();
     this.observer.observe(this.host, { childList: true, characterData: true, subtree: true });
-    if (focus && !this.destroyed) this.focus();
-    if (!this.destroyed) this.drawMatches();
-    this.editor.storyChanged();
   }
 
   /** The page's own story, after what was open is shown nowhere any more. */

@@ -239,3 +239,28 @@ describe("beforeinput types the view does not carry out (21.8)", () => {
     expect(editor.state.doc.textContent).toContain("Y");
   });
 });
+
+describe("a story's view that fails to open (21.8)", () => {
+  it("leaves the body editable, with no half-open story", () => {
+    const { host, view } = mount(p(text("body")));
+    type Renders = { render(this: { paged: boolean }): void };
+    const proto = EditorView.prototype as unknown as Renders;
+    const original = proto.render;
+    const spy = vi.spyOn(proto, "render").mockImplementation(function (this: { paged: boolean }) {
+      // Only the story's own view, which is not paged, fails.
+      if (!this.paged) throw new Error("broken");
+      original.call(this);
+    });
+    try {
+      expect(() => view.openStory("header", 0, true)).toThrow("broken");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(host.getAttribute("contenteditable")).toBe("true");
+    expect(host.classList.contains("foli-in-story")).toBe(false);
+    expect(host.querySelector(".foli-story-mount")).toBeNull();
+    // It opens once it can.
+    expect(view.openStory("header", 0, true)).toBe(true);
+    expect(host.querySelectorAll(".foli-story-mount")).toHaveLength(1);
+  });
+});
