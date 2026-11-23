@@ -137,7 +137,7 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break, horizontal line · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of light cell fills; both in a table, tracked while tracking) · Picture… (a dialog) · page break, horizontal line · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a palette (Word's highlight colors; an app gives another, [Toolbar items](#toolbar-items)), the current color checked; arrow keys,
@@ -591,7 +591,8 @@ recorded formatting only when no other is there; in a selection, the selected pa
 (`acceptChange`, `rejectChange`, `acceptAllChanges(author?)`, `rejectAllChanges(author?)`,
 `nextChange`, `previousChange`). `trackedChanges(doc)` lists the changes (`Change`: `kind`,
 `id`, `author`, `date`, `from`, `to`, `move`) in document order: runs with one change mark,
-paragraph marks inserted or deleted (their closing token), paragraphs' recorded formatting.
+paragraph marks inserted or deleted (their closing token), paragraphs' recorded formatting,
+tables', rows' and cells' (`tableFormatting`, 1.7; at a caret only when no other is there).
 Accepting removes deleted content (a deleted paragraph mark joins the paragraph with the next,
 keeping the first one's properties, or removes it whole when nothing of it is left) and drops records; rejecting removes inserted content (an
 inserted paragraph mark joins it with the next, which keeps its own properties: the original
@@ -732,8 +733,12 @@ null)` (`tableStyles(state)`, `tableStyleAt(state)`), `setCellShading(fill | nul
 `setColumnWidth(tablePos, column, twips)` (`columnAt(state)`: the selection's column, its table
 and width, 19.4); `CellSelection`, `extendCellSelection(axis, dir)`,
 `goToCell(dir)`, `goToCellVertically(dir)`, `cellsAsTable(selection)`, `pasteCells(tr, table)`.
-Rows inserted and deleted while tracking are tracked; column, merge, split, header, style,
-shading and width commands do not apply while tracking.
+Rows inserted and deleted while tracking are tracked, and so are header rows, a table's style
+and cells' shading, as formatting changes (`w:trPrChange`, `w:tblPrChange`, `w:tcPrChange`;
+schema 8, 1.7; `trackedChanges` lists each as `tableFormatting`, its range the node). Column,
+merge, split and width commands do not apply while tracking. Links added, changed or taken off
+while tracking (`setLink`, `removeLink`) are the text deleted and inserted again with the link
+as it is now (Word records no change of a link).
 
 Pictures: `insertPicture({ contentType, url? | data?, width, height, alt?, title?,
 decorative? }, { requireAlt = true })` (size in EMU; alt text required unless `decorative` or

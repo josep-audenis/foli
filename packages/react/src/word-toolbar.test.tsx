@@ -430,17 +430,21 @@ describe("FoliToolbar's table menu", () => {
     expect(select("Table style").value).toBe("Light List");
   });
 
-  it("disables the style box and shading while tracking, and closes the dialog on a change", () => {
+  it("keeps the style box and shading while tracking (23.2), and closes the dialog on a change", () => {
     const editor = setup();
     act(() => {
       editor.select(6);
       editor.run(insertTable(1, 2));
       editor.commands.setTrackChanges(true, "Me");
     });
-    expect(select("Table style").getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("button", { name: "Shading" }).getAttribute("aria-disabled")).toBe(
+    expect(select("Table style").getAttribute("aria-disabled")).not.toBe("true");
+    expect(screen.getByRole("button", { name: "Shading" }).getAttribute("aria-disabled")).not.toBe(
       "true",
     );
+    fireEvent.click(screen.getByRole("button", { name: "Shading" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Light blue" }));
+    const cell = tableIn(editor)?.content?.[0]?.content?.[0];
+    expect(cell?.attrs?.formatChange).toMatchObject({ author: "Me", previous: {} });
     act(() => editor.commands.setTrackChanges(false));
     openMenu();
     fireEvent.click(item("Insert table…"));

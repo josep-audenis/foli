@@ -3,6 +3,7 @@ import { createDocumentV2 } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import { isSafeHref } from "../schema.js";
+import { createDocument } from "../v3/document.js";
 import {
   autolinkHref,
   createEditor,
@@ -10,8 +11,12 @@ import {
   insertLink,
   linkAt,
   normalizeHref,
+  removeLink,
   requestsLinkEditor,
+  setLink,
+  TextSelection,
   type Transaction,
+  trackedChanges,
 } from "./index.js";
 
 const link = (href: string) => ({ type: "link", attrs: { href } });
@@ -210,5 +215,50 @@ describe("link commands", () => {
     expect(seen.some(requestsLinkEditor)).toBe(true);
     expect(editor.state.doc).toBe(doc);
     expect(editor.commands.undo()).toBe(false);
+  });
+});
+
+describe("links while tracking (23.2)", () => {
+  const tracked = () => {
+    const editor = createEditor({
+      document: createDocument({ type: "doc", content: [p(t("see the site now"))] }),
+      author: "Me",
+      trackChanges: true,
+    });
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 5, 13)));
+    return editor;
+  };
+  const hrefs = (editor: Editor) =>
+    JSON.stringify(editor.getDocument().content).match(/"href":"[^"]+"/g) ?? [];
+
+  it("links text as its deletion and insertion: rejecting leaves no link, accepting keeps it", () => {
+    const editor = tracked();
+    expect(editor.run(setLink("https://a.example"))).toBe(true);
+    expect(trackedChanges(editor.state.doc).map((c) => c.kind)).toEqual(["deletion", "insertion"]);
+    editor.commands.rejectAllChanges();
+    expect(editor.state.doc.textContent).toBe("see the site now");
+    expect(hrefs(editor)).toEqual([]);
+
+    const kept = tracked();
+    kept.run(setLink("https://a.example"));
+    kept.commands.acceptAllChanges();
+    expect(kept.state.doc.textContent).toBe("see the site now");
+    expect(hrefs(kept)).toEqual(['"href":"https://a.example"']);
+  });
+
+  it("takes a link off, and changes its address, the same way", () => {
+    const editor = tracked();
+    editor.run(setLink("https://a.example"));
+    editor.commands.acceptAllChanges();
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 7)));
+    expect(editor.run(setLink("https://b.example"))).toBe(true);
+    expect(trackedChanges(editor.state.doc).map((c) => c.kind)).toEqual(["deletion", "insertion"]);
+    editor.commands.rejectAllChanges();
+    expect(hrefs(editor)).toEqual(['"href":"https://a.example"']);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 7)));
+    expect(editor.run(removeLink)).toBe(true);
+    editor.commands.rejectAllChanges();
+    expect(hrefs(editor)).toEqual(['"href":"https://a.example"']);
+    expect(editor.state.doc.textContent).toBe("see the site now");
   });
 });

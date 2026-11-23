@@ -525,7 +525,7 @@ function cellAt(state: EditorState) {
   return after?.type.name === "tableCell" ? after : null;
 }
 const inTable = (state: EditorState) => cellAt(state) !== null;
-/** Table and cell properties change only when not tracking (Foli does not record them yet). */
+/** Column widths change only when not tracking (Foli does not record them; style, shading do). */
 const canFormatTable = (state: EditorState) => inTable(state) && trackState(state)?.on !== true;
 
 const TABLE_ACTIONS: readonly Action[] = [
@@ -1137,7 +1137,7 @@ const GROUPS: Item[][] = [
       key: "tableStyle",
       label: "Table style",
       text: "Table style",
-      enabled: canFormatTable,
+      enabled: inTable,
       select: {
         options: (state) => tableStyles(state).map((name) => ({ value: name, label: name })),
         value: (state) => (inTable(state) ? (tableStyleAt(state) ?? "") : null),
@@ -1148,7 +1148,7 @@ const GROUPS: Item[][] = [
       key: "cellShading",
       label: "Cell shading",
       text: "Shading",
-      enabled: canFormatTable,
+      enabled: inTable,
       colors: {
         options: SHADINGS,
         value: (state) => {

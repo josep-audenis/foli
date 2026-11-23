@@ -1,7 +1,8 @@
 /**
  * Accepting and rejecting tracked changes (9.4), as Word does. A change is a run of content with
  * one `insertion`, `deletion` or `formatChange` mark, a paragraph mark inserted or deleted
- * (`revision`), or a paragraph's recorded formatting (`formatChange`). Accepting an insertion or
+ * (`revision`), or a paragraph's, table's, row's or cell's recorded formatting (`formatChange`).
+ * Accepting an insertion or
  * a formatting change drops its record; accepting a deletion removes the content (a deleted
  * paragraph mark joins the paragraph with the next, keeping the first one's properties, as an
  * untracked join). Rejecting does the reverse: inserted content goes (an inserted paragraph mark
@@ -21,7 +22,7 @@ import { absorbSection, lastSection, resolveSectionChange } from "./sections.js"
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Transaction } from "./state.js";
 import { keepTablesApart, rowRestartingMerges } from "./tables.js";
-import { RECORDED, trackState, untracked } from "./track.js";
+import { RECORDED, TABLE_RECORDED, trackState, untracked } from "./track.js";
 import {
   StoryStep,
   setEnvelopeValue,
@@ -43,7 +44,8 @@ export type ChangeKind =
   | "paragraphFormatting"
   | "sectionFormatting"
   | "rowInsertion"
-  | "rowDeletion";
+  | "rowDeletion"
+  | "tableFormatting";
 
 /** One tracked change of the document, where it is. */
 export interface Change {
@@ -107,6 +109,18 @@ export function trackedChanges(doc: Node, last?: SectionJSON): Change[] {
   };
   // Every paragraph, those in table cells too; a table row's own insertion or deletion.
   doc.descendants((block, offset) => {
+    // A table's, row's or cell's recorded formatting: the whole node.
+    const format = TABLE_RECORDED[block.type.name] && (block.attrs.formatChange as Revision | null);
+    if (format)
+      changes.push({
+        kind: "tableFormatting",
+        id: format.id,
+        author: format.author,
+        date: format.date ?? null,
+        from: offset,
+        to: offset + block.nodeSize,
+        move: null,
+      });
     if (block.type.name === "tableRow") {
       const revision = block.attrs.revision as { insertion?: Revision; deletion?: Revision } | null;
       for (const [kind, r] of [
@@ -201,7 +215,10 @@ function changesIn(
   if (from === to) {
     const around = all.filter((c) => c.from <= from && from <= c.to);
     const own = around.filter(
-      (c) => c.kind !== "paragraphFormatting" && c.kind !== "sectionFormatting",
+      (c) =>
+        c.kind !== "paragraphFormatting" &&
+        c.kind !== "sectionFormatting" &&
+        c.kind !== "tableFormatting",
     );
     picked = own.length ? own : around;
   } else
@@ -279,6 +296,18 @@ function resolve(
             (attrs as Record<string, unknown>)[key] = previous[key] ?? null;
         }
         tr.setNodeMarkup(start, node.type, attrs);
+        break;
+      }
+      case "tableFormatting": {
+        const node = tr.doc.nodeAt(from);
+        const keys = node && TABLE_RECORDED[node.type.name];
+        if (!node || !keys) break;
+        const attrs: Attrs = { ...node.attrs, formatChange: null };
+        if (!accept) {
+          const previous = (node.attrs.formatChange as { previous: Attrs }).previous;
+          for (const key of keys) (attrs as Record<string, unknown>)[key] = previous[key] ?? null;
+        }
+        tr.setNodeMarkup(from, node.type, attrs);
         break;
       }
       case "sectionFormatting": {

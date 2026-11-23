@@ -2,8 +2,10 @@
  * Table commands (10.7, ADR-0006): inserting a table, inserting and deleting rows and columns,
  * deleting a table; also inserting a horizontal rule (19.1). They act on the table around the
  * selection: the rectangle of a cell selection, or the cell holding the caret. Rows are inserted
- * and deleted as tracked changes while tracking (the rebuild records them, 10.6a); column changes
- * are not tracked by Foli yet, so they do not apply while tracking.
+ * and deleted as tracked changes while tracking (the rebuild records them, 10.6a), and so are a
+ * table's style, cells' shading and header rows, as formatting changes (23.2). Column changes,
+ * merging and splitting cells and column widths are not tracked by Foli, so they do not apply
+ * while tracking.
  */
 import { FoliDocumentError, Fragment, type Node, type NodeType, Slice } from "../model/index.js";
 import { attempt } from "./attempt.js";
@@ -623,10 +625,9 @@ export function isHeaderRow(state: EditorState): boolean {
 /**
  * Makes the selection's rows header rows, with every row above them (Word repeats only a run of
  * rows from the table's top), or, when they all are, makes them and the header rows below them
- * ordinary rows. Not while tracking.
+ * ordinary rows. While tracking, a tracked formatting change of each row (`w:trPrChange`).
  */
 export const toggleHeaderRow: Command = (state, dispatch) => {
-  if (tracking(state)) return false;
   const found = around(state);
   if (!found) return false;
   const { table, pos, top, bottom } = found;
@@ -670,11 +671,11 @@ export function tableStyleAt(state: EditorState): string | null {
 
 /**
  * Gives the table around the selection the table style named `name` (Word's Table Grid is
- * added when missing; any other must exist), or none. Not while tracking.
+ * added when missing; any other must exist), or none. While tracking, a tracked formatting
+ * change of the table (`w:tblPrChange`).
  */
 export function setTableStyle(name: string | null): Command {
   return (state, dispatch) => {
-    if (tracking(state)) return false;
     const found = around(state);
     const context = wordContext(state);
     if (!found || !context) return false;
@@ -692,12 +693,11 @@ export function setTableStyle(name: string | null): Command {
 }
 
 /**
- * Shades the selected cells with `fill` (`RRGGBB`), or takes their shading off (null). Not
- * while tracking.
+ * Shades the selected cells with `fill` (`RRGGBB`), or takes their shading off (null). While
+ * tracking, a tracked formatting change of each cell (`w:tcPrChange`).
  */
 export function setCellShading(fill: string | null): Command {
   return (state, dispatch) => {
-    if (tracking(state)) return false;
     if (fill !== null && !/^[0-9A-Fa-f]{6}$/.test(fill)) return false;
     const found = around(state);
     if (!found) return false;

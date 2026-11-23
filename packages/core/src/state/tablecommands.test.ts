@@ -3,6 +3,7 @@ import type { NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
+import { acceptAllChanges, rejectAllChanges, trackedChanges } from "./review.js";
 import { TextSelection } from "./selection.js";
 import {
   columnAt,
@@ -623,6 +624,81 @@ describe("table properties", () => {
     editor.run(setColumnWidth(tablePos, 1, 3000));
     expect(editor.state.doc.child(1).attrs.grid).toEqual([3856, 3000]);
     valid(editor);
+  });
+});
+
+describe("table properties while tracking (23.2)", () => {
+  const kinds = (editor: Editor) =>
+    trackedChanges(editor.state.doc).map(
+      (c) => `${c.kind}:${editor.state.doc.nodeAt(c.from)?.type.name}`,
+    );
+
+  it("record a table style as the table's formatting change; rejecting restores it", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    select(editor, inside(editor, "a1"));
+    expect(editor.run(setTableStyle("Table Grid"))).toBe(true);
+    expect(tableStyleAt(editor.state)).toBe("Table Grid");
+    const change = editor.state.doc.child(1).attrs.formatChange as {
+      author: string;
+      previous: object;
+    };
+    expect(change).toMatchObject({ author: "Me", previous: {} });
+    expect(kinds(editor)).toEqual(["tableFormatting:table"]);
+    expect(editor.run(rejectAllChanges())).toBe(true);
+    expect(tableStyleAt(editor.state)).toBe(null);
+    expect(editor.state.doc.child(1).attrs.formatChange).toBe(null);
+    valid(editor);
+  });
+
+  it("record shading per cell and keep the first record; accepting keeps the new look", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    selectCells(editor, "a1", "a2");
+    expect(editor.run(setCellShading("ffcc00"))).toBe(true);
+    selectCells(editor, "a1", "a1");
+    expect(editor.run(setCellShading("00ff00"))).toBe(true);
+    expect(kinds(editor)).toEqual(["tableFormatting:tableCell", "tableFormatting:tableCell"]);
+    const a1 = editor.state.doc.child(1).child(0).child(0);
+    expect(a1.attrs.shading).toMatchObject({ fill: "00FF00" });
+    expect(a1.attrs.formatChange).toMatchObject({ previous: {} });
+    // Taking it off again is what it was: the record goes.
+    selectCells(editor, "a2", "a2");
+    editor.run(setCellShading(null));
+    expect(kinds(editor)).toEqual(["tableFormatting:tableCell"]);
+    expect(editor.run(acceptAllChanges())).toBe(true);
+    expect(trackedChanges(editor.state.doc)).toEqual([]);
+    expect(editor.state.doc.child(1).child(0).child(0).attrs.shading).toMatchObject({
+      fill: "00FF00",
+    });
+    valid(editor);
+  });
+
+  it("record header rows per row, and do not record in one's own inserted rows", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    select(editor, inside(editor, "a2"));
+    editor.run(toggleHeaderRow);
+    expect(kinds(editor)).toEqual(["tableFormatting:tableRow", "tableFormatting:tableRow"]);
+    editor.run(rejectAllChanges());
+    expect(isHeaderRow(editor.state)).toBe(false);
+
+    select(editor, inside(editor, "a3"));
+    editor.run(insertRow(1));
+    const inserted = editor.state.doc.child(1).lastChild;
+    let at = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (node === inserted) at = pos + 3;
+    });
+    select(editor, at);
+    expect(editor.run(setCellShading("ffcc00"))).toBe(true);
+    // The row and its paragraphs are the insertion; the shading is part of it.
+    expect(kinds(editor).filter((k) => k.startsWith("tableFormatting"))).toEqual([]);
+    valid(editor);
+  });
+
+  it("leave columns, merging and widths refused", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    selectCells(editor, "a1", "b1");
+    expect(editor.run(mergeCells)).toBe(false);
+    expect(editor.run(setColumnWidth(editor.state.doc.child(0).nodeSize, 0, 2000))).toBe(false);
   });
 });
 

@@ -226,9 +226,15 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   the first.
 - A text range across cells deleted through the API (not a cell selection) empties the cells in
   document order between its ends, not Word's rectangle.
-- While tracking, text in cells is tracked as everywhere; of the table's structure only rows
-  are (inserted and deleted as Word records them): column commands, merging and splitting cells,
-  header rows, table styles, shading and column widths are refused. A table style's own definition cannot be changed (a changed one is refused on
+- While tracking, text in cells is tracked as everywhere; of the table's structure rows are
+  (inserted and deleted as Word records them), and so are header rows, table styles and cell
+  shading (as Word's `w:trPrChange`, `w:tblPrChange`, `w:tcPrChange`, 23.2). Column commands,
+  merging and splitting cells and column widths are refused: Word records them as cells
+  inserted and deleted (`w:cellIns`, `w:cellDel`), a grid change (`w:tblGridChange`) and cell
+  formatting together, which Foli does not model. A recorded change Word wrote is read, shown in
+  the list of changes and accepted or rejected; rejecting one that restores a cell's span or
+  vertical merge can leave the row's cells not matching the grid. Its previous properties are
+  the ones Foli models: on rejecting, what it does not model stays as it is now. A table style's own definition cannot be changed (a changed one is refused on
   export).
 - A table the model cannot hold stays opaque (a page, column or section break in a cell, and
   the other cases in the [docx README](../packages/docx/README.md)).
