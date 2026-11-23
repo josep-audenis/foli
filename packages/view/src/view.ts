@@ -1101,7 +1101,7 @@ export class EditorView {
   private scrollToSelection(): void {
     if (this.composing || !this.hasFocus()) return;
     const doc = this.host.ownerDocument;
-    const sel = doc.getSelection();
+    const sel = this.domSelection();
     const node = sel?.focusNode;
     if (!sel || !node || !this.host.contains(node)) return;
     const range = doc.createRange();
@@ -2475,7 +2475,7 @@ export class EditorView {
     // Shift extends by itself: an extended DOM selection would lose its anchor to the same spot.
     if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return false;
     const stop = caretStop(this.state, selection.head, forward);
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (stop === selection.head || !sel) return false;
     if (this.fieldCodes) {
       this.dispatch(this.state.tr.setSelection(TextSelection.create(doc, stop)));
@@ -3323,7 +3323,7 @@ export class EditorView {
 
   /** The live DOM selection as a model selection, or null if it is not inside the host. */
   private readSelection(): Selection | null {
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel?.anchorNode || !sel.focusNode) return null;
     if (this.mount?.wrapper.contains(sel.anchorNode)) return null;
     // A range around exactly one block leaf element (a rule): the node selection that wrote it.
@@ -3487,8 +3487,24 @@ export class EditorView {
     return same(dom.anchor, shown.anchor) && same(dom.head, shown.head);
   }
 
+  /**
+   * The selection the host's text is in. In a shadow root the document's is retargeted to the
+   * shadow host: the root's own where the engine has one (Chromium). Firefox's document
+   * selection reaches inside.
+   * shortcut: WebKit has neither; `getComposedRanges` would give the range there, not the
+   * selection's direction or `modify`: editing in a shadow root is not supported in WebKit.
+   */
+  private domSelection(): ReturnType<Document["getSelection"]> {
+    const root = this.host.getRootNode() as Partial<Pick<Document, "getSelection">>;
+    return root !== this.host.ownerDocument && typeof root.getSelection === "function"
+      ? root.getSelection()
+      : this.host.ownerDocument.getSelection();
+  }
+
   private hasFocus(): boolean {
-    const active = this.host.ownerDocument.activeElement;
+    // A shadow root's own: the document's is the shadow host.
+    const root = this.host.getRootNode() as Partial<Pick<Document, "activeElement">>;
+    const active = root.activeElement ?? this.host.ownerDocument.activeElement;
     return (
       (active === this.host || this.host.contains(active)) && !this.mount?.wrapper.contains(active)
     );
@@ -3497,7 +3513,7 @@ export class EditorView {
   /** Writes the model selection to the DOM unless the DOM already shows it (keeps native affinity). */
   private writeSelection(force: boolean): void {
     if (this.composing || !this.hasFocus()) return;
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel) return;
     const { selection, doc } = this.state;
     if (!force) {
@@ -3648,7 +3664,7 @@ export class EditorView {
     if (this.state.selection.empty && type.includes("Line")) {
       // No target range: let the browser find the line edge, never delete a character instead.
       // shortcut: hard-line deletes also stop at the visual line edge here; Chromium, Firefox and WebKit all give a range.
-      const sel = this.host.ownerDocument.getSelection();
+      const sel = this.domSelection();
       if (type === "deleteEntireSoftLine") {
         sel?.modify?.("move", "backward", "lineboundary");
         sel?.modify?.("extend", "forward", "lineboundary");
@@ -4375,7 +4391,7 @@ export class EditorView {
    * block's first or last fragment (a block split across pages has several).
    */
   private caretOnEdgeLine(dir: -1 | 1, focusOnly = false): boolean {
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     // `focusOnly`: a range's head (Shift+arrows), else only a caret.
     if (!sel?.rangeCount || (!focusOnly && !sel.isCollapsed) || !sel.focusNode) return false;
     const element = this.blockElement(sel.focusNode);
@@ -4411,7 +4427,7 @@ export class EditorView {
     // this view knows (Cmd+arrows go to the line edge, Alt+arrows navigate history on Windows).
     const word = IS_MAC ? event.altKey : event.ctrlKey;
     if (event.metaKey || (IS_MAC ? event.ctrlKey : event.altKey)) return false;
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     if (!sel?.focusNode || !sel.anchorNode || !sel.modify) return false;
     if (!event.shiftKey && !sel.isCollapsed) return false;
     const element = this.blockElement(sel.focusNode);
@@ -4555,7 +4571,7 @@ export class EditorView {
       for (const leaf of desc.leaves)
         if (leaf.dom.nodeType !== Node.TEXT_NODE) hardBreaks.add(leaf.dom);
 
-    const sel = this.host.ownerDocument.getSelection();
+    const sel = this.domSelection();
     let caret = -1;
     let domText = "";
     const walk = (node: Node): void => {
@@ -4827,7 +4843,7 @@ export class EditorView {
       return;
     }
     // Not the selected text (a link or an image the browser drags): the browser's own drag.
-    const range = this.host.ownerDocument.getSelection();
+    const range = this.domSelection();
     const target = event.target as Node | null;
     const fromSelection =
       !!target &&

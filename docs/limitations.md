@@ -545,6 +545,10 @@ Details in the [package README](../packages/docx/README.md).
   or a file picker (which end the composition), not from a timer.
 - A Content Security Policy without `'unsafe-inline'` styles hides the placeholder and breaks
   print sheets ([styling.md](styling.md#content-security-policy)).
+- An editor inside a shadow root works in Chromium and Firefox but not in WebKit (Safari): WebKit
+  gives a shadow root no selection of its own and the document's stops at the shadow host, so
+  the caret is not read (typing goes to the start). A same-origin iframe works in all three
+  (checked in Phase 21, `e2e/realms.spec.ts`; waiting for the owner's acceptance as a limit).
 
 ## Docs and tooling
 
