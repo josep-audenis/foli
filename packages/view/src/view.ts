@@ -651,6 +651,8 @@ export class EditorView {
   private pointerFocus = false;
   /** Whether the view added the host's tabindex (a read-only host must stay focusable). */
   private readonly addedTabIndex: boolean;
+  /** The host's own `translate`, given back on `destroy`. */
+  private readonly ownTranslate: string | null;
   /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
   /** Where pasted and dropped image files go (`EditorViewOptions.upload`). */
@@ -795,6 +797,7 @@ export class EditorView {
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
     // A page translator would rewrite the text, which reading it back takes for typing.
+    this.ownTranslate = host.getAttribute("translate");
     host.setAttribute("translate", "no");
     host.setAttribute(VIEW_ATTR, this.id);
     this.addedTabIndex = !host.hasAttribute("tabindex");
@@ -951,10 +954,11 @@ export class EditorView {
       "aria-multiline",
       "aria-readonly",
       "aria-placeholder",
-      "translate",
       VIEW_ATTR,
     ];
     if (this.addedTabIndex) owned.push("tabindex");
+    if (this.ownTranslate === null) owned.push("translate");
+    else host.setAttribute("translate", this.ownTranslate);
     for (const name of owned) host.removeAttribute(name);
     host.style.removeProperty("white-space");
     host.style.removeProperty("overflow-wrap");
