@@ -3018,7 +3018,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   (`mcp/src/documents.ts`, `save` and `#mine`). Reproduced: open `a.docx`, save (writes
   `a.agent.docx`), open `a.agent.docx`, edit, save (back to `a.agent.docx`), save the first
   again: the second document's edits are gone. Refuse with a message naming the other document.
-- [ ] 21.2 Core: a date control's format cannot hang the editor (`core/src/state/controls.ts`,
+- [x] 21.2 Core: a date control's format cannot hang the editor (`core/src/state/controls.ts`,
   `dateFromText`). Reproduced: `dateFormat: "hdhdhdhdhdhd"`, one keystroke 13 s (the format
   becomes a regular expression of `\S+(\d+)` groups that backtracks). Read the format with a
   linear tokenizer, as `find.ts` avoids regular expressions for the same reason; a test with a

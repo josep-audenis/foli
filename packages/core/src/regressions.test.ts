@@ -139,6 +139,32 @@ describe("regressions: content controls", () => {
     expect(controlProperties(editor.state, "d")?.date).toBe("2024-03-05T00:00:00Z");
   });
 
+  it("a date control's hostile format reads typing at once (21.2)", () => {
+    const editor = open([p("a", ...control("d", "x"), "b")], {
+      controls: { d: { kind: "date", dateFormat: "hdhdhdhdhdhd" } },
+    });
+    editor.select(3, 4);
+    const started = performance.now();
+    expect(editor.run(insertText(`${"1".repeat(32)}!`))).toBe(true);
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  it.each([
+    ["ddMMyyyy", "05032024", "2024-03-05T00:00:00Z"],
+    ["d. MMM. yyyy", "5. Mar. 2024", "2024-03-05T00:00:00Z"],
+    ["MMM d, yyyy", "mar. 5, 2024", "2024-03-05T00:00:00Z"],
+    ["dddd, MMMM d, yyyy", "Tuesday, March 5, 2024", "2024-03-05T00:00:00Z"],
+    ["'on' d/M/yy", "on 5/3/24", "2024-03-05T00:00:00Z"],
+    ["d/M/yyyy", "5/3/2024x", undefined],
+  ])("reads a date typed in the format %s", (dateFormat, typed, date) => {
+    const editor = open([p("a", ...control("d", "x"), "b")], {
+      controls: { d: { kind: "date", dateFormat } },
+    });
+    editor.select(3, 4);
+    expect(editor.run(insertText(typed))).toBe(true);
+    expect(controlProperties(editor.state, "d")?.date).toBe(date);
+  });
+
   it("a drop-down given an item's value takes that item, not another shown as that text", () => {
     const editor = open([p("a", ...control("dd", "x"), "b")], {
       controls: {
