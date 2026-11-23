@@ -49,6 +49,14 @@ not apply), `too-large` (over a limit) or `unauthorized` (the app's callback sai
 sender's own steps come back in the broadcast like everyone's: a client knows its steps are
 confirmed when it receives them with its own client id, and needs no reply to stay correct.
 
+Messages may arrive late or out of order. A client applies a broadcast only when its `version`
+is the client's own; one from later is kept until the ones before it arrive, or the client asks
+to catch up. Catching up is the authority's `stepsSince(version)`, whose answer is
+`{ version, steps, clientIDs }` (the steps since `version`) or `{ snapshot }` when the log was
+compacted past it. After a `stale` refusal the client asks for what it missed the same way,
+rebases its own steps over it and sends them again. Client ids are strings or integers, unique
+among the live clients of one document (below: ids).
+
 **What Foli ships, what the app keeps.** Foli ships:
 
 - the client plugin in `@folijs/core` (headless, beside history): `collab({ version,
@@ -81,39 +89,59 @@ travels, is validated and undone like any other. The parts and the unit a step c
 Comments keep their `CommentStep` and stories their story steps; `schemaVersion` is computed.
 Changing one entry, not the whole value, keeps messages small (a document's styles can weigh
 hundreds of kilobytes) and lets two people change two styles at once. A step changed from a
-stale value is refused by the authority; a client rebasing its own envelope step over another
+stale value is refused: `EnvelopeStep.apply` sees only the tree, so the word plugin's
+`filterTransaction` compares each step's `before` with the envelope's entry and refuses the
+transaction (the authority's `invalid`). A client rebasing its own envelope step over another
 person's change of the same entry merges the two property by property, its own change winning
-where both changed one property. Undo now takes a style or numbering change back with the edit
-it came with (it stayed before): a change of behaviour the changeset and limitations.md state.
+where both changed one property: the collab plugin does it when it applies its own steps again,
+where the envelope is known (`Step.map` has none). Undo now takes a style or numbering change back
+with the edit it came with (it stayed before): a change of behaviour the changeset and
+limitations.md state.
 
 **The tracking switch is in the document.** Whether edits are tracked becomes a setting,
 `settings.trackRevisions`, changed by a step: every client and the authority's snapshot have
-it, `exportDocx` writes it when not told otherwise. A document that has it on needs schema 7
-(the settings check refuses keys it does not know, so 1.5 could not read it); one with it off
-stays at 5. Who makes the changes stays each client's own (`author`).
+it, `exportDocx` writes it when not told otherwise. A document that has the key needs schema 7
+(the settings check refuses keys it does not know, so 1.5 could not read it); one without it
+stays at what its trees need (5, or 6 for a rotated or cropped picture): `schemaVersionOf` reads
+the settings and returns 6 for later nodes explicitly. Turning tracking off removes the key only
+when the document never had it (an imported `.docx` that said on keeps `false`, so export turns
+it off in the package). `importDocx` puts the key in for a Word file that tracks changes: such a
+document is schema 7, which 1.5 cannot read; the changeset says so. Who makes the changes stays
+each client's own (`author`).
 
 **Stories merge.** A change inside an existing header, footer or note is a `StoryEditStep`: the
 story's id and the story's own steps, mapped through the story's own positions, so two people
 typing in one footer rebase like two people typing in the body. `StoryStep` stays for creating,
-removing or replacing a story whole. Maps of story steps travel inside the body's `Mapping`,
-under the story's id.
+removing or replacing a story whole. A `StoryEditStep`'s map (`getMap`) is empty for the body but
+carries the story's id and its inner steps' maps, so it sits at the body step's index in a
+`Mapping`: `slice`, `invert` and mirror pairs keep working per step, and `Mapping.story(id)`
+gives the story's positions mapped through every story step of that id. History's
+`RebaseMapping` answers `story(id)` the same way. A remote story step maps the open story
+editor's selection through it instead of taking the sender's selection.
 
 **Ids are unique across clients.** Revision, comment, note, control and numbering ids and the
 numbers of generated bookmark names are still the next free number after the largest in the
 document, but with the collab plugin on, only numbers of the client's own class are taken:
 `id ≡ slot (mod 256)`, where the slot is the client id when it is an integer (its remainder),
-or a hash of it. Apps give the live clients of one document distinct small integers; two
-clients in one slot can still collide. Without the plugin nothing changes: a single editor's
+or a hash of it (a string). Allocators that take several ids at once (a tracked edit's
+revisions, `track.ts`; generated bookmark names, `fieldupdate.ts`) step by 256 too. Ids grow by
+up to 256 per allocation, far inside Word's 32-bit ids. Apps give the live clients of one
+document distinct small integers; two clients in one slot can still collide. Without the plugin nothing changes: a single editor's
 export is the same as before.
 
 **Received transactions are applied as they are.** They carry the meta `remote`: kept out of
-history and of tracking, let through the filters (the sender's checks held, the authority's
-`authorize` decided), and the plugins that append transactions (comments, controls, fields,
-notes) add nothing, since the sender already sent the steps they appended.
+history and of tracking, let through the clients' filters, and the plugins that append transactions (comments, controls, fields,
+notes) add nothing, since the sender already sent the steps they appended. The authority does
+not trust them that way: it applies a client's steps to an `EditorState` with the document's
+plugins as a local transaction would be (filters on: locked content controls, the envelope's
+`before`), after the app's `authorize`, and refuses a transaction a filter drops as `invalid`.
+Clients then apply only what the authority accepted.
 
 **History.** Received steps are not undoable. The user's own events are mapped over them (the
-existing rebase); an event whose envelope or story steps no longer apply after someone else
-changed the same entry or story is dropped whole, never half applied.
+existing rebase, which drops steps that no longer apply one by one). Undo of an event whose
+envelope step's `before` no longer holds, after someone else changed the same entry, drops the
+event whole, as an envelope changed outside history does today (`storedStepsApply`); 22.7 adds
+the story steps' check.
 
 **What a snapshot holds.** `{ version, document, package? }`: the document as JSON (content,
 envelope, comments, stories and resources), and the package it was imported from, which the
@@ -130,4 +158,3 @@ limit; an app with large pictures stores the bytes and gives resources a `url`.
 - Two clients editing one style property at once: the last confirmed wins. Two clients in one id
   slot can produce duplicate ids; the app avoids it by numbering its live clients.
 - The agent library and the MCP server do not edit a shared document in this phase.
-- Undo takes envelope changes back with their edit, a change from 1.5 written in the changeset.

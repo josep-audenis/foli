@@ -3174,8 +3174,9 @@ server editing a shared document; a hosted service.
   `notes.ts:496`): each client would run them again on steps received from another, doubling
   their steps.
 - The history plugin's state is internal (`history.ts:15`, ADR-0008) so this phase can change
-  it. It already rebases its events over changes kept out of it, with mirrored maps
-  (`Mapping.appendMap(map, mirror)`), which is what received steps need.
+  it. It already rebases its events over changes kept out of it, mirroring inverted and rebased
+  maps (`RebaseMapping`), which is what received steps need; the client plugin will pair its own
+  with `Mapping.appendMap(map, mirror)`.
 - Export needs the package the document came from (`DocxImport.package`: latent styles, picture
   bullets, parts Foli does not edit) and the bytes of uploaded pictures: a server must keep
   them beside the document, not the JSON alone.
@@ -3234,8 +3235,8 @@ lets the agent library return steps); 22.7 onwards build it.
   exported, have unique `w:id`s.
 - [ ] 22.6 Received transactions are applied as they are: this task defines a `remote` meta
   (22.7 sets it; the tests here set it by hand). With it, the four appending plugins add
-  nothing (the sender already sent their steps), the filters of locked controls and stories let
-  it through (the sender's checks held, and the authority's `authorize` decides), and
+  nothing (the sender already sent their steps), the filter of locked controls lets it
+  through (the sender's checks held, and the authority's `authorize` decides), and
   `trackTransaction` leaves it untracked. Test: two editors stay identical after edits that
   trigger each plugin and filter, tracking on.
 - [ ] 22.7 The client plugin (`packages/core`, headless): `collab({ version, clientID })`,
