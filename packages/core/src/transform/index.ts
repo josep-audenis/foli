@@ -1,4 +1,10 @@
-export { type Mappable, Mapping, type MapResult, StepMap } from "./stepmap.js";
+export {
+  type Mappable,
+  Mapping,
+  type MapResult,
+  StepMap,
+  type StoryMaps,
+} from "./stepmap.js";
 export {
   AddMarkStep,
   NodeMarkupBatchStep,
