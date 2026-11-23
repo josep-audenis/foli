@@ -359,8 +359,20 @@ function themeFont(theme: ThemeJSON | undefined, ref: string): string | null {
   return name || null;
 }
 
+const WORDS = new Set([
+  "upperRoman",
+  "lowerRoman",
+  "upperLetter",
+  "lowerLetter",
+  "ordinal",
+  "chicago",
+]);
+
 /** A counter in a number format (ST_NumberFormat); formats Foli does not know show as decimal. */
 export function formatNumber(n: number, format: string | undefined): string {
+  // shortcut: a fraction has no roman, letter or ordinal form here, only its digits; check what
+  // Word shows (a formula field's `\* ROMAN` of 3.5) when a document needs it.
+  if (!Number.isInteger(n) && WORDS.has(format ?? "")) return String(n);
   switch (format ?? "decimal") {
     case "none":
       return "";
@@ -428,8 +440,10 @@ function letters(n: number): string {
 }
 
 function ordinal(n: number): string {
-  const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  // A negative number's suffix is its size's: -1st, -12th.
+  const tens = Math.abs(n) % 100;
+  const suffix =
+    tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][Math.abs(n) % 10] ?? "th");
   return `${n}${suffix}`;
 }
 

@@ -541,6 +541,10 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     return doc;
   }
   if (version !== SCHEMA_VERSION) {
+    if (typeof version === "string")
+      throw new FoliDocumentError(
+        `schemaVersion must be a number, not the string ${JSON.stringify(version)}`,
+      );
     const newer = Number.isInteger(version) && (version as number) > SCHEMA_VERSION;
     throw new FoliDocumentError(
       `Unsupported schemaVersion: ${String(version)} (this version of @folijs/core reads 1 to ` +

@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "./model/index.js";
 import { insertText } from "./state/commands.js";
+import { resolveComment } from "./state/comments.js";
 import { controlProperties, controlValues, setControlValue } from "./state/controls.js";
 import { createEditor, type Editor } from "./state/editor.js";
 import { formatDatePicture, updateFields } from "./state/fieldupdate.js";
@@ -10,6 +11,7 @@ import { noteNumbers } from "./state/notes.js";
 import { acceptAllChanges } from "./state/review.js";
 import type { FoliDocument } from "./v3/document.js";
 import { createDocument, parseDocument, SCHEMA_VERSION } from "./v3/document.js";
+import { formatNumber } from "./v3/resolve.js";
 
 type Inline = NodeJSON | string;
 const t = (text: string, marks?: NodeJSON["marks"]): NodeJSON => ({
@@ -493,5 +495,76 @@ describe("duplicate comment ids (21.3)", () => {
     expect(editor.commands.resolveComment(6)).toBe(true);
     const by = (id: number) => editor.getDocument().comments.find((c) => c.id === id);
     expect([by(1)?.done, by(6)?.done]).toEqual([undefined, true]);
+  });
+});
+
+describe("smaller bugs of the audit (21.7)", () => {
+  it("a new tracked change takes an id above a table row's revision", () => {
+    const row = (id: number): NodeJSON => ({
+      type: "tableRow",
+      attrs: { revision: { insertion: { id, author: "Other" } } },
+      content: [{ type: "tableCell", content: [p("cell")] }],
+    });
+    const editor = createEditor({
+      document: documentOf([p("text"), { type: "table", content: [row(40)] }, p("end")]),
+      author: "Me",
+      trackChanges: true,
+    });
+    editor.select(2);
+    editor.run(insertText("x"));
+    const ids: number[] = [];
+    editor.state.doc.descendants((node) => {
+      for (const mark of node.marks)
+        if (mark.type.name === "insertion") ids.push(mark.attrs.id as number);
+      return true;
+    });
+    expect(ids).toEqual([41]);
+  });
+
+  it("a MERGEFIELD date picture reads ISO dates only, not what Date.parse guesses", () => {
+    const merged = (value: string) => {
+      const editor = open([p(...field('MERGEFIELD d \\@ "yyyy-MM-dd"', "old"))]);
+      updateFields(editor, { data: { d: value } });
+      return paragraphs(editor)[0];
+    };
+    expect(merged("12")).toBe("12");
+    expect(merged("March 5")).toBe("March 5");
+    expect(merged("2024-03-05")).toBe("2024-03-05");
+    expect(merged("2024-03-05 10:00")).toBe("2024-03-05");
+    expect(merged("2024-13-45")).toBe("2024-13-45");
+    expect(merged("2024-03-05T10:00:00Z")).toMatch(/^2024-03-0[45]$/);
+  });
+
+  it("a SEQ \\r with no number counts on", () => {
+    const editor = open([
+      p(...field("SEQ f", "9")),
+      p(...field("SEQ f \\r", "9")),
+      p(...field("SEQ f \\r 5", "9")),
+    ]);
+    updateFields(editor);
+    expect(paragraphs(editor)).toEqual(["1", "2", "5"]);
+  });
+
+  it("roman, letter and ordinal numbers of fractions and negatives", () => {
+    expect(formatNumber(1.5, "upperRoman")).toBe("1.5");
+    expect(formatNumber(2.5, "lowerLetter")).toBe("2.5");
+    expect(formatNumber(1.5, "ordinal")).toBe("1.5");
+    expect(formatNumber(-1, "ordinal")).toBe("-1st");
+    expect(formatNumber(-12, "ordinal")).toBe("-12th");
+    expect(formatNumber(-3, "upperRoman")).toBe("-3");
+    expect(formatNumber(1.5, "none")).toBe("");
+  });
+
+  it("a reply whose parent is missing is resolved as a thread of its own", () => {
+    const comment = { author: "A", content: [{ type: "paragraph" }] };
+    const editor = open([p("text")], { comments: [{ ...comment, id: 2, parent: 9 }] });
+    expect(editor.run(resolveComment(2))).toBe(true);
+    expect(editor.getDocument().comments[0]?.done).toBe(true);
+  });
+
+  it("a string schemaVersion is told to be a number", () => {
+    expect(() => parseDocument({ ...createDocument(), schemaVersion: "6" })).toThrow(
+      'schemaVersion must be a number, not the string "6"',
+    );
   });
 });

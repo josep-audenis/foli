@@ -74,7 +74,10 @@ function rootOf(comments: readonly CommentJSON[], id: number): CommentJSON | und
   while (root?.parent !== undefined && !seen.has(root.id)) {
     seen.add(root.id);
     const up = root.parent;
-    root = comments.find((c) => c.id === up);
+    // A reply whose parent is missing starts a thread of its own.
+    const parent = comments.find((c) => c.id === up);
+    if (!parent) break;
+    root = parent;
   }
   return root;
 }
