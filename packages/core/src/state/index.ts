@@ -234,6 +234,7 @@ export {
   type Command,
   EditorState,
   type EditorStateConfig,
+  isRemote,
   Plugin,
   PluginKey,
   type PluginSpec,

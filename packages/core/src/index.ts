@@ -185,6 +185,7 @@ export {
   isBookmarkName,
   isHeaderRow,
   isMarkActive,
+  isRemote,
   joinBackward,
   joinForward,
   joinHistory,
