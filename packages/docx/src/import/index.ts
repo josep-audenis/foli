@@ -34,8 +34,9 @@ export interface DocxImport {
   readonly package: DocxPackage;
   readonly report: ImportReport;
   /**
-   * Whether Word records edits to it as tracked changes (`w:trackRevisions` in its settings):
-   * pass it to the editor (`trackChanges`), and back to `exportDocx` when it changes.
+   * Whether Word records edits to it as tracked changes (`w:trackRevisions` in its settings).
+   * Also the document's `settings.trackRevisions` (schema 7), which the editor and `exportDocx`
+   * read: passing it to them is no longer needed.
    */
   readonly trackRevisions: boolean;
 }

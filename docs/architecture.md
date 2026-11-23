@@ -540,13 +540,17 @@ schema v3 is the only editing schema. Run properties, alignment and line spacing
 directly only where the resolved formatting without them differs (picking a heading's own size,
 color or alignment leaves no direct value; "Automatic" color and "no highlight" write `auto` and
 `none` where a style gives one); space before and after and indents are always written. Paragraph changes are one
-`NodeMarkupBatchStep`. A transaction can replace the document's envelope (`withEnvelope`,
-plugin state): a new list's numbering definition, and a built-in style the document has not
-used yet (headings, List Paragraph, Hyperlink, with the Word 2013 to 2019 template's
-definitions, not checked against newer Word), are added that way. Undo keeps such a definition,
-unused (a choice; not checked against what Word does). Comments are not changed that way:
-`withEnvelope` ignores them, and a `CommentStep` (made by `setComments`) adds, changes or
-removes one. It leaves the tree as it is, so history records it with the text it belongs to
+`NodeMarkupBatchStep`. A transaction changes the document's envelope with `withEnvelope`: a new
+list's numbering definition, and a built-in style the document has not used yet (headings, List
+Paragraph, Hyperlink, with the Word 2013 to 2019 template's definitions, not checked against
+newer Word), are added that way. Since 1.6 (22.3, ADR-0012) `withEnvelope` makes an
+`EnvelopeStep` per entry it changes (one style by id, one numbering definition, one resource,
+one control's properties, one setting; the section, defaults and theme whole), with the value
+before and after: the word plugin's state follows the steps, its filter refuses a transaction
+whose step no longer finds its `before`, other editors receive them as JSON, and undo takes such
+a definition back with the edit it came with (it stayed before 1.6). Comments are not changed
+that way: `withEnvelope` ignores them, and a `CommentStep` (made by `setComments`) adds, changes
+or removes one. It leaves the tree as it is, so history records it with the text it belongs to
 and undo and redo take it back.
 
 Tracked changes (9.2, `state/track.ts`) do not change the commands. With tracking on (a plugin
@@ -568,8 +572,10 @@ and paragraph marks of one's own insertion record nothing, and an existing recor
 properties before the first change). A join that removes one's own inserted mark keeps the first
 paragraph's properties, as untracked; when they differ from the last one's (whose mark stays),
 that is recorded as the last one's formatting change, so rejecting restores it. Whether tracking
-is on is not part of the document format: the editor option
-and the `.docx`'s `w:trackRevisions` (read and written by `@folijs/docx`) carry it.
+is on is the document's setting `trackRevisions` (schema 7, 22.3): `setTrackChanges` changes it
+with an `EnvelopeStep` kept out of undo, the track plugin reads it (the editor option
+`trackChanges` holds while the document says nothing), and `@folijs/docx` reads and writes it
+as `w:trackRevisions`. The author is each editor's own.
 
 Accepting and rejecting (9.4, `state/review.ts`) work on the list `trackedChanges` makes
 (runs with one change mark, paragraph marks, paragraphs' recorded formatting): mark and attribute

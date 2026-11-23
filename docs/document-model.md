@@ -483,20 +483,23 @@ Migrations never drop content. A published version never changes in place.
 | 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again) |
 | 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)      |
 | 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
-| 6       | 1.4.0       | — (the current version: a picture's `rotation` and `crop`)                                                           |
+| 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
+| 7       | 1.6.0       | — (the current version: the tracking switch, `settings.trackRevisions`, ADR-0012)                                    |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
 needs 6 is refused by them with a message saying so. A document that says 5 holding v6 content
-is refused.
+is refused. From 1.6.0 a document that holds `settings.trackRevisions` (on, or turned off after
+being on) needs 7; 1.4 and 1.5 refuse it, and a document that says 5 or 6 holding it is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
 0.4.0 (Phase 9: recording, accepting and rejecting tracked changes, editing comments) uses the
 same schema 3: it writes the marks and attributes 0.3.0 already reads (`insertion`, `deletion`,
 `formatChange`, a paragraph's `revision` and `formatChange`, comment anchors and `comments`), so
-0.3.0 and 0.4.0 read each other's documents. Whether tracking is on is not in the document: the
-editor option and a `.docx`'s `w:trackRevisions` carry it. 0.4.0 cannot read schema 4; 0.5.0
+0.3.0 and 0.4.0 read each other's documents. Until 1.5, whether tracking was on was not in the
+document: the editor option and a `.docx`'s `w:trackRevisions` carried it (from 1.6 it is the
+setting `trackRevisions`, schema 7). 0.4.0 cannot read schema 4; 0.5.0
 cannot read schema 5.
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
 page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the

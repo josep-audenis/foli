@@ -63,10 +63,7 @@ describe("steps as JSON", () => {
     for (const json of steps) tr.step(Step.fromJSON(state.schema, json));
     state = state.apply(tr);
     const replayed = documentJSON(wordContext(state)?.envelope ?? context.envelope, state.doc);
-    const made = editor.getDocument();
-    // shortcut: styles and numbering change through `withEnvelope`, not steps, until 22.3.
-    for (const key of ["content", "comments", "stories", "section", "settings"] as const)
-      expect(replayed[key], key).toEqual(made[key]);
+    expect(replayed).toEqual(editor.getDocument());
   });
 
   it("refuses what is not a step of this schema", () => {
@@ -96,7 +93,9 @@ describe("steps as JSON", () => {
         index: 0,
       },
       { stepType: "comment", id: 1, comment: { id: 1, author: "a" }, previous: null, index: 0 },
-      { stepType: "envelope", key: "styles", before: [], after: [] },
+      { stepType: "envelope", key: "comments", before: [], after: [] },
+      { stepType: "envelope", key: "styles", path: ["a", "b"], before: null, after: null },
+      { stepType: "envelope", key: "styles", path: ["Normal"], after: { id: 1 } },
       { stepType: "envelope", key: "section", before: {}, after: { nope: 1 } },
       { stepType: "story", id: "h", before: null, after: null },
       { stepType: "story", id: "h", before: null, after: { kind: "header", content: {} } },

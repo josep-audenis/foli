@@ -748,10 +748,10 @@ describe("the clipboard on a schema v3 document", () => {
       [4, "B"],
       [5, "A"],
     ]);
-    // Undo takes the content and its comment out; styles it added stay, as in Word.
+    // Undo takes the content, its comment and the styles it added out (envelope steps, 22.3).
     target.editor.commands.undo();
     expect(target.editor.getDocument().content.content).toHaveLength(2);
-    expect(target.editor.getDocument().styles.map((s) => s.id)).toContain("Quote");
+    expect(target.editor.getDocument().styles.map((s) => s.id)).not.toContain("Quote");
     expect(target.editor.getDocument().comments.map((c) => c.id)).toEqual([4]);
     target.editor.commands.redo();
     expect(target.editor.getDocument().comments).toEqual(pasted.comments);

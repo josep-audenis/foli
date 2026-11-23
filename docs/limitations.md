@@ -356,6 +356,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   resolved or deleted. A comment anchored inside content Foli keeps verbatim (an opaque block)
   stays: its anchors there cannot be removed.
 - Revisions carry no initials (Word has none); comments do.
+- Since 1.6, undo takes back a style, list definition, resource or control's properties added with
+  an edit, with the edit (before, they stayed as in Word). The tracking switch is the
+  document's (`settings.trackRevisions`, schema 7): a document with it set, or an imported
+  `.docx` that tracks changes, cannot be read by 1.5 or earlier.
 
 ## Agent editing (`@folijs/agent`)
 
@@ -398,7 +402,8 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 - Core's rules let a paragraph be inserted into a locked block content control; the session
   refuses it itself, the editor under it (`session.editor`) does not.
 - A style the session adds to the document stays when its changes are rejected: a built-in
-  heading it used, and the styles a rebuilt table of contents or a control's placeholder needs.
+  heading it used, and the styles a rebuilt table of contents or a control's placeholder needs
+  (undo takes it back since 1.6; rejecting a tracked change does not).
 - A handle lost (its block removed, or joined into the next) does not come back with undo.
 - Every operation reads the whole body again; not measured on long documents.
 

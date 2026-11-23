@@ -198,7 +198,8 @@ function relative(from: string, to: string): string {
 export interface ExportOptions {
   /**
    * Whether Word records edits as tracked changes (`w:trackRevisions`). Left out: as the
-   * original package has it (off in a new one).
+   * document's settings say (`settings.trackRevisions`), else as the original package has it
+   * (off in a new one).
    */
   trackRevisions?: boolean;
   /**
@@ -644,8 +645,9 @@ async function intoPackage(
     if (partRels.added.length) writeRelationships(target, partRels);
   }
 
-  const { trackRevisions } = options;
   const { settings } = doc;
+  // The document's switch when not told otherwise (ADR-0012); neither: the package's.
+  const trackRevisions = options.trackRevisions ?? settings?.trackRevisions;
   if (trackRevisions !== undefined || settings) {
     part(
       REL.settings,
@@ -815,7 +817,7 @@ async function newPackage(
     "/word/settings.xml",
     REL.settings,
     CT.settings,
-    newSettingsXml(!!options.trackRevisions, doc.settings, true),
+    newSettingsXml(!!(options.trackRevisions ?? doc.settings?.trackRevisions), doc.settings, true),
   );
   parts.push({
     name: "/word/_rels/document.xml.rels",

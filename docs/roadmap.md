@@ -3218,7 +3218,7 @@ lets the agent library return steps); 22.7 onwards build it.
   registry (`Step.jsonID`) so an extension can add its own; slices keep `ext`, `attributes` and
   opaque nodes. Property test: random transactions → JSON → applied on a second state give the
   same document. `fromJSON` validates its input (a trust boundary: it will read the network).
-- [ ] 22.3 Envelope changes as steps: `withEnvelope` keeps its signature but adds an
+- [x] 22.3 Envelope changes as steps: `withEnvelope` keeps its signature but adds an
   `EnvelopeStep` for each key it changes (`styles`, `numbering`, `resources`, `section`,
   `controls` and the rest it can change; a list in the ADR), with `before` and `after` so a
   change made from a stale value is refused. This changes undo: a style or numbering change is

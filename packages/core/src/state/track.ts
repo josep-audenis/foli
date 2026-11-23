@@ -35,7 +35,7 @@ import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { otherTrees, wordContext } from "./word.js";
+import { EnvelopeStep, otherTrees, wordContext } from "./word.js";
 
 /**
  * How tracked changes show: `markup` (inserted text underlined and deleted text struck through,
@@ -106,13 +106,20 @@ interface ParagraphRevision {
   deletion?: Revision;
 }
 
+/** `value` with `on` as the document's settings say, when they say (ADR-0012). */
+function withSettings(value: TrackState, state: EditorState): TrackState {
+  const on = wordContext(state)?.envelope.settings?.trackRevisions;
+  return on === undefined || on === value.on ? value : { ...value, on };
+}
+
 /** @internal */
 export function trackPlugin(state: TrackState): Plugin<TrackState> {
   return new Plugin({
     key,
     state: {
-      init: () => state,
-      apply: (tr, value) => (tr.getMeta(key) as TrackState | undefined) ?? value,
+      init: (editor) => withSettings(state, editor),
+      apply: (tr, value, _old, next) =>
+        withSettings((tr.getMeta(key) as TrackState | undefined) ?? value, next),
     },
   });
 }
@@ -129,12 +136,24 @@ export function trackState(state: EditorState): TrackState | null {
 export const withTrackState = (tr: Transaction, state: TrackState): Transaction =>
   tr.setMeta(key, state);
 
-/** Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. */
+/**
+ * Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. The switch
+ * is the document's (`settings.trackRevisions`, a step other editors receive, kept out of undo);
+ * the author is this editor's.
+ */
 export function setTrackChanges(on: boolean, author?: string): Command {
   return (state, dispatch) => {
     const current = key.getState(state);
     if (!current || !state.schema.marks.insertion) return false;
-    dispatch?.(state.tr.setMeta(key, { ...current, on, author: author ?? current.author }));
+    if (!dispatch) return true;
+    const tr = state.tr.setMeta(key, { ...current, on, author: author ?? current.author });
+    const before = wordContext(state)?.envelope.settings?.trackRevisions;
+    if (wordContext(state) && before !== on)
+      tr.step(new EnvelopeStep("settings", before, on, ["trackRevisions"])).setMeta(
+        "addToHistory",
+        false,
+      );
+    dispatch(tr);
     return true;
   };
 }

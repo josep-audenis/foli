@@ -41,9 +41,10 @@ import {
 
 /**
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
- * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007).
+ * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
+ * crop; v7 the tracking switch in the settings, ADR-0012).
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -382,6 +383,11 @@ export interface WordSettingsJSON {
   evenAndOddHeaders?: boolean;
   footnotes?: NotePropertiesJSON;
   endnotes?: NotePropertiesJSON;
+  /**
+   * `w:trackRevisions`: edits are recorded as tracked changes (schema 7). Left out: the document
+   * never said (an editor tracks when told to; `exportDocx` keeps the package's).
+   */
+  trackRevisions?: boolean;
 }
 
 /** A document in the Word model: the content tree and what Word keeps beside it. */
@@ -390,7 +396,7 @@ export interface FoliDocument {
    * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
    * added (6: a picture's rotation or crop, 1.4).
    */
-  schemaVersion: 5 | typeof SCHEMA_VERSION;
+  schemaVersion: 5 | 6 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -437,18 +443,22 @@ export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
 
 /**
  * The lowest schema `doc`'s content needs (ADR-0008: a document is saved with it, so an older
- * 1.x reads it when it can): 6 for a picture rotated or cropped, else 5.
+ * 1.x reads it when it can): 7 for the tracking switch in the settings, 6 for a picture rotated
+ * or cropped, else 5.
  * @internal
  */
 export function schemaVersionOf(
-  doc: Pick<FoliDocument, "content" | "comments" | "stories">,
+  doc: Pick<FoliDocument, "content" | "comments" | "stories"> & {
+    settings?: WordSettingsJSON | undefined;
+  },
 ): FoliDocument["schemaVersion"] {
+  if (doc.settings?.trackRevisions !== undefined) return 7;
   const trees = [
     doc.content,
     ...doc.comments.map((c) => ({ content: c.content })),
     ...Object.values(doc.stories ?? {}).map((s) => s.content),
   ];
-  return trees.some((tree) => laterNode(tree, 5)) ? SCHEMA_VERSION : 5;
+  return trees.some((tree) => laterNode(tree, 5)) ? 6 : 5;
 }
 
 /**
@@ -506,7 +516,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   if (version === 1 || version === 2) {
     return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))), options);
   }
-  if (version === 3 || version === 4 || version === 5) {
+  if (version === 3 || version === 4 || version === 5 || version === 6) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
     if (version < 5)
@@ -516,6 +526,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     // What a later schema added is not in a document that says it is of an earlier one.
     const later = version < 5 ? laterSection(doc.section) : undefined;
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
+    if (doc.settings?.trackRevisions !== undefined)
+      fail("settings.trackRevisions", `is of schema 7 (the document says schema ${version})`);
     for (const [path, content] of [
       ["content", doc.content],
       ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
@@ -530,7 +542,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
           `${found.name} is a schema ${found.schema} node (the document says schema ${version})`,
         );
     }
-    if (version === 5) return doc;
+    if (version >= 5) return doc;
     if (version === 3)
       doc.styles.forEach((style, i) => {
         for (const key of ["table", "row", "cell", "conditions"]) {
@@ -763,7 +775,7 @@ function laterNode(
     if (version < 5 && attrs.controls) return { name: "controls", schema: 5 };
     const part = version < 5 ? laterSection(attrs.section) : undefined;
     if (part) return { name: part, schema: 5 };
-    if (name === "picture" && (attrs.rotation != null || attrs.crop != null))
+    if (version < 6 && name === "picture" && (attrs.rotation != null || attrs.crop != null))
       return { name: "a picture's rotation or crop", schema: 6 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
@@ -1052,6 +1064,7 @@ const checkSettings: Check = shape(
     evenAndOddHeaders: bool,
     footnotes: checkNoteProperties,
     endnotes: checkNoteProperties,
+    trackRevisions: bool,
   },
   [],
   true,
