@@ -520,6 +520,8 @@ export declare class EditorView {
     endComposition(): void;
     /** Leaves the story being edited; `focus`: the body takes the focus, with its selection back. */
     closeStory(focus?: boolean): void;
+    /** The host editable again, its changes read back, as before a story opened. */
+    private bodyEditable;
     /** The page's own story, after what was open is shown nowhere any more. */
     private reopenStory;
     /** The margin of a page a mouse event is in, if it is on the page itself. */
@@ -612,6 +614,14 @@ export declare class EditorView {
      * shown as the text range between its snapped ends, so reading it back must not replace it.
      */
     private shows;
+    /**
+     * The selection the host's text is in. In a shadow root the document's is retargeted to the
+     * shadow host: the root's own where the engine has one (Chromium). Firefox's document
+     * selection reaches inside.
+     * shortcut: WebKit has neither; `getComposedRanges` would give the range there, not the
+     * selection's direction or `modify`: editing in a shadow root is not supported in WebKit.
+     */
+    private domSelection;
     private hasFocus;
     /** Writes the model selection to the DOM unless the DOM already shows it (keeps native affinity). */
     private writeSelection;
@@ -629,6 +639,8 @@ export declare class EditorView {
     private boundaryOnly;
     /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
     private selectTargetRange;
+    /** The `beforeinput` types already warned about (`onBeforeInput`). */
+    private readonly unhandledInput;
     private onBeforeInput;
     /**
      * Runs the first command bound to `name` that applies, through the view's dispatch; the view's
@@ -716,9 +728,15 @@ export declare class EditorView {
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
-     * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`.
+     * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`,
+     * and goes to the bookmark a link to one names (a table of contents' entry, a cross-reference).
      */
     private onClick;
+    /**
+     * The bookmark `node` links to, read from the model: a link to a bookmark (`w:anchor`), a
+     * `HYPERLINK \l` field's result, a `REF`, `PAGEREF` or `NOTEREF` field's with `\h`.
+     */
+    private bookmarkLinked;
     /** The href of the link an `<a>` shows, read from the model (the DOM is never the truth). */
     private linkHref;
     private onKeyDown;
@@ -860,7 +878,48 @@ export type { ReviewView } from "@folijs/core";
 export {};
 
 // word/controls.d.ts
-export {};
+/**
+ * What the editable view draws for content controls (ADR-0007, 11.9): the bounding box and title
+ * of the control the caret is in or the pointer is over, its list or date button, and the pop-ups
+ * those open. Everything here is the view's own: it stands beside the blocks, marked
+ * `contenteditable="false"`, so it is neither document text nor a place positions map to.
+ */
+import { type ControlRange } from "@folijs/core";
+export declare class ControlChrome {
+    private readonly view;
+    /** Unique in the page: two views' lists never share an option's id (`aria-activedescendant`). */
+    private readonly idPrefix;
+    private drawn;
+    private hovered;
+    private popup;
+    private status;
+    private said;
+    private stopWatching;
+    constructor(view: ControlChromeHost);
+    private get doc();
+    /** Where pop-ups go: out of the editing host. */
+    private get root();
+    /** The control the selection is in, if it is all in one. */
+    active(): ControlRange | null;
+    private properties;
+    /** Draws the frames as the state and the pages now are (`show` false: none). */
+    draw(show?: boolean): void;
+    private frame;
+    private element;
+    private selectWhole;
+    /** The pointer over `target`: the control there gets its frame too. */
+    hover(target: EventTarget | null): void;
+    /** A click on a check box's glyph changes it. Whether it was one. */
+    click(event: MouseEvent): boolean;
+    private announce;
+    /** Opens the list or date picker of the control the selection is in. Whether there is one. */
+    open(): boolean;
+    private choose;
+    private list;
+    private datePicker;
+    close(focus: boolean): void;
+    destroy(): void;
+}
 
 // word/edit.d.ts
 export {};
