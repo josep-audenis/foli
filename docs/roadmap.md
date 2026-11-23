@@ -33,6 +33,7 @@ place that says what is in progress; check it before starting work.
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
 | 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.7 merged; 20.8 (docs, release) left                                                                                                                                                   |
 | 21 Hardening              | Ready                    | —                     | Planned 2026-11-22 from an audit of 1.4.0, nothing built: data loss, a hang and a PDF leak first                                                                                              |
+| 22 Collaboration          | Blocked by 21            | —                     | Planned 2026-11-23, nothing built: central authority over steps; fixes go before features (Phase 21)                                                                                          |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -93,27 +94,27 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Overview
 
-| Phase | Name                      | Outcome                                                                     | Release      | Size |
-| ----- | ------------------------- | --------------------------------------------------------------------------- | ------------ | ---- |
-| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                               | —            | ✅   |
-| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                              | —            | M    |
-| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON                            | —            | L    |
-| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor                 | —            | L    |
-| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard                         | 0.0.x canary | XL   |
-| 5     | Native pagination         | Real pages, fragments, incremental reflow, print                            | —            | XL   |
-| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                                     | **0.1.0**    | M    |
-| 7     | Rich content              | Lists, links, alignment, color, highlight, rules                            | 0.2.0        | L    |
-| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX                   | 0.3.0        | XL   |
-| 9     | Review                    | Tracked changes and comments, Word-compatible                               | 0.4.0        | XL   |
-| 10    | Tables & images           | Word tables across pages, inline and floating images                        | 0.5.0        | XL   |
-| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF                       | 0.6.0        | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking                       | **1.0.0**    | L    |
-| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions                  | agent 0.1.0  | M    |
-| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                | mcp 0.1.0    | M    |
-| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed               | mcp 0.2.0    | M    |
-| 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow | 1.2.0        | M    |
-| 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change              | 1.3.0        | S    |
-| —     | Optional                  | Real-time collaboration                                                     | —            | —    |
+| Phase | Name                      | Outcome                                                                           | Release             | Size |
+| ----- | ------------------------- | --------------------------------------------------------------------------------- | ------------------- | ---- |
+| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                                     | —                   | ✅   |
+| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                                    | —                   | M    |
+| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON                                  | —                   | L    |
+| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor                       | —                   | L    |
+| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard                               | 0.0.x canary        | XL   |
+| 5     | Native pagination         | Real pages, fragments, incremental reflow, print                                  | —                   | XL   |
+| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                                           | **0.1.0**           | M    |
+| 7     | Rich content              | Lists, links, alignment, color, highlight, rules                                  | 0.2.0               | L    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX                         | 0.3.0               | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible                                     | 0.4.0               | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images                              | 0.5.0               | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF                             | 0.6.0               | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking                             | **1.0.0**           | L    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions                        | agent 0.1.0         | M    |
+| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                      | mcp 0.1.0           | M    |
+| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed                     | mcp 0.2.0           | M    |
+| 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow       | 1.2.0               | M    |
+| 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change                    | 1.3.0               | S    |
+| 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.5.0, collab 0.1.0 | L    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -3087,6 +3088,150 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   v2, `mark.ts` Phase 9) removed or rewritten, changesets per package; patch releases
   (packages at 1.4.x, agent, mcp) published with the owner's approval.
 
+## Phase 22 — Real-time collaboration · L → 1.5.0, `@folijs/collab` 0.1.0
+
+Several people edit one document at once, as in Google Docs: each sees the others' typing,
+cursors and names within a moment, and the document stays a lossless Word document. Asked for
+by the owner on 2026-11-23; planned the same day, nothing built.
+
+The approach is a central authority over steps: the app's server orders every change, each
+client rebases its unconfirmed steps over the ones it receives (Google Docs works the same way).
+Foli's steps and mapping already do the rebasing; what is missing is listed under "Starts
+from". A CRDT binding (Yjs) was weighed and left out: it bypasses steps, so the server cannot
+validate a change, a merge can leave a document the schema refuses (a table row with the wrong
+number of cells), and Word's envelope and stories would need their own mapping into Yjs types.
+22.1 records this as an ADR.
+
+Foli ships the protocol, the client plugin and a server-side authority that runs anywhere
+`packages/core` runs (Node, workers, Durable Objects). It ships no transport and no hosted
+service: the app passes messages over WebSocket, SSE or anything else, and keeps auth and
+storage. A WebSocket example shows the whole loop.
+
+Not in this phase: a CRDT or Yjs binding; offline editing beyond a reconnect (long offline
+sessions, peer-to-peer); auth, sharing and permissions UI (the authority takes a callback, the
+app decides); version history UI (the step log makes it possible); the agent library and the MCP
+server editing a shared document; a hosted service.
+
+**Starts from (1.4.x), checked 2026-11-23:**
+
+- No `Step` has a JSON form: `ReplaceStep`, `ReplaceAroundStep`, `AddMarkStep`,
+  `RemoveMarkStep`, `NodeMarkupStep`, `NodeMarkupBatchStep` (`transform/steps.ts`),
+  `CommentStep`, `EnvelopeStep`, `StoryStep` (`state/word.ts`). Selections have one
+  (`Selection.toJSON`/`fromJSON`).
+- Most envelope changes are not steps: styles, numbering, resources and the rest go through
+  `withEnvelope`, a transaction meta (about 15 callers: `wordformat.ts`, `notes.ts`,
+  `pictures.ts`, `controls.ts`, `fieldupdate.ts`, `tablecommands.ts`, `review.ts`,
+  `stories.ts`, the view, the agent). Steps alone would not carry them to other clients, and
+  history does not record them (undo leaves a style change as it is). `EnvelopeStep` covers
+  `section`, `settings` and `controls`; `withEnvelope` cannot change `settings` or comments
+  (`word.ts:391`), and changes `section` and `controls` too, beside `EnvelopeStep`.
+- Whether edits are tracked (`w:trackRevisions`) is the track plugin's state, set by meta
+  (`track.ts:137`), an editor option and an `exportDocx` argument: not part of the document,
+  so neither other clients nor a server's snapshot would have it. Every dispatched transaction
+  goes through `trackTransaction` (`editor.ts:603`), so a received one would be tracked again.
+- Two plugins filter transactions by their metas (locked controls, `controls.ts:417`; stories,
+  `stories.ts:211`): a received transaction carries none, so an edit the sender was allowed to
+  make could be refused on another client, and the documents would part.
+- `StoryStep` replaces a whole header, footer or note (`before`/`after`) and maps to itself: two
+  people typing in one header at once would overwrite each other.
+- New ids are the largest in the document plus one (`nextRevisionId`, `track.ts:223`; comments,
+  notes, controls and bookmarks alike): two clients would give two changes the same id, and Word
+  would get duplicate `w:id`s.
+- Four plugins append transactions (`comments.ts`, `controls.ts`, `fields.ts`, `notes.ts`):
+  each client would run them again on steps received from another, doubling their steps.
+- The history plugin's state is internal (`history.ts:15`, ADR-0008) so this phase can change
+  it.
+- Export needs the package the document came from (`DocxImport.package`: latent styles, picture
+  bullets, parts Foli does not edit) and the bytes of uploaded pictures: a server must keep
+  them beside the document, not the JSON alone.
+
+**Acceptance:**
+
+- Two to five simulated clients making random edits (text, marks, lists, tables, styles,
+  comments, tracked changes, headers and notes) with messages delayed and reordered at random
+  end with identical documents that the schema accepts, in a property test of at least 1000
+  runs; no client's edit is lost.
+- Undo undoes only the user's own changes, mapped over everyone else's.
+- The authority refuses a malformed message, a step that does not apply, a stale version
+  (the client rebases and resends) and a message over its size limit, without changing the
+  document.
+- A client that disconnects and comes back catches up from its version, or from a snapshot when
+  the log was compacted past it.
+- A document edited by three clients and exported from the authority's snapshot and package
+  matches the export of the same edits made in one editor; the parts Foli does not edit are
+  byte for byte the original's; Word opens it.
+- Two browsers over WebSocket (e2e): both type in the same paragraph and see each other's text,
+  carets and names; the tracked changes carry each user's name.
+- Keystroke time with remote steps arriving (four clients, a 50-page document) measured with
+  `pnpm bench` against the single-user baseline.
+- `pnpm check` green after each PR; 1.5.0 and `@folijs/collab` 0.1.0 published with the
+  owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-22/collab`, the build green after each, merged after an agent's
+review. 22.2 to 22.6 make the editor ready for collaboration and are useful alone (22.2 also
+lets the agent library return steps); 22.7 onwards build it.
+
+- [ ] Claim phase, branch `phase-22/collab`
+- [ ] 22.1 ADR-0012 Collaboration: central authority over steps, not a CRDT (the reasons
+  above); the message protocol (`{ version, steps, clientID }`, confirm, refuse); what Foli
+  ships and what the app keeps (transport, auth, storage); how ids, envelope changes and
+  stories are handled (22.3–22.5); what a snapshot holds (document, package, resources).
+- [ ] 22.2 Steps as JSON: `toJSON` on every step and `Step.fromJSON(schema, json)`, with a
+  registry (`Step.jsonID`) so an extension can add its own; slices keep `ext`, `attributes` and
+  opaque nodes. Property test: random transactions → JSON → applied on a second state give the
+  same document. `fromJSON` validates its input (a trust boundary: it will read the network).
+- [ ] 22.3 Envelope changes as steps: `withEnvelope` keeps its signature but adds an
+  `EnvelopeStep` for each key it changes (`styles`, `numbering`, `resources`, `section`,
+  `controls` and the rest it can change; a list in the ADR), with `before` and `after` so a
+  change made from a stale value is refused. This changes undo: a style or numbering change is
+  undone with the edit it came with (today it stays); limitations.md and the changeset say so.
+  The tracking switch becomes a `settings` value carried by a step, read by the track plugin
+  and by `exportDocx` when no argument is given. Tests for each caller listed above.
+- [ ] 22.4 Stories that merge: a story change carries the story's own steps (story id + steps)
+  instead of the whole story, so two edits in one header rebase. `StoryStep` kept for
+  creating and removing a story. Tests: two transactions in one footer, applied in either order,
+  give the same footer.
+- [ ] 22.5 Ids unique across clients: revision, comment, note, control ids and bookmark names
+  never collide between two editors of one document (an id space per client, from its
+  `clientID`). Export unchanged for a single editor. Test: two editors tracking changes at once,
+  exported, have unique `w:id`s.
+- [ ] 22.6 Received transactions are applied as they are: this task defines a `remote` meta
+  (22.7 sets it; the tests here set it by hand). With it, the four appending plugins add
+  nothing (the sender already sent their steps), the filters of locked controls and stories let
+  it through (the sender's checks held, and the authority's `authorize` decides), and
+  `trackTransaction` leaves it untracked. Test: two editors stay identical after edits that
+  trigger each plugin and filter, tracking on.
+- [ ] 22.7 The client plugin (`packages/core`, headless): `collab({ version, clientID })`,
+  `sendableSteps(state)`, `receiveTransaction(state, steps, clientIDs)`, `getVersion(state)`.
+  Unconfirmed steps are rebased over received ones through mapping; history takes received
+  steps as not undoable and maps its own events over them. The convergence property test of the
+  acceptance list lives here.
+- [ ] 22.8 `@folijs/collab`, the authority: `createAuthority({ document, package?, limits })`
+  with `receive(version, steps, clientID)` → accepted or refused with the reason,
+  `stepsSince(version)` (or a snapshot), a snapshot (document, package, resources) and
+  compaction of the log. It validates every step by applying it with `packages/core`; an
+  `authorize(clientID, steps)` callback lets the app refuse edits (a read-only user). No
+  transport, no storage: the app persists what it gives. Size limits on messages, steps per
+  batch and the log.
+- [ ] 22.9 Presence: a message with a client's name, colour and selection (as JSON), mapped
+  through changes until the next one. The view draws remote carets and selections with the
+  CSS Custom Highlight API, as find does, and the name beside the caret; nothing added to the
+  document or its undo; reduced motion respected. A presence list for apps
+  (`presence(state)`).
+- [ ] 22.10 Authorship: each client's tracked changes and comments carry its user's name; a
+  received step keeps its author.
+- [ ] 22.11 Example and e2e: `examples/collab`, a Node WebSocket server (the authority, a JSON
+  file as storage) and a page with the editor; the playground shows two editors side by side
+  over an in-memory transport. Playwright: two pages type in one paragraph and converge; one
+  drops its connection and catches up; the exported .docx opens.
+- [ ] 22.12 Speed: a `pnpm bench` case with remote steps from four clients arriving while the
+  user types in a 50-page document; a miss is written down in benchmarks.md, not hidden.
+- [ ] 22.13 Docs and release: architecture.md (the collab loop), api.md, a site page (how to
+  wire a transport and a store), limitations.md (no CRDT, no long offline, what the app must
+  do), changesets; 1.5.0 and `@folijs/collab` 0.1.0 published with the owner's approval.
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -3192,9 +3337,7 @@ beside Word's; rejecting them gives the original text; Word 16 opens it (31 revi
 comments). Left, not built on purpose: headers, footers and notes through the tools, tables
 inserted, accepting or rejecting changes (the person's part), a network transport.
 
-**Optional, later:** real-time collaboration (steps and mapping enable a central-authority
-protocol; a CRDT binding evaluated separately; steps have no JSON form yet), headless
-server-side processing.
+**Optional, later:** headless server-side processing. Real-time collaboration is Phase 22.
 
 ---
 
