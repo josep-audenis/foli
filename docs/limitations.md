@@ -386,6 +386,11 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
 - Speed: remote steps cost every client a transaction and a redraw each; three others typing
   without pause roughly double to quintuple keystroke-to-paint p95 on a 50-page document
   ([benchmarks](benchmarks.md#typing-while-others-edit-2212)).
+- **Convergence is tested, not proven.** The property test (2–5 clients, 10–40 random edits a run,
+  1000 runs) passes; a heavier run of it (30–80 edits, five seeds of 1000 runs) found one case in
+  5000 where a client ended with a bold mark the others did not have (bold, deletions and undo
+  close together), which did not replay alone. Not fixed in 1.6; a client that drifts gets the
+  authority's snapshot back when it reconnects.
 - The agent library and the MCP server do not edit a shared document.
 - Not tried by hand: a document edited together and exported opened in Word (the e2e reads it
   back with `@folijs/docx`).
