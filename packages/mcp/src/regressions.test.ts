@@ -208,9 +208,11 @@ describe("regressions", () => {
     const text = `${lines.join("\n")}\n(more: read from "b400")`;
     const cut = cutResult(text);
     expect(cut.length).toBeLessThanOrEqual(MAX_RESULT_CHARS);
-    expect(cut.endsWith('\n(more: read from "b400")')).toBe(true);
     const kept = cut.split("\n").filter((l) => l.startsWith("[b"));
     expect(kept.every((l) => l.length === line(0).length)).toBe(true);
+    // Read on from the first block cut away, not from where the whole read would have gone on.
+    const first = /^\[(b\d+)\]/.exec(lines[kept.length] as string)?.[1];
+    expect(cut.endsWith(`\n(more: read from "${first}")`)).toBe(true);
     // One line longer than all the room: never half a surrogate pair.
     const emoji = cutResult("😀".repeat(MAX_RESULT_CHARS));
     expect(emoji).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);

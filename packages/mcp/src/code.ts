@@ -67,7 +67,7 @@ doc.fillControl(name, value): { blocks, controls, unfilled }   // unfilled: cont
 doc.updateFields({ data?, contents? }): { updated, unchanged, rebuilt, text }   // counts, and a sentence
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
-  cell?: { table, row, column }, depth, changed, comments }
+  cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments }   // column: the grid column
 blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. Only the body is there: headers, footers and the text of notes are not.`;
 
 /**

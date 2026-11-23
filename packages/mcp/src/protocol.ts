@@ -20,13 +20,14 @@ export const MAX_RESULT_CHARS = 200_000;
 /**
  * @internal
  * `text` within `MAX_RESULT_CHARS`: cut at a line's end (a read's block, never inside one nor
- * a surrogate pair), its `(more: …)` line kept, so the model can go on reading.
+ * a surrogate pair). A read's `(more: …)` line then names the first block cut away, so the model
+ * goes on reading from there.
  */
 export function cutResult(text: string): string {
   if (text.length <= MAX_RESULT_CHARS) return text;
   const lines = text.split("\n");
-  const more = lines.at(-1)?.startsWith("(more:") ? `\n${lines.at(-1)}` : "";
-  const room = MAX_RESULT_CHARS - more.length - 200;
+  const reading = lines.at(-1)?.startsWith("(more:");
+  const room = MAX_RESULT_CHARS - 300;
   let end = text.lastIndexOf("\n", room);
   if (end <= 0) {
     // One line longer than the room: cut inside it, not between a surrogate pair's halves.
@@ -34,6 +35,8 @@ export function cutResult(text: string): string {
     const low = text.charCodeAt(end);
     if (low >= 0xdc00 && low <= 0xdfff) end--;
   }
+  const next = reading ? /^\[(b\d+)\]/.exec(text.slice(end + 1))?.[1] : undefined;
+  const more = next ? `\n(more: read from "${next}")` : "";
   return `${text.slice(0, end)}\n(cut: ${text.length} characters in all, the first ${end} shown. Ask for less at a time.)${more}`;
 }
 

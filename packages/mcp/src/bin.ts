@@ -19,6 +19,8 @@ const log = (message: string) => process.stderr.write(`foli-mcp: ${message}\n`);
 console.log = console.error;
 console.info = console.error;
 console.debug = console.error;
+console.dir = (...args) => console.error(...args);
+console.table = (...args) => console.error(...args);
 // The client went away: nothing to say, and nobody to say it to.
 process.stdout.on("error", () => process.exit(0));
 try {

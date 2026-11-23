@@ -304,7 +304,7 @@ describe("what is not a message", () => {
     const text = (result.content as { text: string }[])[0]?.text ?? "";
     expect(text.length).toBeLessThan(MAX_RESULT_CHARS + 200);
     expect(text).toMatch(
-      /\n\(cut: 200005 characters in all, the first 199800 shown\. Ask for less at a time\.\)$/,
+      /\n\(cut: 200005 characters in all, the first 199700 shown\. Ask for less at a time\.\)$/,
     );
     const whole = await client.callTool({ name: "echo", arguments: { text: "y".repeat(1000) } });
     expect((whole.content as { text: string }[])[0]?.text).toHaveLength(1000);

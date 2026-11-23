@@ -195,7 +195,7 @@ export function write(file: string, bytes: Uint8Array, replace: boolean): Checke
     // Windows refuses to replace a file another program has open (Word does).
     if (code === "EBUSY" || code === "EPERM" || code === "EACCES")
       return no(
-        `${name} could not be written: the system refused (${code}). It may be open in another program, such as Word: close it there, or save under another name.`,
+        `${name} could not be written: the system refused (${code}). It may be open in another program, such as Word (close it there, or save under another name), or the folder may not be writable.`,
       );
     return no(`${name} could not be written.`);
   }
