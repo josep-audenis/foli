@@ -34,6 +34,7 @@ import {
   insertText,
   isSafeHref,
   joinHistory,
+  listBookmarks,
   type Node as ModelNode,
   marksAt,
   type NavigationRequest,
@@ -46,6 +47,7 @@ import {
   type OpenStory,
   pageVariant,
   parseContentV2,
+  parseFieldInstruction,
   pasteCells,
   type ResourceJSON,
   type ReviewView,
@@ -4164,18 +4166,63 @@ export class EditorView {
 
   /**
    * A click on a link in the document does not navigate (it places the caret, also in read-only
-   * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`.
+   * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`,
+   * and goes to the bookmark a link to one names (a table of contents' entry, a cross-reference).
    */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
     if (event.type === "click" && !event.shiftKey && this.controlChrome.click(event)) return;
     const element = target instanceof Element ? target.closest("a") : null;
+    if (!element && event.type === "click" && (IS_MAC ? event.metaKey : event.ctrlKey)) {
+      const name = target instanceof Node ? this.bookmarkLinked(target) : null;
+      if (name !== null) {
+        event.preventDefault();
+        // By name, capitals not counting, as Word finds a bookmark; its hidden ones too (`_Toc…`).
+        const found = listBookmarks(this.editor, { hidden: true }).find(
+          (b) => b.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (found) this.reveal(found, { focus: true });
+      }
+      return;
+    }
     if (!element || !this.host.contains(element)) return;
     event.preventDefault();
     if (event.type !== "click" || !(IS_MAC ? event.metaKey : event.ctrlKey)) return;
     const href = this.linkHref(element);
     if (href) this.host.ownerDocument.defaultView?.open(href, "_blank", "noopener,noreferrer");
   };
+
+  /**
+   * The bookmark `node` links to, read from the model: a link to a bookmark (`w:anchor`), a
+   * `HYPERLINK \l` field's result, a `REF`, `PAGEREF` or `NOTEREF` field's with `\h`.
+   */
+  private bookmarkLinked(node: Node): string | null {
+    if (!this.host.contains(node)) return null;
+    const pos = this.posFromDOM(node, 0);
+    if (pos === null) return null;
+    const $pos = this.state.doc.resolve(pos);
+    const anchor = this.state.schema.marks.link?.isInSet(
+      $pos.parent.maybeChild($pos.index())?.marks ?? [],
+    )?.attrs.anchor;
+    if (typeof anchor === "string" && anchor) return anchor;
+    // The innermost field around it: a table of contents' entry is a HYPERLINK inside the TOC.
+    let found: string | null = null;
+    let size = Number.POSITIVE_INFINITY;
+    for (const field of fieldsIn(this.state.doc)) {
+      if (pos < field.resultFrom || pos > field.resultTo || field.to - field.from >= size) continue;
+      const { args, switches } = parseFieldInstruction(field.instruction);
+      const name =
+        field.name === "HYPERLINK"
+          ? switches.get("l")?.[0]
+          : ["REF", "PAGEREF", "NOTEREF"].includes(field.name) && switches.has("h")
+            ? args[0]
+            : undefined;
+      if (name === undefined) continue;
+      found = name;
+      size = field.to - field.from;
+    }
+    return found;
+  }
 
   /** The href of the link an `<a>` shows, read from the model (the DOM is never the truth). */
   private linkHref(element: Element): string | null {

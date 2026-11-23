@@ -51,6 +51,7 @@ const WITH_VALUE: Record<string, string> = {
   TOC: "abcdflnopst",
   MERGEFIELD: "bf",
   REF: "d",
+  HYPERLINK: "lot",
 };
 const GENERAL = "*@#";
 

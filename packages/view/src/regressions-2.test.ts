@@ -156,3 +156,45 @@ describe("page fields in a header", () => {
     expect(header([text(own)])).toBe(own);
   });
 });
+
+describe("Ctrl+click on a link to a bookmark (21.8)", () => {
+  const target = (): NodeJSON[] => [
+    { type: "bookmarkStart", attrs: { id: 1, name: "_Toc1" } },
+    text("Target"),
+    { type: "bookmarkEnd", attrs: { id: 1 } },
+  ];
+  const field = (code: string, shown: string): NodeJSON[] => [
+    { type: "fieldStart" },
+    { type: "fieldCode", attrs: { text: code } },
+    { type: "fieldSeparator" },
+    text(shown),
+    { type: "fieldEnd" },
+  ];
+  const click = (host: HTMLElement, shown: string, ctrlKey = true) => {
+    const span = [...host.querySelectorAll("span")].find((s) => s.textContent === shown);
+    span?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey }));
+  };
+  const selected = (editor: ReturnType<typeof createEditor>) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it.each([
+    [
+      "a link's anchor",
+      p({ type: "text", text: "Go", marks: [{ type: "link", attrs: { anchor: "_toc1" } }] }),
+    ],
+    ["a table of contents' HYPERLINK", p(...field(' HYPERLINK \\l "_Toc1" ', "Go"))],
+    ["a cross-reference with \\h", p(...field(" REF _Toc1 \\h ", "Go"))],
+  ])("goes to the bookmark from %s", (_, link) => {
+    const { host, editor } = mount(link, p(text("between")), p(...target()));
+    click(host, "Go", false);
+    expect(selected(editor)).toBe("");
+    click(host, "Go");
+    expect(selected(editor)).toBe("Target");
+  });
+
+  it("not from a cross-reference without \\h", () => {
+    const { host, editor } = mount(p(...field(" REF _Toc1 ", "Go")), p(...target()));
+    click(host, "Go");
+    expect(selected(editor)).toBe("");
+  });
+});
