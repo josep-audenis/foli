@@ -325,6 +325,10 @@ describe("custom content on read-only pages (19.3)", () => {
 
   it("draws custom nodes and marks with the extensions' views", () => {
     const { container, pages } = draw([withoutView]);
+    // A page translator leaves read-only pages alone too (21.5).
+    expect(container.querySelectorAll(".foli-word-page").length).toBeGreaterThan(0);
+    for (const page of container.querySelectorAll(".foli-word-page"))
+      expect(page.getAttribute("translate")).toBe("no");
     expect(container.querySelector(".chip")?.textContent).toBe("@Ada");
     expect(container.querySelector(".card p")?.textContent).toBe("Card c-1");
     expect(container.querySelector(".topic")?.getAttribute("data-topic")).toBe("fin");

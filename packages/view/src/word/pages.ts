@@ -118,6 +118,8 @@ const sameGeometry = (a: Geometry, b: Geometry) =>
 function createPage(doc: Document, g: Geometry): { page: HTMLElement; body: HTMLElement } {
   const page = doc.createElement("div");
   page.className = WORD_PAGE_CLASS;
+  // The document as written: a page translator leaves it (and a print of it) alone.
+  page.setAttribute("translate", "no");
   const { style } = page;
   style.boxSizing = "border-box";
   style.position = "relative";

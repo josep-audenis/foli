@@ -794,6 +794,8 @@ export class EditorView {
     this.notes = this.paged ? new PageNotes(host.ownerDocument, storyOptions, new WeakMap()) : null;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
+    // A page translator would rewrite the text, which reading it back takes for typing.
+    host.setAttribute("translate", "no");
     host.setAttribute(VIEW_ATTR, this.id);
     this.addedTabIndex = !host.hasAttribute("tabindex");
     if (this.addedTabIndex) host.tabIndex = 0;
@@ -949,6 +951,7 @@ export class EditorView {
       "aria-multiline",
       "aria-readonly",
       "aria-placeholder",
+      "translate",
       VIEW_ATTR,
     ];
     if (this.addedTabIndex) owned.push("tabindex");
