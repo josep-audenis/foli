@@ -179,8 +179,9 @@ export function setComments(
 /**
  * The envelope's parts an `EnvelopeStep` changes (ADR-0012); comments and stories have steps of
  * their own.
+ * @internal
  */
-export const ENVELOPE_KEYS = [
+export const ENVELOPE_KEYS: readonly EnvelopeKey[] = [
   "section",
   "settings",
   "defaults",
@@ -189,8 +190,17 @@ export const ENVELOPE_KEYS = [
   "numbering",
   "resources",
   "controls",
-] as const;
-export type EnvelopeKey = (typeof ENVELOPE_KEYS)[number];
+];
+/** What `EnvelopeStep` can change (ADR-0012). */
+export type EnvelopeKey =
+  | "section"
+  | "settings"
+  | "defaults"
+  | "theme"
+  | "styles"
+  | "numbering"
+  | "resources"
+  | "controls";
 
 /** How deep a step's path goes into each key: one setting, one style, one resource… */
 const DEPTH: Readonly<Record<EnvelopeKey, number>> = {
