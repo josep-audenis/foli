@@ -19,8 +19,8 @@ export interface FoliCanvasProps {
     upload?: EditorViewOptions["upload"] | undefined;
     /**
      * The URL to show a picture's image from (`packageImages` for a .docx package's images). A new
-     * function each render is fine: pictures drawn later ask the latest one; ones already drawn
-     * keep their image until the document or the picture changes.
+     * function draws every picture again: keep it the same between renders (`useMemo`,
+     * `useCallback`) and give a new one only with new images.
      */
     resource?: EditorViewOptions["resource"] | undefined;
     className?: string | undefined;
