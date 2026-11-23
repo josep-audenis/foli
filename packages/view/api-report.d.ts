@@ -271,6 +271,8 @@ export declare class EditorView {
     private pointerFocus;
     /** Whether the view added the host's tabindex (a read-only host must stay focusable). */
     private readonly addedTabIndex;
+    /** The host's own `translate`, given back on `destroy`. */
+    private readonly ownTranslate;
     /** Renders the document's blocks; made by the first render. */
     private word;
     /** Where pasted and dropped image files go (`EditorViewOptions.upload`). */
