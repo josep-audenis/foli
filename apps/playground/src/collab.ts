@@ -64,7 +64,8 @@ function client(id: number, name: string, color: string, host: HTMLElement): voi
       const result = authority.receive(JSON.stringify(message));
       inFlight = false;
       if (result.ok) for (const c of clients) later(() => c.inbox(result.broadcast));
-      else later(send);
+      // Stale: sent again once what was missed is in; any other reason would come again.
+      else if (result.reason === "stale") later(send);
     });
   };
   const presence = () => {
