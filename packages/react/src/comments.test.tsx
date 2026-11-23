@@ -219,6 +219,8 @@ describe("FoliComments in FoliEditor", () => {
       ["Ben", 0],
       ["Me", 0],
     ]);
+    // Back to the button that opened the form.
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Reply to Ben");
   });
 
   it("edits and deletes only the author's own comments when asked", () => {

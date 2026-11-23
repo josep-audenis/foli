@@ -158,7 +158,9 @@ export function FoliComments({
   const pane = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
-  const [written, setWriting] = useState<{ id: number; reply: boolean } | null>(null);
+  const [written, setWriting] = useState<{ id: number; reply: boolean; from?: number } | null>(
+    null,
+  );
   // A form open when the editor turns read-only goes: it could still save.
   const writing = readOnly ? null : written;
   const [focused, setFocused] = useState<number | null>(null);
@@ -272,14 +274,20 @@ export function FoliComments({
   }, [focused, doc]);
 
   const run = (command: Parameters<Editor["run"]>[0]) => editor.run(command);
-  /** Focus the thread of `id` (its first button), else the pane, else the document. */
-  const focusThread = (id: number | undefined) => {
+  /**
+   * Focus the thread of `id` (comment `from`'s first button, else the thread's), else the pane,
+   * else the document.
+   */
+  const focusThread = (id: number | undefined, from?: number) => {
     refocus.current = () => {
       const root = pane.current;
       const thread =
         id === undefined ? null : root?.querySelector<HTMLElement>(`[data-thread="${id}"]`);
       const document = root && pagesAround(root)?.querySelector<HTMLElement>('[role="textbox"]');
       (
+        (from === undefined
+          ? null
+          : thread?.querySelector<HTMLElement>(`[data-comment="${from}"] button`)) ??
         thread?.querySelector<HTMLElement>("button") ??
         thread ??
         (root?.hidden ? document : root)
@@ -328,7 +336,7 @@ export function FoliComments({
                 canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
                 editing={writing?.id === c.id && !writing.reply}
                 onEdit={() => setWriting({ id: c.id, reply: false })}
-                onReply={() => setWriting({ id: comment.id, reply: true })}
+                onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
                 onResolve={() => {
                   run(resolveComment(comment.id, !comment.done));
                   focusThread(comment.id);
@@ -361,12 +369,12 @@ export function FoliComments({
                 onSave={(text) => {
                   if (text.trim() && !run(replyToComment(comment.id, text))) return false;
                   setWriting(null);
-                  focusThread(comment.id);
+                  focusThread(comment.id, writing.from);
                   return true;
                 }}
                 onCancel={() => {
                   setWriting(null);
-                  focusThread(comment.id);
+                  focusThread(comment.id, writing.from);
                 }}
               />
             )}
@@ -409,7 +417,7 @@ function CommentView({
   const author = comment.author || "Unknown author";
   const what = root ? "comment" : "reply";
   return (
-    <div className="foli-comment">
+    <div className="foli-comment" data-comment={comment.id}>
       <p className="foli-comment-meta">
         <strong>{author}</strong> <span>{dateOf(comment.date)}</span>
       </p>
