@@ -13,7 +13,14 @@ import type { CommentJSON } from "../v3/document.js";
 import { closeHistory } from "./history.js";
 import { freshId } from "./ids.js";
 import { AllSelection, Selection, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import {
+  type Command,
+  type EditorState,
+  isRemote,
+  Plugin,
+  PluginKey,
+  type Transaction,
+} from "./state.js";
 import { now, trackState, untracked } from "./track.js";
 import { setComments, storyBody, wordContext } from "./word.js";
 
@@ -339,6 +346,7 @@ export function commentsPlugin(): Plugin {
   return new Plugin({
     key,
     appendTransaction(transactions, oldState, newState) {
+      if (transactions.every(isRemote)) return null;
       const comments = wordContext(newState)?.envelope.comments;
       if (!comments?.length || !transactions.some(removesReference)) return null;
       const before = commentAnchors(oldState.doc);

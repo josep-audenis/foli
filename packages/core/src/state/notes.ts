@@ -21,7 +21,7 @@ import { freshId } from "./ids.js";
 import { resolveStoryChanges } from "./review.js";
 import { documentSections } from "./sections.js";
 import { TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { type Command, type EditorState, isRemote, Plugin, type Transaction } from "./state.js";
 import { nextRevisionId, untracked } from "./track.js";
 import {
   type Story,
@@ -495,7 +495,12 @@ function referenceMap(doc: Node): Map<string, BlockReference> {
 export function notesPlugin(): Plugin {
   return new Plugin({
     appendTransaction(transactions, before, after) {
-      if (before.doc === after.doc || transactions.some((t) => t.getMeta("historyOp"))) return null;
+      if (
+        before.doc === after.doc ||
+        transactions.some((t) => t.getMeta("historyOp")) ||
+        transactions.every(isRemote)
+      )
+        return null;
       const context = wordContext(after);
       if (!context || ![...context.stories.values()].some(isNote)) return null;
       const was = referenceMap(before.doc);

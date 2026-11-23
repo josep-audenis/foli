@@ -29,7 +29,7 @@ import { formatDatePicture } from "./fieldupdate.js";
 import { closeHistory, joinHistory } from "./history.js";
 import { idsOf } from "./ids.js";
 import { marksAt, Selection, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { type Command, type EditorState, isRemote, Plugin, type Transaction } from "./state.js";
 import { trackedDeletes, trackTransaction } from "./track.js";
 import {
   setEnvelopeValue,
@@ -417,7 +417,8 @@ function holdsText(
 
 /** Whether `tr` keeps what the controls of `state` require. */
 function allowed(tr: Transaction, state: EditorState): boolean {
-  if (!tr.docChanged || tr.doc === state.doc || tr.getMeta("historyOp")) return true;
+  if (!tr.docChanged || tr.doc === state.doc || tr.getMeta("historyOp") || isRemote(tr))
+    return true;
   const controls = wordContext(state)?.envelope.controls;
   if (!controls) return true;
   const before = scan(state.doc);
@@ -947,6 +948,7 @@ export function controlsPlugin(): Plugin {
   return new Plugin({
     filterTransaction: allowed,
     appendTransaction(transactions, before, after) {
+      if (transactions.every(isRemote)) return null;
       const controls = wordContext(after)?.envelope.controls;
       if (!controls) return null;
       const tr = after.tr;

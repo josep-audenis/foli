@@ -237,6 +237,7 @@ export {
   Plugin,
   PluginKey,
   type PluginSpec,
+  remote,
   Transaction,
 } from "./state.js";
 export {

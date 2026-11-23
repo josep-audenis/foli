@@ -232,6 +232,7 @@ export {
   redoDepth,
   rejectAllChanges,
   rejectChange,
+  remote,
   removeLink,
   removeSectionBreak,
   renameBookmark,
