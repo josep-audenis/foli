@@ -9,6 +9,12 @@
  * and persists what `snapshot` and the log give. Runs wherever `@folijs/core` runs.
  */
 import { type EditorDocument, type Extension, type FoliDocument, Step, type StepJSON } from "@folijs/core";
+/**
+ * The client id of the steps the authority adds itself: Word's rules that concurrent edits can
+ * break and the schema does not hold (two tables inserted at one place by two people meet; a
+ * table ends the body), restored by a paragraph, broadcast with the client's steps.
+ */
+export declare const AUTHORITY: ClientID;
 /** A client's id: unique among the live clients of one document (a small integer is best). */
 export type ClientID = string | number;
 /** What a client sends: the steps it made since `version`. */
