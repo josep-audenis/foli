@@ -700,7 +700,7 @@ export interface DocJSON {
 export {};
 
 // state/collab.d.ts
-import type { Step } from "../transform/steps.js";
+import { type Step } from "../transform/steps.js";
 import { type EditorState, Plugin, type Transaction } from "./state.js";
 export interface CollabOptions {
     /** The authority's version the document was loaded at. Default 0. */
@@ -714,7 +714,8 @@ export interface CollabOptions {
 /** A step not confirmed yet, and its inverse on the document it was applied to. */
 interface Unconfirmed {
     readonly step: Step;
-    readonly inverted: Step;
+    /** What takes it back, in order: one step, or several for a mark step (below). */
+    readonly inverted: readonly Step[];
 }
 interface CollabState {
     readonly slot: number;
