@@ -3024,11 +3024,15 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   becomes a regular expression of `\S+(\d+)` groups that backtracks). Read the format with a
   linear tokenizer, as `find.ts` avoids regular expressions for the same reason; a test with a
   hostile format under a time limit.
-- [ ] 21.3 Core and docx: duplicate comment ids. Reproduced: comments `1, 1, 2`;
+- [x] 21.3 Core and docx: duplicate comment ids. Reproduced: comments `1, 1, 2`;
   `editComment(1)` loses the edit and `resolveComment(2)` overwrites the first comment.
   `parseDocument` refuses duplicate comment ids; docx import (`import/parts.ts`) renumbers them
   (and their anchors), as paste already renumbers. Same check for bookmark names and control
   ids where a duplicate makes a command act on the wrong one.
+  (Done: `parseDocument` renumbers them instead of refusing, so a document 1.4 saved with
+  them still opens; a reply to a repeated id stays the first's. Bookmark names and control ids need no
+  check: a repeated bookmark name acts as in Word, the first found and every one renamed
+  together; `importDocx` gives each control an id of its own and paste renumbers them.)
 - [ ] 21.4 PDF: two `exportPdf` calls on one page cannot mix (`pdf/src/index.ts`). Today the
   second `setContent` replaces the first's DOM while it renders: on a server with a pool of
   pages, one user's PDF can hold another's document. A lock per page (exports on one page run
