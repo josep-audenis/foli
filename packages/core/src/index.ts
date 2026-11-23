@@ -327,6 +327,7 @@ export {
   StepMap,
   type StepParser,
   StepResult,
+  type StoryMaps,
   Transform,
   TransformError,
 } from "./transform/index.js";
