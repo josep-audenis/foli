@@ -127,15 +127,19 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * it points) and `asDocument`, a .docm or template written as a .docx without its macros.
  * View raised in 21.11 (118.2 kB, 120.1 allowed): it carries core's find, which now looks
  * through soft hyphens and zero-width spaces (an offset map).
+ * Core, view, React and agent raised in 22.2 (88.2, 120.9, 172.5 and 78.1 kB; 91.8, 124.0,
+ * 175.8 and 80.1 allowed): steps read from JSON as untrusted input (every step's parser, the
+ * envelope's and stories' checks), which every package that loads the editor carries, with room
+ * for Phase 22's envelope steps, story steps and the collab plugin.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 90_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 123_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 176_640 },
-  { name: "FoliEditor only", entry: appEntry, budget: 176_640 },
+  { name: "@folijs/core", entry: dist("core"), budget: 94_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 127_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 180_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 180_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 78_500 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
 const BUILT = [
