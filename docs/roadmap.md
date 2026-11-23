@@ -3092,12 +3092,15 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   file open in Word) says so; cuts never split a surrogate pair; an invalid request with an id
   is answered with it; `console.log` bound to stderr in `bin.ts`; a read gives a table cell's
   grid column and marks merged cells.
-- [ ] 21.12 Tooling: `pnpm test:e2e` (three engines) and `pnpm examples` run in the Release
+- [x] 21.12 Tooling: `pnpm test:e2e` (three engines) and `pnpm examples` run in the Release
   workflow before publishing; the site deploy runs `pnpm check` first; e2e configs do not reuse
   a server on a fixed port another checkout may have started (`reuseExistingServer`, as the
   bench config already does); `docs/contributing.md` lists both workflows. Written down for the
   owner, who alone can set them: branch protection on `main` and a required reviewer on the
   `npm` environment.
+  (Done: the browser tests and examples run in a Windows job the publish waits for, as the
+  visual snapshots are Windows'; not run in GitHub yet, the first release will. Branch
+  protection and the reviewer on `npm` written in contributing.md for the owner.)
 - [ ] 21.13 Docs and release: limitations.md updated ("as of" its version, what this phase
   fixed or accepted), the stale `shortcut:` comments the audit found (`core/src/state/word.ts`
   v2, `mark.ts` Phase 9) removed or rewritten, changesets per package; patch releases

@@ -1,7 +1,8 @@
-# Publishes @folijs/* to npm with provenance. Release-only: no CI runs here (checks run in the
-# local pre-push hook). Started by hand from the Actions tab, on main, after a "Version
-# packages" commit (see docs/contributing.md, "Releasing"). Publishes only versions that are not
-# on npm yet, then pushes their git tags.
+# Publishes @folijs/* to npm with provenance, after the browser tests and the examples pass on
+# Windows (the pre-push hook runs the other checks). Started by hand from the Actions tab, on
+# main, after a "Version packages" commit (see docs/contributing.md, "Releasing"). Publishes only
+# versions that are not on npm yet, then pushes their git tags. Run on another branch, it runs
+# the browser job only: a way to try it before a release.
 name: Release
 
 on:
@@ -14,7 +15,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The browser tests (three engines) and the examples, which the pre-push hook does not run. On
+  # Windows: the visual snapshots are Windows' (`*-win32.png`). No secret, no write permission.
+  browsers:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Before the long tests: a release that is not versioned stops here.
+      - name: Refuse unapplied changesets
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          pending=$(find .changeset -name '*.md' ! -name README.md)
+          if [ -n "$pending" ]; then
+            echo "::error::Changesets not applied yet: run 'pnpm changeset version' and commit first."
+            echo "$pending"
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - run: pnpm install --frozen-lockfile
+      # The PDF tests import the built packages (`dist/`), and the PDF renderer is built.
+      - run: pnpm build
+      - run: pnpm exec playwright install chromium firefox webkit
+      - run: pnpm test:e2e
+      - run: pnpm examples
+
   publish:
+    needs: browsers
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Holds the NPM_TOKEN secret; add required reviewers to it to approve each publish.

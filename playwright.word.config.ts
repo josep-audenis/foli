@@ -24,6 +24,8 @@ export default defineConfig({
   webServer: {
     command: `pnpm --filter @folijs/playground dev --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Never another checkout's server on the same port (a worktree's, a dev server left open):
+    // a port in use fails the run instead of testing other code.
+    reuseExistingServer: false,
   },
 });

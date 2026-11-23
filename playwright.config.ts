@@ -34,6 +34,9 @@ export default defineConfig({
   fullyParallel: true,
   // Unbounded workers starve the machine (Firefox compositor errors, timing-dependent failures).
   workers: 4,
+  // In the Release workflow's runner (slower than a desktop): the WebKit timing tests listed
+  // under "Known flaky tests" (docs/contributing.md) get one more try and twice the time.
+  ...(process.env.GITHUB_ACTIONS ? { retries: 1, timeout: 60_000 } : {}),
   reporter: [["list"]],
   use: { trace: "retain-on-failure" },
   // Project names: "<app>-<browser>", e.g. `pnpm test:e2e --project=playground-firefox`.
@@ -47,6 +50,8 @@ export default defineConfig({
   webServer: APPS.map((app) => ({
     command: app.command ?? `pnpm --filter ${app.filter} dev --port ${app.port} --strictPort`,
     url: `http://localhost:${app.port}`,
-    reuseExistingServer: !process.env.CI,
+    // Never another checkout's server on the same port (a worktree's, a dev server left open):
+    // a port in use fails the run instead of testing other code.
+    reuseExistingServer: false,
   })),
 });

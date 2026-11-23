@@ -12,8 +12,11 @@ pnpm dev                       # playground at http://localhost:5173
 ```
 
 `pnpm install` also installs a git pre-push hook that runs `pnpm check` on the working tree
-(uncommitted edits count). There is no GitHub CI; the only workflow publishes releases
-([Releasing](#releasing)). Skip once with `git push --no-verify`. The hook
+(uncommitted edits count). There is no GitHub CI on pull requests. Two workflows run:
+**Release** (`.github/workflows/release.yml`, by hand: checks, browser tests in three engines,
+the examples, then publishes; [Releasing](#releasing)) and **Deploy site**
+(`.github/workflows/deploy-site.yml`, on each push to `main`: `pnpm check`, then the site;
+[The site](#the-site)). Skip the hook once with `git push --no-verify`. The hook
 is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exists.
 
 Packages import each other by name; the `@folijs/source` export condition maps the names to
@@ -262,11 +265,14 @@ them, the same way.
    Review, commit ("Version packages"), PR, merge to `main`.
 4. **Publish**: GitHub → Actions → **Release** → Run workflow (on `main`). It installs from the
    lockfile, refuses to run while unapplied changesets exist or a package is still at the
-   `0.0.0` placeholder, runs `pnpm check`, publishes every version not yet on npm with
+   `0.0.0` placeholder, first runs a job on Windows (where the visual snapshots were taken) with
+   the browser tests in Chromium, Firefox and WebKit (`pnpm test:e2e`) and the examples
+   (`pnpm examples`), then runs `pnpm check`, publishes every version not yet on npm with
    [provenance](https://docs.npmjs.com/generating-provenance-statements), then tags every
    current version that is on npm and has no tag yet (`@folijs/core@0.1.0`…) and pushes the
    tags. A failed run can be re-run: published versions are skipped, and their missing tags
-   are added.
+   are added. Run on another branch, the workflow runs the Windows job only: try it there after
+   changing the tests or the workflow.
 
 The owner set up, once (done before 0.1.0; repeat when a token expires or moves):
 
@@ -282,7 +288,12 @@ The owner set up, once (done before 0.1.0; repeat when a token expires or moves)
     check can be removed on another branch by anyone who can push, so this setting is what
     keeps the token on `main`. Without the environment, the first run creates it unprotected.
   - Secret `NPM_TOKEN`: the token above.
-  - Optional: required reviewers, to approve each publish.
+  - **Required reviewers** (the owner): each publish waits for an approval. Not set yet
+    (Phase 21, 2026-11-23): only the owner can set it.
+- **Branch protection on `main`** (repository Settings → Branches → Add rule `main`): require a
+  pull request before merging and block force pushes. Not set yet (Phase 21, 2026-11-23): only
+  the owner can set it. Force pushes are refused today by the agents' own settings, not by
+  GitHub.
 - After the first publish, optionally switch to npm
   [trusted publishing](https://docs.npmjs.com/trusted-publishers) (each package's settings on
   npmjs.com → Trusted publisher: GitHub Actions, this repository, workflow `release.yml`,
