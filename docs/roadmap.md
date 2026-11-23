@@ -33,7 +33,7 @@ place that says what is in progress; check it before starting work.
 | 19 Editing gaps           | ✅ Done                  | —                       | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
-| 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; the release (1.6.0, `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3) waits for the owner's approval; a rare divergence a heavier property run found is a known limit       |
+| 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit       |
 | 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building 2026-11-23: 23.1 (ADR-0013, the tools in `@folijs/agent`) merged                                                                                                                     |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -3214,7 +3214,7 @@ the export from the snapshot and package equal to one editor's with untouched pa
 byte: `packages/collab/src/authority.test.ts` (Word opening it is not tried by hand). Two
 browsers over WebSocket: `examples/e2e/collab.spec.ts`, three engines locally (the whole
 `pnpm examples` not run). Keystroke time with remote steps: `pnpm bench`'s new case, a miss
-written in benchmarks.md. The release waits for the owner.
+written in benchmarks.md. Released 2026-11-24 as 1.6.0 (#252).
 
 ### Tasks
 
