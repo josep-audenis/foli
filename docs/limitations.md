@@ -1,8 +1,8 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 1.5.0 (`@folijs/agent` 0.3.2,
-`@folijs/mcp` 0.2.3: Phase 21 fixed what an audit of 1.4.0 found; what it left is marked
-"Phase 21" below). Read it before you ship. The
+What Foli does not do yet, or does with caveats, as of 1.6.0 (`@folijs/agent` 0.3.2,
+`@folijs/mcp` 0.2.3, `@folijs/collab` 0.1.0: Phase 21 fixed what an audit of 1.4.0 found, what it
+left is marked "Phase 21" below; Phase 22's collaboration has a section of its own). Read it before you ship. The
 owner decided on 2026-11-20 that each of these ships in 1.0 as a known limit (the one picked as a
 blocker, pictures losing their images when copied into another document, was fixed first, in
 12.11); 1.x minors may lift them. Details
@@ -360,6 +360,35 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   an edit, with the edit (before, they stayed; not checked against what Word does). The tracking switch is the
   document's (`settings.trackRevisions`, schema 7): a document with it set, or an imported
   `.docx` that tracks changes, cannot be read by 1.5 or earlier.
+
+## Collaboration
+
+Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)):
+
+- A central authority over steps, not a CRDT: one process orders each document's steps. No
+  peer-to-peer and no long offline editing: a client that was away sends its steps when it comes
+  back, rebased over what it missed (or starts again from a snapshot once the authority's log was
+  compacted past its version, losing its unsent steps then).
+- Foli ships no transport, no store and no server: the app moves the JSON messages, stores the
+  snapshot (and the original package beside it), authenticates, and decides who may edit
+  (`authorize`).
+- The authority validates a step by applying it (the schema, envelope and story steps that no
+  longer find what they change); it does not run the locked content controls' rules again, which
+  depend on the command that made the edit: an app whose clients may be hostile checks locks in
+  `authorize`.
+- Two people changing one property of one style at once: the last confirmed wins; other envelope
+  entries (other styles, other properties) merge.
+- Ids of new changes, comments, notes and controls are kept apart by the client id's class
+  (`id ≡ clientID mod 256`); two live clients in one class can still take the same id. Give the
+  live clients of a document distinct small integers.
+- Presence is drawn in the body only, not in an open header, footer or note; a presence message
+  sent from an older version than the receiver's is dropped (the next one comes).
+- Speed: remote steps cost every client a transaction and a redraw each; three others typing
+  without pause roughly double to quintuple keystroke-to-paint p95 on a 50-page document
+  ([benchmarks](benchmarks.md#typing-while-others-edit-2212)).
+- The agent library and the MCP server do not edit a shared document.
+- Not tried by hand: a document edited together and exported opened in Word (the e2e reads it
+  back with `@folijs/docx`).
 
 ## Agent editing (`@folijs/agent`)
 

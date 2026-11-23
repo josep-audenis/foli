@@ -55,6 +55,9 @@
   decorations, plugin views and toolbar items.
 - **Agents** (0.x). `@folijs/agent` lets an LLM edit a document by block handles, and
   `@folijs/mcp` exposes `.docx` editing to MCP clients; every edit is a tracked change.
+- **Real-time collaboration** (1.6). Several people edit one document at once, through a central
+  authority (`@folijs/collab`, 0.x) over the app's own transport: carets and names, tracked
+  changes in each one's name, undo of one's own changes.
 
 ## Stability
 
@@ -106,17 +109,18 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 
 ## Packages
 
-| Package                              | Version                                                                                                               | Purpose                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [`@folijs/core`](packages/core)      | [![npm](https://img.shields.io/npm/v/@folijs/core?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/core)   | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.     |
-| [`@folijs/view`](packages/view)      | [![npm](https://img.shields.io/npm/v/@folijs/view?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/view)   | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                |
-| [`@folijs/react`](packages/react)    | [![npm](https://img.shields.io/npm/v/@folijs/react?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/react) | React components and default stylesheet.                                                         |
-| [`@folijs/docx`](packages/docx)      | [![npm](https://img.shields.io/npm/v/@folijs/docx?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/docx)   | `.docx` import to Foli's Word model and lossless export. No DOM.                                 |
-| [`@folijs/pdf`](packages/pdf)        | [![npm](https://img.shields.io/npm/v/@folijs/pdf?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/pdf)     | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.       |
-| [`@folijs/agent`](packages/agent)    | [![npm](https://img.shields.io/npm/v/@folijs/agent?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/agent) | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.      |
-| [`@folijs/mcp`](packages/mcp)        | [![npm](https://img.shields.io/npm/v/@folijs/mcp?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/mcp)     | MCP server: an MCP client's model edits `.docx` files in a folder through tools. 0.x.            |
-| [`apps/playground`](apps/playground) |                                                                                                                       | Demo app; consumes the packages like a third party would.                                        |
-| [`apps/site`](apps/site)             |                                                                                                                       | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`. |
+| Package                              | Version                                                                                                                 | Purpose                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [`@folijs/core`](packages/core)      | [![npm](https://img.shields.io/npm/v/@folijs/core?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/core)     | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.      |
+| [`@folijs/view`](packages/view)      | [![npm](https://img.shields.io/npm/v/@folijs/view?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/view)     | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                 |
+| [`@folijs/react`](packages/react)    | [![npm](https://img.shields.io/npm/v/@folijs/react?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/react)   | React components and default stylesheet.                                                          |
+| [`@folijs/docx`](packages/docx)      | [![npm](https://img.shields.io/npm/v/@folijs/docx?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/docx)     | `.docx` import to Foli's Word model and lossless export. No DOM.                                  |
+| [`@folijs/pdf`](packages/pdf)        | [![npm](https://img.shields.io/npm/v/@folijs/pdf?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/pdf)       | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.        |
+| [`@folijs/agent`](packages/agent)    | [![npm](https://img.shields.io/npm/v/@folijs/agent?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/agent)   | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.       |
+| [`@folijs/collab`](packages/collab)  | [![npm](https://img.shields.io/npm/v/@folijs/collab?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/collab) | The authority of a shared document: orders and validates every step; no transport, no store. 0.x. |
+| [`@folijs/mcp`](packages/mcp)        | [![npm](https://img.shields.io/npm/v/@folijs/mcp?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/mcp)       | MCP server: an MCP client's model edits `.docx` files in a folder through tools. 0.x.             |
+| [`apps/playground`](apps/playground) |                                                                                                                         | Demo app; consumes the packages like a third party would.                                         |
+| [`apps/site`](apps/site)             |                                                                                                                         | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`.  |
 
 ## Documentation
 

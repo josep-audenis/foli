@@ -1,0 +1,142 @@
+# Real-time collaboration
+
+Several people edit one document at once: each sees the others' typing, carets and names within
+a moment, and the document stays a lossless Word document. Foli ships the pieces that need the
+document model; your app keeps the transport, authentication and storage
+([ADR-0012](../decisions/ADR-0012-collaboration.md)).
+
+| Piece             | Where                                                              | What it does                                                                      |
+| ----------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| The authority     | `@folijs/collab`, on your server                                   | Orders every step, validates it by applying it, gives what to broadcast and store |
+| The client plugin | `collab`, `sendableSteps`, `receiveTransaction` in `@folijs/core`  | Sends its steps, rebases them over the others', keeps undo to its own changes     |
+| Presence          | `presenceMessage`, `receivePresence`, `presence` in `@folijs/core` | Who else edits, in what colour and where; drawn by `EditorView`                   |
+| The transport     | yours                                                              | WebSocket, SSE, HTTP, a queue: JSON messages                                      |
+| Who may edit      | yours (`authorize`)                                                | A read-only user's steps refused                                                  |
+| Storage           | yours                                                              | The authority's `snapshot()` (and the original `.docx` package beside it)         |
+
+[`examples/collab`](https://github.com/josep-audenis/foli/tree/main/examples/collab) is a
+complete app: a Node WebSocket server and a page.
+
+## The server
+
+```ts
+export function serve(
+  stored: Snapshot,
+  canEdit: (clientID: string | number) => boolean,
+  save: (snapshot: Snapshot) => void,
+  broadcast: (message: unknown) => void,
+) {
+  const authority = createAuthority({
+    document: stored.document,
+    version: stored.version,
+    package: stored.package, // DocxImport.package, kept for export
+    authorize: (clientID) => canEdit(clientID),
+  });
+
+  return (connection: Connection, text: string) => {
+    const message = JSON.parse(text);
+    if (message.type === "steps") {
+      // The client id is the connection's, never what the message claims.
+      const result = authority.receive({ ...message, clientID: connection.clientID });
+      if (result.ok) {
+        save(authority.snapshot()); // or append result.broadcast to a log
+        broadcast({ type: "steps", ...result.broadcast }); // to everyone, the sender too
+      } else connection.reply({ type: "refused", ...result });
+    } else if (message.type === "catchup") {
+      const missed = authority.stepsSince(message.version);
+      connection.reply(
+        "snapshot" in missed ? { type: "init", ...missed } : { type: "steps", ...missed },
+      );
+    }
+  };
+}
+```
+
+Give each live connection of a document a small integer client id (1, 2, 3…): it also keeps the
+ids of their new tracked changes, comments and notes apart. Keep one authority per document in
+one process (a Durable Object, a single worker, a lock in your store). `receive` refuses a
+message that is not JSON steps of the document's schema, a step that does not apply, a stale
+version and a message over its `limits`, changing nothing.
+
+## The client
+
+```ts
+export function join(snapshot: Snapshot, clientID: number, name: string, socket: WebSocket) {
+  const editor = createEditor({
+    document: snapshot.document,
+    author: name,
+    plugins: [collab({ version: snapshot.version, clientID })],
+  });
+
+  let inFlight = false;
+  function send() {
+    const sendable = sendableSteps(editor.state);
+    if (!sendable || inFlight) return;
+    inFlight = true;
+    const steps = sendable.steps.map((step) => step.toJSON());
+    socket.send(JSON.stringify({ type: "steps", version: sendable.version, steps }));
+  }
+  editor.subscribe(send);
+
+  // Broadcasts that arrived before the ones before them.
+  const early = new Map<number, Broadcast>();
+  function receive(message: Broadcast) {
+    early.set(message.version, message);
+    for (
+      let next = early.get(getVersion(editor.state));
+      next;
+      next = early.get(getVersion(editor.state))
+    ) {
+      early.delete(next.version);
+      const steps = next.steps.map((json) => Step.fromJSON(editor.state.schema, json));
+      editor.dispatch(receiveTransaction(editor.state, steps, next.clientIDs));
+      if (next.clientIDs.includes(clientID)) inFlight = false;
+    }
+    send();
+  }
+  // Refused: what was missed comes first, then the steps go again, rebased.
+  function refused() {
+    inFlight = false;
+    socket.send(JSON.stringify({ type: "catchup", version: getVersion(editor.state) }));
+  }
+  return { editor, receive, refused };
+}
+```
+
+Received steps are not undoable: undo takes back only the user's own changes, mapped over everyone
+else's. A client that loses its connection keeps editing; when it comes back it asks for the steps
+since its version and sends its own, rebased. When the authority's log no longer has them, it gets
+a snapshot and starts from it.
+
+## Presence
+
+```ts
+export function presenceOf(editor: Editor, socket: WebSocket, name: string) {
+  const sendPresence = () =>
+    socket.send(
+      JSON.stringify({
+        type: "presence",
+        ...presenceMessage(editor.state, { name, color: "#c2410c" }),
+      }),
+    );
+  const received = (message: unknown) => editor.dispatch(receivePresence(editor.state, message));
+  return { sendPresence, received };
+}
+```
+
+Send it when the selection changes and after receiving steps. `EditorView` marks the others'
+selections and draws their carets with their names; `presence(editor.state)` lists them for your
+own UI. Nothing of it goes into the document or its undo.
+
+## Tracked changes and export
+
+The tracking switch is the document's (`settings.trackRevisions`): one person turning it on turns
+it on for everyone, each change in its own author's name. Export from the authority's snapshot and
+the package the document was imported from: `exportDocx(snapshot.document, snapshot.package)`.
+
+## Limits
+
+No CRDT and no long offline editing; one authority orders a document's steps; locked content
+controls are enforced by each editor, not re-checked by the authority (check them in `authorize`
+if a client may be hostile); presence is drawn in the body only. See
+[limitations](../limitations.md#collaboration).
