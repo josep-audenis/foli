@@ -12,6 +12,12 @@ import {
   sendableSteps,
 } from "@folijs/core";
 
+interface Broadcast {
+  version: number;
+  steps: StepJSON[];
+  clientIDs: (string | number)[];
+}
+
 /** What the server's transport gives it: one connection, its id, a way to answer. */
 export interface Connection {
   clientID: number;
@@ -19,15 +25,16 @@ export interface Connection {
 }
 
 export function serve(
-  stored: Snapshot,
+  stored: Snapshot & { log?: Broadcast },
   canEdit: (clientID: string | number) => boolean,
-  save: (snapshot: Snapshot) => void,
+  save: (stored: Snapshot & { log: Broadcast }) => void,
   broadcast: (message: unknown) => void,
 ) {
   const authority = createAuthority({
     document: stored.document,
     version: stored.version,
     package: stored.package, // DocxImport.package, kept for export
+    ...(stored.log ? { log: stored.log } : {}), // clients behind catch up after a restart
     authorize: (clientID) => canEdit(clientID),
   });
 
@@ -37,7 +44,8 @@ export function serve(
       // The client id is the connection's, never what the message claims.
       const result = authority.receive(message, connection.clientID);
       if (result.ok) {
-        save(authority.snapshot()); // or append result.broadcast to a log
+        // The snapshot and the log (or only the log's new steps, appended, on a big document).
+        save({ ...authority.snapshot(), log: authority.log });
         broadcast({ type: "steps", ...result.broadcast }); // to everyone, the sender too
       } else connection.reply({ type: "refused", ...result });
     } else if (message.type === "catchup") {
@@ -47,12 +55,6 @@ export function serve(
       );
     }
   };
-}
-
-interface Broadcast {
-  version: number;
-  steps: StepJSON[];
-  clientIDs: (string | number)[];
 }
 
 export function join(snapshot: Snapshot, clientID: number, name: string, socket: WebSocket) {
@@ -65,7 +67,7 @@ export function join(snapshot: Snapshot, clientID: number, name: string, socket:
   let inFlight = false;
   function send() {
     const sendable = sendableSteps(editor.state);
-    if (!sendable || inFlight) return;
+    if (!sendable || inFlight || stopped) return;
     inFlight = true;
     const steps = sendable.steps.map((step) => step.toJSON());
     socket.send(JSON.stringify({ type: "steps", version: sendable.version, steps }));
@@ -88,10 +90,14 @@ export function join(snapshot: Snapshot, clientID: number, name: string, socket:
     }
     send();
   }
-  // Refused: what was missed comes first, then the steps go again, rebased.
-  function refused() {
+  // Stale: what was missed comes first, then the steps go again, rebased. Any other reason
+  // would come again with the same steps: stop sending and tell the user.
+  let stopped = false;
+  function refused(reason: string) {
     inFlight = false;
-    socket.send(JSON.stringify({ type: "catchup", version: getVersion(editor.state) }));
+    if (reason === "stale")
+      socket.send(JSON.stringify({ type: "catchup", version: getVersion(editor.state) }));
+    else stopped = true;
   }
   return { editor, receive, refused };
 }

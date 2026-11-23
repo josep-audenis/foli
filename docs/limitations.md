@@ -1,6 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 1.6.0 (`@folijs/agent` 0.3.2,
+What Foli does not do yet, or does with caveats, as of 1.6.0 (`@folijs/agent` 0.3.3,
 `@folijs/mcp` 0.2.3, `@folijs/collab` 0.1.0: Phase 21 fixed what an audit of 1.4.0 found, what it
 left is marked "Phase 21" below; Phase 22's collaboration has a section of its own). Read it before you ship. The
 owner decided on 2026-11-20 that each of these ships in 1.0 as a known limit (the one picked as a
@@ -387,8 +387,8 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
   without pause roughly double to quintuple keystroke-to-paint p95 on a 50-page document
   ([benchmarks](benchmarks.md#typing-while-others-edit-2212)).
 - **Convergence is tested, not proven.** The property test (2–5 clients, 10–40 random edits a run,
-  1000 runs) passes; a heavier run of it (30–80 edits, five seeds of 1000 runs) found one case in
-  5000 where a client ended with a bold mark the others did not have (bold, deletions and undo
+  1000 runs) passes; a heavier run of it (30–80 edits, eight seeds of 1000 runs) found one case in
+  8000 where a client ended with a bold mark the others did not have (bold, deletions and undo
   close together), which did not replay alone. Not fixed in 1.6: such a client stays apart until
   it loads the authority's snapshot again (a reload).
 - The agent library and the MCP server do not edit a shared document.

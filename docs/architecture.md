@@ -1105,7 +1105,7 @@ A central authority orders every step; clients rebase. The loop:
    them to its own headless editor as a `remote` transaction (the word plugin's filter refuses
    an envelope or story step whose `before` or tree no longer holds). Accepted: the version
    moves on and the steps are broadcast with their authors' client ids; the log is compacted to
-   a snapshot past `limits.log`.
+   a snapshot past `limits.log` steps or `limits.logSize` characters.
 3. Each client applies broadcasts in version order with `receiveTransaction`: its own steps at
    the start confirm its unconfirmed ones; otherwise its unconfirmed steps are inverted, the
    others' applied, and its own mapped over them and applied again (mirrored maps, so positions
