@@ -3252,7 +3252,7 @@ lets the agent library return steps); 22.7 onwards build it.
   `authorize(clientID, steps)` callback lets the app refuse edits (a read-only user). No
   transport, no storage: the app persists what it gives. Size limits on messages, steps per
   batch and the log.
-- [ ] 22.9 Presence: a message with a client's name, colour and selection (as JSON), mapped
+- [x] 22.9 Presence: a message with a client's name, colour and selection (as JSON), mapped
   through changes until the next one. The view draws remote carets and selections with the
   CSS Custom Highlight API, as find does, and the name beside the caret; nothing added to the
   document or its undo; reduced motion respected. A presence list for apps

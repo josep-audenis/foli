@@ -50,6 +50,7 @@ import {
   parseContentV2,
   parseFieldInstruction,
   pasteCells,
+  presence,
   type ResourceJSON,
   type ReviewView,
   redo,
@@ -159,6 +160,7 @@ import {
 import { HintMarks, MATCH_STYLES, MatchMarks, rangesInCopy, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
+import { type PeerDrawing, PeerMarks } from "./word/presence.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
   collect,
@@ -727,6 +729,10 @@ export class EditorView {
   private found: FoundMatches | null = null;
   private matchStory: string | null = null;
   private readonly matchMarks: MatchMarks;
+  /** Other people's selections and carets (22.9). */
+  private readonly peerMarks: PeerMarks;
+  private peerFrame = 0;
+  private peersShown = false;
   private readonly hintMarks: HintMarks;
   /** The hint shown, as positions of the body (18.1). */
   private shownHint: {
@@ -762,6 +768,7 @@ export class EditorView {
   ) {
     this.state = editor.state;
     this.matchMarks = new MatchMarks(host.ownerDocument);
+    this.peerMarks = new PeerMarks(host.ownerDocument);
     this.hintMarks = new HintMarks(host.ownerDocument);
     this.paged = options.paged !== false;
     this.noteMark = options.noteMark;
@@ -855,6 +862,7 @@ export class EditorView {
     this.unsubscribe = editor.subscribe((state, transactions) => {
       this.mapHint(state, transactions);
       this.update(state);
+      this.drawPeers();
     });
     for (const extension of extensions) {
       try {
@@ -939,6 +947,8 @@ export class EditorView {
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
     this.unsubscribe();
+    this.peerMarks.clear();
+    if (this.peersShown) this.showPeers(false);
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
     this.resizeObserver?.disconnect();
@@ -2218,6 +2228,63 @@ export class EditorView {
     }
     this.matchMarks.set(all, here ? this.rangesOf(here.from, here.to) : []);
   }
+
+  /** Other people's selections marked and carets with their names (22.9); nothing in the document. */
+  private drawPeers(): void {
+    const peers = presence(this.state);
+    if (!peers.length && !this.peersShown) return;
+    this.showPeers(peers.length > 0);
+    const size = this.state.doc.content.size;
+    const drawings: PeerDrawing[] = [];
+    for (const { name, color, selection } of peers) {
+      if (!selection) continue;
+      const from = Math.min(selection.anchor, selection.head, size);
+      const to = Math.min(Math.max(selection.anchor, selection.head), size);
+      let ranges: Range[] = [];
+      try {
+        ranges = from < to ? this.rangesOf(from, to) : [];
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+      }
+      drawings.push({ name, color, ranges, caret: this.caretAt(selection.head) });
+    }
+    this.peerMarks.draw(drawings);
+  }
+
+  /** Where the caret at `pos` is drawn, in viewport coordinates; null where none shows. */
+  private caretAt(pos: number): PeerDrawing["caret"] {
+    const size = this.state.doc.content.size;
+    try {
+      const after = pos < size ? this.rangesOf(pos, pos + 1)[0]?.getClientRects?.()[0] : undefined;
+      if (after?.height) return { left: after.left, top: after.top, height: after.height };
+      const before = pos > 0 ? this.rangesOf(pos - 1, pos)[0]?.getClientRects?.() : undefined;
+      const rect = before?.[before.length - 1];
+      if (rect?.height) return { left: rect.right, top: rect.top, height: rect.height };
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
+    return null;
+  }
+
+  /** While peers show, scrolling and resizing move their carets, once per frame. */
+  private showPeers(on: boolean): void {
+    if (on === this.peersShown) return;
+    this.peersShown = on;
+    const doc = this.host.ownerDocument;
+    const win = doc.defaultView;
+    const listen = on ? "addEventListener" : "removeEventListener";
+    doc[listen]("scroll", this.onPeerScroll, SCROLL_OPTIONS);
+    win?.[listen]("resize", this.onPeerScroll);
+  }
+
+  private readonly onPeerScroll = (): void => {
+    const win = this.host.ownerDocument.defaultView;
+    if (this.peerFrame || !win) return;
+    this.peerFrame = win.requestAnimationFrame(() => {
+      this.peerFrame = 0;
+      if (!this.destroyed) this.drawPeers();
+    });
+  };
 
   /** Scrolling brings other pages near: their marks are drawn, once per frame. */
   private readonly onMatchScroll = (): void => {
