@@ -47,6 +47,8 @@ jobs:
           package-manager-cache: false
 
       - run: pnpm install --frozen-lockfile
+      # The PDF tests import the built packages (`dist/`), and the PDF renderer is built.
+      - run: pnpm build
       - run: pnpm exec playwright install chromium firefox webkit
       - run: pnpm test:e2e
       - run: pnpm examples
