@@ -67,7 +67,8 @@ export abstract class Step {
   }
 
   /**
-   * Reads a step from JSON, as untrusted input: an unknown `stepType`, a key the step does not
+   * Reads a step from JSON (a value `JSON.parse` gave), as untrusted input: an unknown
+   * `stepType`, a key the step does not
    * have, a position that is not a non-negative integer or content the schema refuses throws
    * `FoliDocumentError` with the JSON path. Whether the step applies is `apply`'s to say.
    */
@@ -160,7 +161,7 @@ export class ReplaceStep extends Step {
       stepType: "replace",
       from: this.from,
       to: this.to,
-      ...(this.slice.size ? { slice: this.slice.toJSON() } : {}),
+      ...(this.slice.content.size ? { slice: this.slice.toJSON() } : {}),
       ...(this.structure ? { structure: true } : {}),
     };
   }
@@ -236,7 +237,7 @@ export class ReplaceAroundStep extends Step {
       gapFrom,
       gapTo,
       insert,
-      ...(this.slice.size ? { slice: this.slice.toJSON() } : {}),
+      ...(this.slice.content.size ? { slice: this.slice.toJSON() } : {}),
       ...(this.structure ? { structure: true } : {}),
     };
   }

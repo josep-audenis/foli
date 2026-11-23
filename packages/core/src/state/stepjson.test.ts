@@ -60,7 +60,12 @@ describe("steps as JSON", () => {
     if (!context) throw new Error("no word context");
     let state = EditorState.create({ doc: start.doc, plugins: [wordPlugin(context.envelope)] });
     const tr = state.tr;
-    for (const json of steps) tr.step(Step.fromJSON(state.schema, json));
+    for (const json of steps) {
+      const step = Step.fromJSON(state.schema, json);
+      const again = JSON.parse(JSON.stringify(step.toJSON()));
+      expect(Step.fromJSON(state.schema, again).toJSON()).toEqual(again);
+      tr.step(step);
+    }
     state = state.apply(tr);
     const replayed = documentJSON(wordContext(state)?.envelope ?? context.envelope, state.doc);
     const made = editor.getDocument();
@@ -99,6 +104,12 @@ describe("steps as JSON", () => {
       { stepType: "envelope", key: "styles", before: [], after: [] },
       { stepType: "envelope", key: "section", before: {}, after: { nope: 1 } },
       { stepType: "story", id: "h", before: null, after: null },
+      {
+        stepType: "story",
+        id: "__proto__",
+        before: null,
+        after: { kind: "header", content: { type: "doc", content: [p("x")] } },
+      },
       { stepType: "story", id: "h", before: null, after: { kind: "header", content: {} } },
       {
         stepType: "story",
@@ -131,6 +142,48 @@ describe("steps as JSON", () => {
     expect(() => Step.fromJSON(schema, around([{ type: "table" }, { type: "table" }]))).toThrow(
       FoliDocumentError,
     );
+  });
+
+  it("keeps what Foli does not model: verbatim XML, attributes, opaque and foreign content", () => {
+    const { schema } = createEditor().state;
+    const json = {
+      stepType: "replace",
+      from: 1,
+      to: 1,
+      slice: {
+        content: [
+          {
+            type: "paragraph",
+            attrs: { ext: "<w:pPr><w:kinsoku/></w:pPr>" },
+            content: [
+              {
+                type: "text",
+                text: "x",
+                marks: [{ type: "foreign", attrs: { type: "acme:tag", attrs: { a: 1 } } }],
+              },
+            ],
+          },
+          { type: "opaqueBlock", attrs: { xml: "<w:customXml/>" } },
+        ],
+        openStart: 0,
+        openEnd: 0,
+      },
+    };
+    const step = Step.fromJSON(schema, json);
+    expect(JSON.parse(JSON.stringify(step.toJSON()))).toEqual(
+      JSON.parse(JSON.stringify(Step.fromJSON(schema, step.toJSON()).toJSON())),
+    );
+    expect(JSON.stringify(step.toJSON())).toContain("w:kinsoku");
+    expect(JSON.stringify(step.toJSON())).toContain("acme:tag");
+    expect(JSON.stringify(step.toJSON())).toContain("w:customXml");
+    // A slice of size 0 that holds content (two open ends) keeps it.
+    const closed = Step.fromJSON(schema, {
+      stepType: "replace",
+      from: 1,
+      to: 1,
+      slice: { content: [{ type: "paragraph" }, { type: "paragraph" }], openStart: 1, openEnd: 1 },
+    });
+    expect(closed.toJSON().slice).toBeDefined();
   });
 
   it("refuses a step type registered twice", () => {
