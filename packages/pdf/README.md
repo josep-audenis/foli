@@ -53,9 +53,13 @@ The document is validated first (`parseDocument`): an invalid one throws before 
 - **One export per page at a time.** A page shows one document: exports given the same page run
   one after another, never mixed, so one user's PDF never holds another's. For exports at once,
   give each its own page (a pool of pages).
-- **`signal` and `timeout`** (milliseconds) stop an export: the call rejects at once; the export
-  on the page stops at its next step, and the page's next export waits for it. A hung page is
-  still the app's to close.
+- **`signal` and `timeout`** (milliseconds, counted from the call, the wait for earlier exports
+  on the page included) stop an export: the call rejects at once; the export on the page stops at
+  its next step, and the page's next export waits for it. Until then the page is busy: other work
+  on it (`goto`, a screenshot) must wait, or close the page. A page that hangs holds every later
+  export on it until the app closes it.
+- The lock is the page object's, in one copy of `@folijs/pdf`: give `exportPdf` the same page
+  object each time (not a new wrapper around it), and keep one copy of the package.
 - **Keep `@folijs/pdf` external in a bundler** (esbuild's `external`, webpack's `externals`): it
   reads `dist/renderer.js` from beside its own file, which a bundle does not have.
 

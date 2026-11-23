@@ -60,7 +60,10 @@ export interface ExportPdfOptions {
     extensions?: string | undefined;
     /** Stops the export: the call rejects with the signal's reason. */
     signal?: AbortSignal | undefined;
-    /** Milliseconds after which the export stops, as `signal` does (a `TimeoutError`). */
+    /**
+     * Milliseconds after which the export stops, as `signal` does (a `TimeoutError`): counted from
+     * the call, the wait for earlier exports on the page included.
+     */
     timeout?: number | undefined;
 }
 export interface ExportedPdf {

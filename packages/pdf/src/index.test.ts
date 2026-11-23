@@ -205,9 +205,33 @@ describe("exportPdf", () => {
     const stop = new AbortController();
     stop.abort(new Error("gone"));
     await expect(exportPdf(saying("a"), { page, signal: stop.signal })).rejects.toThrow("gone");
-    const slow = exportPdf(saying("slow"), { page, timeout: 1 });
+    // Given up while it renders: the page stays its until it stops.
+    const log: string[] = [];
+    const { setContent, evaluate } = page;
+    page.setContent = async (html) => {
+      log.push("setContent");
+      return setContent(html);
+    };
+    let rendering = () => {};
+    const rendered = new Promise<void>((resolve) => {
+      rendering = resolve;
+    });
+    page.evaluate = async (fn, arg) => {
+      rendering();
+      const result = await evaluate(fn, arg);
+      log.push("evaluated");
+      return result;
+    };
+    const quit = new AbortController();
+    const slow = exportPdf(saying("slow"), { page, signal: quit.signal });
+    await rendered;
+    quit.abort(new Error("given up"));
+    await expect(slow).rejects.toThrow("given up");
     const next = exportPdf(saying("next"), { page });
-    await expect(slow).rejects.toThrow();
     expect(text(await next)).toBe("next");
+    expect(log).toEqual(["setContent", "evaluated", "setContent", "evaluated"]);
+    await expect(exportPdf(saying("x"), { page, timeout: 1 })).rejects.toThrow();
+    await expect(exportPdf(saying("x"), { page, timeout: 1.5 })).rejects.toThrow(TypeError);
+    await expect(exportPdf(saying("x"), { page, timeout: 0 })).rejects.toThrow(TypeError);
   });
 });

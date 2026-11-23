@@ -71,7 +71,10 @@ export interface ExportPdfOptions {
   extensions?: string | undefined;
   /** Stops the export: the call rejects with the signal's reason. */
   signal?: AbortSignal | undefined;
-  /** Milliseconds after which the export stops, as `signal` does (a `TimeoutError`). */
+  /**
+   * Milliseconds after which the export stops, as `signal` does (a `TimeoutError`): counted from
+   * the call, the wait for earlier exports on the page included.
+   */
   timeout?: number | undefined;
 }
 
@@ -187,8 +190,14 @@ export async function exportPdf(
   const { page } = options;
   if (!page || typeof page.pdf !== "function" || typeof page.evaluate !== "function")
     throw new TypeError("@folijs/pdf: options.page must be a Playwright or Puppeteer page");
-  const signals = [options.signal, options.timeout ? AbortSignal.timeout(options.timeout) : null];
-  const stop = AbortSignal.any(signals.filter((s): s is AbortSignal => !!s));
+  const { timeout } = options;
+  if (timeout !== undefined && !(Number.isInteger(timeout) && timeout > 0 && timeout < 2 ** 31))
+    throw new TypeError("@folijs/pdf: options.timeout must be a whole number of milliseconds");
+  const signals = [options.signal, timeout ? AbortSignal.timeout(timeout) : null].filter(
+    (s): s is AbortSignal => !!s,
+  );
+  // One signal is used as it is: `any` of an app's long-lived signal on every call is avoided.
+  const stop = signals.length === 1 ? (signals[0] as AbortSignal) : AbortSignal.any(signals);
   stop.throwIfAborted();
   const input: RenderInput = {
     document: valid,
@@ -218,6 +227,7 @@ async function print(
   extensions: string | undefined,
   stop: AbortSignal,
 ): Promise<ExportedPdf> {
+  stop.throwIfAborted();
   const script = await rendererBundle();
   stop.throwIfAborted();
   await page.setContent(PAGE);
