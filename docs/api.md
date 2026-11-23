@@ -748,7 +748,7 @@ selection of a picture, and its position).
 Fields (11.8, ADR-0007; markers in the model, see
 [document-model.md](document-model.md)). `updateFields(editor, { layout, data, now, only, maxWritten })` works
 results out and writes them in one transaction, one undo step, recorded as tracked changes when
-tracking is on (a story's change is a `StoryStep` of it; with `maxWritten`, it throws a
+tracking is on (a story's change is a `StoryEditStep` of it; with `maxWritten`, it throws a
 `RangeError` and changes nothing when the new results would hold more characters than that), and returns `{ updated, unchanged, rebuilt,
 skipped }`. Locked fields stay; a field left as it was is in `skipped`, with its `instruction`, its
 `story` and why (`locked`, `unknown`, `no-layout`, `no-data`, `missing-bookmark`,
@@ -892,7 +892,8 @@ Stable, for plugins and code that edits documents directly:
   `liftTarget`, `NodeTypeWithAttrs`.
 - Steps as JSON (1.6): `step.toJSON()` (`StepJSON`: `stepType` and the step's fields) and
   `Step.fromJSON(schema, json)` (a value `JSON.parse` gave), for every step of `@folijs/core`, the Word steps
-  (`CommentStep`, `EnvelopeStep`, `StoryStep`, from `@folijs/core/internal`) included. `fromJSON` reads untrusted input: an
+  (`CommentStep`, `EnvelopeStep`, `StoryStep`, `StoryEditStep`, from `@folijs/core/internal`)
+  included. `fromJSON` reads untrusted input: an
   unknown step type or key, a position that is not a non-negative integer, or a slice, mark,
   attribute, comment, story or envelope value the schema refuses throws `FoliDocumentError` with
   the JSON path; whether the step applies is `apply`'s to say. An extension's own step class
@@ -929,7 +930,7 @@ as exact peer dependencies, so each runs with the core it was built with). Not f
 release may change it.
 
 - The Word context and envelope: `wordContext`, `WordContext`, `WordEnvelope`, `withEnvelope`,
-  `setComments`, `Story`, `StoryStep`, `CommentStep`, `EnvelopeStep`, `EnvelopeKey`.
+  `setComments`, `Story`, `StoryStep`, `StoryEditStep`, `CommentStep`, `EnvelopeStep`, `EnvelopeKey`.
 - The formatting resolver: `Resolver`, `ParagraphFormat`, `RunFormat`, `ListMarker`,
   `TableFormat`, `CellFormat`, `CellPlace`, `tableConditions`, `formatNumber`.
 - Clipboard fitting: `copiedDefinitions`, `fitPaste`, `fitPastedV2`, `FittedPaste`,
