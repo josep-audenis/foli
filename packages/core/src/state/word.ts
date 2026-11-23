@@ -7,10 +7,17 @@
  * ranges) and select opaque content before deleting it.
  */
 import { deepEqual } from "../model/attrs.js";
+import { fail } from "../model/errors.js";
 import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
-import { Step, StepResult } from "../transform/steps.js";
+import { natural, record, Step, type StepJSON, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
-import { parseContent, schemaVersionOf } from "../v3/document.js";
+import {
+  checkCommentJSON,
+  envelopeValueError,
+  parseContent,
+  parseStory,
+  schemaVersionOf,
+} from "../v3/document.js";
 import { writeCustom } from "../v3/extensions.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
@@ -87,7 +94,28 @@ export class CommentStep extends Step {
   map(): Step {
     return this;
   }
+
+  override toJSON(): StepJSON {
+    const { id, comment, previous, index } = this;
+    return { stepType: "comment", id, comment, previous, index };
+  }
 }
+
+Step.jsonID("comment", (schema, value) => {
+  const json = record(value, "$", ["stepType", "id", "comment", "previous", "index"]);
+  const id = natural(json, "id");
+  const read = (key: "comment" | "previous"): CommentJSON | null => {
+    const comment = json[key];
+    if (comment === null) return null;
+    checkCommentJSON(comment, schema, `$.${key}`);
+    if ((comment as CommentJSON).id !== id) fail(`$.${key}.id`, "must be the step's id");
+    return structuredClone(comment as CommentJSON);
+  };
+  const comment = read("comment");
+  const previous = read("previous");
+  if (!comment && !previous) fail("$", "a comment step changes a comment");
+  return new CommentStep(id, comment, previous, natural(json, "index"));
+});
 
 /**
  * `comments` after the comment steps among `steps`.
@@ -167,7 +195,28 @@ export class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends Step {
   map(): Step {
     return this;
   }
+
+  override toJSON(): StepJSON {
+    return { stepType: "envelope", key: this.key, before: this.before, after: this.after };
+  }
 }
+
+const ENVELOPE_KEYS: readonly string[] = ["section", "settings", "controls"];
+
+Step.jsonID("envelope", (_schema, value) => {
+  const json = record(value, "$", ["stepType", "key", "before", "after"]);
+  const key = json.key as EnvelopeKey;
+  if (!ENVELOPE_KEYS.includes(key)) fail("$.key", `unknown envelope key ${JSON.stringify(key)}`);
+  for (const side of ["before", "after"]) {
+    const error = envelopeValueError(key, [], json[side]);
+    if (error) fail(`$.${side}`, error);
+  }
+  return new EnvelopeStep(
+    key,
+    structuredClone(json.before) as never,
+    structuredClone(json.after) as never,
+  );
+});
 
 /**
  * Changes story `id` from `before` to `after` (null: no story), a step of the body's transaction
@@ -203,6 +252,17 @@ export class StoryStep extends Step {
     return this;
   }
 
+  override toJSON(): StepJSON {
+    return {
+      stepType: "story",
+      id: this.id,
+      before: this.before && storyJSON(this.before),
+      after: this.after && storyJSON(this.after),
+      selectionBefore: this.selectionBefore,
+      selectionAfter: this.selectionAfter,
+    };
+  }
+
   /** This step followed by `next`, when `next` starts from what this one leaves. */
   merge(next: StoryStep): StoryStep | null {
     if (next.id !== this.id || !sameStory(this.after, next.before)) return null;
@@ -215,6 +275,47 @@ export class StoryStep extends Step {
     );
   }
 }
+
+/** A selection's JSON, checked: a known type and two positions (clamped when restored). */
+function selectionJSON(value: unknown, path: string): SelectionJSON | null {
+  if (value === null) return null;
+  const json = record(value, path, ["type", "anchor", "head"]);
+  if (!["text", "node", "all", "cell"].includes(json.type as string))
+    fail(`${path}.type`, "unknown selection type");
+  return {
+    type: json.type as SelectionJSON["type"],
+    anchor: natural(json, "anchor", path),
+    head: natural(json, "head", path),
+  };
+}
+
+Step.jsonID("story", (schema, value) => {
+  const json = record(value, "$", [
+    "stepType",
+    "id",
+    "before",
+    "after",
+    "selectionBefore",
+    "selectionAfter",
+  ]);
+  if (typeof json.id !== "string" || !json.id) fail("$.id", "expected a story id");
+  const read = (key: "before" | "after"): Story | null => {
+    if (json[key] === null) return null;
+    const doc = parseStory(json[key], schema, `$.${key}`);
+    const { content: _content, ...rest } = structuredClone(json[key] as StoryJSON);
+    return { ...rest, doc };
+  };
+  const before = read("before");
+  const after = read("after");
+  if (!before && !after) fail("$", "a story step changes a story");
+  return new StoryStep(
+    json.id,
+    before,
+    after,
+    selectionJSON(json.selectionBefore ?? null, "$.selectionBefore"),
+    selectionJSON(json.selectionAfter ?? null, "$.selectionAfter"),
+  );
+});
 
 /**
  * Whether two stories are the same: identical trees are the usual case.

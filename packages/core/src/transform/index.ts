@@ -7,6 +7,8 @@ export {
   ReplaceAroundStep,
   ReplaceStep,
   Step,
+  type StepJSON,
+  type StepParser,
   StepResult,
 } from "./steps.js";
 export {

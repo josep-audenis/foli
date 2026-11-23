@@ -1,3 +1,5 @@
+import { computeAttrs } from "../model/attrs.js";
+import { fail } from "../model/errors.js";
 import {
   type Attrs,
   FoliDocumentError,
@@ -6,6 +8,7 @@ import {
   type Node,
   type NodeType,
   ReplaceError,
+  type Schema,
   Slice,
 } from "../model/index.js";
 import { type Mappable, StepMap } from "./stepmap.js";
@@ -36,6 +39,17 @@ export class StepResult {
   }
 }
 
+/** A step as JSON: `stepType` names how to read it back (`Step.jsonID`), the rest is the step's. */
+export interface StepJSON {
+  stepType: string;
+  [key: string]: unknown;
+}
+
+/** Reads a step's JSON (its `stepType` matched) in `schema`; throws `FoliDocumentError`. */
+export type StepParser = (schema: Schema, json: Readonly<Record<string, unknown>>) => Step;
+
+const parsers = new Map<string, StepParser>();
+
 /**
  * One atomic, invertible document change. Every edit is a sequence of steps; steps report how
  * they move positions (`getMap`), can be inverted against the document they were applied to,
@@ -43,6 +57,33 @@ export class StepResult {
  */
 export abstract class Step {
   abstract apply(doc: Node): StepResult;
+
+  /**
+   * The step as JSON, for another editor (`Step.fromJSON`). An extension's step class that
+   * travels between editors (collaboration) overrides it and registers its `stepType`.
+   */
+  toJSON(): StepJSON {
+    throw new RangeError(`${this.constructor.name} has no JSON form (see Step.jsonID)`);
+  }
+
+  /**
+   * Reads a step from JSON, as untrusted input: an unknown `stepType`, a key the step does not
+   * have, a position that is not a non-negative integer or content the schema refuses throws
+   * `FoliDocumentError` with the JSON path. Whether the step applies is `apply`'s to say.
+   */
+  static fromJSON(schema: Schema, json: unknown): Step {
+    const value = record(json, "$");
+    const type = value.stepType;
+    const parse = typeof type === "string" ? parsers.get(type) : undefined;
+    if (!parse) return fail("$.stepType", `unknown step type ${JSON.stringify(type)}`);
+    return parse(schema, value);
+  }
+
+  /** Registers how steps of `stepType` are read back. A type registered twice throws. */
+  static jsonID(stepType: string, parse: StepParser): void {
+    if (parsers.has(stepType)) throw new RangeError(`Step type ${stepType} is registered already`);
+    parsers.set(stepType, parse);
+  }
 
   getMap(): StepMap {
     return StepMap.empty;
@@ -114,6 +155,16 @@ export class ReplaceStep extends Step {
     return new ReplaceStep(range.from, to, this.slice, this.structure);
   }
 
+  override toJSON(): StepJSON {
+    return {
+      stepType: "replace",
+      from: this.from,
+      to: this.to,
+      ...(this.slice.size ? { slice: this.slice.toJSON() } : {}),
+      ...(this.structure ? { structure: true } : {}),
+    };
+  }
+
   /**
    * One step equivalent to applying this step and then `next`, when they touch adjacent ranges
    * (e.g. consecutive keystrokes); null otherwise. Keeps typing history to one step per run.
@@ -174,6 +225,20 @@ export class ReplaceAroundStep extends Step {
     return filled
       ? StepResult.fromReplace(doc, from, to, filled)
       : StepResult.fail("Content does not fit in gap");
+  }
+
+  override toJSON(): StepJSON {
+    const { from, to, gapFrom, gapTo, insert } = this;
+    return {
+      stepType: "replaceAround",
+      from,
+      to,
+      gapFrom,
+      gapTo,
+      insert,
+      ...(this.slice.size ? { slice: this.slice.toJSON() } : {}),
+      ...(this.structure ? { structure: true } : {}),
+    };
   }
 
   override getMap(): StepMap {
@@ -288,6 +353,11 @@ abstract class MarkStep extends Step {
     const range = mapRange(mapping, this.from, this.to);
     return range && range.from < range.to ? this.create(range.from, range.to) : null;
   }
+
+  override toJSON(): StepJSON {
+    const stepType = this instanceof AddMarkStep ? "addMark" : "removeMark";
+    return { stepType, from: this.from, to: this.to, mark: this.mark.toJSON() };
+  }
 }
 
 /** Adds a mark to all inline content in `from..to` whose parent allows it. */
@@ -358,6 +428,10 @@ export class NodeMarkupStep extends Step {
     const node = doc.nodeAt(this.pos);
     if (!node) throw new RangeError(`No node at position ${this.pos}`);
     return new NodeMarkupStep(this.pos, node.type, node.attrs, node.marks);
+  }
+
+  override toJSON(): StepJSON {
+    return { stepType: "nodeMarkup", ...markupJSON(this) };
   }
 
   map(mapping: Mappable): Step | null {
@@ -452,4 +526,121 @@ export class NodeMarkupBatchStep extends Step {
       .filter((step): step is NodeMarkupStep => step !== null);
     return steps.length ? new NodeMarkupBatchStep(steps) : null;
   }
+
+  override toJSON(): StepJSON {
+    return { stepType: "nodeMarkupBatch", steps: this.steps.map(markupJSON) };
+  }
 }
+
+function markupJSON(step: NodeMarkupStep): Record<string, unknown> {
+  return {
+    pos: step.pos,
+    type: step.type.name,
+    attrs: step.attrs,
+    ...(step.marks ? { marks: step.marks.map((m) => m.toJSON()) } : {}),
+  };
+}
+
+/**
+ * `value` as an object with only the keys `allowed`; throws `FoliDocumentError` otherwise.
+ * @internal
+ */
+export function record(
+  value: unknown,
+  path: string,
+  allowed?: readonly string[],
+): Readonly<Record<string, unknown>> {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return fail(path, "expected an object");
+  const json = value as Record<string, unknown>;
+  if (allowed)
+    for (const key of Object.keys(json))
+      if (!allowed.includes(key)) fail(`${path}.${key}`, "unknown key");
+  return json;
+}
+
+/**
+ * `json[key]` as a non-negative integer (a position, an id, an index).
+ * @internal
+ */
+export function natural(json: Readonly<Record<string, unknown>>, key: string, path = "$"): number {
+  const value = json[key];
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+    fail(`${path}.${key}`, "expected a non-negative integer");
+  return value as number;
+}
+
+function flag(json: Readonly<Record<string, unknown>>, key: string): boolean {
+  const value = json[key];
+  if (value !== undefined && typeof value !== "boolean") fail(`$.${key}`, "expected a boolean");
+  return value === true;
+}
+
+function sliceOf(schema: Schema, json: Readonly<Record<string, unknown>>): Slice {
+  return json.slice === undefined ? Slice.empty : schema.sliceFromJSON(json.slice, "$.slice");
+}
+
+function marksOf(schema: Schema, value: unknown, path: string): readonly Mark[] {
+  if (!Array.isArray(value)) return fail(path, "expected an array");
+  return value.reduce<readonly Mark[]>(
+    (set, m, i) => schema.markFromJSON(m, `${path}[${i}]`).addToSet(set),
+    [],
+  );
+}
+
+function markupFromJSON(schema: Schema, value: unknown, path: string): NodeMarkupStep {
+  const json = record(value, path, ["stepType", "pos", "type", "attrs", "marks"]);
+  const type = typeof json.type === "string" ? schema.nodes[json.type] : undefined;
+  if (!type || type.isText)
+    return fail(`${path}.type`, `unknown node type ${JSON.stringify(json.type)}`);
+  const given = json.attrs == null ? undefined : record(json.attrs, `${path}.attrs`);
+  const attrs = computeAttrs(type.spec.attrs, given, `${path}.attrs`);
+  const marks = json.marks === undefined ? undefined : marksOf(schema, json.marks, `${path}.marks`);
+  return new NodeMarkupStep(natural(json, "pos", path), type, attrs, marks);
+}
+
+const REPLACE = ["stepType", "from", "to", "slice", "structure"];
+
+/** `from..to` of `json`, in order. */
+function range(json: Readonly<Record<string, unknown>>): { from: number; to: number } {
+  const from = natural(json, "from");
+  const to = natural(json, "to");
+  if (to < from) fail("$.to", "must not be before from");
+  return { from, to };
+}
+
+Step.jsonID("replace", (schema, value) => {
+  const json = record(value, "$", REPLACE);
+  const { from, to } = range(json);
+  return new ReplaceStep(from, to, sliceOf(schema, json), flag(json, "structure"));
+});
+Step.jsonID("replaceAround", (schema, value) => {
+  const json = record(value, "$", [...REPLACE, "gapFrom", "gapTo", "insert"]);
+  const { from, to } = range(json);
+  const insert = natural(json, "insert");
+  const slice =
+    json.slice === undefined ? Slice.empty : schema.sliceFromJSON(json.slice, "$.slice", insert);
+  if (insert > slice.size) fail("$.insert", "must be inside the slice");
+  const gapFrom = natural(json, "gapFrom");
+  const gapTo = natural(json, "gapTo");
+  return new ReplaceAroundStep(from, to, gapFrom, gapTo, slice, insert, flag(json, "structure"));
+});
+for (const [stepType, Type] of [
+  ["addMark", AddMarkStep],
+  ["removeMark", RemoveMarkStep],
+] as const)
+  Step.jsonID(stepType, (schema, value) => {
+    const json = record(value, "$", ["stepType", "from", "to", "mark"]);
+    const { from, to } = range(json);
+    if (from === to) fail("$.to", "must be after from");
+    return new Type(from, to, schema.markFromJSON(json.mark, "$.mark"));
+  });
+Step.jsonID("nodeMarkup", (schema, value) => markupFromJSON(schema, value, "$"));
+Step.jsonID("nodeMarkupBatch", (schema, value) => {
+  const json = record(value, "$", ["stepType", "steps"]);
+  if (!Array.isArray(json.steps) || !json.steps.length)
+    fail("$.steps", "expected a non-empty array");
+  return new NodeMarkupBatchStep(
+    (json.steps as unknown[]).map((s, i) => markupFromJSON(schema, s, `$.steps[${i}]`)),
+  );
+});

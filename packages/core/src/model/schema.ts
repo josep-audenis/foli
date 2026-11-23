@@ -319,8 +319,12 @@ export class Schema {
     return new Mark(type, computeAttrs(type.spec.attrs, attrs, `${path}.attrs`));
   }
 
-  /** Parses a slice. Open nodes may hold incomplete content; everything else is strict. */
-  sliceFromJSON(value: unknown, path = "$"): Slice {
+  /**
+   * Parses a slice. Open nodes may hold incomplete content; everything else is strict. `gap`: a
+   * position of the slice (`Slice.insertAt`'s) where content will be inserted, a
+   * `ReplaceAroundStep`'s: the node holding it may lack what the inserted content will give.
+   */
+  sliceFromJSON(value: unknown, path = "$", gap?: number): Slice {
     const json = expectObject(value, path, SLICE_KEYS);
     const items = expectArray(json.content, `${path}.content`);
     const { openStart, openEnd } = json;
@@ -329,20 +333,26 @@ export class Schema {
     if (!items.length && (openStart || openEnd)) {
       fail(path, "an empty slice cannot be open");
     }
-    const children = items.map((item, i) =>
-      this.parseNode(
+    let offset = 0;
+    const children = items.map((item, i) => {
+      const child = this.parseNode(
         item,
         `${path}.content[${i}]`,
         i === 0 ? openStart : 0,
         i === items.length - 1 ? openEnd : 0,
-      ),
-    );
+        0,
+        gap === undefined ? -1 : gap + openStart - offset - 1,
+      );
+      offset += child.nodeSize;
+      return child;
+    });
     return new Slice(Fragment.fromArray(children), openStart, openEnd);
   }
 
   /**
    * `openStart`/`openEnd`: how many levels, starting with this node, are cut open. `depth`: how
    * deep the node is; past `MAX_NODE_DEPTH` the input is refused instead of overflowing the stack.
+   * `gap`: a position in the node's content (`sliceFromJSON`'s), -1 for none.
    */
   private parseNode(
     value: unknown,
@@ -350,6 +360,7 @@ export class Schema {
     openStart: number,
     openEnd: number,
     depth = 0,
+    gap = -1,
   ): Node {
     if (depth > MAX_NODE_DEPTH) fail(path, `nodes nested deeper than ${MAX_NODE_DEPTH} levels`);
     const json = expectObject(value, path, NODE_KEYS);
@@ -381,17 +392,29 @@ export class Schema {
     if (json.content !== undefined) {
       if (type.isLeaf) fail(`${path}.content`, `${type.name} cannot have content`);
       const items = expectArray(json.content, `${path}.content`);
-      children = items.map((item, i) =>
-        this.parseNode(
+      let offset = 0;
+      children = items.map((item, i) => {
+        const child = this.parseNode(
           item,
           `${path}.content[${i}]`,
           i === 0 ? Math.max(openStart - 1, 0) : 0,
           i === items.length - 1 ? Math.max(openEnd - 1, 0) : 0,
           depth + 1,
-        ),
-      );
+          gap < 0 ? -1 : gap - offset - 1,
+        );
+        offset += child.nodeSize;
+        return child;
+      });
     }
-    if (openStart || openEnd) {
+    // The gap between two children (not inside one): the content inserted there completes it.
+    let boundary = gap === 0;
+    for (let i = 0, at = 0; !boundary && i < children.length && at < gap; i++) {
+      at += (children[i] as Node).nodeSize;
+      boundary = at === gap;
+    }
+    if (boundary) {
+      // Checked once filled (`Slice.insertAt`).
+    } else if (openStart || openEnd) {
       if (!children.length && (openStart > 1 || openEnd > 1)) {
         fail(`${path}.content`, "open depth exceeds the content");
       }
