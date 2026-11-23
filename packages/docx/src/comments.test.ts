@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createDocument, createEditor } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx } from "./index.js";
+import { docx } from "./testing/package.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 
@@ -49,5 +50,48 @@ describe("comments made in the editor", () => {
     const again = await importDocx(await exportDocx(editor.getDocument(), imported.package));
     expect(again.document.comments).toHaveLength(before + 2);
     expect(view(again.document.comments)).toEqual(view(editor.getDocument().comments));
+  });
+});
+
+describe("comments whose ids a file repeats (21.3)", () => {
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const anchored = (id: number, text: string) =>
+    `<w:p><w:commentRangeStart w:id="${id}"/><w:r><w:t>${text}</w:t></w:r><w:commentRangeEnd w:id="${id}"/>` +
+    `<w:r><w:commentReference w:id="${id}"/></w:r></w:p>`;
+  const comment = (id: number, author: string, text: string) =>
+    `<w:comment w:id="${id}" w:author="${author}"><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:comment>`;
+  const file = () =>
+    docx(anchored(1, "a") + anchored(1, "b") + anchored(2, "c"), {
+      rels: `<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="comments.xml"/>`,
+      parts: {
+        "word/comments.xml": `<w:comments xmlns:w="${W}">${comment(1, "A", "first")}${comment(1, "B", "second")}${comment(2, "C", "third")}</w:comments>`,
+      },
+    });
+
+  it("are read each with an id of its own, its anchors following it", async () => {
+    const { document } = await importDocx(await file());
+    expect(document.comments.map((c) => [c.id, c.author])).toEqual([
+      [1, "A"],
+      [3, "B"],
+      [2, "C"],
+    ]);
+    const ids = document.content.content?.map((p) =>
+      (p.content ?? []).filter((n) => n.type !== "text").map((n) => n.attrs?.id),
+    );
+    expect(ids).toEqual([
+      [1, 1, 1],
+      [3, 3, 3],
+      [2, 2, 2],
+    ]);
+  });
+
+  it("are edited and resolved one at a time", async () => {
+    const { document } = await importDocx(await file());
+    const editor = createEditor({ document, author: "Me" });
+    expect(editor.commands.resolveComment(2)).toBe(true);
+    expect(editor.commands.resolveComment(3)).toBe(true);
+    const by = (id: number) => editor.getDocument().comments.find((c) => c.id === id);
+    expect([by(1)?.done, by(3)?.done, by(2)?.done]).toEqual([undefined, true, true]);
+    expect(by(1)?.author).toBe("A");
   });
 });

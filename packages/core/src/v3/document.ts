@@ -494,7 +494,8 @@ export function createDocument(
  * Custom types (ADR-0008) are validated by `options.extensions`; a namespaced type none of them
  * declares is kept as it is, its attributes checked only as plain JSON (a foreign node or mark).
  *
- * What Word opens is accepted: duplicate ids (the first wins), a numbering instance or a reply
+ * What Word opens is accepted: duplicate ids (the first wins; not a comment's: refused, as
+ * `importDocx` renumbers them), a numbering instance or a reply
  * whose target is missing, references to styles that do not exist. Rejected is only what the
  * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
  * itself, comments replying to each other) that would never end when followed.
@@ -586,6 +587,12 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     (c) => c.parent,
     (c) => `comment ${c.id} replies to itself`,
   );
+  // Unlike a style's: comments are edited and resolved by id, and one would change another.
+  const ids = new Set<number>();
+  comments.forEach((c, i) => {
+    if (ids.has(c.id)) fail(`comments[${i}].id`, `${c.id} is the id of an earlier comment`);
+    ids.add(c.id);
+  });
 
   const schema = schemaWith(options.extensions);
   const content = parseContent(input.content, { schema });

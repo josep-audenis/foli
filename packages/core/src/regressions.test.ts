@@ -9,7 +9,7 @@ import { renameBookmark } from "./state/navigation.js";
 import { noteNumbers } from "./state/notes.js";
 import { acceptAllChanges } from "./state/review.js";
 import type { FoliDocument } from "./v3/document.js";
-import { createDocument, SCHEMA_VERSION } from "./v3/document.js";
+import { createDocument, parseDocument, SCHEMA_VERSION } from "./v3/document.js";
 
 type Inline = NodeJSON | string;
 const t = (text: string, marks?: NodeJSON["marks"]): NodeJSON => ({
@@ -430,5 +430,17 @@ describe("several of one's own paragraphs, deleted together at the document's en
     editor.run(acceptAllChanges());
     editor.run(rejectAllChanges());
     expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+  });
+});
+
+describe("duplicate comment ids (21.3)", () => {
+  it("are refused: a command by id would act on the wrong comment", () => {
+    const comment = (id: number) => ({ id, author: "A", content: [{ type: "paragraph" }] });
+    expect(() =>
+      parseDocument({ ...createDocument(), comments: [comment(1), comment(1), comment(2)] }),
+    ).toThrow("comments[1].id: 1 is the id of an earlier comment");
+    expect(() =>
+      parseDocument({ ...createDocument(), comments: [comment(1), comment(2)] }),
+    ).not.toThrow();
   });
 });
