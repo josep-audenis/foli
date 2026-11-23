@@ -17,7 +17,11 @@ export interface FoliCanvasProps {
      * `data:` URL, opting in). Without it, pictures are not pasted, dropped or inserted.
      */
     upload?: EditorViewOptions["upload"] | undefined;
-    /** The URL to show a picture's image from (`packageImages` for a .docx package's images). */
+    /**
+     * The URL to show a picture's image from (`packageImages` for a .docx package's images). A new
+     * function each render is fine: pictures drawn later ask the latest one; ones already drawn
+     * keep their image until the document or the picture changes.
+     */
     resource?: EditorViewOptions["resource"] | undefined;
     className?: string | undefined;
 }
@@ -482,16 +486,6 @@ export declare const defaultToolbarTabs: readonly (ToolbarTab & {
     /** Arrays only, no captioned groups: `tab.items.map((group) => group.filter(…))` works. */
     readonly items: readonly (readonly ToolbarItem[])[];
 })[];
-/**
- * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
- * style, font and size boxes, marks, link (a dialog, also on Mod-K in the document), text color
- * and highlight menus, alignment and line spacing, lists (bulleted, numbered, decrease and
- * increase indent), undo, redo, tables (a Table menu with an insert table dialog, a table style
- * box, a cell shading menu), page break.
- * One tab stop (arrow keys, Home and End move between buttons); toggles carry
- * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
- * Clicks leave the focus and selection in the document.
- */
 export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label: givenLabel, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
