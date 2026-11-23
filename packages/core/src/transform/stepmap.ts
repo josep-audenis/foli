@@ -205,8 +205,11 @@ export class Mapping implements Mappable {
       if (story?.id !== id) continue;
       starts.set(i, out.maps.length);
       const partner = this.mirror.get(i);
-      const pair = partner !== undefined && partner < i ? starts.get(partner) : undefined;
       const count = story.maps.length;
+      // Mirrored inside only when both hold the same steps (a mapped one may have dropped some).
+      const same =
+        partner !== undefined && (this.maps[partner] as StepMap).storyMaps?.maps.length === count;
+      const pair = same && partner < i ? starts.get(partner) : undefined;
       story.maps.forEach((map, k) => {
         // An inverted story map lists its inner maps in reverse.
         out.appendMap(map, pair === undefined ? undefined : pair + count - 1 - k);

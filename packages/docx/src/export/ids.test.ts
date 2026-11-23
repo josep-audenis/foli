@@ -92,3 +92,20 @@ describe("ids unique across clients (22.5)", () => {
     expect(editor.getDocument().comments[0]?.id).toBe(0);
   });
 });
+
+describe("id classes (22.5)", () => {
+  it("takes the next id of the client's class, a single editor's next number otherwise", async () => {
+    const { freshId, idSlot } = await import("../../../core/src/state/ids.js");
+    const plain = createEditor({ document: documentOf() }).state;
+    expect([freshId(plain, -1), freshId(plain, 0), freshId(plain, 41)]).toEqual([0, 1, 42]);
+    const slotted = createEditor({ document: documentOf(), plugins: [idSlotPlugin(3)] }).state;
+    expect([freshId(slotted, -1), freshId(slotted, 3), freshId(slotted, 300)]).toEqual([
+      3, 259, 515,
+    ]);
+    expect(idSlot(-1)).toBe(255);
+    expect(idSlot(256)).toBe(0);
+    expect(idSlot("Ann")).toBe(idSlot("Ann"));
+    // Non-Latin ids that differ only above a byte land apart too.
+    expect(new Set(["中", "丮", "乞", "亀"].map(idSlot)).size).toBeGreaterThan(1);
+  });
+});

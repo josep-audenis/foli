@@ -42,12 +42,13 @@ export declare function parseContentV2(value: unknown, path?: string): Node;
 export { DEFAULT_SETTINGS, type DocumentSettings, type FoliDocumentV2, PAGE_SIZES, type PageMargins, type PageSize, parseContentV2, } from "./document.js";
 export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, FoliDocumentError, Fragment, Mark, type MarkJSON, type MarkSpec, MarkType, Node, type NodeJSON, NodeRange, type NodeSpec, NodeType, ReplaceError, ResolvedPos, Schema, type SchemaSpec, Slice, type SliceJSON, TextNode, } from "./model/index.js";
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
-export { AllSelection, acceptAllChanges, acceptChange, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type Command, type CommentContent, type CommentMatch, type CommentOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, changeIndent, closeHistory, colorAt, columnAt, commentAnchors, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, createEditor, crossReferenceTargets, type DeleteUnit, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, joinBackward, joinForward, joinHistory, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, openLinkEditor, type PictureCrop, Plugin, PluginKey, type PluginSpec, pageVariant, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, previousChange, type ReplaceRefusal, type ReplaceReport, type ReviewView, redo, redoDepth, rejectAllChanges, rejectChange, removeLink, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestsLinkEditor, resolveComment, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, setAlign, setBlockType, setCellShading, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setLineSpacing, setLink, setNoteProperties, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, sinkListItem, splitBlock, splitCell, splitListItem, storyOfSection, type TableOfContentsOptions, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleHeaderRow, toggleList, toggleMark, trackedChanges, trackState, trackTransaction, type UpdateFieldsOptions, undo, undoDepth, untracked, updateFields, wrapInList, } from "./state/index.js";
-export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, Transform, TransformError, } from "./transform/index.js";
+export { AllSelection, acceptAllChanges, acceptChange, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type Command, type CommentContent, type CommentMatch, type CommentOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, changeIndent, closeHistory, colorAt, columnAt, commentAnchors, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, createEditor, crossReferenceTargets, type DeleteUnit, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, openLinkEditor, type PictureCrop, Plugin, PluginKey, type PluginSpec, pageVariant, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, previousChange, type ReplaceRefusal, type ReplaceReport, type ReviewView, redo, redoDepth, rejectAllChanges, rejectChange, remote, removeLink, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestsLinkEditor, resolveComment, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, setAlign, setBlockType, setCellShading, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setLineSpacing, setLink, setNoteProperties, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, sinkListItem, splitBlock, splitCell, splitListItem, storyOfSection, type TableOfContentsOptions, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleHeaderRow, toggleList, toggleMark, trackedChanges, trackState, trackTransaction, type UpdateFieldsOptions, undo, undoDepth, untracked, updateFields, wrapInList, } from "./state/index.js";
+export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, type StoryMaps, Transform, TransformError, } from "./transform/index.js";
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
-export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
+export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
+export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryEditStep, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export { withTrackState } from "./state/track.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
@@ -1245,6 +1246,13 @@ export declare function sameSpot(tree: Node, a: number, b: number): boolean;
 export declare function caretStop(state: EditorState, pos: number, forward: boolean): number;
 
 // state/fieldupdate.d.ts
+/**
+ * Updating and inserting Word's fields (ADR-0007, 11.8). A field's result is worked out from its
+ * instruction, as Word's switches say, and put between its separator and end; a table of contents
+ * is rebuilt from the headings as Word builds it. Everything happens in one transaction, recorded
+ * as tracked changes when tracking is on; what cannot be worked out keeps its result and is
+ * reported. Page numbers come from `FieldLayout`, which only a view has.
+ */
 import type { Editor } from "./editor.js";
 import { type Field } from "./fields.js";
 import type { Command, EditorState } from "./state.js";
@@ -1516,6 +1524,20 @@ export declare const redo: Command;
 export declare function undoDepth(state: EditorState): number;
 export declare function redoDepth(state: EditorState): number;
 
+// state/ids.d.ts
+/**
+ * Ids unique across clients (22.5, ADR-0012). New revision, comment, note, control and numbering
+ * ids and the numbers of generated bookmark names are the next free number after the largest in
+ * the document; with an id slot (the collab plugin's, from its client id) only numbers of the
+ * client's own class are taken, `id ≡ slot (mod ID_SPACE)`, so two editors of one document never
+ * give two changes one id. Without a slot nothing changes.
+ */
+import { Plugin } from "./state.js";
+/** How many id classes there are: the live clients of one document each take one. */
+export declare const ID_SPACE = 256;
+/** Gives an editor's new ids `clientID`'s class (what `collab` does, without the rest). */
+export declare const idSlotPlugin: (clientID: string | number) => Plugin<number>;
+
 // state/index.d.ts
 export { arrowAcrossLeaf, baseKeymap, type DeleteUnit, deleteBackward, deleteForward, deleteSelection, deleteSelectionKeepingTables, insertColumnBreak, insertHardBreak, insertPageBreak, insertTab, insertText, isMarkActive, joinBackward, joinForward, selectAll, setBlockType, splitBlock, toggleMark, } from "./commands.js";
 export { addComment, type CommentContent, type CommentOptions, commentAnchors, deleteAllComments, deleteComment, editComment, replyToComment, resolveComment, } from "./comments.js";
@@ -1535,11 +1557,11 @@ export { insertPicture, type NewPicture, type PictureCrop, selectedPicture, setP
 export { acceptAllChanges, acceptChange, type Change, type ChangeFilter, type ChangeKind, nextChange, previousChange, rejectAllChanges, rejectChange, trackedChanges, } from "./review.js";
 export { documentSections, ensureStory, insertSectionBreak, pageVariant, removeSectionBreak, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, type StorySide, type StoryVariant, sectionAt, sectionColumns, setDifferentEvenPages, setDifferentFirstPage, setSectionSetup, setStoryLinked, storyOfSection, } from "./sections.js";
 export { AllSelection, marksAt, NodeSelection, Selection, type SelectionJSON, TextSelection, } from "./selection.js";
-export { type Command, EditorState, type EditorStateConfig, Plugin, PluginKey, type PluginSpec, Transaction, } from "./state.js";
+export { type Command, EditorState, type EditorStateConfig, isRemote, Plugin, PluginKey, type PluginSpec, remote, Transaction, } from "./state.js";
 export { columnAt, deleteColumns, deleteRows, deleteTable, insertColumn, insertHorizontalRule, insertRow, insertTable, isHeaderRow, mergeCells, setCellShading, setColumnWidth, setTableStyle, splitCell, tableStyleAt, tableStyles, toggleHeaderRow, } from "./tablecommands.js";
 export { CellSelection, cellsAsTable, extendCellSelection, goToCell, goToCellVertically, keepTablesApart, pasteCells, } from "./tables.js";
 export { type ReviewView, setReviewView, setTrackChanges, type TrackState, trackState, trackTransaction, untracked, } from "./track.js";
-export { CommentStep, documentJSON, EnvelopeStep, StoryStep, setComments, type WordContext, type WordEnvelope, withEnvelope, wordContext, } from "./word.js";
+export { CommentStep, documentJSON, EnvelopeStep, StoryEditStep, StoryStep, setComments, type WordContext, type WordEnvelope, withEnvelope, wordContext, } from "./word.js";
 export { copiedDefinitions, type FittedPaste, fitPaste, fitPastedV2, type WordDefinitions, } from "./wordclip.js";
 export { canOutdent, changeIndent, fontFamilyAt, fontSizeAt, HIGHLIGHT_HEX, type ListKind, lineSpacingAt, paragraphStyleAt, paragraphStyles, setFontFamily, setFontSize, setLineSpacing, setParagraphSpacing, setParagraphStyle, } from "./wordformat.js";
 
@@ -2123,6 +2145,18 @@ export declare class Plugin<T = unknown> {
     constructor(spec: PluginSpec<T>);
 }
 /**
+ * Set this meta (true) on a transaction of steps another editor made, received as they are
+ * (collaboration, ADR-0012): it is kept out of history and tracking, the filters let it through
+ * (the sender's checks held; the authority applied it with its own) and the plugins that append
+ * transactions add nothing (the sender already sent what they appended).
+ */
+export declare const remote = "remote";
+/**
+ * Whether `tr` is received (`remote`), or appended to a received one: a plugin that appends
+ * transactions appends nothing to these (the sender's plugin already did).
+ */
+export declare const isRemote: (tr: Transaction) => boolean;
+/**
  * A transform created from a state: tracks the selection (mapped through every step), stored
  * marks and metadata. Metadata `addToHistory: false` keeps a change out of undo history.
  */
@@ -2141,6 +2175,7 @@ export declare class Transaction extends Transform {
     protected addStep(step: Step, doc: Node): void;
     setMeta(key: unknown, value: unknown): this;
     getMeta(key: unknown): unknown;
+    /** False with the `addToHistory: false` meta, and for a received (`remote`) transaction. */
     get addToHistory(): boolean;
     /** Deletes the selection; deleting everything leaves one empty default textblock. */
     deleteSelection(): this;
@@ -2404,6 +2439,7 @@ export declare function trackTransaction(state: EditorState, tr: Transaction): T
 
 // state/word.d.ts
 import type { Node } from "../model/index.js";
+import { type Mappable, StepMap } from "../transform/stepmap.js";
 import { Step, type StepJSON, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import { Resolver } from "../v3/resolve.js";
@@ -2489,11 +2525,36 @@ export declare class StoryStep extends Step {
     readonly selectionAfter: SelectionJSON | null;
     constructor(id: string, before: Story | null, after: Story | null, selectionBefore?: SelectionJSON | null, selectionAfter?: SelectionJSON | null);
     apply(doc: Node): StepResult;
+    /** The story replaced whole: edits of it made before map to deleted. */
+    getMap(): StepMap;
     invert(): Step;
     map(): Step;
     toJSON(): StepJSON;
     /** This step followed by `next`, when `next` starts from what this one leaves. */
     merge(next: StoryStep): StoryStep | null;
+}
+/**
+ * An edit inside existing story `id` (a header, footer or note), as the story's own `steps`, so
+ * two edits of one story map over each other as edits of the body do (22.4, ADR-0012). Its map
+ * moves no body position but carries the story's (`StepMap.storyMaps`). `StoryStep` creates, removes
+ * or replaces a story whole. The selections are the story's around the change, for undo; they do
+ * not travel (JSON).
+ */
+export declare class StoryEditStep extends Step {
+    readonly id: string;
+    readonly steps: readonly Step[];
+    readonly selectionBefore: SelectionJSON | null;
+    readonly selectionAfter: SelectionJSON | null;
+    constructor(id: string, steps: readonly Step[], selectionBefore?: SelectionJSON | null, selectionAfter?: SelectionJSON | null, 
+    /** The story's tree the steps apply to, when known, and what they make of it. */
+    base?: Node, result?: Node);
+    apply(doc: Node): StepResult;
+    getMap(): StepMap;
+    invert(): Step;
+    map(mapping: Mappable): Step | null;
+    /** This edit followed by `next`, an edit of the same story. */
+    merge(next: StoryEditStep): StoryEditStep | null;
+    toJSON(): StepJSON;
 }
 /**
  * Makes `tr` change the document's envelope to `envelope` (styles, numbering…): an
@@ -2505,6 +2566,31 @@ export declare function withEnvelope(tr: Transaction, envelope: WordEnvelope): T
 export declare function wordContext(state: EditorState): WordContext | null;
 
 // state/wordclip.d.ts
+/**
+ * Copy and paste of schema v3 content (8.7c). A copy carries the definitions its content
+ * references (styles, numbering, comments); a paste fits them to the target document, as Word
+ * does with its default "use destination styles":
+ * - A style the target has by name is used; any other is added (a free id if its id is taken).
+ * - A list copied inside one document (the copy carries the document's id, `WordContext.id`)
+ *   goes on; otherwise it gets an instance of its own (the target's definition when one is the
+ *   same). Lists of different documents are never taken for each other: Foli makes equal ids
+ *   and definitions in every document.
+ * - Comments are copied with new ids, as Word duplicates them; an anchor without its comment
+ *   is left out.
+ * - A bookmark whose name the target already uses (outside the selection the paste replaces)
+ *   is left out, as in Word; others get new ids.
+ * - From another document, a style or list the copy does not define is not one: the text is in
+ *   the default style, not numbered (not the target's style or list of that id).
+ * - Paragraph ids (`w14:paraId`, `w14:textId`) are left out: export makes the ones it needs.
+ * - A note reference brings its note, carried by the copy, as a new story with a new id: a copy
+ *   is a second note, and what was cut was removed with its reference (ADR-0007).
+ * - A content control copied inside its document is a new control with the same properties while
+ *   the original stays (cut and pasted, it is the same one). From elsewhere its content comes
+ *   without it.
+ *
+ * shortcut: ids inside opaque content (a table's bookmarks and paragraph ids) and tracked-change
+ * ids are pasted as they are; Word tolerates repeats of both. Map them when a file shows otherwise.
+ */
 import type { Node } from "../model/index.js";
 import { type AbstractNumberingJSON, type CommentJSON, type NumberingInstanceJSON, type ResourceJSON, type StoryJSON, type StyleJSON } from "../v3/document.js";
 import type { EditorState } from "./state.js";
@@ -2560,6 +2646,18 @@ export declare function fitPastedV2(state: EditorState, content: Node): {
 export declare function fitPaste(state: EditorState, content: unknown, definitions?: unknown): FittedPaste;
 
 // state/wordformat.d.ts
+/**
+ * Word formatting on a schema v3 document (8.7b): paragraph styles, font family and size, text
+ * color and highlight, alignment, line spacing, indentation, and lists as Word's numbering. The
+ * generic commands (`setAlign`, `setTextColor`, `toggleList`…) call these on a v3 document;
+ * the others are v3 only (they do not apply to schema v2).
+ *
+ * Run properties, alignment and line spacing are written as direct formatting only where the
+ * paragraph's or run's styles do not already give the value (picking a heading's own size
+ * leaves no direct size), as Word does; space before and after and indents are always written.
+ * Built-in styles a document has not used yet (headings, List Paragraph, Hyperlink) are added
+ * with Word's definitions when first applied.
+ */
 import type { Command, EditorState } from "./state.js";
 /**
  * The paragraph styles a style picker offers: the document's, its default first, then Word's
@@ -2620,7 +2718,7 @@ export declare function canOutdent(state: EditorState): boolean;
 export type ListKind = "bulletList" | "orderedList";
 
 // transform/index.d.ts
-export { type Mappable, Mapping, type MapResult, StepMap } from "./stepmap.js";
+export { type Mappable, Mapping, type MapResult, StepMap, type StoryMaps, } from "./stepmap.js";
 export { AddMarkStep, NodeMarkupBatchStep, NodeMarkupStep, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, type StepParser, StepResult, } from "./steps.js";
 export { canJoin, canSplit, findWrapping, liftTarget, type NodeTypeWithAttrs, } from "./structure.js";
 export { Transform, TransformError } from "./transform.js";
@@ -2637,6 +2735,11 @@ export interface Mappable {
     map(pos: number, assoc?: number): number;
     mapResult(pos: number, assoc?: number): MapResult;
 }
+/** What a step inside a story did to the story's own positions: its maps, under the story's id. */
+export interface StoryMaps {
+    readonly id: string;
+    readonly maps: readonly StepMap[];
+}
 /**
  * How one step moved positions: a sorted flat list of `[start, oldSize, newSize]` triples in the
  * pre-step coordinates. Everything outside the ranges shifts by the accumulated size difference.
@@ -2645,7 +2748,9 @@ export declare class StepMap implements Mappable {
     readonly ranges: readonly number[];
     readonly inverted: boolean;
     static readonly empty: StepMap;
-    constructor(ranges: readonly number[], inverted?: boolean);
+    constructor(ranges: readonly number[], inverted?: boolean, 
+    /** @internal A story step's: what it did inside the story. The body's positions do not move. */
+    storyMaps?: StoryMaps | null);
     /**
      * Maps `pos`. `sides` (from `sides()` of a map with the same ranges) overrides `assoc` per
      * range at pure insertions, where the side decides which side of the new content `pos` ends up.
