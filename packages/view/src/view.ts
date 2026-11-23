@@ -2616,13 +2616,21 @@ export class EditorView {
     const region = { element, drawing: {}, section: 0, id: story };
     const texts = () =>
       noteTexts(noteNumbers(this.state.doc, (wordContext(this.state) as WordContext).envelope));
-    this.mountStory(
-      editor,
-      { id: story, side: "note", variant: "default", section: 0, page, region },
-      "Note",
-      () => texts().get(story) ?? "",
-      focus,
-    );
+    try {
+      this.mountStory(
+        editor,
+        { id: story, side: "note", variant: "default", section: 0, page, region },
+        "Note",
+        () => texts().get(story) ?? "",
+        focus,
+      );
+    } catch (error) {
+      // Not open after all: the note drawn closed again.
+      notes.open = null;
+      this.flowed = null;
+      this.render();
+      throw error;
+    }
     editor.select(Selection.atEnd(editor.state.doc).from);
     return true;
   }
@@ -2839,10 +2847,17 @@ export class EditorView {
       caretPositionFromPoint?: (
         x: number,
         y: number,
+        options?: { shadowRoots: ShadowRoot[] },
       ) => { offsetNode: Node; offset: number } | null;
       caretRangeFromPoint?: (x: number, y: number) => Range | null;
     };
-    const point = doc.caretPositionFromPoint?.(x, y);
+    const root = this.host.getRootNode();
+    // Inside a shadow root the engine stops at its host unless it is told of the root.
+    const shadow =
+      root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+        ? { shadowRoots: [root as ShadowRoot] }
+        : undefined;
+    const point = doc.caretPositionFromPoint?.(x, y, shadow);
     const range = point ? null : doc.caretRangeFromPoint?.(x, y);
     const node = point?.offsetNode ?? range?.startContainer;
     const offset = point?.offset ?? range?.startOffset ?? 0;

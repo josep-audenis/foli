@@ -33,20 +33,23 @@ export function printStyles(
   last: Pick<PrintSheet, "width" | "height">,
   sheets: readonly PrintSheet[],
   name: string,
+  /** Named pages even for one size: `@page` alone is the web page's, which other output shares. */
+  always = false,
 ): string {
   // Sections with other page sizes: a named page each (engines without named pages print
   // every sheet at the last section's size).
-  const named = sheets.every((s) => s.width === last.width && s.height === last.height)
-    ? ""
-    : sheets
-        .map(({ width, height, index }) => {
-          const page = `foli-${name}-${index}`;
-          return (
-            `@page ${page}{size:${width} ${height};margin:0}` +
-            `${pages}[${SHEET_ATTR}="${index}"]{page:${page};height:${height}!important}`
-          );
-        })
-        .join("");
+  const named =
+    !always && sheets.every((s) => s.width === last.width && s.height === last.height)
+      ? ""
+      : sheets
+          .map(({ width, height, index }) => {
+            const page = `foli-${name}-${index}`;
+            return (
+              `@page ${page}{size:${width} ${height};margin:0}` +
+              `${pages}[${SHEET_ATTR}="${index}"]{page:${page};height:${height}!important}`
+            );
+          })
+          .join("");
   return (
     `@media print{@page{size:${last.width} ${last.height};margin:0}` +
     `${pages}{height:${last.height}!important;margin-block:0!important;` +

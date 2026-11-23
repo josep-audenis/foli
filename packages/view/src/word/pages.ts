@@ -435,7 +435,6 @@ export function renderDocument(
       marginTop: block.before,
       marginBottom: block.after,
       repeat,
-      // A table splits at any line: no widow and orphan control across its rows.
       // A table splits between rows; a paragraph without widow control at any line.
       anyLine: !!block.element.querySelector(":scope > table") || block.widowControl === false,
       keepWithNext: block.keepNext,
@@ -715,6 +714,7 @@ export function renderDocument(
           index: flow.index ?? 0,
         })),
         `word-${output}`,
+        true,
       );
     },
     pageOf: (index) => firstPage.get(index),

@@ -549,6 +549,8 @@ Details in the [package README](../packages/docx/README.md).
   gives a shadow root no selection of its own and the document's stops at the shadow host, so
   the caret is not read (typing goes to the start). A same-origin iframe works in all three
   (checked in Phase 21, `e2e/realms.spec.ts`; waiting for the owner's acceptance as a limit).
+  In a shadow root, `@folijs/react`'s toolbar and navigation pane do not give the focus back
+  where they took it from (they read the document's `activeElement`, the shadow host there).
 
 ## Docs and tooling
 

@@ -103,10 +103,10 @@ function lines(rects: readonly Box[]): Box[] {
   return out;
 }
 
-/** @internal */
 /** Numbers each view's chrome: its pop-ups' element ids are its own. */
 let chromes = 0;
 
+/** @internal */
 export class ControlChrome {
   /** Unique in the page: two views' lists never share an option's id (`aria-activedescendant`). */
   private readonly idPrefix = `foli-control-${++chromes}`;
@@ -126,7 +126,9 @@ export class ControlChrome {
   /** Where pop-ups go: out of the editing host. */
   private get root(): ParentNode & Node {
     const root = this.view.host.getRootNode();
-    return root instanceof ShadowRoot ? root : (this.doc.body ?? this.doc.documentElement);
+    return root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+      ? (root as ShadowRoot)
+      : (this.doc.body ?? this.doc.documentElement);
   }
 
   /** The control the selection is in, if it is all in one. */
