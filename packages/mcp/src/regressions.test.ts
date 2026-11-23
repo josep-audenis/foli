@@ -173,11 +173,20 @@ describe("regressions", () => {
       replacement: "BILATERAL",
     });
     expect((await call("save", { document: "d2" })).refused).toBe(false);
-    for (const args of [{ document: "d1" }, { document: "d1", path: "01-mutual-nda.agent.docx" }]) {
-      const again = await call("save", args);
-      expect(again.refused).toBe(true);
-      expect(again.text).toContain("open as d2");
-    }
+    const again = await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" });
+    expect(again.refused).toBe(true);
+    expect(again.text).toContain("open as d2");
+    // With no path, the next name; closed, d2's saved file is still not d1's to write over.
+    expect((await call("save", { document: "d1" })).text).toBe(
+      "Saved d1 as 01-mutual-nda.agent-2.docx.",
+    );
+    await call("close", { document: "d2" });
+    expect((await call("save", { document: "d1" })).text).toBe(
+      "Saved d1 as 01-mutual-nda.agent-2.docx.",
+    );
+    expect(
+      (await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" })).refused,
+    ).toBe(true);
     const { document } = await importDocx(readFileSync(join(root, "01-mutual-nda.agent.docx")));
     expect(JSON.stringify(document)).toContain("BILATERAL");
     await client.close();
