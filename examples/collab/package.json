@@ -1,0 +1,20 @@
+{
+  "name": "foli-example-collab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@folijs/collab": "file:../../.packs/folijs-collab.tgz",
+    "@folijs/core": "file:../../.packs/folijs-core.tgz",
+    "@folijs/docx": "file:../../.packs/folijs-docx.tgz",
+    "@folijs/view": "file:../../.packs/folijs-view.tgz",
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.3.6"
+  }
+}

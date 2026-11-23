@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@folijs/collab": "workspace:*",
     "@folijs/core": "workspace:*",
     "@folijs/docx": "workspace:*",
     "@folijs/react": "workspace:*",

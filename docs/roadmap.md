@@ -3259,7 +3259,7 @@ lets the agent library return steps); 22.7 onwards build it.
   (`presence(state)`).
 - [x] 22.10 Authorship: each client's tracked changes and comments carry its user's name; a
   received step keeps its author.
-- [ ] 22.11 Example and e2e: `examples/collab`, a Node WebSocket server (the authority, a JSON
+- [x] 22.11 Example and e2e: `examples/collab`, a Node WebSocket server (the authority, a JSON
   file as storage) and a page with the editor; the playground shows two editors side by side
   over an in-memory transport. Playwright: two pages type in one paragraph and converge; one
   drops its connection and catches up; the exported .docx opens.
