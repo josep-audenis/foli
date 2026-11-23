@@ -133,6 +133,8 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * for Phase 22's envelope steps, story steps and the collab plugin.
  * Agent raised again in 22.6 (80.1 kB, 84.0 allowed): core's story edits, ids per client and
  * received transactions, which the session's editor carries.
+ * Collab added in 22.8 (80.1 allowed): the authority is `createEditor` (it applies every step as
+ * the clients do), so nearly all of it is core, which a server that edits already loads.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 94_000 },
@@ -142,6 +144,7 @@ const BUNDLES = [
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 86_000 },
+  { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
 const BUILT = [

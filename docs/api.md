@@ -1274,6 +1274,30 @@ Foli's packages, at exact versions.
   drive, and on an `author` with nothing writable in it.
 - `PROTOCOL_VERSIONS`, `MAX_MESSAGE_BYTES` (8 MB), `MAX_RESULT_CHARS` (200,000).
 
+## `@folijs/collab`
+
+The authority of a shared document (0.x, unstable; ADR-0012; [package README](../packages/collab/README.md)).
+
+- `createAuthority({ document, version?, package?, limits?, authorize?, extensions? })`:
+  `Authority`. `limits` (`AuthorityLimits`): `messageSize` (characters of a message's JSON,
+  default 4 000 000), `steps` (per message, 1000), `log` (steps kept, 10 000), `logSize` (their JSON's characters,
+  50 000 000); `log` in the options restores a stored log ending at `version`. A document nested
+  deeper than 250 levels is refused (`too-large`). `authorize(clientID,
+  steps)` false refuses a client's steps.
+- `authority.receive(message, clientID?)`: a client's `{ version, clientID, steps }`
+  (`StepsMessage`, its JSON text or the parsed value) and the client id the app's connection
+  authenticated (a message claiming another, or `AUTHORITY`, is refused). `Received`: `{ ok: true, version, broadcast }` (`Broadcast`:
+  `{ version, steps, clientIDs }`, for every client, the sender too) or `{ ok: false, reason,
+  version, message? }` (`Refusal`: `stale`, `malformed`, `invalid`, `too-large`, `unauthorized`),
+  nothing changed.
+- `authority.stepsSince(version)`: `CatchUp`, the steps since `version` (a `Broadcast`) or
+  `{ snapshot }` when the log no longer has them. `authority.snapshot()`: `Snapshot` (`version`,
+  `document`, `package`). `authority.version`, `authority.log`.
+- Word's rules concurrent edits can break and the schema does not hold (two tables two people
+  inserted at one place meet; a table ends the body) are restored by the authority: a paragraph
+  goes between, its steps broadcast after the client's under the client id `AUTHORITY`
+  (`"@folijs/collab"`; never give a client that id).
+
 ## `@folijs/pdf`
 
 PDF from Foli's own page layout, printed by a headless Chromium page the app supplies (11.12,

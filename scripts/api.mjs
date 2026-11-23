@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, posix, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const PACKAGES = ["core", "view", "react", "docx", "pdf", "agent", "mcp"];
+export const PACKAGES = ["core", "view", "react", "docx", "pdf", "agent", "mcp", "collab"];
 
 const DECLARED =
   /^export (?:declare )?(?:const )?(?:abstract )?(?:function|class|const|let|var|interface|type|enum|namespace) ([\w$]+)/gm;
