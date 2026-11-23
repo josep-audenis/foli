@@ -4,7 +4,14 @@ import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transfor
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { StoryStep, storedStepsApply, storyBody, wordContext } from "./word.js";
+import {
+  StoryEditStep,
+  StoryStep,
+  storedStepsApply,
+  storyBody,
+  storyStepsApply,
+  wordContext,
+} from "./word.js";
 
 /** One undoable unit: inverted steps in the order they apply, and the selection to restore. */
 interface HistoryEvent {
@@ -151,7 +158,9 @@ function prepend(inverted: readonly Step[], steps: readonly Step[]): Step[] {
       ? left.merge(right)
       : left instanceof StoryStep && right instanceof StoryStep
         ? left.merge(right)
-        : null;
+        : left instanceof StoryEditStep && right instanceof StoryEditStep
+          ? left.merge(right)
+          : null;
   if (merged) joined.splice(at, 2, merged);
   return joined;
 }
@@ -199,6 +208,11 @@ class RebaseMapping implements Mappable {
   private readonly rebased: (StepMap | null)[] = [];
 
   constructor(private readonly base: Mappable) {}
+
+  /** shortcut: a story's positions through the base only, not mirrored over the rebased steps. */
+  storyMapping(id: string): Mapping | undefined {
+    return this.base.storyMapping?.(id);
+  }
 
   push(original: Step, rebased: Step | null): void {
     this.inverted.push(original.getMap().invert());
@@ -338,6 +352,8 @@ function historyCommand(redo: boolean): Command {
       }
       const selection = remap ? mapSelection(event.selection, remap) : event.selection;
       tr.setSelection(Selection.fromJSON(tr.doc, selection));
+      // Story edits mapped on the way have no tree to invert against yet.
+      if (context) storyStepsApply(context.stories, tr.steps);
       const reverse: HistoryEvent = {
         steps: tr.steps.map((step, i) => step.invert(tr.docs[i] as Node)).reverse(),
         selection: state.selection.toJSON(),

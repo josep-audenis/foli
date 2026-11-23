@@ -9,7 +9,9 @@
 import { deepEqual } from "../model/attrs.js";
 import { fail } from "../model/errors.js";
 import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
+import { type Mappable, Mapping, StepMap } from "../transform/stepmap.js";
 import { natural, record, Step, type StepJSON, StepResult } from "../transform/steps.js";
+import type { Transform } from "../transform/transform.js";
 import { text } from "../v3/check.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import {
@@ -478,6 +480,189 @@ Step.jsonID("story", (schema, value) => {
   );
 });
 
+/** The story tree each `StoryEditStep` applies to, once known (made, or checked by the filter). */
+const storyBases = new WeakMap<StoryEditStep, Node>();
+/** The tree a `StoryEditStep` made from its base, when known: applied again, the same tree. */
+const storyResults = new WeakMap<StoryEditStep, Node>();
+
+/** The story's tree after `step`, from `doc`; null when its steps do not apply. */
+function storyEditResult(step: StoryEditStep, doc: Node): Node | null {
+  const known = storyResults.get(step);
+  if (known && storyBases.get(step) === doc) return known;
+  const result = applyAll(doc, step.steps);
+  if (result) {
+    storyBases.set(step, doc);
+    storyResults.set(step, result);
+  }
+  return result;
+}
+
+/** `doc` after `steps`, or null when one does not apply. */
+function applyAll(doc: Node, steps: readonly Step[]): Node | null {
+  let current = doc;
+  for (const step of steps) {
+    const result = step.apply(current);
+    if (!result.doc) return null;
+    current = result.doc;
+  }
+  return current;
+}
+
+/** The step types a story's own edit is made of: what changes a tree (ADR-0012). */
+const STORY_EDIT_STEPS = new Set([
+  "replace",
+  "replaceAround",
+  "addMark",
+  "removeMark",
+  "nodeMarkup",
+  "nodeMarkupBatch",
+]);
+
+/**
+ * An edit inside existing story `id` (a header, footer or note), as the story's own `steps`, so
+ * two edits of one story map over each other as edits of the body do (22.4, ADR-0012). Its map
+ * moves no body position but carries the story's (`StepMap.storyMaps`). `StoryStep` creates, removes
+ * or replaces a story whole. The selections are the story's around the change, for undo; they do
+ * not travel (JSON).
+ */
+export class StoryEditStep extends Step {
+  constructor(
+    readonly id: string,
+    readonly steps: readonly Step[],
+    readonly selectionBefore: SelectionJSON | null = null,
+    readonly selectionAfter: SelectionJSON | null = null,
+    /** The story's tree the steps apply to, when known, and what they make of it. */
+    base?: Node,
+    result?: Node,
+  ) {
+    super();
+    if (base) storyBases.set(this, base);
+    if (base && result) storyResults.set(this, result);
+  }
+
+  apply(doc: Node): StepResult {
+    return StepResult.ok(doc);
+  }
+
+  override getMap(): StepMap {
+    return new StepMap([], false, { id: this.id, maps: this.steps.map((s) => s.getMap()) });
+  }
+
+  invert(): Step {
+    const base = storyBases.get(this);
+    if (!base) throw new RangeError(`The story edit of ${this.id} has no tree to invert against`);
+    const inverted: Step[] = [];
+    let doc = base;
+    for (const step of this.steps) {
+      inverted.unshift(step.invert(doc));
+      doc = step.apply(doc).doc ?? doc;
+    }
+    return new StoryEditStep(this.id, inverted, this.selectionAfter, this.selectionBefore, doc);
+  }
+
+  map(mapping: Mappable): Step | null {
+    const through = mapping.storyMapping?.(this.id);
+    if (!through?.maps.length) return this;
+    // Each step through: the ones before it taken back, the mapping, the ones before it again.
+    const count = this.steps.length;
+    const m = new Mapping();
+    for (let i = count - 1; i >= 0; i--) m.appendMap((this.steps[i] as Step).getMap().invert());
+    m.appendMapping(through);
+    const steps: Step[] = [];
+    this.steps.forEach((step, i) => {
+      const mapped = step.map(m.slice(count - i));
+      if (mapped) {
+        steps.push(mapped);
+        m.appendMap(mapped.getMap(), count - 1 - i);
+      }
+    });
+    return steps.length ? new StoryEditStep(this.id, steps) : null;
+  }
+
+  /** This edit followed by `next`, an edit of the same story. */
+  merge(next: StoryEditStep): StoryEditStep | null {
+    if (next.id !== this.id) return null;
+    return new StoryEditStep(
+      this.id,
+      [...this.steps, ...next.steps],
+      this.selectionBefore,
+      next.selectionAfter,
+      storyBases.get(this),
+    );
+  }
+
+  override toJSON(): StepJSON {
+    return { stepType: "storyEdit", id: this.id, steps: this.steps.map((s) => s.toJSON()) };
+  }
+}
+
+/**
+ * The edit `transactions` made to story `id`'s tree, from `before` to `after`: their steps of the
+ * tree (comment and envelope steps are the body's), or a whole replace when there are none.
+ * @internal
+ */
+export function storyEdit(
+  id: string,
+  story: Story,
+  transactions: readonly Transform[],
+  after: Node,
+  selections: [SelectionJSON | null, SelectionJSON | null] = [null, null],
+): Step {
+  const steps = transactions.flatMap((t) =>
+    t.steps.filter((s) => !(s instanceof CommentStep || s instanceof EnvelopeStep)),
+  );
+  return steps.length
+    ? new StoryEditStep(id, steps, selections[0], selections[1], story.doc, after)
+    : new StoryStep(id, story, { ...story, doc: after }, selections[0], selections[1]);
+}
+
+Step.jsonID("storyEdit", (schema, value) => {
+  const json = record(value, "$", ["stepType", "id", "steps"]);
+  const idError =
+    typeof json.id !== "string"
+      ? "expected a story id"
+      : json.id === "__proto__"
+        ? "is not a story id"
+        : text()(json.id);
+  if (idError) fail("$.id", idError);
+  if (!Array.isArray(json.steps) || !json.steps.length)
+    fail("$.steps", "expected a non-empty array");
+  const steps = (json.steps as unknown[]).map((step, i) => {
+    const type = (step as { stepType?: unknown } | null)?.stepType;
+    if (typeof type !== "string" || !STORY_EDIT_STEPS.has(type))
+      fail(`$.steps[${i}].stepType`, "not a step of a story's tree");
+    return Step.fromJSON(schema, step);
+  });
+  return new StoryEditStep(json.id as string, steps);
+});
+
+/**
+ * Finds the tree each story step of `steps` applies to, given `stories` and the ones before it,
+ * and whether every one applies (a `StoryEditStep`'s steps to its story; with `strict`, a
+ * `StoryStep`'s `before` too). Gives each `StoryEditStep` its base, so it can be inverted.
+ * @internal
+ */
+export function storyStepsApply(
+  stories: ReadonlyMap<string, Story>,
+  steps: readonly Step[],
+  strict = false,
+): boolean {
+  const current = new Map<string, Story | null>();
+  const at = (id: string) => (current.has(id) ? current.get(id) : (stories.get(id) ?? null));
+  for (const step of steps) {
+    if (step instanceof StoryStep) {
+      if (strict && !sameStory(at(step.id), step.before)) return false;
+      current.set(step.id, step.after);
+    } else if (step instanceof StoryEditStep) {
+      const story = at(step.id);
+      const doc = story && storyEditResult(step, story.doc);
+      if (!story || !doc) return false;
+      current.set(step.id, { ...story, doc });
+    }
+  }
+  return true;
+}
+
 /**
  * Whether two stories are the same: identical trees are the usual case.
  * @internal
@@ -543,17 +728,9 @@ function envelopeStepsHold(envelope: WordEnvelope, steps: readonly Step[]): bool
  * @internal
  */
 export function storedStepsApply(context: WordContext, steps: readonly Step[]): boolean {
-  if (!envelopeStepsHold(context.envelope, steps)) return false;
-  const stories = new Map<string, Story | null>();
-  for (const step of steps) {
-    if (!(step instanceof StoryStep)) continue;
-    const current = stories.has(step.id)
-      ? stories.get(step.id)
-      : (context.stories.get(step.id) ?? null);
-    if (!sameStory(current, step.before)) return false;
-    stories.set(step.id, step.after);
-  }
-  return true;
+  return (
+    envelopeStepsHold(context.envelope, steps) && storyStepsApply(context.stories, steps, true)
+  );
 }
 
 /**
@@ -562,7 +739,11 @@ export function storedStepsApply(context: WordContext, steps: readonly Step[]): 
  */
 export function storyAfter(state: EditorState, tr: Transaction, id: string): Story | null {
   let story = wordContext(state)?.stories.get(id) ?? null;
-  for (const step of tr.steps) if (step instanceof StoryStep && step.id === id) story = step.after;
+  for (const step of tr.steps) {
+    if (step instanceof StoryStep && step.id === id) story = step.after;
+    else if (step instanceof StoryEditStep && step.id === id && story)
+      story = { ...story, doc: storyEditResult(step, story.doc) ?? story.doc };
+  }
   return story;
 }
 
@@ -638,7 +819,11 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
     key,
     filterTransaction: (tr, state) => {
       const current = wordContext(state);
-      return !current || envelopeStepsHold(current.envelope, tr.steps);
+      return (
+        !current ||
+        (envelopeStepsHold(current.envelope, tr.steps) &&
+          storyStepsApply(current.stories, tr.steps))
+      );
     },
     state: {
       init: (state) =>
@@ -656,12 +841,20 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
         let { stories } = value;
         let storiesJSON = value.envelope.stories;
         for (const step of tr.steps) {
-          if (!(step instanceof StoryStep)) continue;
+          let after: Story | null;
+          if (step instanceof StoryStep) after = step.after;
+          else if (step instanceof StoryEditStep) {
+            const story = stories.get(step.id);
+            // The filter found it applies; a story removed since takes nothing.
+            const doc = story && storyEditResult(step, story.doc);
+            if (!story || !doc) continue;
+            after = { ...story, doc };
+          } else continue;
           const trees = new Map(stories);
           const json = { ...storiesJSON };
-          if (step.after) {
-            trees.set(step.id, step.after);
-            json[step.id] = storyJSON(step.after);
+          if (after) {
+            trees.set(step.id, after);
+            json[step.id] = storyJSON(after);
           } else {
             trees.delete(step.id);
             delete json[step.id];

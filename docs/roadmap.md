@@ -3225,7 +3225,7 @@ lets the agent library return steps); 22.7 onwards build it.
   undone with the edit it came with (today it stays); limitations.md and the changeset say so.
   The tracking switch becomes a `settings` value carried by a step, read by the track plugin
   and by `exportDocx` when no argument is given. Tests for each caller listed above.
-- [ ] 22.4 Stories that merge: a story change carries the story's own steps (story id + steps)
+- [x] 22.4 Stories that merge: a story change carries the story's own steps (story id + steps)
   instead of the whole story, so two edits in one header rebase. `StoryStep` kept for
   creating and removing a story. Tests: two transactions in one footer, applied in either order,
   give the same footer.
