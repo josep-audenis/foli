@@ -875,6 +875,24 @@ in Word; each change is one undo step.
   at page splits, Escape out of a story, Tab after Escape, keys while composing or in a pop-up)
   are listed in [keyboard.md](keyboard.md#reserved).
 
+### Collaboration (client)
+
+Real-time editing by several people through a central authority (1.6, ADR-0012; the authority is
+`@folijs/collab`). Headless: the app moves the messages.
+
+- `collab({ version?, clientID })`: the plugin, given to `createEditor({ plugins })`, with the
+  authority's version the document was loaded at (default 0) and this editor's client id (unique
+  among the live clients of one document; a small integer also gives the editor's new ids a class
+  of their own, `id ≡ clientID mod 256`). `CollabOptions`.
+- `sendableSteps(state)`: `{ version, steps, clientID }` (`SendableSteps`) to send, or null when
+  every step of this editor is confirmed. Send `steps.map((s) => s.toJSON())`.
+- `receiveTransaction(state, steps, clientIDs)`: the transaction that applies steps the
+  authority broadcast from this editor's version (`Step.fromJSON` each); dispatch it. This
+  editor's own steps among them are confirmed; the others are applied, its unconfirmed steps
+  rebased over them. It is `remote`: not undoable, not tracked; undo maps the user's own changes
+  over it. Apply broadcasts in version order (keep a later one until those before it arrive).
+- `getVersion(state)`: the authority's version this editor has.
+
 ### Model, state and plugins
 
 Stable, for plugins and code that edits documents directly:

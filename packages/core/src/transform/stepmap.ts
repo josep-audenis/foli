@@ -19,10 +19,7 @@ export interface Mappable {
   storyMapping?(id: string): Mapping | undefined;
 }
 
-/**
- * What a step inside a story did to the story's own positions: its maps, under the story's id.
- * @internal
- */
+/** What a step inside a story did to the story's own positions: its maps, under the story's id. */
 export interface StoryMaps {
   readonly id: string;
   readonly maps: readonly StepMap[];
