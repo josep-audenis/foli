@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
+import { insertText } from "./commands.js";
 import { createEditor } from "./editor.js";
-import { acceptAllChanges, rejectAllChanges, trackedChanges } from "./review.js";
+import {
+  acceptAllChanges,
+  acceptChange,
+  nextChange,
+  rejectAllChanges,
+  trackedChanges,
+} from "./review.js";
 import { TextSelection } from "./selection.js";
 import {
   columnAt,
@@ -692,6 +699,33 @@ describe("table properties while tracking (23.2)", () => {
     // The row and its paragraphs are the insertion; the shading is part of it.
     expect(kinds(editor).filter((k) => k.startsWith("tableFormatting"))).toEqual([]);
     valid(editor);
+  });
+
+  it("resolve one table change at a time: the next change's, or the innermost at a caret", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    select(editor, inside(editor, "a1"));
+    editor.run(setTableStyle("Table Grid"));
+    selectCells(editor, "b2", "b2");
+    editor.run(setCellShading("ffcc00"));
+    select(editor, inside(editor, "b2", 1));
+    editor.run(insertText("Z"));
+    const all = () => trackedChanges(editor.state.doc).map((c) => c.kind);
+    expect(all()).toEqual(["tableFormatting", "tableFormatting", "insertion"]);
+    // Next change from the start selects the table's: accepting it leaves the others.
+    select(editor, 1);
+    editor.run(nextChange);
+    editor.run(acceptChange);
+    expect(all()).toEqual(["tableFormatting", "insertion"]);
+    // At a caret in b2 with its text accepted, the cell's shading, not anything around it.
+    editor.run(acceptAllChanges());
+    select(editor, inside(editor, "a1"));
+    expect(editor.run(setTableStyle(null))).toBe(true);
+    selectCells(editor, "bZ2", "bZ2");
+    editor.run(setCellShading("00ff00"));
+    select(editor, inside(editor, "bZ2", 0));
+    editor.run(acceptChange);
+    expect(all()).toEqual(["tableFormatting"]);
+    expect(trackedChanges(editor.state.doc)[0]?.from).toBe(editor.state.doc.child(0).nodeSize);
   });
 
   it("leave columns, merging and widths refused", () => {

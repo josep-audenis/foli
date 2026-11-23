@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createEditor, parseDocument, trackedChanges } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "../index.js";
+import { docx } from "../testing/package.js";
 
 const fixture = new URL("../../../core/fixtures/formats/v8.json", import.meta.url);
 const v8 = () => parseDocument(JSON.parse(readFileSync(fixture, "utf8")));
@@ -56,5 +57,23 @@ describe("a table's tracked formatting through .docx (23.2)", () => {
     expect(kept?.attrs?.style).toBeUndefined();
     expect(kept?.content?.[0]?.attrs?.header).toBe(true);
     expect(trackedChanges(accepted.state.doc)).toEqual([]);
+  });
+});
+
+describe("a table style's own recorded change (23.2 review)", () => {
+  it("stays in the style's ext: the import does not fail", async () => {
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const STYLES = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    const { document } = await importDocx(
+      await docx("<w:p/>", {
+        rels: `<Relationship Id="s" Type="${STYLES}" Target="styles.xml"/>`,
+        parts: {
+          "word/styles.xml": `<w:styles xmlns:w="${W}"><w:style w:type="table" w:styleId="T"><w:name w:val="T"/><w:tblPr><w:tblPrChange w:id="8" w:author="Bob"><w:tblPr/></w:tblPrChange></w:tblPr><w:tcPr><w:shd w:val="clear" w:fill="FF0000"/><w:tcPrChange w:id="9" w:author="Bob"><w:tcPr/></w:tcPrChange></w:tcPr></w:style></w:styles>`,
+        },
+      }),
+    );
+    const style = document.styles.find((s) => s.id === "T");
+    expect(style?.cell).toMatchObject({ shading: { fill: "FF0000" } });
+    expect(JSON.stringify(style)).not.toContain('"formatChange"');
   });
 });

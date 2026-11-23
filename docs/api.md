@@ -738,7 +738,9 @@ and cells' shading, as formatting changes (`w:trPrChange`, `w:tblPrChange`, `w:t
 schema 8, 1.7; `trackedChanges` lists each as `tableFormatting`, its range the node). Column,
 merge, split and width commands do not apply while tracking. Links added, changed or taken off
 while tracking (`setLink`, `removeLink`) are the text deleted and inserted again with the link
-as it is now (Word records no change of a link).
+as it is now (Word records no change of a link); text that is a tracked insertion takes the link
+in place, staying its author's. `nextChange` selects a table's, row's or cell's change as the
+node, and accepting or rejecting then resolves that change alone; at a caret, the innermost.
 
 Pictures: `insertPicture({ contentType, url? | data?, width, height, alt?, title?,
 decorative? }, { requireAlt = true })` (size in EMU; alt text required unless `decorative` or

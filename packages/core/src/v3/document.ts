@@ -782,7 +782,7 @@ function laterNode(
     if (version < 6 && name === "picture" && (attrs.rotation != null || attrs.crop != null))
       return { name: "a picture's rotation or crop", schema: 6 };
     if (version < 8 && TABLE_NODES.has(name) && attrs.formatChange != null)
-      return { name: `a ${name}'s formatChange`, schema: 8 };
+      return { name: `a ${name} with a formatChange`, schema: 8 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;

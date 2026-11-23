@@ -264,6 +264,7 @@ export function cellProperties(el: XmlElement | undefined, context: Context, nod
   return out;
 }
 
+const unchanged = ({ formatChange: _, ...json }: Json) => json;
 const nonEmpty = (json: Json) => (Object.keys(json).length ? json : undefined);
 
 /**
@@ -282,9 +283,10 @@ export function tableStyleParts(
     return {
       paragraph: pPr ? nonEmpty(paragraph(pPr)) : undefined,
       run: marks.length ? marks : undefined,
-      table: nonEmpty(tableProperties(child(el, "tblPr"), context, false)),
+      // A style's own recorded change stays in its `ext`: a style's parts hold none.
+      table: nonEmpty(unchanged(tableProperties(child(el, "tblPr"), context, false))),
       row: nonEmpty(rowProperties(child(el, "trPr"), context, false)),
-      cell: nonEmpty(cellProperties(child(el, "tcPr"), context, false)),
+      cell: nonEmpty(unchanged(cellProperties(child(el, "tcPr"), context, false))),
     };
   };
   const own = parts(style);

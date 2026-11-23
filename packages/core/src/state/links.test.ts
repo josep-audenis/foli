@@ -261,4 +261,21 @@ describe("links while tracking (23.2)", () => {
     expect(hrefs(editor)).toEqual(['"href":"https://a.example"']);
     expect(editor.state.doc.textContent).toBe("see the site now");
   });
+
+  it("links another author's inserted text in place: it stays theirs", () => {
+    const editor = tracked();
+    editor.commands.setTrackChanges(true, "Bob");
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 17)));
+    editor.commands.insertText(" later");
+    editor.commands.setTrackChanges(true, "Me");
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 18, 23)));
+    expect(editor.run(setLink("https://a.example"))).toBe(true);
+    const changes = trackedChanges(editor.state.doc);
+    // Bob's text stays one insertion of his; the link's character style is Me's formatting.
+    expect(changes.map((c) => [c.kind, c.author])).toEqual([
+      ["insertion", "Bob"],
+      ["formatting", "Me"],
+    ]);
+    expect(hrefs(editor)).toEqual(['"href":"https://a.example"']);
+  });
 });

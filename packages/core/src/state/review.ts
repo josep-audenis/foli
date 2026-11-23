@@ -19,7 +19,7 @@ import { controlEdit, controlsPlugin, readOnlyAt } from "./controls.js";
 import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { absorbSection, lastSection, resolveSectionChange } from "./sections.js";
-import { TextSelection } from "./selection.js";
+import { NodeSelection, TextSelection } from "./selection.js";
 import { type Command, EditorState, type Transaction } from "./state.js";
 import { keepTablesApart, rowRestartingMerges } from "./tables.js";
 import { RECORDED, TABLE_RECORDED, trackState, untracked } from "./track.js";
@@ -188,6 +188,12 @@ function paragraphChange(
   };
 }
 const INLINE: ReadonlySet<ChangeKind> = new Set(["insertion", "deletion", "formatting"]);
+/** Changes of a whole table, row or cell: their range is the node. */
+const NODE_KINDS: ReadonlySet<ChangeKind> = new Set([
+  "tableFormatting",
+  "rowInsertion",
+  "rowDeletion",
+]);
 /** Inline nodes no change marks: they stay when the text around them goes. */
 const MARKERS = new Set([
   "bookmarkStart",
@@ -220,8 +226,17 @@ function changesIn(
         c.kind !== "sectionFormatting" &&
         c.kind !== "tableFormatting",
     );
-    picked = own.length ? own : around;
-  } else
+    // Else the paragraph's or section's formatting; else the innermost table node's (the cell's
+    // before its row's and table's).
+    const formats = around.filter((c) => c.kind !== "tableFormatting");
+    const nodes = around
+      .filter((c) => c.kind === "tableFormatting")
+      .sort((a, b) => a.to - a.from - (b.to - b.from));
+    picked = own.length ? own : formats.length ? formats : nodes.slice(0, 1);
+  } else if (all.some((c) => NODE_KINDS.has(c.kind) && c.from === from && c.to === to))
+    // Exactly a table's, row's or cell's change (what `nextChange` selects): that one only.
+    picked = all.filter((c) => NODE_KINDS.has(c.kind) && c.from === from && c.to === to);
+  else
     picked = all
       .filter((c) => c.from < to && from < c.to)
       .map((c) =>
@@ -645,7 +660,14 @@ function goTo(forward: boolean): Command {
         target.kind === "paragraphDeletion" ||
         target.kind === "sectionFormatting";
       const head = mark ? target.from : target.to;
-      dispatch(state.tr.setSelection(TextSelection.create(state.doc, target.from, head)));
+      // A table's, row's or cell's change: the node, which accepting then resolves alone.
+      dispatch(
+        state.tr.setSelection(
+          NODE_KINDS.has(target.kind)
+            ? NodeSelection.create(state.doc, target.from)
+            : TextSelection.create(state.doc, target.from, head),
+        ),
+      );
     }
     return true;
   };

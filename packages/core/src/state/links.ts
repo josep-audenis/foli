@@ -35,6 +35,13 @@ function relink(
     if (deletion?.isInSet(node.marks)) return false;
     const s = Math.max(pos, from);
     const e = Math.min(pos + node.nodeSize, to);
+    // Inserted text (anyone's) takes the link in place: it is part of that insertion, and its
+    // author stays its author.
+    if (state.schema.marks.insertion?.isInSet(node.marks)) {
+      if (mark) tr.addMark(s, e, mark);
+      else tr.removeMark(s, e, type);
+      return false;
+    }
     const next = marks(node.marks);
     if (!Mark.sameSet(next, node.marks))
       pieces.push({
