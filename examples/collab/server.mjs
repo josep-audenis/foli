@@ -75,7 +75,7 @@ sockets.on("connection", (socket) => {
     }
     if (message?.type === "steps") {
       // The client's id is the connection's, whatever the message says.
-      const result = authority.receive({ ...message, clientID });
+      const result = authority.receive(message, clientID);
       if (result.ok) {
         persist();
         everyone({ type: "steps", ...result.broadcast });

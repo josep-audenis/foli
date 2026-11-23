@@ -35,7 +35,7 @@ export function serve(
     const message = JSON.parse(text);
     if (message.type === "steps") {
       // The client id is the connection's, never what the message claims.
-      const result = authority.receive({ ...message, clientID: connection.clientID });
+      const result = authority.receive(message, connection.clientID);
       if (result.ok) {
         save(authority.snapshot()); // or append result.broadcast to a log
         broadcast({ type: "steps", ...result.broadcast }); // to everyone, the sender too
