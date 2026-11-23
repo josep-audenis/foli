@@ -122,13 +122,16 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * each on bundles at their limit, with room for the rest of the phase. React and FoliEditor
  * raised in 21.9 (170.2 kB, 172.5 allowed): the select boxes held until Enter, the focus given
  * back after a dialog closed from elsewhere, the comments pane's frame-batched measuring.
+ * Docx raised in 21.10 (61.4 kB, 63.5 allowed): export correctness (Word 2013's compatibility
+ * settings in a new package, the spacing flag into an existing part, a related part made where
+ * it points) and `asDocument`, a .docm or template written as a .docx without its macros.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 90_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 121_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 176_640 },
   { name: "FoliEditor only", entry: appEntry, budget: 176_640 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 62_500 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 78_500 },
 ];
