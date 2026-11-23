@@ -9,7 +9,7 @@ import {
   type StoryJSON,
 } from "@folijs/core";
 import { Resolver } from "@folijs/core/internal";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { htmlToDoc } from "./clipboard.js";
 import { EditorView } from "./index.js";
 import { headerHeight } from "./word/pages.js";
@@ -196,5 +196,46 @@ describe("Ctrl+click on a link to a bookmark (21.8)", () => {
     const { host, editor } = mount(p(...field(" REF _Toc1 ", "Go")), p(...target()));
     click(host, "Go");
     expect(selected(editor)).toBe("");
+  });
+});
+
+describe("beforeinput types the view does not carry out (21.8)", () => {
+  const input = (host: HTMLElement, inputType: string, data: string | null = null) => {
+    const event = new InputEvent("beforeinput", { inputType, data, cancelable: true });
+    host.dispatchEvent(event);
+    return event;
+  };
+
+  it("are said once each, never silently dropped; the DOM stays the view's", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { host, editor } = mount(p(text("abc")));
+      const before = JSON.stringify(editor.state.doc.toJSON());
+      expect(input(host, "formatJustifyCenter").defaultPrevented).toBe(true);
+      input(host, "formatJustifyCenter");
+      input(host, "insertTranspose");
+      expect(warn.mock.calls.map((c) => String(c[0]))).toEqual([
+        `Foli: the browser's "formatJustifyCenter" input is not supported; nothing was changed.`,
+        `Foli: the browser's "insertTranspose" input is not supported; nothing was changed.`,
+      ]);
+      // Paste and drop have their own handlers: nothing said.
+      input(host, "insertFromPaste");
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(JSON.stringify(editor.state.doc.toJSON())).toBe(before);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("indents, outdents and yanks", () => {
+    const { host, editor } = mount(p(text("abc")));
+    input(host, "formatIndent");
+    const indent = () =>
+      (editor.state.doc.firstChild?.attrs.indent as { left?: number } | null)?.left ?? 0;
+    expect(indent()).toBeGreaterThan(0);
+    input(host, "formatOutdent");
+    expect(indent()).toBe(0);
+    input(host, "insertFromYank", "Y");
+    expect(editor.state.doc.textContent).toContain("Y");
   });
 });

@@ -6,6 +6,7 @@ import {
   type Command,
   type ControlRange,
   cellsAsTable,
+  changeIndent,
   closeHistory,
   controlAt,
   controlProperties,
@@ -3566,6 +3567,9 @@ export class EditorView {
     if (!selection.eq(this.state.selection)) this.dispatch(this.state.tr.setSelection(selection));
   }
 
+  /** The `beforeinput` types already warned about (`onBeforeInput`). */
+  private readonly unhandledInput = new Set<string>();
+
   private onBeforeInput = (event: InputEvent): void => {
     // During composition the browser owns the DOM; it is reconciled at compositionend. A
     // composition event that arrives after it must not fall through to a delete or insert.
@@ -3576,6 +3580,8 @@ export class EditorView {
     const text = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
     switch (type) {
       case "insertText":
+      // macOS's Ctrl+Y: what Ctrl+K cut, as text.
+      case "insertFromYank":
         this.run(insertText(text));
         return;
       case "insertReplacementText":
@@ -3603,8 +3609,20 @@ export class EditorView {
         this.run(toggleMark(mark));
         return;
       }
+      case "formatIndent":
+      case "formatOutdent":
+        this.run(changeIndent(type === "formatIndent" ? 1 : -1));
+        return;
     }
-    if (!type.startsWith("delete") || type === "deleteByDrag") return;
+    if (!type.startsWith("delete")) {
+      // The browser's own editing would change the DOM, which is never the truth: said, once.
+      if (!ELSEWHERE_INPUT.has(type) && !this.unhandledInput.has(type)) {
+        this.unhandledInput.add(type);
+        console.warn(`Foli: the browser's "${type}" input is not supported; nothing was changed.`);
+      }
+      return;
+    }
+    if (type === "deleteByDrag") return;
     // Android keyboards send Backspace at a paragraph's start as a delete of the boundary
     // before it (a target range from the paragraph before's end to the caret): that is the key
     // at a caret, so a numbered paragraph loses its number rather than joining the one before.
@@ -5681,6 +5699,13 @@ const HARD_BREAK = "\uFFFC";
 function isHighSurrogate(code: number): boolean {
   return code >= 0xd800 && code <= 0xdbff;
 }
+
+/** `beforeinput` types the view's paste and drop handlers carry out. */
+const ELSEWHERE_INPUT = new Set([
+  "insertFromPaste",
+  "insertFromPasteAsQuotation",
+  "insertFromDrop",
+]);
 
 const COMPOSITION_INPUT = new Set([
   "insertCompositionText",
