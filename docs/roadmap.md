@@ -3263,7 +3263,7 @@ lets the agent library return steps); 22.7 onwards build it.
   file as storage) and a page with the editor; the playground shows two editors side by side
   over an in-memory transport. Playwright: two pages type in one paragraph and converge; one
   drops its connection and catches up; the exported .docx opens.
-- [ ] 22.12 Speed: a `pnpm bench` case with remote steps from four clients arriving while the
+- [x] 22.12 Speed: a `pnpm bench` case with remote steps from four clients arriving while the
   user types in a 50-page document; a miss is written down in benchmarks.md, not hidden.
 - [ ] 22.13 Docs and release: architecture.md (the collab loop), api.md, a site page (how to
   wire a transport and a store), limitations.md (no CRDT, no long offline, what the app must

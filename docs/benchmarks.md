@@ -481,6 +481,38 @@ search comes again; the panel looks again 300 ms after typing pauses, keeps the 
 only the matches of the pages near the window, found by halving the sorted list. Before this, every
 key searched again and marked every match: 8.2 s for ten keys in the reviewer's run.
 
+## Typing while others edit (22.12)
+
+`50-section document, 3 others editing` in `apps/playground/bench/pagination.bench.ts` (tracked by
+`pnpm bench` as `… 50 remote 3`): the 50-section paragraph document (53 pages) in `FoliEditor`
+with the `collab` plugin, and three headless editors of it in the page, each typing a character
+into a paragraph of the document's second half every 50 ms (60 remote steps a second in all)
+through an in-page authority (`@folijs/collab`, no network delay). The user types and presses
+Enter on page 1 as in the single-user case, which runs beside it as the baseline. Like every
+case, each change reads the whole document back (`onChange`), remote ones included. One run,
+2026-11-23, the owner's laptop with other sessions running (cells may be off by ~30%):
+
+| Engine   | Others | type handler p50 | type paint p50 / p95 | Enter handler p50 | Enter paint p50 / p95 | layout |
+| -------- | -----: | ---------------: | -------------------: | ----------------: | --------------------: | -----: |
+| Chromium |      0 |              5.8 |           7.4 / 13.2 |               8.2 |           10.4 / 22.4 |   51.3 |
+| Chromium |      3 |              7.3 |          13.2 / 30.3 |              15.2 |           37.6 / 69.1 |   76.7 |
+| Firefox  |      0 |                6 |               9 / 15 |                 8 |               12 / 24 |     66 |
+| Firefox  |      3 |                5 |              30 / 71 |                 8 |               81 / 95 |     94 |
+| WebKit   |      0 |                7 |                    — |                 9 |                     — |     83 |
+| WebKit   |      3 |               18 |                    — |                24 |                     — |    110 |
+
+(WebKit's paint times are not tracked: Playwright's WebKit on Windows paints in software.)
+
+**Missed** against the 100-page targets (handler p50 ≤ 8 ms, paint p95 ≤ 25 ms), with fewer
+pages: the user's own keys stay fast to handle in Chromium and Firefox typing, but every remote
+step is a transaction the editor applies, the view redraws and the page reads back, sixty times a
+second, so a key often waits behind them: paint p95 doubles to quintuples, and Enter's handler
+doubles in Chromium and WebKit. Not fixed in Phase 22. The likely remedies, for a later phase:
+receiving several broadcasts as one transaction (one redraw), drawing remote changes off the
+key's frame, and not reading the document back on remote changes (an app saves from the
+authority's snapshot, not from each client). 60 remote steps a second is a heavy load: three
+people typing without pause.
+
 ## Bundle size (Phase 6.4)
 
 **Run:** `pnpm size` (after `pnpm build`; part of `pnpm check`; source: `scripts/size.mjs`).
