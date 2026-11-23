@@ -32,7 +32,7 @@ place that says what is in progress; check it before starting work.
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
 | 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.7 and 20.8's docs merged; the patch release left                                                                                                                                      |
-| 21 Hardening              | Ready                    | —                     | Planned 2026-11-22 from an audit of 1.4.0, nothing built: data loss, a hang and a PDF leak first                                                                                              |
+| 21 Hardening              | In progress              | `phase-21/hardening` | Planned 2026-11-22 from an audit of 1.4.0; claimed 2026-11-23, tasks in order: data loss, a hang and a PDF leak first                                                                         |
 | 22 Collaboration          | Blocked by 21            | —                     | Planned 2026-11-23, nothing built: central authority over steps; fixes go before features (Phase 21)                                                                                          |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -3013,7 +3013,7 @@ releases published with the owner's approval.
 Each task is a PR on `phase-21/hardening`, the build green after each, merged after an agent's
 review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
 
-- [ ] Claim phase, branch `phase-21/hardening`
+- [x] Claim phase, branch `phase-21/hardening`
 - [ ] 21.1 MCP: a save never writes over the file another open document came from
   (`mcp/src/documents.ts`, `save` and `#mine`). Reproduced: open `a.docx`, save (writes
   `a.agent.docx`), open `a.agent.docx`, edit, save (back to `a.agent.docx`), save the first
