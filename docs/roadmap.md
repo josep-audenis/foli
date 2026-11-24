@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 and 23.4 merged                                                                                                    |
+| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.5 merged                                                                                                     |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 | 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
@@ -3433,7 +3433,11 @@ lands second merges the other in (no rebase: force push is blocked).
   16,262 with `--code`); ADR-0013's aim raised for `--code`. 23.3's review fixed with it: row
   commands in a vertically merged table act on the row named; several edits all or nothing;
   code mode counts what changed, not the whole table.
-- [ ] 23.5 Agent: paragraph formatting and lists; one tool `format_paragraph`.
+- [x] 23.5 Agent: paragraph formatting and lists; one tool `format_paragraph`.
+  Done: `formatParagraphs` (alignment, line spacing, space before and after, indent, bullet
+  and numbered lists; paragraphs next to each other one list), `read`'s formatting line starts
+  with the paragraph's own properties, the `format_paragraph` tool and `doc.formatParagraphs`.
+  17 tools, 14,036 characters with schemas (18, 17,702 with `--code`).
 - [ ] 23.6 Agent: insert pictures (bytes and type in the package; in the MCP server a path
   under the root, size limits as `open`'s; alt text), page and section breaks, horizontal
   rules, footnotes and endnotes; one tool `insert`.
