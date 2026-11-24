@@ -1146,8 +1146,19 @@ transaction and runs core's commands. Background and what was tried:
   neighbour's properties, minus its mark's own), `deleteBlock` (a paragraph: a whole-node
   delete, which tracking records, content only where the paragraph must stay; a table: core's
   `deleteTable`), `setStyle`, `comment`,
-  `fillControl`, `updateFields`. Each returns a value: the blocks as they read now (`deleteBlock`
-  and `updateFields` a sentence), or a refusal with a code and a message written for the model.
+  `fillControl`, `updateFields`; and from Phase 23 (ADR-0013) tables (`tables.ts`: table and
+  row commands with the caret where they act, rows and columns numbered as `read` numbers them),
+  text and paragraph formatting (`formatting.ts`, `paragraphs.ts`), pictures, breaks and notes
+  (`inserts.ts`), review (`changes.ts`, by core's `acceptChangesById`). Each returns a value: the
+  blocks as they read now (`deleteBlock` and `updateFields` a sentence), or a refusal with a code
+  and a message written for the model. One of several edits is all or nothing (`whole`, a
+  nested checkpoint).
+- **Stories** (`stories.ts`, 23.7): headers and footers are read after the body with their own
+  handles (`h1`, `f1`), each story's a `Handles` that follows the body editor's changes through
+  the story's mapping (a story's editor tells its listeners of no steps); operations given such
+  a handle run in the story's editor.
+- **Tools** (`tools.ts`, ADR-0013): `AGENT_TOOLS`, each with its words for a model and its
+  code-mode methods; `agentTools(session, host)` binds them, the host giving pictures' bytes.
 - **Checkpoint** (`session.ts`): `checkpoint()` keeps the body as it is (a document is a value), the
   envelope, undo's state and each handle's position, and from then on the inverse of every
   step that changes something beside the body (a comment, a note, a header). `rollback()` is

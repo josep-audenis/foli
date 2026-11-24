@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.9 merged                                                                                                     |
+| 23 Agent editing parity   | In review                | `phase-23/agent-parity` | 23.1–23.9 merged (#253–#266); the release (agent 0.4.0, mcp 0.3.0, 1.7.0) waits for the owner                                                                                                 |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 | 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
@@ -3484,6 +3484,11 @@ lands second merges the other in (no rebase: force push is blocked).
 - [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
   server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
   core patch) published with the owner's approval.
+  (Docs done 2026-11-24: the agent and MCP READMEs (the site's Agents and MCP server pages),
+  limitations.md's Agent editing, the server's instructions, architecture.md, api.md, ADR-0013's
+  cost table; changesets: `@folijs/agent` minor (0.4.0), `@folijs/mcp` minor (0.3.0),
+  `@folijs/core` and `@folijs/docx` minor (1.7.0, schema 8), `@folijs/react` patch. Publishing
+  waits for the owner's approval.)
 
 ## Phase 24 — Collaboration, easy to integrate · M → 1.7.0, `@folijs/collab` 0.2.0
 
