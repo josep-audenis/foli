@@ -590,13 +590,6 @@ export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarP
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";
 
 // localFonts.d.ts
-/**
- * The fonts installed on the machine, for the Font box: the Local Font Access API
- * (`queryLocalFonts`, Chromium browsers). Asking needs the user's permission, and a first ask
- * a user gesture: the box asks when the user opens it. Elsewhere (Firefox, Safari, a refusal)
- * the list stays empty and the box offers its own fonts.
- * @internal
- */
 export {};
 
 // messages.d.ts
