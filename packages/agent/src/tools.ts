@@ -658,6 +658,46 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       },
     ],
   },
+  {
+    name: "format_paragraph",
+    description:
+      "Formats paragraphs, as tracked formatting changes: handles, one or several (paragraphs next to each other become one list). format says what to change, the rest stays: align (left, center, right, justify), lineSpacing (a multiple: 1, 1.15, 1.5, 2), spaceBefore and spaceAfter (points), indent (more or less: half an inch, or a list level), list (bullet, numbered; null takes the numbering off); null gives spacing back to the style. read with formatting shows a paragraph's own. Returns the blocks as they read now.",
+    inputSchema: args(
+      {
+        handles: {
+          type: "array",
+          description: 'The paragraphs\' handles, from read: ["b4", "b5"].',
+          items: { type: "string" },
+        },
+        format: {
+          type: "object",
+          description: 'What to change: { "align": "center", "spaceAfter": 6 }.',
+          properties: {
+            align: { type: "string", enum: ["left", "center", "right", "justify"] },
+            lineSpacing: { anyOf: [{ type: "number" }, { type: "null" }] },
+            spaceBefore: { anyOf: [{ type: "number" }, { type: "null" }] },
+            spaceAfter: { anyOf: [{ type: "number" }, { type: "null" }] },
+            indent: { type: "string", enum: ["more", "less"] },
+            list: {
+              anyOf: [{ type: "string", enum: ["bullet", "numbered"] }, { type: "null" }],
+            },
+          },
+          additionalProperties: false,
+        },
+      },
+      ["handles", "format"],
+    ),
+    run: (session, { handles, format }) =>
+      told(session.formatParagraphs(handles as string[], format as never)),
+    methods: [
+      {
+        name: "formatParagraphs",
+        signature: "doc.formatParagraphs(handles, format): { blocks }",
+        effect: "edit",
+        call: (session, [a, b]: Args) => ({ blocks: given(session.formatParagraphs(a, b)).blocks }),
+      },
+    ],
+  },
 ];
 
 /**

@@ -1,5 +1,6 @@
 export type { FormatOptions, TextFormat } from "./formatting.js";
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
+export type { ParagraphFormat } from "./paragraphs.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";

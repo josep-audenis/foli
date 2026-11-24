@@ -31,6 +31,7 @@ export {};
 // index.d.ts
 export type { FormatOptions, TextFormat } from "./formatting.js";
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
+export type { ParagraphFormat } from "./paragraphs.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";
@@ -58,6 +59,23 @@ export interface ReplaceOptions {
 export interface CommentOptions {
     /** Text in the block to anchor the comment to, as `read` shows it. Default: the whole block. */
     on?: string;
+}
+
+// paragraphs.d.ts
+/** What to change of the paragraphs; what is left out stays as it is. */
+export interface ParagraphFormat {
+    /** left, center, right or justify. */
+    align?: "left" | "center" | "right" | "justify";
+    /** A multiple of single spacing (1, 1.15, 1.5, 2); null: the style's. */
+    lineSpacing?: number | null;
+    /** Space before, in points; null: the style's. */
+    spaceBefore?: number | null;
+    /** Space after, in points; null: the style's. */
+    spaceAfter?: number | null;
+    /** Half an inch in or out; in a list, a level deeper or higher. */
+    indent?: "more" | "less";
+    /** Number the paragraphs as a list (one list for paragraphs next to each other); null: none. */
+    list?: "bullet" | "numbered" | null;
 }
 
 // read.d.ts
@@ -101,8 +119,9 @@ export interface Block {
     /** How many comments are anchored in it. */
     comments: number;
     /**
-     * The text's own formatting, when `read` was asked for it (`formatting`): runs of text that
-     * have some, each with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
+     * The paragraph's own formatting, when `read` was asked for it (`formatting`): its own
+     * properties (`paragraph centered, space after 6 pt`), then runs of text that have some, each
+     * with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
      */
     formatting?: string;
 }
@@ -164,6 +183,7 @@ export declare function invalid(value: unknown, schema: JsonSchemaOrAny, path?: 
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
 import { type FormatOptions, type TextFormat } from "./formatting.js";
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
+import { type ParagraphFormat } from "./paragraphs.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
 import { type CellText, type InsertTableOptions, type ShadeOptions } from "./tables.js";
@@ -312,6 +332,12 @@ export interface Session {
      * stays. A tracked formatting change; a link, the text deleted and inserted again with it.
      */
     formatText(handle: string, format: TextFormat, options?: FormatOptions): Result<Changed>;
+    /**
+     * Formats paragraphs (one handle, or several: those next to each other become one list):
+     * alignment, line spacing, space before and after, indentation (a list level in a list),
+     * list numbering. What `format` leaves out stays. Tracked formatting changes.
+     */
+    formatParagraphs(handles: string | readonly string[], format: ParagraphFormat): Result<Changed>;
     /**
      * Marks the document as it is now, to come back to: `rollback` takes back every edit made
      * since, the session's own and those made through `editor`, as if none had been (no tracked

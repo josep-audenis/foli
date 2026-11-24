@@ -58,7 +58,7 @@ describe("the run tool", { timeout: 30_000 }, () => {
     expect(await names(false)).not.toContain("run");
     const withCode = await names(true);
     expect(withCode.at(-1)).toBe("run");
-    expect(withCode).toHaveLength(17);
+    expect(withCode).toHaveLength(18);
   });
 
   it("does a loop over the document in one call, every edit a tracked change", async () => {

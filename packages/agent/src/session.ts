@@ -31,7 +31,14 @@ import {
   setStyle,
   styles,
 } from "./operations.js";
-import { type Block, formatBlocks, readBlocks, runFormatting } from "./read.js";
+import { formatParagraphs, type ParagraphFormat } from "./paragraphs.js";
+import {
+  type Block,
+  formatBlocks,
+  paragraphFormatting,
+  readBlocks,
+  runFormatting,
+} from "./read.js";
 import { type Result, refuse } from "./result.js";
 import {
   type CellText,
@@ -204,6 +211,12 @@ export interface Session {
    */
   formatText(handle: string, format: TextFormat, options?: FormatOptions): Result<Changed>;
   /**
+   * Formats paragraphs (one handle, or several: those next to each other become one list):
+   * alignment, line spacing, space before and after, indentation (a list level in a list),
+   * list numbering. What `format` leaves out stays. Tracked formatting changes.
+   */
+  formatParagraphs(handles: string | readonly string[], format: ParagraphFormat): Result<Changed>;
+  /**
    * Marks the document as it is now, to come back to: `rollback` takes back every edit made
    * since, the session's own and those made through `editor`, as if none had been (no tracked
    * change is left of them, and every handle names the block it named). `release` ends the
@@ -261,7 +274,9 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     if (formatting === true)
       for (const block of blocks) {
         const node = block.kind === "paragraph" ? handles.resolve(block.handle)?.node : undefined;
-        const own = node ? runFormatting(node) : "";
+        const own = node
+          ? [paragraphFormatting(node), runFormatting(node)].filter(Boolean).join("; ")
+          : "";
         if (own) block.formatting = own;
       }
     const next = all[start + blocks.length]?.handle ?? null;
@@ -388,6 +403,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     setTableStyle: (handle, style) => setTableStyle(context, handle, style),
     shadeCells: (handle, fill, options) => shadeCells(context, handle, fill, options),
     setHeaderRows: (handle, count) => setHeaderRows(context, handle, count),
+    formatParagraphs: (handles, format) => whole(() => formatParagraphs(context, handles, format)),
     formatText: (handle, format, options) =>
       whole(() => formatText(context, handle, format, options)),
   };
