@@ -370,7 +370,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 ## Collaboration
 
-Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)):
+Real-time editing (Phase 22, 1.6; Phase 24; ADR-0012; [the guide](guides/collaboration.md)):
 
 - A central authority over steps, not a CRDT: one process orders each document's steps. No
   peer-to-peer and no long offline editing: a client that was away sends its steps when it comes
@@ -378,7 +378,15 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
   compacted past its version, losing its unsent steps then).
 - Foli ships no transport, no store and no server: the app moves the JSON messages, stores the
   snapshot (and the original package beside it), authenticates, and decides who may edit
-  (`authorize`).
+  (`authorize`). `createHub` and `connect` speak the protocol over any transport; the app still
+  carries the text, and rate-limits `catchup` when clients may be hostile (each answers with steps
+  or a whole snapshot).
+- A host in a browser holds the authority: when the host leaves, the session ends. Moving the
+  authority to another browser (which needs the document as last confirmed, without the leaving
+  host's pending steps) is not done.
+- `connect` notices a lost broadcast when the next one arrives (a gap) and catches up; a lost
+  last message is found only by `resume` after a reconnect, or by the next broadcast. A transport
+  that drops messages without reconnecting should call `resume` itself from time to time.
 - The authority validates a step by applying it (the schema, envelope and story steps that no
   longer find what they change); it does not run the locked content controls' rules again, which
   depend on the command that made the edit: an app whose clients may be hostile checks locks in
@@ -389,7 +397,8 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
   (`id ≡ clientID mod 256`); two live clients in one class can still take the same id. Give the
   live clients of a document distinct small integers.
 - Presence is drawn in the body only, not in an open header, footer or note; a presence message
-  sent from an older version than the receiver's is dropped (the next one comes).
+  sent from an older version than the receiver's is dropped (the next one comes), and the hub drops
+  one over 4000 characters.
 - Speed: remote steps cost every client a transaction and a redraw each; three others typing
   without pause roughly double to quintuple keystroke-to-paint p95 on a 50-page document
   ([benchmarks](benchmarks.md#typing-while-others-edit-2212)).
