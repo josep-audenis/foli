@@ -282,8 +282,11 @@ the focus on the item, ArrowDown opens a menu. A copy of a built-in item with an
 - A built-in box or color menu with other entries is a copy:
   `{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options: mine } }`,
   `{ ...toolbarItems.font, select: { ...toolbarItems.font.select, options: () => myFonts } }`.
-  The text color goes into the document as it is; a highlight outside Word's is written as
-  shading. Keep text colors readable on white (4.5:1).
+  The copy keeps the built-in's grid (`columns`) and "More colors…" (`custom`); for a list of
+  named rows add `columns: undefined, custom: false`. The built-ins' `options` is a function of
+  the state: call it (`options(state)`) to extend their palette. The text color goes into the
+  document as it is, a plain color (a theme swatch does not follow a later theme change); a
+  highlight outside Word's is written as shading. Keep text colors readable on white (4.5:1).
 
 Since 1.1 `toolbarItems` types its six boxes and three color menus as `ToolbarSelect` and
 `ToolbarColorMenu` (1.0 typed them `ToolbarButton`, with a `command` they never had). Types only:
