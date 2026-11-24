@@ -105,4 +105,71 @@ describe("inserting what is not text (23.6)", () => {
     session.editor.commands.rejectAllChanges();
     expect(text(session)).not.toMatch(/\[note\]|\[page break\]/);
   });
+
+  it("gives a picture or line paragraph none of its neighbour's properties (23.6 review)", () => {
+    const session = openSession(
+      createDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: { style: "Heading1" },
+            content: [{ type: "text", text: "Title" }],
+          },
+          { type: "paragraph", content: [{ type: "text", text: "Body" }] },
+        ],
+      }),
+      { author: "Agent" },
+    );
+    const [title] = handles(session) as [string];
+    expect(session.insertItem(title, { kind: "horizontalRule" }, { where: "before" }).ok).toBe(
+      true,
+    );
+    expect(
+      session.insertItem(
+        title,
+        { kind: "picture", data: png(10, 10), alt: "x" },
+        { where: "before" },
+      ).ok,
+    ).toBe(true);
+    const [picture, rule] = session.document().content.content ?? [];
+    expect(rule?.attrs?.style).toBeUndefined();
+    expect(picture?.attrs?.style).toBeUndefined();
+  });
+
+  it("reports a section break's two paragraphs, the text's first (23.6 review)", () => {
+    const session = open("A", "B");
+    const [a] = handles(session) as [string];
+    const done = session.insertItem(a, { kind: "sectionBreak" });
+    expect(done.ok && done.blocks.map((b) => b.text)).toEqual(["A", ""]);
+  });
+
+  it("refuses a picture whose header gives no size; takes one at the largest given size", () => {
+    const session = open("x");
+    const [x] = handles(session) as [string];
+    expect(session.insertItem(x, { kind: "picture", data: png(0, 0), alt: "a" }).ok).toBe(false);
+    const huge = session.insertItem(x, {
+      kind: "picture",
+      data: png(10, 10),
+      alt: "a",
+      width: 15840,
+      height: 15840,
+    });
+    expect(huge.ok).toBe(true);
+    expect(imageInfo(new TextEncoder().encode("GIF is a format"))).toBeNull();
+  });
+
+  it("leaves nothing when a picture or line is rejected (23.6 review)", () => {
+    for (const where of ["after", "before"] as const) {
+      const session = open("A", "B");
+      const [a] = handles(session) as [string];
+      expect(session.insertItem(a, { kind: "horizontalRule" }, { where }).ok).toBe(true);
+      expect(
+        session.insertItem(a, { kind: "picture", data: png(10, 10), alt: "x" }, { where }).ok,
+      ).toBe(true);
+      expect(session.document().content.content).toHaveLength(4);
+      session.editor.commands.rejectAllChanges();
+      expect(session.document().content.content).toHaveLength(2);
+    }
+  });
 });

@@ -68,7 +68,7 @@ tools and about 15,000 characters with schemas, `run` included.
 | 23.6 (`insert`)           |    18 |                  5,275 |       15,709 |                          19, 19,579 |
 
 `run`'s summary of `doc` grows with each method (23.3's eight added about 800 characters): the
-later tasks keep their method lines short. With `--code` the 15,000 aim was passed in 23.4: it
+later tasks keep their method lines short. With `--code` the 15,000 aim was passed in 23.4, and without it in 23.6: it
 is raised to about 22,000 for the phase (the four areas still to come cost about 1,500 each),
 which is still a small part of a model's context; a tool or method that does not earn its
 characters is cut in 23.9, when a fresh model has used them.

@@ -532,7 +532,6 @@ export interface ScriptMethod {
     effect?: "edit" | "insert" | "delete" | "fields";
     call(session: Session, args: readonly unknown[], host?: ToolHost): unknown;
 }
-/** A tool over any session: what `agentTools` binds, and what a server serves. */
 /**
  * What the app gives the tools that the document does not hold (23.6): a picture's bytes for a
  * path the model names. Without it, pictures are refused.
@@ -543,6 +542,7 @@ export interface ToolHost {
         contentType?: string;
     }>;
 }
+/** A tool over any session: what `agentTools` binds, and what a server serves. */
 export interface ToolDefinition {
     name: string;
     description: string;
