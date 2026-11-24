@@ -2,6 +2,7 @@ import { createDocument, trackedChanges } from "@folijs/core";
 import { exportDocx, importDocx } from "@folijs/docx";
 import { describe, expect, it } from "vitest";
 import { imageInfo, openSession, type Session } from "./index.js";
+import { base64 } from "./inserts.js";
 
 const open = (...texts: string[]) =>
   openSession(
@@ -25,6 +26,13 @@ function png(width: number, height: number): Uint8Array {
 }
 
 describe("inserting what is not text (23.6)", () => {
+  it("encodes base64 as the platform does", () => {
+    for (const n of [0, 1, 2, 3, 4, 5, 1000]) {
+      const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
+      expect(base64(bytes)).toBe(Buffer.from(bytes).toString("base64"));
+    }
+  });
+
   it("reads an image's size and type from its first bytes", () => {
     expect(imageInfo(png(800, 400))).toEqual({ width: 800, height: 400, contentType: "image/png" });
     const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x20, 0x00, 0x10, 0x00]);

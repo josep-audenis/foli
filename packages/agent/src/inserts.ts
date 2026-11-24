@@ -84,12 +84,24 @@ export function imageInfo(
   return null;
 }
 
-/** Bytes as base64, without Node's Buffer (the package runs anywhere core does). */
-function base64(bytes: Uint8Array): string {
-  let text = "";
-  for (let i = 0; i < bytes.length; i += 0x8000)
-    text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(text);
+const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/** @internal Bytes as base64, with no platform's encoder (the package runs anywhere core does). */
+export function base64(bytes: Uint8Array): string {
+  const out: string[] = [];
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i] as number;
+    const b = bytes[i + 1];
+    const c = bytes[i + 2];
+    const n = (a << 16) | ((b ?? 0) << 8) | (c ?? 0);
+    out.push(
+      B64[(n >> 18) & 63] as string,
+      B64[(n >> 12) & 63] as string,
+      b === undefined ? "=" : (B64[(n >> 6) & 63] as string),
+      c === undefined ? "=" : (B64[n & 63] as string),
+    );
+  }
+  return out.join("");
 }
 
 /** The body's text width in points, from the last section's page. */
