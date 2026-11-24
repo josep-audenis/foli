@@ -64,7 +64,7 @@ describe("the tools a client lists", () => {
     expect(listed.text).toMatch(/^\[c\d+\] /m);
     expect((await call("review", { action: "accept", ids: "all" })).refused).toBe(false);
     expect((await call("review", { action: "list" })).text).toBe(
-      "The document has no tracked changes.",
+      "The body has no tracked changes.",
     );
     await client.close();
   });

@@ -229,9 +229,15 @@ export interface Session {
   /** The body's tracked changes, a line each: `[c12] inserted, Bob (2026-11-20), in [b7]: "…"`. */
   changes(): Result<{ changes: ChangeInfo[]; text: string }>;
   /** Accepts changes by id, or "all" (every story too; `author`: only theirs). */
-  acceptChanges(ids: readonly number[] | "all", options?: ResolveOptions): Result<{ text: string }>;
+  acceptChanges(
+    ids: readonly number[] | "all",
+    options?: ResolveOptions | null,
+  ): Result<{ text: string }>;
   /** Rejects changes by id, or "all", as `acceptChanges` accepts them. */
-  rejectChanges(ids: readonly number[] | "all", options?: ResolveOptions): Result<{ text: string }>;
+  rejectChanges(
+    ids: readonly number[] | "all",
+    options?: ResolveOptions | null,
+  ): Result<{ text: string }>;
   /**
    * Formats paragraphs (one handle, or several: those next to each other become one list):
    * alignment, line spacing, space before and after, indentation (a list level in a list),

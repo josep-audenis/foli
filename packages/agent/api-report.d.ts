@@ -427,11 +427,11 @@ export interface Session {
         text: string;
     }>;
     /** Accepts changes by id, or "all" (every story too; `author`: only theirs). */
-    acceptChanges(ids: readonly number[] | "all", options?: ResolveOptions): Result<{
+    acceptChanges(ids: readonly number[] | "all", options?: ResolveOptions | null): Result<{
         text: string;
     }>;
     /** Rejects changes by id, or "all", as `acceptChanges` accepts them. */
-    rejectChanges(ids: readonly number[] | "all", options?: ResolveOptions): Result<{
+    rejectChanges(ids: readonly number[] | "all", options?: ResolveOptions | null): Result<{
         text: string;
     }>;
     /**

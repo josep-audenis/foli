@@ -53,9 +53,6 @@ type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, t
   cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting?, story? }   // column: the grid column; formatting: with blocks({ formatting: true })
 blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. blocks() is the body, blocks({ headers: true }) the headers' and footers' blocks after it (each with story); their handles (h1, f1) work with the methods too. The text of notes is not there.`;
 
-/** @internal `doc`'s summary on a server that does not review. */
-export const DOC_TYPES = docTypes();
-
 /**
  * @internal
  * How much a run may add to a document, in positions (a character or a block's edge each):

@@ -442,8 +442,9 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   counts its bytes in the session's weight; an app gives bytes. EXIF rotation is not applied to
   the size. No floating pictures, captions or picture from a URL.
 - Review (23.8) only in a session opened with `review: true` (the MCP server's `--review`): the
-  body's changes are listed and accepted or rejected by id; "all" reaches every story. A
-  header's or footer's changes are not listed one by one. Accepting or rejecting a change in a
+  body's changes are listed (300 at a time) and accepted or rejected by id; "all" reaches every
+  story. A header's, footer's or note's changes are counted, not listed one by one. An answer
+  names the changes that a locked content control kept, in whole or in part. Accepting or rejecting a change in a
   locked content control follows Word's rule (what leaves the text as it shows goes through). `session.editor` is the
   headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
