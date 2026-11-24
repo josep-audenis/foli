@@ -8,7 +8,7 @@ document model; your app keeps the transport, authentication and storage
 | Piece             | Where                                                              | What it does                                                                      |
 | ----------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
 | The authority     | `@folijs/collab`, on your server                                   | Orders every step, validates it by applying it, gives what to broadcast and store |
-| The client plugin | `collab`, `sendableSteps`, `receiveTransaction` in `@folijs/core`  | Sends its steps, rebases them over the others', keeps undo to its own changes     |
+| The client plugin | `collab`, `sendableSteps`, `receiveBroadcast` in `@folijs/core`    | Sends its steps, rebases them over the others', keeps undo to its own changes     |
 | Presence          | `presenceMessage`, `receivePresence`, `presence` in `@folijs/core` | Who else edits, in what colour and where; drawn by `EditorView`                   |
 | The transport     | yours                                                              | WebSocket, SSE, HTTP, a queue: JSON messages                                      |
 | Who may edit      | yours (`authorize`)                                                | A read-only user's steps refused                                                  |
@@ -128,9 +128,11 @@ which:
 
 So a broadcast fits an editor when `broadcast.version === getVersion(editor.state)`; after it the
 editor is at `broadcast.version + broadcast.steps.length`. The sender gets its own broadcast too:
-that is how its steps are confirmed and its version moves. `receiveTransaction` does not check
-the version: apply a broadcast only when it fits, keep one from later until those before it
-arrive, and drop one from before (the editor has it).
+that is how its steps are confirmed and its version moves. `receiveBroadcast(state, broadcast)`
+checks it: it applies the part the editor lacks (`applied`, with the transaction to dispatch),
+says `had` for one it has, and `gap` for one from later (ask for `stepsSince` the editor's
+version). `receiveTransaction` checks only when given the broadcast's version as its fourth
+argument, and throws when it does not fit.
 
 ## My edits stop
 

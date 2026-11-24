@@ -31,7 +31,7 @@ or [`@folijs/view`](https://www.npmjs.com/package/@folijs/view).
 - [Document format](https://github.com/josep-audenis/foli/blob/main/docs/document-model.md)
 - [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#folijscore)
 - [Real-time collaboration](https://github.com/josep-audenis/foli/blob/main/docs/guides/collaboration.md):
-  the client side (`collab`, `sendableSteps`, `receiveTransaction`, `getVersion`, presence);
+  the client side (`collab`, `sendableSteps`, `receiveBroadcast`, `getVersion`, presence);
   read its Versions section before wiring a transport
 - [Known limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md)
 

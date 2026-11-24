@@ -395,8 +395,11 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
 - **Convergence is tested, not proven.** The property test (2–5 clients, 10–40 random edits a run,
   1000 runs) passes; a heavier run of it (30–80 edits, eight seeds of 1000 runs) found one case in
   8000 where a client ended with a bold mark the others did not have (bold, deletions and undo
-  close together), which did not replay alone. Not fixed in 1.6: such a client stays apart until
-  it loads the authority's snapshot again (a reload).
+  close together), which did not replay alone. 24.2's run over an unreliable channel (2–4
+  clients, 30–60 edits) meets it about once in 4000 runs and shrank one that replays alone: two
+  clients bolding overlapping text, deletions and an undo. It is pinned as an expected failure in
+  `collab.property.test.ts`, and that run uses a fixed seed. Not fixed yet: such a client stays apart
+  until it loads the authority's snapshot again (a reload).
 - The agent library and the MCP server do not edit a shared document.
 - Not tried by hand: a document edited together and exported opened in Word (the e2e reads it
   back with `@folijs/docx`).

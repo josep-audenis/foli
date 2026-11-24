@@ -909,11 +909,19 @@ Real-time editing by several people through a central authority (1.6, ADR-0012; 
   of their own, `id ≡ clientID mod 256`). `CollabOptions`.
 - `sendableSteps(state)`: `{ version, steps, clientID }` (`SendableSteps`) to send, or null when
   every step of this editor is confirmed. Send `steps.map((s) => s.toJSON())`.
-- `receiveTransaction(state, steps, clientIDs)`: the transaction that applies steps the
+- `receiveBroadcast(state, broadcast)` (24.2): a broadcast as received (`BroadcastJSON`: its
+  `version`, JSON steps and `clientIDs`) checked against this editor's version.
+  `ReceivedBroadcast`: `{ status: "applied", transaction }` (dispatch it; a broadcast that
+  overlaps what the editor has applies only the part it lacks), `{ status: "had" }` (nothing
+  to do) or `{ status: "gap", version, from }` (ask the authority for the steps since
+  `version`). Throws a `RangeError` on a broadcast that is not one.
+- `receiveTransaction(state, steps, clientIDs, from?)`: the transaction that applies steps the
   authority broadcast from this editor's version (`Step.fromJSON` each); dispatch it. This
   editor's own steps among them are confirmed; the others are applied, its unconfirmed steps
   rebased over them. It is `remote`: not undoable, not tracked; undo maps the user's own changes
   over it. Apply broadcasts in version order (keep a later one until those before it arrive).
+  Given `from` (the broadcast's version), it throws a `RangeError` naming both when it is not the
+  editor's; `receiveBroadcast` does that check and more.
 - `getVersion(state)`: the authority's version this editor has.
 - Authorship (22.10): each editor's tracked changes and comments carry its own `author`; a
   received step keeps the author it was made with (it is not tracked again). The tracking switch

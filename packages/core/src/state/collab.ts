@@ -8,7 +8,7 @@
  */
 import type { Node } from "../model/index.js";
 import type { Mappable } from "../transform/stepmap.js";
-import { AddMarkStep, RemoveMarkStep, type Step } from "../transform/steps.js";
+import { AddMarkStep, RemoveMarkStep, Step, type StepJSON } from "../transform/steps.js";
 import type { CommentJSON } from "../v3/document.js";
 import { collabKey, idSlot } from "./ids.js";
 import type { SelectionJSON } from "./selection.js";
@@ -229,14 +229,20 @@ export function sendableSteps(state: EditorState): SendableSteps | null {
  * its order, `clientIDs[i]` the author of `steps[i]`): dispatch it. This editor's own steps
  * among them are confirmed; the others are applied, its unconfirmed steps rebased over them.
  * It is `remote`: not undoable, not tracked, nothing appended; history maps over it. The version
- * is not checked: give it only a broadcast whose `version` is `getVersion(state)`, once.
+ * is checked only when given (`version`, the broadcast's): a `RangeError` when it is not the
+ * editor's. `receiveBroadcast` takes a broadcast as received and checks it.
  */
 export function receiveTransaction(
   state: EditorState,
   steps: readonly Step[],
   clientIDs: readonly (string | number)[],
+  from?: number,
 ): Transaction {
   const current = stateOf(state);
+  if (from !== undefined && from !== current.version)
+    throw new RangeError(
+      `receiveTransaction: steps from version ${from}, the editor is at ${current.version}`,
+    );
   const version = current.version + steps.length;
   // The authority keeps one client's steps together, in order: ours come first.
   let ours = 0;
@@ -291,6 +297,48 @@ export function receiveTransaction(
   const comments = applyCommentSteps(commentsOf(state), tr.steps.slice(0, start));
   unconfirmed = inversesOf(rebased, tr.docs.slice(start), comments);
   return tr.setMeta(collabKey, { ...current, version, unconfirmed });
+}
+
+/** A broadcast as an authority sends it: steps from `version` (the version before them). */
+export interface BroadcastJSON {
+  readonly version: number;
+  readonly steps: readonly StepJSON[];
+  readonly clientIDs: readonly (string | number)[];
+}
+
+/**
+ * What `receiveBroadcast` found. `applied`: dispatch `transaction`. `had`: the editor has all of
+ * it (a duplicate, or a catch-up it already received). `gap`: steps between the editor's
+ * `version` and the broadcast's `from` are missing: ask the authority for those since `version`.
+ */
+export type ReceivedBroadcast =
+  | { readonly status: "applied"; readonly transaction: Transaction }
+  | { readonly status: "had" }
+  | { readonly status: "gap"; readonly version: number; readonly from: number };
+
+/**
+ * A broadcast (as received: JSON steps), checked against this editor's version: the part it
+ * lacks applied, nothing applied twice, a gap said. Throws a `RangeError` on a broadcast that is
+ * not one (a version that is not a non-negative integer, `steps` and `clientIDs` of different
+ * lengths) and a `FoliDocumentError` on a step that is not one of this schema.
+ */
+export function receiveBroadcast(state: EditorState, broadcast: BroadcastJSON): ReceivedBroadcast {
+  const version = stateOf(state).version;
+  if (typeof broadcast !== "object" || broadcast === null)
+    throw new RangeError("receiveBroadcast: not a broadcast");
+  const { version: from, steps, clientIDs } = broadcast;
+  if (!Number.isSafeInteger(from) || from < 0)
+    throw new RangeError(`receiveBroadcast: version ${from} is not a version`);
+  if (!Array.isArray(steps) || !Array.isArray(clientIDs) || steps.length !== clientIDs.length)
+    throw new RangeError("receiveBroadcast: steps and clientIDs differ in length");
+  if (from > version) return { status: "gap", version, from };
+  const skip = version - from;
+  if (skip >= steps.length) return { status: "had" };
+  const parsed = steps.slice(skip).map((json) => Step.fromJSON(state.schema, json));
+  return {
+    status: "applied",
+    transaction: receiveTransaction(state, parsed, clientIDs.slice(skip), version),
+  };
 }
 
 /** `peers` with their selections moved through `mapping` (clamped into a document of `size`). */
