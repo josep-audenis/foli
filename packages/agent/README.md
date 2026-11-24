@@ -131,8 +131,9 @@ session.formatParagraphs("b6", { indent: "more" }); // in a list: a level deeper
 ## Headers and footers
 
 `read({ headers: true })` adds the headers and footers after the body, each under a line saying
-where it is used. Their blocks' handles are `h1`…, `f1`…, and every operation takes them (but
-`comment`: Word keeps no comments there).
+where it is used (in a read in parts, after its last part). Their blocks' handles are `h1`…,
+`f1`…, and the operations take them, but for `comment` (Word keeps no comments there), breaks
+and notes; a header's content controls are not listed or filled.
 
 ```ts
 session.read({ headers: true });
@@ -265,7 +266,7 @@ const answer = tools.find((t) => t.name === call.name)?.run(call.arguments);
 ```
 
 `run` checks the arguments against the schema and answers in words when they do not fit.
-`AGENT_TOOLS` are the same tools over any session (`run(session, args)`), for an app that holds
+`AGENT_TOOLS` are the same tools over any session (`run(session, args, host?)`), for an app that holds
 several: check a call's arguments with `invalid(args, tool.inputSchema)` first, as `agentTools`
 does. Limits on how much a model may add are the app's (the MCP server has its own). `@folijs/mcp` serves these tools to MCP clients, over `.docx` files in a folder, and
 its code mode gives a script the same operations.

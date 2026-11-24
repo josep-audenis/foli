@@ -83,7 +83,8 @@ instructions and in each tool's description; no system prompt is needed.
 
 ## What it does to your files
 
-- It reads and writes **`.docx` files under the root only**, by names relative to it. A path
+- It reads and writes **`.docx` files under the root only**, by names relative to it, and
+  reads pictures there for `insert` (`.png`, `.jpg`, `.jpeg`, `.gif`, up to 16 MB). A path
   that leaves the root, by `..`, an absolute path or a link, is refused.
 - **`save` does not write over your document.** Without a path it writes a new file beside the
   original: `contract.docx` → `contract.agent.docx` (`contract.agent-2.docx` if that is
@@ -134,8 +135,9 @@ documents, as tracked changes.
 - No pages: `update_fields` leaves page numbers as they are, and a table of contents too
   unless asked (`contents`), when its page numbers come back empty until Word updates it.
 - One client, over stdin and stdout. No network transport.
-- What the library does not do, the server does not: no tables or pictures inserted, no
-  formatting of text, no accepting or rejecting changes.
+- What the library does not do, the server does not: no columns added or deleted, no cells
+  merged or split, no column widths (none can be a tracked change), no floating pictures, no
+  superscript or subscript.
   [Limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md#the-mcp-server-folijsmcp).
 
 ## As a library

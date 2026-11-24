@@ -3160,7 +3160,7 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
  * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
- * formatting, ADR-0013).
+ * formatting, Phase 23 task 23.2).
  */
 export declare const SCHEMA_VERSION = 8;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */

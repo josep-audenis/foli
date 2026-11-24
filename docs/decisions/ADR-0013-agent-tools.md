@@ -12,7 +12,7 @@
 ## Decision
 
 1. **The definitions are `@folijs/agent`'s.** `AGENT_TOOLS` lists each tool once, over any
-   session: `name`, `description`, `inputSchema`, `run(session, args)` and its code-mode
+   session: `name`, `description`, `inputSchema`, `run(session, args, host?)` (`host`: a picture's bytes by path) and its code-mode
    `methods` (name, the line a script is told, what a run counts of it, the call).
    `agentTools(session)` binds them to one session and checks a call's arguments against the
    schema (`invalid`, moved from the server with the `JsonSchema` types), answering the model in
@@ -27,7 +27,7 @@
    server.
 3. **One tool per area, an `action` field.** Every tool's description costs the model context
    on every call, so Phase 23 adds few tools: `edit_table`, `format_text`, `format_paragraph`,
-   `insert` and, behind an option, the review tools (23.3–23.8). Headers and footers (23.7) need
+   `insert` and, behind an option, the review tool (23.3–23.8; only for a session that reviews, `toolsFor`). Headers and footers (23.7) need
    no tool: their blocks get handles, marked with their story in a read, and the existing tools
    take them. Code mode gets a method per action, where a call costs nothing in descriptions.
 4. **How a handle names part of a table.** A table is named by its own handle (the
@@ -38,8 +38,8 @@
    double the lines of a read. The indexes are `read`'s, and the table tools resolve them by the
    same walk: rows as they are with every change accepted (a row deleted as a tracked change is
    not counted), columns of the grid. A column inside a span names the spanning cell; a cell
-   merged up names the top cell of its merge, which holds the text. `read` does not count a
-   row's `gridBefore` today; 23.3 makes it, so that `c` is the grid column core counts.
+   merged up names the top cell of its merge, which holds the text. `read` counts a row's
+   `gridBefore` (23.3), so that `c` is the grid column core counts.
 5. **How `on` names text for formatting.** As `comment` already does: `on` is text of the block
    exactly as `read` shows it, there once, or with `all` every place it is. Without `on` the
    whole block is formatted. Positions are never asked of a model.
@@ -66,10 +66,11 @@ tools and about 15,000 characters with schemas, `run` included.
 | 23.4 (`format_text`)      |    16 |                  4,262 |       12,646 |                          17, 16,262 |
 | 23.5 (`format_paragraph`) |    17 |                  4,777 |       14,036 |                          18, 17,702 |
 | 23.6 (`insert`)           |    18 |                  5,275 |       15,709 |                          19, 19,579 |
+| 23.10 (the phase's end)   |    18 |                      — |       16,960 |                          19, 21,258 |
 
 `run`'s summary of `doc` grows with each method (23.3's eight added about 800 characters): the
 later tasks keep their method lines short. With `--code` the 15,000 aim was passed in 23.4, and without it in 23.6: it
-is raised to about 22,000 for the phase (the four areas still to come cost about 1,500 each),
+is raised to about 22,000 for the phase. At its end: 18 tools and 16,960 characters with schemas; 19 and 21,258 with `--code`; 19 and 17,976 with `--review`; 20 and 22,488 with both, the instructions 1,631 (the four areas still to come cost about 1,500 each),
 which is still a small part of a model's context; a tool or method that does not earn its
 characters is cut in 23.9, when a fresh model has used them.
 
@@ -77,7 +78,7 @@ characters is cut in 23.9, when a fresh model has used them.
 
 - `@folijs/agent` gains a public surface (`AGENT_TOOLS`, `agentTools`, `INSTRUCTIONS`,
   `READ_LIMIT`, `invalid`, the `JsonSchema` types, `AgentTool`, `ToolDefinition`,
-  `ScriptMethod`, `ToolAnswer`): changing a description, or what code mode counts of a method,
+  `ScriptMethod`, `ToolAnswer`, `ToolHost`, `toolsFor`): changing a description, or what code mode counts of a method,
   is now a change to the agent package, released with it (0.x).
 - `agentTools` has no limit on how much a model adds; the app sets its own, as the server does.
 - The server and code mode cannot drift from the library: a tool or a method is added once.
