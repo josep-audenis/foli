@@ -44,5 +44,5 @@ broadcast's steps: a client applies it when `broadcast.version === getVersion(ed
 one from later until those before it arrive, and drops one it already has. `received.version` is
 the authority's version _after_ them. Broadcast to everyone, the sender too: its own broadcast is
 how its steps are confirmed. A client that skips it, applies a broadcast twice or drops a `stale`
-refusal is refused as `stale` from then on: see the guide's
+refusal is refused as `stale` until it catches up, or for good: see the guide's
 [My edits stop](https://github.com/josep-audenis/foli/blob/main/docs/guides/collaboration.md#my-edits-stop).

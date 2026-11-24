@@ -134,8 +134,10 @@ arrive, and drop one from before (the editor has it).
 
 ## My edits stop
 
-An editor whose version is off sends steps the authority refuses as `stale`, every time. It looks
-like "the first character works, then nothing". What causes it:
+An editor whose version is off sends steps the authority refuses as `stale`. One that catches up on
+`stale` recovers; one that also drops the refusal, or is ahead of the authority (only a snapshot
+brings it back), stops for good. It looks like "the first character works, then nothing". What
+causes it:
 
 - **The sender skips its own broadcast** (sending to the others only). Its steps stay
   unconfirmed and its version stays behind.
@@ -143,7 +145,8 @@ like "the first character works, then nothing". What causes it:
   broadcast already received. Compare `broadcast.version` with `getVersion` first.
 - **`received.version` sent as the broadcast's version.** It is the version after the steps.
 - **Refusals dropped.** On `stale`, ask for `stepsSince(getVersion(editor.state))`, apply it,
-  then send again (the steps are rebased). Any other reason comes back for the same steps: stop
+  then send again (the steps are rebased). When it gives `{ snapshot }` (the log no longer has the
+  steps, or the editor is ahead: a broadcast applied twice), create the editor again from it. Any other reason comes back for the same steps: stop
   sending them and tell the user.
 - **A new editor at version 0** for a document the authority has at another version: create it
   with `collab({ version: snapshot.version })`, the version of the snapshot it loads.
