@@ -93,7 +93,17 @@ export function createHub(authority: Authority): Hub {
       ];
       if (type === "steps") {
         const { version, steps } = value as { version?: unknown; steps?: unknown };
-        const result = authority.receive({ version, steps, clientID } as never, clientID);
+        let result: ReturnType<Authority["receive"]>;
+        try {
+          result = authority.receive({ version, steps, clientID } as never, clientID);
+        } catch (error) {
+          // A step's own code throwing (an extension's): refused, not the app's server down.
+          return refused(
+            "invalid",
+            authority.version,
+            error instanceof Error ? error.message : undefined,
+          );
+        }
         if (result.ok) return [{ to: "everyone", message: { type: "steps", ...result.broadcast } }];
         return refused(result.reason, result.version, result.message);
       }
@@ -103,9 +113,10 @@ export function createHub(authority: Authority): Hub {
         try {
           size = JSON.stringify(value).length;
         } catch {
-          return refused("malformed", authority.version);
+          return [];
         }
-        if (size > PRESENCE_SIZE) return refused("too-large", authority.version);
+        // Dropped, not refused: a refusal is about steps, and its client would stop sending them.
+        if (size > PRESENCE_SIZE) return [];
         // Who it is is the connection's to say; the receiving editors check the rest.
         const relayed: HubMessage = { ...(value as object), type: "presence", clientID };
         presence.set(String(clientID), relayed);

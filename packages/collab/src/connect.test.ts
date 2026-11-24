@@ -267,14 +267,28 @@ describe("connect and createHub (24.3)", () => {
 
   it("the hub refuses what is not a message, without throwing", () => {
     const net = new Net();
-    for (const bad of [
-      "{",
-      "null",
-      "[]",
-      { type: "nope" },
-      { type: "steps" },
-      { type: "presence", x: "y".repeat(5000) },
-    ])
+    for (const bad of ["{", "null", "[]", { type: "nope" }, { type: "steps" }])
       expect(net.hub.receive(bad, 1)[0]?.message.type).toBe("refused");
+    // A presence too big is dropped, not refused: a refusal would stop the client's steps.
+    expect(net.hub.receive({ type: "presence", x: "y".repeat(5000) }, 1)).toEqual([]);
+  });
+
+  it("a long name neither stops the connection nor reaches the others whole", () => {
+    const net = new Net();
+    const a = net.join(1);
+    const b = net.join(2);
+    a.connection.destroy();
+    a.connection = connect(a.editor, {
+      send: (message) => a.outbox.push(JSON.parse(JSON.stringify(message))),
+      name: "N".repeat(5000),
+      color: "#123456",
+      onError: (reason) => a.errors.push(reason),
+    });
+    a.editor.select(2);
+    type(a, 1, "x");
+    net.settle();
+    expect(a.errors).toEqual([]);
+    expect(text(b)).toBe("xHello world");
+    expect(presence(b.editor.state)[0]?.name).toHaveLength(100);
   });
 });

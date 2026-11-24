@@ -46,7 +46,8 @@ export interface Connection {
  * hub through `send` and `receive`: the app gives each message from the hub to `receive`.
  */
 export function connect(editor: Editor, options: ConnectOptions): Connection {
-  const who = { name: options.name, color: options.color };
+  // At most what the others show (100 characters): a long name would only weigh on every message.
+  const who = { name: [...options.name].slice(0, 100).join(""), color: options.color };
   const clientID: ClientID = presenceMessage(editor.state, who).clientID;
   /** The version a batch was sent from, while it waits for its broadcast or refusal. */
   let inFlight: number | null = null;
@@ -115,7 +116,9 @@ export function connect(editor: Editor, options: ConnectOptions): Connection {
       if (result.status === "had") return sendSteps();
       editor.dispatch(result.transaction);
       // Its own steps confirmed: the next batch can go.
-      if (m.clientIDs.some((id) => String(id) === String(clientID))) inFlight = null;
+      // Its own steps confirmed (the batch in flight, at its version): the next batch can go.
+      if (inFlight !== null && String(m.clientIDs[inFlight - m.version]) === String(clientID))
+        inFlight = null;
       sendSteps();
       sendPresence();
     } else if (m.type === "refused") {

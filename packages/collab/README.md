@@ -64,7 +64,9 @@ socket.onreconnect = () => connection.resume();
 
 `connect` sends one batch at a time, checks every broadcast against the editor's version,
 catches up after a gap or a `stale` refusal and sends and shows presence (`EditorView` draws the
-others' carets).
+others' carets). A presence message over 4000 characters is dropped by the hub (a name is cut
+to 100 characters before it is sent). Each `catchup` answers with steps or a whole snapshot: rate-limit
+them per connection when clients may be hostile.
 
 The client side is `collab`, `sendableSteps`, `receiveBroadcast` and `getVersion` in
 `@folijs/core`. Refusals: `stale`, `malformed`, `invalid` (a step does not apply, or an envelope
