@@ -90,14 +90,14 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      */
     initialContent?: EditorDocument | undefined;
     /**
-     * Read once on mount: a different list later is ignored, with a warning unless
-     * `process.env.NODE_ENV` is `"production"` at run time (`useFoliEditor`). To change them, give
-     * `FoliEditor` a new `key`.
+     * The editor's plugins: a different list later replaces them in place (`editor.reconfigure`,
+     * `useFoliEditor`), keeping the document and undo; joining or leaving a shared session is one.
      */
     plugins?: readonly Plugin[] | undefined;
     /**
-     * Read once on mount, as `plugins`: custom nodes and marks with their view hooks
-     * (`ViewExtension`).
+     * Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). A
+     * different list later is ignored, with a warning unless `process.env.NODE_ENV` is
+     * `"production"` at run time; give `FoliEditor` a new `key` to change them.
      */
     extensions?: readonly Extension[] | undefined;
     /** Read once on mount: who edits (tracked changes are made in this name). */
@@ -516,14 +516,16 @@ export interface UseFoliEditorOptions {
      */
     initialContent?: EditorDocument | undefined;
     /**
-     * Read once, when the editor is created. A different list later (other plugins, not a new
-     * array of the same ones) is ignored, with a warning unless `process.env.NODE_ENV` is
-     * `"production"` at run time: give the component a new `key` to make a new editor with it.
+     * The editor's plugins. A different list later (other plugins, not a new array of the same
+     * ones) replaces them in place (`editor.reconfigure`): the document, the selection, undo and
+     * the state of plugins in both lists stay. Joining or leaving a shared session is a new list.
      */
     plugins?: readonly Plugin[] | undefined;
     /**
      * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
-     * `@folijs/view`), as `createEditor`'s `extensions`. Changed later: as `plugins`.
+     * `@folijs/view`), as `createEditor`'s `extensions`. A different list later is ignored, with a
+     * warning unless `process.env.NODE_ENV` is `"production"` at run time: give the component a
+     * new `key` to make a new editor with it.
      */
     extensions?: readonly Extension[] | undefined;
     /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
@@ -536,7 +538,7 @@ export interface UseFoliEditorOptions {
 /**
  * A headless `Editor` (state, commands, history) of a schema v3 document, owned by the calling
  * component: created on the first render and kept for its lifetime. Later changes to `options`
- * are ignored. Throws FoliDocumentError when `initialContent` is not a valid document.
+ * are ignored, but for `plugins` (applied with `editor.reconfigure`). Throws FoliDocumentError when `initialContent` is not a valid document.
  */
 export declare function useFoliEditor(options?: UseFoliEditorOptions): Editor;
 /** Makes `editor` the one `useCurrentEditor`, `useEditorState` and `FoliCanvas` use below it. */

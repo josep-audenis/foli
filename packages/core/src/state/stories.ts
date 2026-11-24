@@ -168,6 +168,9 @@ export function editTrees(
 /** @internal */
 export type StoryListener = (state: EditorState, transactions: readonly Transaction[]) => void;
 
+/** Where the body's plugins start in a story's (after `storyBodyKey`'s and the filter). */
+const OWN_AT = 2;
+
 /**
  * A story's editing state, kept in step with the body.
  * @internal
@@ -220,6 +223,12 @@ export class StoryEditing {
         ...host.plugins(context, trackState(host.state)),
       ],
     });
+  }
+
+  /** Its plugins, the body's own (after the two of the story's here) swapped by `swap`. */
+  reconfigure(swap: (plugins: readonly Plugin[], at: number) => readonly Plugin[]): void {
+    this.state = this.state.reconfigure(swap(this.state.plugins, OWN_AT));
+    this.notify([]);
   }
 
   private notify(transactions: readonly Transaction[]): void {

@@ -4,6 +4,7 @@ import {
   createDocument,
   createEditor,
   deleteSelection,
+  type Editor,
   type FoliDocument,
   insertText,
   type OpenStory,
@@ -1198,23 +1199,29 @@ describe("plugins changed after mount", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the editor, and warns once when the list really changed", () => {
+  it("keeps the editor and its document, and takes the new list in place (24.5)", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const editors: unknown[] = [];
-    const ref = (handle: { editor: unknown } | null) => {
+    const editors: Editor[] = [];
+    const ref = (handle: { editor: Editor } | null) => {
       if (handle) editors.push(handle.editor);
     };
     const { rerender } = render(
       <FoliEditor ref={ref} initialContent={doc()} plugins={[shouting]} />,
     );
+    const editor = editors[0] as Editor;
+    const before = editor.state.doc;
     // A new array of the same plugins is no change.
+    const plugins = editor.state.plugins;
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[shouting]} />);
-    expect(warn).not.toHaveBeenCalled();
+    expect(editor.state.plugins).toBe(plugins);
     const other = new Plugin({ key: new PluginKey("other") });
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[shouting, other]} />);
+    expect(editor.state.plugins).toContain(other);
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[other]} />);
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn.mock.calls[0]?.[0]).toContain("`plugins` changed after the editor was created");
+    expect(editor.state.plugins).not.toContain(shouting);
+    expect(editor.state.plugins).toContain(other);
+    expect(editor.state.doc).toBe(before);
+    expect(warn).not.toHaveBeenCalled();
     expect(new Set(editors).size).toBe(1);
   });
 

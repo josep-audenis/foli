@@ -44,7 +44,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | Prop              | Type                                                                                                     | Default      | Notes                                                                                                                                            |
 | ----------------- | -------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `initialContent`  | `EditorDocument`                                                                                         | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                                                       |
-| `plugins`         | `readonly Plugin[]`                                                                                      | `[]`         | Read once, on mount. Other plugins later: ignored, with a dev warning (`useFoliEditor`); use a new `key`.                                        |
+| `plugins`         | `readonly Plugin[]`                                                                                      | `[]`         | Other plugins later replace them in place (`editor.reconfigure`): document and undo stay.                                                        |
 | `extensions`      | `readonly Extension[]`                                                                                   | `[]`         | Read once, on mount, as `plugins`: custom nodes and marks, with their view hooks (`ViewExtension`).                                              |
 | `author`          | `string`                                                                                                 | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                                                                    |
 | `trackChanges`    | `boolean`                                                                                                | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                                                                    |
@@ -547,7 +547,10 @@ This whole section is internal (`@folijs/core/internal`): the renderers and `.do
 `createEditor({ document?, plugins?, extensions?, author?, trackChanges?, reviewView? }): Editor`: a headless editor (state, commands, undo
 history, change notifications) of a Word's model document (schema v5). The document is
 validated and, when saved by 0.1.0 to 0.5.0, migrated (`parseDocument`; default:
-`createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
+`createDocument()`); `setDocument` behaves the same way. `editor.reconfigure({ plugins })` (24.5)
+replaces the plugins it was made with and keeps the document, the selection, undo and the state of
+the plugins in both lists (the same instance); its stories' editors and `commands` follow, and a
+command name taken twice throws, changing nothing. `EditorDocument` is what both take:
 `FoliDocument | FoliDocumentV2`. The editor keeps its styles, numbering and sections,
 `getDocument()` returns a v5 document (a copy) and `settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
 inch margins where the section leaves them out). The commands edit as Word does: Enter
