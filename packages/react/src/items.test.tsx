@@ -4,6 +4,7 @@ import {
   createDocument,
   createEditor,
   deleteSelection,
+  type Editor,
   type FoliDocument,
   insertText,
   type OpenStory,
@@ -34,6 +35,7 @@ import {
   toolbarItems,
   useCommand,
   useEditorState,
+  useFoliEditor,
 } from "./index.js";
 
 declare module "@folijs/core" {
@@ -1178,19 +1180,36 @@ describe("useCommand", () => {
     expect(button.disabled).toBe(true);
   });
 
-  it("throws for a name the editor does not have", () => {
+  it("is disabled for a name the editor does not have, until a plugin gives it (24.5)", () => {
     const editor = createEditor({ document: doc() });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() =>
-      render(
-        <FoliEditorProvider editor={editor}>
-          <ShoutButton />
-        </FoliEditorProvider>,
-      ),
-    ).toThrow('the editor has no command named "shout"');
-    vi.restoreAllMocks();
+    render(
+      <FoliEditorProvider editor={editor}>
+        <ShoutButton />
+      </FoliEditorProvider>,
+    );
+    const button = screen.getByRole("button") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    act(() => editor.reconfigure({ plugins: [shouting] }));
+    expect(button.disabled).toBe(false);
+    act(() => fireEvent.click(button));
+    expect(text(editor)).toBe("HEY Hello");
+    // Its plugin taken away: the command goes with it.
+    act(() => editor.reconfigure({ plugins: [] }));
+    expect(button.disabled).toBe(true);
+  });
+
+  it("a command of a plugin added in the same render does not throw", () => {
+    const { rerender } = render(<ShoutingApp on={false} />);
+    act(() => rerender(<ShoutingApp on={true} />));
+    expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
   });
 });
+
+/** An editor whose `shouting` plugin comes with the button that runs its command. */
+function ShoutingApp({ on }: { on: boolean }) {
+  const editor = useFoliEditor({ initialContent: doc(), plugins: on ? [shouting] : [] });
+  return <FoliEditorProvider editor={editor}>{on && <ShoutButton />}</FoliEditorProvider>;
+}
 
 describe("plugins changed after mount", () => {
   afterEach(() => {
@@ -1198,23 +1217,29 @@ describe("plugins changed after mount", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the editor, and warns once when the list really changed", () => {
+  it("keeps the editor and its document, and takes the new list in place (24.5)", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const editors: unknown[] = [];
-    const ref = (handle: { editor: unknown } | null) => {
+    const editors: Editor[] = [];
+    const ref = (handle: { editor: Editor } | null) => {
       if (handle) editors.push(handle.editor);
     };
     const { rerender } = render(
       <FoliEditor ref={ref} initialContent={doc()} plugins={[shouting]} />,
     );
+    const editor = editors[0] as Editor;
+    const before = editor.state.doc;
     // A new array of the same plugins is no change.
+    const plugins = editor.state.plugins;
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[shouting]} />);
-    expect(warn).not.toHaveBeenCalled();
+    expect(editor.state.plugins).toBe(plugins);
     const other = new Plugin({ key: new PluginKey("other") });
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[shouting, other]} />);
+    expect(editor.state.plugins).toContain(other);
     rerender(<FoliEditor ref={ref} initialContent={doc()} plugins={[other]} />);
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn.mock.calls[0]?.[0]).toContain("`plugins` changed after the editor was created");
+    expect(editor.state.plugins).not.toContain(shouting);
+    expect(editor.state.plugins).toContain(other);
+    expect(editor.state.doc).toBe(before);
+    expect(warn).not.toHaveBeenCalled();
     expect(new Set(editors).size).toBe(1);
   });
 

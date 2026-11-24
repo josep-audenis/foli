@@ -167,9 +167,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   after giving it to `createEditor`, `parseDocument` or `exportDocx`; make a new one.
 - `PluginSpec` is frozen for 1.x; the history plugin's state is internal, and collaboration is
   not part of 1.0 (steps, maps and mapping are public, which a later package needs).
-- `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
-  after mount does not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run time, which a bundle without `process` always shows; a new `key` makes a
-  new editor, losing undo history and the selection).
+- `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them after mount does
+  not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run
+  time, which a bundle without `process` always shows; a new `key` makes a new editor, losing undo
+  history and the selection). `plugins` follow the prop since 24.5 (`editor.reconfigure`).
 - A toolbar wider than its place wraps, or with `overflow="menu"` puts whole groups under
   More: a group wider than the toolbar is then in the panel whole (its items are not split),
   and a change of an item's own width (a box showing a longer value, a late font) is not

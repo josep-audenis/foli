@@ -299,6 +299,15 @@ export interface Editor {
   getDocument(): FoliDocument;
   /** Replaces the whole document (an older one migrated) and resets history. */
   setDocument(document: EditorDocument): void;
+  /**
+   * Replaces the plugins the editor was made with (`EditorOptions.plugins`) and keeps the
+   * document, the selection, undo history and the state of every plugin in both lists (the same
+   * instance): one added starts from its `init`, one left out is dropped. Its stories' editors
+   * follow; extensions' plugins and the built-in ones stay. Starting or leaving a shared session
+   * (`collab`) without making the editor again. Throws, changing nothing, on a command name taken
+   * twice.
+   */
+  reconfigure(options: { plugins: readonly Plugin[] }): void;
   subscribe(listener: EditorListener): () => void;
   /**
    * An editor over a story (a header, footer or note) by id, null when there is none. It has its
@@ -377,7 +386,11 @@ interface EditorParts {
   storyChanged(): void;
   extensions: readonly Extension[];
   /** The user's and extensions' plugins: their `commands` join the built-in ones. */
-  plugins: readonly Plugin[];
+  plugins(): readonly Plugin[];
+  /** `plugins` with the extensions' after them, as `plugins()` would give them. */
+  withExtensions(plugins: readonly Plugin[]): readonly Plugin[];
+  /** Makes `plugins` (with the extensions') the editor's own, in the body and its stories. */
+  reconfigure(plugins: readonly Plugin[]): void;
 }
 
 function makeEditor(parts: EditorParts): Editor {
@@ -397,7 +410,7 @@ function makeEditor(parts: EditorParts): Editor {
     ];
   };
   // Each named command as a factory, so `editorCommand` can give it for a dry run.
-  const factories = withPluginFactories(parts.plugins, {
+  const builtIns: BuiltInFactories = {
     insertText: (text) => insertText(text),
     deleteSelection: () => deleteSelection,
     deleteBackward: (unit) => deleteBackward(unit),
@@ -447,7 +460,20 @@ function makeEditor(parts: EditorParts): Editor {
           done = true;
       return done;
     },
-  });
+  };
+  /** The commands, made again when the plugins change (`reconfigure`). */
+  let made: { plugins: readonly Plugin[]; factories: Factories; commands: FoliCommands } | null =
+    null;
+  const current = () => {
+    const plugins = parts.plugins();
+    if (made?.plugins !== plugins) {
+      const factories = withPluginFactories(plugins, builtIns);
+      made = { plugins, factories, commands: commandsOf(factories, run) };
+    }
+    return made;
+  };
+  // A command name taken twice throws here, when the editor is made.
+  current();
   const self: Editor = {
     get settings() {
       return parts.settings();
@@ -471,7 +497,9 @@ function makeEditor(parts: EditorParts): Editor {
       const clamp = (pos: number) => Math.max(0, Math.min(pos, size));
       dispatch(state.tr.setSelection(TextSelection.create(state.doc, clamp(anchor), clamp(head))));
     },
-    commands: commandsOf(factories, run),
+    get commands() {
+      return current().commands;
+    },
     controlValues: () =>
       withStories().flatMap(({ editor, story }) =>
         controlValues(editor.state).map((value) => (story ? { ...value, story } : value)),
@@ -482,6 +510,11 @@ function makeEditor(parts: EditorParts): Editor {
     isMarkActive: (type) => isMarkActive(parts.state(), type),
     getDocument: parts.getDocument,
     setDocument: parts.setDocument,
+    reconfigure({ plugins }) {
+      const next = parts.withExtensions(plugins);
+      withPluginFactories(next, builtIns); // throws before anything changes
+      parts.reconfigure(next);
+    },
     subscribe: parts.subscribe,
     story: parts.story,
     get storyView() {
@@ -499,7 +532,7 @@ function makeEditor(parts: EditorParts): Editor {
       parts.views.navigation = handler;
     },
   };
-  commandFactories.set(self, factories);
+  commandFactories.set(self, () => current().factories);
   return self;
 }
 
@@ -540,7 +573,7 @@ function commandsOf(factories: Factories, run: (command: Command) => boolean): F
   return commands as FoliCommands;
 }
 
-const commandFactories = new WeakMap<Editor, Factories>();
+const commandFactories = new WeakMap<Editor, () => Factories>();
 
 /**
  * The command `editor.commands[name](...args)` would run, for a dry run (`editor.can`): built-in
@@ -551,7 +584,7 @@ export function editorCommand(
   name: string,
   args: readonly unknown[],
 ): Command | undefined {
-  const factories = commandFactories.get(editor);
+  const factories = commandFactories.get(editor)?.();
   const factory = factories && Object.hasOwn(factories, name) ? factories[name] : undefined;
   return factory?.(...(args as never[]));
 }
@@ -571,7 +604,12 @@ export function createEditor({
   reviewView = "markup",
 }: EditorOptions = {}): Editor {
   const schema = schemaWith(extensions);
-  const own = [...plugins, ...extensions.flatMap((e) => e.plugins ?? [])];
+  const withExtensions = (list: readonly Plugin[]) => [
+    ...list,
+    ...extensions.flatMap((e) => e.plugins ?? []),
+  ];
+  /** The app's plugins and the extensions': first in every state, swapped by `reconfigure`. */
+  let own: readonly Plugin[] = withExtensions(plugins);
   const load = (next: EditorDocument) => loadDocument(next, extensions, schema);
   let loaded = load(document);
   let track: TrackState = { on: trackChanges, author, view: reviewView };
@@ -667,10 +705,25 @@ export function createEditor({
       views,
       storyChanged,
       extensions,
-      plugins: own,
+      plugins: () => own,
+      withExtensions,
+      reconfigure: (next) => reconfigure(next),
     });
     stories.set(id, { editing, editor });
     return editor;
+  };
+  const reconfigure = (next: readonly Plugin[]) => {
+    const before = own.length;
+    own = next;
+    // `own` leads each state's plugins (after a story's own two): the rest keep their state.
+    const swap = (list: readonly Plugin[], at: number) => [
+      ...list.slice(0, at),
+      ...own,
+      ...list.slice(at + before),
+    ];
+    state = state.reconfigure(swap(state.plugins, 0));
+    for (const { editing } of stories.values()) editing.reconfigure(swap);
+    notify([]);
   };
   const story = (id: string): Editor | null =>
     wordContext(state)?.stories.has(id) ? (stories.get(id)?.editor ?? storyEditor(id)) : null;
@@ -696,6 +749,8 @@ export function createEditor({
     views,
     storyChanged,
     extensions,
-    plugins: own,
+    plugins: () => own,
+    withExtensions,
+    reconfigure,
   });
 }

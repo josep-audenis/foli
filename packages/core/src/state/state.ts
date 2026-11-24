@@ -267,6 +267,22 @@ export class EditorState {
     return this.applyTransaction(tr).state;
   }
 
+  /**
+   * This state with `plugins` instead of its own: the document and selection stay, a plugin in
+   * both lists (the same instance) keeps its state, a new one starts from `init` on this state,
+   * one left out is dropped.
+   */
+  reconfigure(plugins: readonly Plugin[]): EditorState {
+    const fields = new Map<Plugin, unknown>();
+    const next = new EditorState(this.doc, this.selection, this.storedMarks, plugins, fields);
+    for (const plugin of plugins) {
+      const field = plugin.spec.state;
+      if (field)
+        fields.set(plugin, this.fields.has(plugin) ? this.fields.get(plugin) : field.init(next));
+    }
+    return next;
+  }
+
   /** @internal This state over another tree (a story's, after undo): plugin states stay. */
   withDocument(doc: Node, selection: Selection): EditorState {
     return new EditorState(doc, selection, null, this.plugins, new Map(this.fields));

@@ -122,6 +122,11 @@ limits like anyone's: one refused for good stops its sending, and `onError` says
 channel that reorders, repeats and drops messages
 ([`collab.test.ts`](https://github.com/josep-audenis/foli/blob/main/apps/site/src/guides/collab.test.ts)).
 
+Starting to share the document a person already has open keeps their editor and its undo: add
+`collab` to it with `editor.reconfigure({ plugins: [collab({ clientID: 1 })] })` (in React, a new
+`plugins` list) and create the authority from `editor.getDocument()` at version 0; leaving gives
+the list without it. Joining someone else's document is a new editor, made from their snapshot.
+
 With a server, the same two calls: `createHub(authority)` where the authority lives, each
 connection's messages to `hub.receive`, and `connect` in every page.
 

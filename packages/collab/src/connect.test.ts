@@ -305,3 +305,31 @@ describe("connect and createHub (24.3)", () => {
     expect(presence(b.editor.state)[0]?.name).toHaveLength(100);
   });
 });
+
+describe("sharing a document already open (24.5)", () => {
+  it("collab added in place: the authority takes it at version 0, undo reaches back", () => {
+    const editor = createEditor({ document: DOCUMENT });
+    editor.select(1);
+    editor.commands.insertText("Mine ");
+    editor.reconfigure({ plugins: [collab({ clientID: 1 })] });
+    const authority = createAuthority({ document: editor.getDocument() });
+    const hub = createHub(authority);
+    const c = connect(editor, {
+      send: (message) => {
+        for (const { message: reply } of hub.receive(JSON.stringify(message), 1))
+          queueMicrotask(() => c.receive(JSON.stringify(reply)));
+      },
+      name: "Host",
+      color: "#123456",
+    });
+    // Undo the typing from before the session: a step like any other, accepted.
+    expect(editor.commands.undo()).toBe(true);
+    expect(text({ editor } as Peer)).toBe("Hello world");
+    expect(authority.version).toBe(1);
+    expect(authority.snapshot().document.content).toEqual(editor.getDocument().content);
+    c.destroy();
+    editor.reconfigure({ plugins: [] });
+    expect(editor.commands.redo()).toBe(true);
+    expect(text({ editor } as Peer)).toBe("Mine Hello world");
+  });
+});

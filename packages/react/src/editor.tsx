@@ -38,14 +38,16 @@ export interface UseFoliEditorOptions {
    */
   initialContent?: EditorDocument | undefined;
   /**
-   * Read once, when the editor is created. A different list later (other plugins, not a new
-   * array of the same ones) is ignored, with a warning unless `process.env.NODE_ENV` is
-   * `"production"` at run time: give the component a new `key` to make a new editor with it.
+   * The editor's plugins. A different list later (other plugins, not a new array of the same
+   * ones) replaces them in place (`editor.reconfigure`): the document, the selection, undo and
+   * the state of plugins in both lists stay. Joining or leaving a shared session is a new list.
    */
   plugins?: readonly Plugin[] | undefined;
   /**
    * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
-   * `@folijs/view`), as `createEditor`'s `extensions`. Changed later: as `plugins`.
+   * `@folijs/view`), as `createEditor`'s `extensions`. A different list later is ignored, with a
+   * warning unless `process.env.NODE_ENV` is `"production"` at run time: give the component a
+   * new `key` to make a new editor with it.
    */
   extensions?: readonly Extension[] | undefined;
   /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
@@ -59,7 +61,7 @@ export interface UseFoliEditorOptions {
 /**
  * A headless `Editor` (state, commands, history) of a schema v3 document, owned by the calling
  * component: created on the first render and kept for its lifetime. Later changes to `options`
- * are ignored. Throws FoliDocumentError when `initialContent` is not a valid document.
+ * are ignored, but for `plugins` (applied with `editor.reconfigure`). Throws FoliDocumentError when `initialContent` is not a valid document.
  */
 export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
   const [editor] = useState(() => {
@@ -80,18 +82,21 @@ export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
       ...(reviewView !== undefined && { reviewView }),
     });
   });
-  // ADR-0008: the editor takes its plugins and extensions once; say so when an app changes them.
-  const first = useRef(options);
+  // Plugins follow the prop (24.5, ADR-0008 amended): the same editor, its undo kept.
+  const applied = useRef(options.plugins);
+  useEffect(() => {
+    if (sameItems(applied.current, options.plugins)) return;
+    applied.current = options.plugins;
+    editor.reconfigure({ plugins: options.plugins ?? [] });
+  });
+  // ADR-0008: the editor takes its extensions once; say so when an app changes them.
+  const first = useRef(options.extensions);
   const warned = useRef(false);
   useEffect(() => {
-    if (warned.current || !development()) return;
-    const changed = (["plugins", "extensions"] as const).find(
-      (name) => !sameItems(first.current[name], options[name]),
-    );
-    if (!changed) return;
+    if (warned.current || !development() || sameItems(first.current, options.extensions)) return;
     warned.current = true;
     console.warn(
-      `Foli: \`${changed}\` changed after the editor was created and is ignored. Give the component a new \`key\` to create an editor with the new list.`,
+      "Foli: `extensions` changed after the editor was created and is ignored. Give the component a new `key` to create an editor with the new list.",
     );
   });
   return editor;
@@ -215,8 +220,8 @@ export function useCommand(command: Command, options?: UseCommandOptions): Comma
 /**
  * A named command of `editor.commands` (built-in, or a plugin's `PluginSpec.commands`), typed by
  * `FoliCommands`, on the context's editor (or the story open on its page):
- * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Throws when
- * the editor has no command of that name.
+ * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Disabled while
+ * the editor has no command of that name (its plugin not added yet, or taken away).
  */
 export function useCommand<K extends keyof FoliCommands>(
   name: K,
@@ -231,27 +236,34 @@ export function useCommand(target: Command | string, ...rest: unknown[]): Comman
     ),
   );
   const args = named ? rest : [];
-  // One command and selector per editor, target and arguments: useEditorState keeps its answer.
+  // One command and selector per editor, its commands, target and arguments: useEditorState
+  // keeps its answer. A named command is looked up again when the plugins change (`reconfigure`):
+  // one whose plugin the parent adds in this render is disabled until its effect has added it.
   const memo = useRef<{
     editor: Editor;
+    commands: FoliCommands;
     target: Command | string;
     args: readonly unknown[];
-    command: Command;
+    command: Command | undefined;
     selector: (state: EditorState, editor: Editor) => boolean;
   } | null>(null);
   let current = memo.current;
   if (
     !current ||
     current.editor !== editor ||
+    current.commands !== editor.commands ||
     current.target !== target ||
     !sameItems(current.args, args)
   ) {
     const command = typeof target === "string" ? editorCommand(editor, target, args) : target;
-    if (!command) throw new RangeError(`useCommand: the editor has no command named "${target}"`);
-    current = { editor, target, args, command, selector: (_state, e) => e.can(command) };
+    const selector = (_state: EditorState, e: Editor) => {
+      const now = typeof target === "string" ? editorCommand(e, target, args) : target;
+      return now ? e.can(now) : false;
+    };
+    current = { editor, commands: editor.commands, target, args, command, selector };
     memo.current = current;
   }
   const { command, selector } = current;
   const enabled = useEditorState(selector, { editor });
-  return { enabled, run: () => editor.run(command) };
+  return { enabled, run: () => (command ? editor.run(command) : false) };
 }

@@ -49,14 +49,14 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   initialContent?: EditorDocument | undefined;
   /**
-   * Read once on mount: a different list later is ignored, with a warning unless
-   * `process.env.NODE_ENV` is `"production"` at run time (`useFoliEditor`). To change them, give
-   * `FoliEditor` a new `key`.
+   * The editor's plugins: a different list later replaces them in place (`editor.reconfigure`,
+   * `useFoliEditor`), keeping the document and undo; joining or leaving a shared session is one.
    */
   plugins?: readonly Plugin[] | undefined;
   /**
-   * Read once on mount, as `plugins`: custom nodes and marks with their view hooks
-   * (`ViewExtension`).
+   * Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). A
+   * different list later is ignored, with a warning unless `process.env.NODE_ENV` is
+   * `"production"` at run time; give `FoliEditor` a new `key` to change them.
    */
   extensions?: readonly Extension[] | undefined;
   /** Read once on mount: who edits (tracked changes are made in this name). */

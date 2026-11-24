@@ -1261,6 +1261,17 @@ export interface Editor {
     getDocument(): FoliDocument;
     /** Replaces the whole document (an older one migrated) and resets history. */
     setDocument(document: EditorDocument): void;
+    /**
+     * Replaces the plugins the editor was made with (`EditorOptions.plugins`) and keeps the
+     * document, the selection, undo history and the state of every plugin in both lists (the same
+     * instance): one added starts from its `init`, one left out is dropped. Its stories' editors
+     * follow; extensions' plugins and the built-in ones stay. Starting or leaving a shared session
+     * (`collab`) without making the editor again. Throws, changing nothing, on a command name taken
+     * twice.
+     */
+    reconfigure(options: {
+        plugins: readonly Plugin[];
+    }): void;
     subscribe(listener: EditorListener): () => void;
     /**
      * An editor over a story (a header, footer or note) by id, null when there is none. It has its
@@ -2335,6 +2346,12 @@ export declare class EditorState {
     get tr(): Transaction;
     pluginState<T>(key: PluginKey<T>): T | undefined;
     apply(tr: Transaction): EditorState;
+    /**
+     * This state with `plugins` instead of its own: the document and selection stay, a plugin in
+     * both lists (the same instance) keeps its state, a new one starts from `init` on this state,
+     * one left out is dropped.
+     */
+    reconfigure(plugins: readonly Plugin[]): EditorState;
     /** Applies `root` plus any transactions plugins append; returns all that were applied. */
     applyTransaction(root: Transaction): {
         state: EditorState;
