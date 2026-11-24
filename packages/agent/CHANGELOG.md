@@ -1,5 +1,13 @@
 # @folijs/agent
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [27ff32e]
+- Updated dependencies [04bf62f]
+  - @folijs/core@1.8.0
+
 ## 0.4.0
 
 ### Minor Changes

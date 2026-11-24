@@ -1,5 +1,17 @@
 # @folijs/collab
 
+## 0.2.0
+
+### Minor Changes
+
+- 89c9f08: `createHub(authority)` and `connect(editor, options)`: the messages between an authority and its clients, and the client loop (one batch in flight, every broadcast checked against the editor's version, catching up after a gap or a `stale` refusal, presence sent and shown), so an app only carries JSON messages over its own transport. A `snapshot` message carries the client id it is for, and `onSnapshot` gets it.
+
+### Patch Changes
+
+- Updated dependencies [27ff32e]
+- Updated dependencies [04bf62f]
+  - @folijs/core@1.8.0
+
 ## 0.1.1
 
 ### Patch Changes
