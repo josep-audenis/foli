@@ -3642,6 +3642,22 @@ beside Word's; rejecting them gives the original text; Word 16 opens it (31 revi
 comments). Left, not built on purpose: headers, footers and notes through the tools, tables
 inserted, accepting or rejecting changes (the person's part), a network transport.
 
+**Comment-only mode** (asked for by the owner on 2026-11-24): a person can select text, add
+comments and reply to them, but cannot change the text, as Word's "Comments only" protection
+and Google Docs' "Commenter" role. Two of the three usual roles already work with props:
+reading (`FoliEditor`'s canvas `readOnly`, which also disables the toolbar, the comments pane
+and navigation) and editing (the default, with `author`). Suggest-only editing (every edit
+tracked) is app code: `trackChanges: true`, a toolbar without "Track changes" and accept/reject,
+and a plugin's `filterTransaction` refusing whatever turns tracking off or resolves a change.
+Comment-only cannot be built from outside: `readOnly` blocks comments too (`FoliComments`'s
+`readOnly` is meant to go with a read-only canvas). To build: a mode (on `FoliEditor`, the view
+and the toolbar) in which the canvas keeps selection and copy but takes no input, the toolbar
+offers only "New comment" and review navigation, and the comments pane writes; and, in core, a
+filter that lets through only the transactions a comment makes (its `CommentStep`s and whatever
+else adding a comment changes in the document; to check), so shortcuts, paste and drop change
+nothing. With `@folijs/collab`, the server must refuse a commenter's other steps too. Not access
+control on its own: the app's server still checks who may save.
+
 **Optional, later:** headless server-side processing. Real-time collaboration is Phase 22.
 
 ---
