@@ -15,7 +15,7 @@ pnpm dev                       # playground at http://localhost:5173
 (uncommitted edits count). There is no GitHub CI on pull requests. Two workflows run:
 **Release** (`.github/workflows/release.yml`, by hand: checks, browser tests in three engines,
 the examples, then publishes; [Releasing](#releasing)) and **Deploy site**
-(`.github/workflows/deploy-site.yml`, on each push to `main`: `pnpm check`, then the site;
+(`.github/workflows/deploy-site.yml`, by hand on `main`: `pnpm check`, then the site;
 [The site](#the-site)). Skip the hook once with `git push --no-verify`. The hook
 is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exists.
 
@@ -157,10 +157,10 @@ pnpm --filter @folijs/site preview  # serve the build locally
 ```
 
 It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) and
-**deploys from GitHub Actions on every push to `main`**: `.github/workflows/deploy-site.yml`
+**deploys from GitHub Actions when the workflow is run by hand on `main`**: `.github/workflows/deploy-site.yml`
 builds it and uploads `apps/site/dist/` to the Cloudflare Pages project `foli` with Wrangler
-(production, `foli-8c6.pages.dev`; foli.josepaudenis.com serves the same files). Pull requests
-and other branches deploy nothing. Run the workflow by hand from the Actions tab to redeploy.
+(production, `foli-8c6.pages.dev`; foli.josepaudenis.com serves the same files). Pushes do not
+deploy: run it from the Actions tab or with `gh workflow run deploy-site.yml`.
 It needs, on the `cloudflare` environment, the `CLOUDFLARE_API_TOKEN` secret (a token with
 "Cloudflare Pages: Edit") and the `CLOUDFLARE_ACCOUNT_ID` variable. Until 2026-11-21 the project
 was connected to the repository through Cloudflare's GitHub app and built every pushed commit,
