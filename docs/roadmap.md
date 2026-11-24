@@ -35,6 +35,7 @@ place that says what is in progress; check it before starting work.
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013) and 23.2 (tracked table formatting, schema 8) merged                                                                                                                |
+| 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -117,6 +118,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change                    | 1.3.0                  | S    |
 | 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.6.0, collab 0.1.0    | L    |
 | 23    | Agent editing parity      | Tables, formatting, lists, pictures, headers: the agent edits as a user does      | agent 0.4.0, mcp 0.3.0 | M    |
+| 24    | Collab, easy to integrate | Versions checked, a client loop over any transport, plugins switched in place     | 1.7.0, collab 0.2.0    | M    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -3434,6 +3436,106 @@ lands second merges the other in (no rebase: force push is blocked).
 - [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
   server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
   core patch) published with the owner's approval.
+
+## Phase 24 — Collaboration, easy to integrate · M → 1.7.0, `@folijs/collab` 0.2.0
+
+An app wires collaboration up without trial and error, over whatever transport it already has.
+Asked for by the owner on 2026-11-24, from an integrator's coding agent that got 0.1.0 working
+only after a week of chasing "works for one character, then stops". Its six points, and what this
+phase does with each: version numbers undocumented (24.1); no tested example of a host and a
+joiner (24.4); a broadcast that does not fit the editor's version is applied without a word
+(24.2); the collab plugin cannot be added or removed without rebuilding the editor (24.5);
+shared cursors wired by hand (already built, `connect` sends them: 24.3); an official Yjs
+connector holding the document (left out, below). Planned the same day, nothing built.
+
+Not in this phase: a Yjs (or any CRDT) binding that keeps the document in Yjs: ADR-0012 chose a
+central authority, Word's envelope and stories have no Yjs mapping, and the library stays
+neutral to the transport (Yjs, WebSocket, WebRTC and BroadcastChannel all carry 24.3's
+messages). Moving the authority to another browser when the hosting one leaves (it needs the
+document as last confirmed, without the leaving host's pending steps): written down for later.
+Offline editing over days, as in Phase 22.
+
+**Starts from (core 1.6.0, collab 0.1.0), checked 2026-11-24:**
+
+- `authority.receive()` returns `Received.version`, the version after the steps, and
+  `broadcast.version`, the version before them (the one a client must be at to apply it). The
+  sender gets its own broadcast too: that is how its steps are confirmed. Neither README nor
+  TSDoc says which version is which.
+- `receiveTransaction(state, steps, clientIDs)` (`core/src/state/collab.ts`) takes no version and
+  checks none: it adds `steps.length` to the editor's version whatever it is given. A broadcast
+  applied twice, the sender's own echo skipped, or `Received.version` used as the broadcast's
+  leaves the count off; every later send is then refused as `stale`, and an app that drops
+  refusals stops with no message. A step that no longer applies throws from `tr.step`.
+- Every app writes the same client loop: `examples/collab/src/main.ts` spends about 100 lines on
+  one batch in flight, broadcasts held until their version is reached, catching up after
+  `stale` or a reconnect, and sending presence. The guide repeats it.
+- Presence is built: `presenceMessage`, `receivePresence`, `presence` and `removePresence` in
+  core; `EditorView` draws the others' carets (`view/src/word/presence.ts`, body only); the guide
+  has a section on it. Apps miss it, and its sending is theirs to wire.
+- `createEditor` reads its plugins once; React's `useFoliEditor` (`react/src/editor.tsx`) warns
+  in development when `plugins` changes and tells the app to give a new `key` (ADR-0008). Starting
+  or leaving a session therefore rebuilds the editor: version, undo history and view state lost.
+- `authority.test.ts` drives the authority with core's client functions, but no test is written
+  as an app would integrate: a host in a browser (an authority and its own editor) and a joiner,
+  over an unreliable channel.
+
+**Acceptance:**
+
+- The version contract written once and linked from everywhere it matters: TSDoc on
+  `Broadcast`, `Received`, `getVersion`, `sendableSteps` and `receiveTransaction`, both
+  READMEs, the guide (with a "my edits stop" section: the causes above and what each looks like).
+- `receiveBroadcast(state, broadcast)` in core: takes a broadcast as received (its `version`,
+  JSON steps and `clientIDs`), compares its version with `getVersion`, and returns what happened:
+  applied (with the transaction to dispatch), already had (nothing to do; a broadcast that
+  overlaps what the editor has applies only the part it lacks) or a gap (the version it has and
+  the one it got: the app asks for `stepsSince`). `receiveTransaction` keeps its signature and
+  gains a version check that throws a `RangeError` naming both versions when given one that
+  does not fit. Property test: random delivery order, duplicates and drops, the editors agree
+  with the authority after catching up.
+- `@folijs/collab` gives the loop, transport-neutral: `connect(editor, { send, clientID, name,
+  color })` returns `{ receive(message), destroy() }` and does one batch in flight, holding early
+  broadcasts, catch-up after `stale` or a gap, resending after a reconnect, and presence (sent on
+  selection change and after receiving, received and removed). `hub(authority)` on the other
+  side turns a client's message into what to send everyone and what to send back to it
+  (broadcasts, refusals, catch-ups, presence relayed). The messages are JSON a transport carries
+  as text. A host in a browser is a hub with its own editor connected in memory.
+- A test written as an app would: a host and a joiner over a channel that reorders, duplicates
+  and drops messages, several rounds of concurrent edits from both, a reconnect and a catch-up
+  from a snapshot, both documents and both presences equal to the authority's at the end; once
+  with the raw functions (`collab`, `sendableSteps`, `receiveBroadcast`, `getVersion`,
+  `createAuthority`), once with `connect` and `hub`. The guide's "host in a browser" example is
+  that test's code. `examples/collab` moves onto `connect` and `hub`, and its e2e stays green.
+- `editor.reconfigure({ plugins })` in core: the document, selection and the state of every
+  plugin in both lists kept (history keeps its undo), added plugins initialised on the current
+  state, removed ones dropped. React's `plugins` prop follows changes through it instead of
+  warning (extensions still read once). ADR-0008 amended. Starting a session on the editor's own
+  document (the host) and leaving one keep the editor and its undo; joining someone else's loads
+  their document, as before.
+- READMEs, the guide, limitations.md and the site's collab page updated; `pnpm check` green after
+  each PR; core 1.7.0 and collab 0.2.0 published with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-24/collab-integration`, the build green after each, merged after an
+agent's review. Starts after Phase 22 (done). Independent of Phase 23: it touches `collab.ts`,
+`state.ts`, `editor.ts`, `react/src/editor.tsx` and `packages/collab`, not `track.ts` or the
+agent; if both change a shared file, whichever lands second merges the other in (no rebase).
+
+- [ ] Claim phase, branch `phase-24/collab-integration`
+- [ ] 24.1 The version contract in TSDoc, both READMEs and the guide, with the "my edits stop"
+  section. Docs only: what 0.1.0 already does.
+- [ ] 24.2 Core: `receiveBroadcast` with its three outcomes; the version check in
+  `receiveTransaction`; the property test over reordered, duplicated and dropped broadcasts.
+- [ ] 24.3 Collab: `connect` and `hub`, their message types, presence through them; unit tests of
+  each case (stale, gap, duplicate, reconnect, a client refused for good).
+- [ ] 24.4 The host-and-joiner test over an unreliable channel, both ways (raw functions,
+  `connect` and `hub`); the guide's host-in-a-browser example from it; `examples/collab` and
+  its e2e on `connect` and `hub`.
+- [ ] 24.5 Core: `editor.reconfigure({ plugins })`, tests that undo survives adding and removing
+  `collab` and that every kept plugin's state carries over; React's `plugins` prop through it;
+  ADR-0008 amended. The riskiest task: a plugin whose state depends on another's is checked.
+- [ ] 24.6 Docs and release: READMEs, guide, limitations.md, the site's collab page; changesets;
+  core 1.7.0 and collab 0.2.0 published with the owner's approval.
 
 ## After 1.0
 
