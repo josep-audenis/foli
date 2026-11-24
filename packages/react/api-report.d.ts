@@ -582,8 +582,8 @@ export declare function useCommand(command: Command, options?: UseCommandOptions
 /**
  * A named command of `editor.commands` (built-in, or a plugin's `PluginSpec.commands`), typed by
  * `FoliCommands`, on the context's editor (or the story open on its page):
- * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Throws when
- * the editor has no command of that name.
+ * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Disabled while
+ * the editor has no command of that name (its plugin not added yet, or taken away).
  */
 export declare function useCommand<K extends keyof FoliCommands>(name: K, ...args: Parameters<FoliCommands[K]>): CommandState;
 

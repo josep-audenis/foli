@@ -220,8 +220,8 @@ export function useCommand(command: Command, options?: UseCommandOptions): Comma
 /**
  * A named command of `editor.commands` (built-in, or a plugin's `PluginSpec.commands`), typed by
  * `FoliCommands`, on the context's editor (or the story open on its page):
- * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Throws when
- * the editor has no command of that name.
+ * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Disabled while
+ * the editor has no command of that name (its plugin not added yet, or taken away).
  */
 export function useCommand<K extends keyof FoliCommands>(
   name: K,
@@ -236,27 +236,34 @@ export function useCommand(target: Command | string, ...rest: unknown[]): Comman
     ),
   );
   const args = named ? rest : [];
-  // One command and selector per editor, target and arguments: useEditorState keeps its answer.
+  // One command and selector per editor, its commands, target and arguments: useEditorState
+  // keeps its answer. A named command is looked up again when the plugins change (`reconfigure`):
+  // one whose plugin the parent adds in this render is disabled until its effect has added it.
   const memo = useRef<{
     editor: Editor;
+    commands: FoliCommands;
     target: Command | string;
     args: readonly unknown[];
-    command: Command;
+    command: Command | undefined;
     selector: (state: EditorState, editor: Editor) => boolean;
   } | null>(null);
   let current = memo.current;
   if (
     !current ||
     current.editor !== editor ||
+    current.commands !== editor.commands ||
     current.target !== target ||
     !sameItems(current.args, args)
   ) {
     const command = typeof target === "string" ? editorCommand(editor, target, args) : target;
-    if (!command) throw new RangeError(`useCommand: the editor has no command named "${target}"`);
-    current = { editor, target, args, command, selector: (_state, e) => e.can(command) };
+    const selector = (_state: EditorState, e: Editor) => {
+      const now = typeof target === "string" ? editorCommand(e, target, args) : target;
+      return now ? e.can(now) : false;
+    };
+    current = { editor, commands: editor.commands, target, args, command, selector };
     memo.current = current;
   }
   const { command, selector } = current;
   const enabled = useEditorState(selector, { editor });
-  return { enabled, run: () => editor.run(command) };
+  return { enabled, run: () => (command ? editor.run(command) : false) };
 }

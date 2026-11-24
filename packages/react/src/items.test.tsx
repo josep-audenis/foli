@@ -35,6 +35,7 @@ import {
   toolbarItems,
   useCommand,
   useEditorState,
+  useFoliEditor,
 } from "./index.js";
 
 declare module "@folijs/core" {
@@ -1179,19 +1180,36 @@ describe("useCommand", () => {
     expect(button.disabled).toBe(true);
   });
 
-  it("throws for a name the editor does not have", () => {
+  it("is disabled for a name the editor does not have, until a plugin gives it (24.5)", () => {
     const editor = createEditor({ document: doc() });
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(() =>
-      render(
-        <FoliEditorProvider editor={editor}>
-          <ShoutButton />
-        </FoliEditorProvider>,
-      ),
-    ).toThrow('the editor has no command named "shout"');
-    vi.restoreAllMocks();
+    render(
+      <FoliEditorProvider editor={editor}>
+        <ShoutButton />
+      </FoliEditorProvider>,
+    );
+    const button = screen.getByRole("button") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    act(() => editor.reconfigure({ plugins: [shouting] }));
+    expect(button.disabled).toBe(false);
+    act(() => fireEvent.click(button));
+    expect(text(editor)).toBe("HEY Hello");
+    // Its plugin taken away: the command goes with it.
+    act(() => editor.reconfigure({ plugins: [] }));
+    expect(button.disabled).toBe(true);
+  });
+
+  it("a command of a plugin added in the same render does not throw", () => {
+    const { rerender } = render(<ShoutingApp on={false} />);
+    act(() => rerender(<ShoutingApp on={true} />));
+    expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
   });
 });
+
+/** An editor whose `shouting` plugin comes with the button that runs its command. */
+function ShoutingApp({ on }: { on: boolean }) {
+  const editor = useFoliEditor({ initialContent: doc(), plugins: on ? [shouting] : [] });
+  return <FoliEditorProvider editor={editor}>{on && <ShoutButton />}</FoliEditorProvider>;
+}
 
 describe("plugins changed after mount", () => {
   afterEach(() => {

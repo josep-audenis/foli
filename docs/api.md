@@ -45,7 +45,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | ----------------- | -------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `initialContent`  | `EditorDocument`                                                                                         | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                                                       |
 | `plugins`         | `readonly Plugin[]`                                                                                      | `[]`         | Other plugins later replace them in place (`editor.reconfigure`): document and undo stay.                                                        |
-| `extensions`      | `readonly Extension[]`                                                                                   | `[]`         | Read once, on mount, as `plugins`: custom nodes and marks, with their view hooks (`ViewExtension`).                                              |
+| `extensions`      | `readonly Extension[]`                                                                                   | `[]`         | Read once, on mount: other extensions later are ignored, with a dev warning; use a new `key`.                                                    |
 | `author`          | `string`                                                                                                 | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                                                                    |
 | `trackChanges`    | `boolean`                                                                                                | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                                                                    |
 | `reviewView`      | `ReviewView`                                                                                             | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                                                                    |
@@ -458,7 +458,8 @@ own width changes (a box showing a longer value, a font that loads late).
   plugin's (`PluginSpec.commands`), typed by `FoliCommands`, on the context's editor (or the
   story open): `useCommand("undo")`, `useCommand("toggleMark", "bold")`,
   `useCommand("insertMention", "u-1", "Ada")`. Kept across renders with the same name and
-  arguments. Throws when the editor has no command of that name.
+  arguments. Disabled while the editor has no command of that name (its plugin not added yet, as
+  when the parent adds it in the same render, or taken away; it used to throw).
 
 ## `@folijs/core`
 
