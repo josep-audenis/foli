@@ -425,7 +425,14 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   not shown). Numbering paragraphs already in two numbered lists leaves two lists; table cells
   are apart, each its own list. A paragraph in a locked content control is refused, and so is
   the call. Left and right are Word's `left` and `right` (not checked in right-to-left text).
-- No operation inserts a picture, or accepts or rejects changes. `session.editor` is the
+- Inserting (23.6): a picture or a horizontal line goes in a paragraph of its own; a page or
+  section break at a paragraph's end or start (a section break in the body only, and the
+  paragraph splits there as in Word); a footnote or endnote at a paragraph's end or after text in
+  it. A picture is inline, its size read from PNG, JPEG and GIF headers (else given), shown at
+  96 dpi and fitted to the text width; alt text is required. The MCP server reads a picture from
+  a .png, .jpg or .gif under its root, no larger than a document; an app gives bytes. No floating
+  pictures, captions or picture from a URL.
+- No operation accepts or rejects changes. `session.editor` is the
   headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
   block; Word's final view shows it joined with the next paragraph.

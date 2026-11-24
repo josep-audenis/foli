@@ -58,6 +58,7 @@ const TOOLS = [
   "edit_table",
   "format_text",
   "format_paragraph",
+  "insert",
   "save",
   "close",
   "list_documents",

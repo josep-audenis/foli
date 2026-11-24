@@ -1,4 +1,10 @@
 export type { FormatOptions, TextFormat } from "./formatting.js";
+export {
+  type InsertItem,
+  type InsertItemOptions,
+  imageInfo,
+  type PictureItem,
+} from "./inserts.js";
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export type { ParagraphFormat } from "./paragraphs.js";
 export { type Block, formatBlocks } from "./read.js";
@@ -23,4 +29,5 @@ export {
   type ScriptMethod,
   type ToolAnswer,
   type ToolDefinition,
+  type ToolHost,
 } from "./tools.js";

@@ -3,7 +3,7 @@
  * sees `doc`, whose methods are the functions below over the document's session: what the
  * tools do, and nothing the tools cannot. A run that fails is taken back whole.
  */
-import { AGENT_TOOLS, formatBlocks } from "@folijs/agent";
+import { AGENT_TOOLS, formatBlocks, type ToolHost } from "@folijs/agent";
 import type { OpenDocument } from "./documents.js";
 import type { ToolResult } from "./protocol.js";
 import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits, StopRun } from "./sandbox.js";
@@ -90,6 +90,7 @@ export async function runCode(
   document: OpenDocument,
   code: string,
   limits: SandboxLimits = SANDBOX_LIMITS,
+  files: ToolHost = {},
 ): Promise<ToolResult> {
   const { session } = document;
   const before = session.editor.state.doc;
@@ -127,7 +128,7 @@ export async function runCode(
     }
     const method = METHODS.get(name);
     if (!method) throw new Error(`doc has no ${oneLine(String(name)).slice(0, 40)}.`);
-    const value = method.call(session, Array.isArray(args) ? args : []);
+    const value = method.call(session, Array.isArray(args) ? args : [], files);
     // An edit's value names the blocks it changed: the blocks the run changed.
     const blocks =
       method.effect === "edit" || method.effect === "insert"

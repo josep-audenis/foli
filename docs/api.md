@@ -1296,6 +1296,11 @@ version. Details, the read format and examples: the
   right or justify; `lineSpacing` a multiple; `spaceBefore`, `spaceAfter` in points; `indent`
   "more" or "less"; `list` "bullet", "numbered" or null); `Block.formatting` starts with the
   paragraph's own properties.
+- Inserting (0.4, 23.6): `insertItem(handle, InsertItem, { where? })` (`picture` with `data`,
+  `alt`, `contentType?`, `width?`, `height?` in points; `pageBreak`; `sectionBreak` with
+  `start?`; `horizontalRule`; `footnote` and `endnote` with `text`, `on?`); `imageInfo(bytes)`,
+  a PNG's, JPEG's or GIF's size and type. `agentTools(session, ToolHost?)`: `picture(path)`
+  gives the `insert` tool an image's bytes.
 - Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
   `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
   checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session

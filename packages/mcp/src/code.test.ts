@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createEditor, trackedChanges } from "@folijs/core";
@@ -41,8 +41,16 @@ async function opened(name: string, limits = {}) {
     expect((await call("save")).refused).toBe(false);
     return (await importDocx(readFileSync(join(root, `${name}.agent.docx`)))).document;
   };
-  return { client, call, run, read, first, saved };
+  return { client, call, run, read, first, saved, root };
 }
+
+const run_ = (
+  call: (
+    tool: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ text: string; refused: boolean }>,
+  code: string,
+) => call("run", { code });
 
 // Each run starts a thread: slow when the whole suite runs at once.
 describe("the run tool", { timeout: 30_000 }, () => {
@@ -58,7 +66,7 @@ describe("the run tool", { timeout: 30_000 }, () => {
     expect(await names(false)).not.toContain("run");
     const withCode = await names(true);
     expect(withCode.at(-1)).toBe("run");
-    expect(withCode).toHaveLength(18);
+    expect(withCode).toHaveLength(19);
   });
 
   it("does a loop over the document in one call, every edit a tracked change", async () => {
@@ -116,6 +124,35 @@ return doc.tableStyles().length > 0;`);
     );
     expect(kinds).toContain("rowInsertion");
     expect(kinds).toContain("tableFormatting");
+    await client.close();
+  });
+
+  it("inserts a picture from a file under the root, and refuses one outside it (23.6)", async () => {
+    const { client, call, read, saved, root } = await opened("01-mutual-nda");
+    const png = new Uint8Array(33);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+    new DataView(png.buffer).setUint32(16, 200);
+    new DataView(png.buffer).setUint32(20, 100);
+    writeFileSync(join(root, "logo.png"), png);
+    const first = /^\[(b\d+)\]/m.exec(await read())?.[1] as string;
+    const done = await call("insert", {
+      handle: first,
+      what: "picture",
+      path: "logo.png",
+      alt: "Logo",
+    });
+    expect(done.refused).toBe(false);
+    expect(done.text).toMatch(/changed: \[picture\]/);
+    for (const path of ["../logo.png", "contract.docx", "logo.txt"])
+      expect(
+        (await call("insert", { handle: first, what: "picture", path, alt: "x" })).refused,
+      ).toBe(true);
+    const ran = await run_(
+      call,
+      `doc.insert(${JSON.stringify(first)}, { kind: "pageBreak" }); return 1;`,
+    );
+    expect(ran.refused).toBe(false);
+    expect(JSON.stringify((await saved()).content)).toContain('"alt":"Logo"');
     await client.close();
   });
 

@@ -56,10 +56,18 @@ export interface ScriptMethod {
    * how many; `delete`, a block deleted or emptied; `fields`, fields updated.
    */
   effect?: "edit" | "insert" | "delete" | "fields";
-  call(session: Session, args: readonly unknown[]): unknown;
+  call(session: Session, args: readonly unknown[], host?: ToolHost): unknown;
 }
 
 /** A tool over any session: what `agentTools` binds, and what a server serves. */
+/**
+ * What the app gives the tools that the document does not hold (23.6): a picture's bytes for a
+ * path the model names. Without it, pictures are refused.
+ */
+export interface ToolHost {
+  picture?(path: string): Result<{ data: Uint8Array; contentType?: string }>;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -68,7 +76,7 @@ export interface ToolDefinition {
    * Arguments are taken as checked against `inputSchema` (`invalid` first: `agentTools` does);
    * others may be there.
    */
-  run(session: Session, args: Record<string, unknown>): ToolAnswer;
+  run(session: Session, args: Record<string, unknown>, host?: ToolHost): ToolAnswer;
   /** Its methods in code mode, in the order they are listed. */
   methods: readonly ScriptMethod[];
 }
@@ -698,6 +706,131 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       },
     ],
   },
+  {
+    name: "insert",
+    description:
+      "Inserts what is not text, as a tracked insertion, next to or in a paragraph (handle): a picture (path to an image file, and alt: what it shows; width or height in points, else its own size fitted to the page) or a horizontal line, as a paragraph of its own after (or before) it; a page break or a section break (start: nextPage, continuous, evenPage, oddPage) at its end (or start); a footnote or endnote, its text, at the paragraph's end or after on text in it. Returns the blocks made or changed.",
+    inputSchema: args(
+      {
+        handle: HANDLE,
+        what: {
+          type: "string",
+          enum: [
+            "picture",
+            "page_break",
+            "section_break",
+            "horizontal_rule",
+            "footnote",
+            "endnote",
+          ],
+          description: "What to insert.",
+        },
+        where: { type: "string", enum: ["after", "before"], description: "Default: after." },
+        path: { type: "string", description: "picture: the image file (.png, .jpg, .gif)." },
+        alt: {
+          type: "string",
+          description: "picture: what it shows, for a reader who cannot see it.",
+        },
+        width: { type: "number", description: "picture: in points." },
+        height: { type: "number", description: "picture: in points." },
+        start: {
+          type: "string",
+          enum: ["nextPage", "continuous", "evenPage", "oddPage"],
+          description: "section_break: where the next section starts. Default: nextPage.",
+        },
+        text: { type: "string", description: "footnote, endnote: the note's text." },
+        on: {
+          type: "string",
+          description: "footnote, endnote: text of the paragraph the note follows.",
+        },
+      },
+      ["handle", "what"],
+    ),
+    run(session, a, host) {
+      const handle = a.handle as string;
+      const where = a.where === "before" ? { where: "before" as const } : {};
+      switch (a.what) {
+        case "picture": {
+          if (!host?.picture)
+            return {
+              text: "Pictures cannot be inserted here: the app gives no files.",
+              isError: true,
+            };
+          if (typeof a.path !== "string" || typeof a.alt !== "string")
+            return { text: "picture needs path and alt.", isError: true };
+          const file = host.picture(a.path);
+          if (!file.ok) return { text: file.message, isError: true };
+          return told(
+            session.insertItem(
+              handle,
+              {
+                kind: "picture",
+                data: file.data,
+                ...(file.contentType ? { contentType: file.contentType } : {}),
+                alt: a.alt,
+                ...(typeof a.width === "number" ? { width: a.width } : {}),
+                ...(typeof a.height === "number" ? { height: a.height } : {}),
+              },
+              where,
+            ),
+          );
+        }
+        case "page_break":
+          return told(session.insertItem(handle, { kind: "pageBreak" }, where));
+        case "section_break":
+          return told(
+            session.insertItem(
+              handle,
+              { kind: "sectionBreak", ...(a.start ? { start: a.start as never } : {}) },
+              where,
+            ),
+          );
+        case "horizontal_rule":
+          return told(session.insertItem(handle, { kind: "horizontalRule" }, where));
+        default:
+          if (typeof a.text !== "string")
+            return { text: `${a.what as string} needs text.`, isError: true };
+          return told(
+            session.insertItem(handle, {
+              kind: a.what === "endnote" ? "endnote" : "footnote",
+              text: a.text,
+              ...(typeof a.on === "string" ? { on: a.on } : {}),
+            }),
+          );
+      }
+    },
+    methods: [
+      {
+        name: "insert",
+        signature:
+          'doc.insert(handle, { kind, ... }, { where? }): { blocks }   // kind: "picture" (path, alt, width?, height?) | "pageBreak" | "sectionBreak" (start?) | "horizontalRule" | "footnote" | "endnote" (text, on?)',
+        effect: "edit",
+        call(session, [a, b, c]: Args, host) {
+          const item = b as Record<string, unknown> | undefined;
+          if (item?.kind === "picture") {
+            if (!host?.picture)
+              throw new Error("Pictures cannot be inserted here: the app gives no files.");
+            const file = given(host.picture(String(item.path)));
+            const { path: _, ...rest } = item;
+            return {
+              blocks: given(
+                session.insertItem(
+                  a,
+                  {
+                    ...rest,
+                    data: file.data,
+                    ...(file.contentType ? { contentType: file.contentType } : {}),
+                  } as never,
+                  c,
+                ),
+              ).blocks,
+            };
+          }
+          return { blocks: given(session.insertItem(a, b, c)).blocks };
+        },
+      },
+    ],
+  },
 ];
 
 /**
@@ -705,7 +838,7 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
  * `INSTRUCTIONS` and each tool's name, description and schema, and pass its calls to `run`.
  * A call whose arguments do not fit the schema is answered with why, as a refusal.
  */
-export function agentTools(session: Session): AgentTool[] {
+export function agentTools(session: Session, host: ToolHost = {}): AgentTool[] {
   return AGENT_TOOLS.map(({ name, description, inputSchema, run }) => ({
     name,
     description,
@@ -714,7 +847,7 @@ export function agentTools(session: Session): AgentTool[] {
       const wrong = invalid(a, inputSchema);
       return wrong
         ? { text: `Wrong arguments for ${name}: ${wrong}.`, isError: true }
-        : run(session, a);
+        : run(session, a, host);
     },
   }));
 }

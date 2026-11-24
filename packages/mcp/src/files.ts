@@ -81,7 +81,10 @@ export function fileRules(root: string, overwrite: boolean): FileRules {
 }
 
 /** A path as a tool is given it: a `.docx`'s name relative to the root, or why it is not. */
-function named(path: unknown): string | Checked {
+/** @internal The pictures `insert` reads (23.6), by extension. */
+export const PICTURE_KINDS: readonly string[] = [".png", ".jpg", ".jpeg", ".gif"];
+
+function named(path: unknown, kinds: readonly string[] = [".docx"]): string | Checked {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is refused
   if (typeof path !== "string" || !path.trim() || /[\u0000-\u001F\u007F]/.test(path))
     return no("A path is the file's name, relative to the server's folder: contract.docx.");
@@ -89,7 +92,12 @@ function named(path: unknown): string | Checked {
   // (a.docx:b.docx); `..` would say whether a folder above the root has a given name.
   if (isAbsolute(path) || path.includes(":") || path.split(/[\\/]/).includes(".."))
     return no("A path is relative to the server's folder: contract.docx, or drafts/contract.docx.");
-  if (extname(path).toLowerCase() !== ".docx") return no("Only .docx files are read and written.");
+  if (!kinds.includes(extname(path).toLowerCase()))
+    return no(
+      kinds.includes(".docx")
+        ? "Only .docx files are read and written."
+        : `Only pictures are read here: ${kinds.join(", ")}.`,
+    );
   return path;
 }
 
@@ -104,8 +112,9 @@ const missing = (name: string) =>
 export function read(
   rules: FileRules,
   path: unknown,
+  kinds: readonly string[] = [".docx"],
 ): { ok: true; file: string; bytes: Uint8Array } | { ok: false; message: string } {
-  const name = named(path);
+  const name = named(path, kinds);
   if (typeof name !== "string") return name as { ok: false; message: string };
   let file: string;
   try {
@@ -113,7 +122,7 @@ export function read(
   } catch {
     return missing(name) as { ok: false; message: string };
   }
-  if (!inside(rules.root, file) || extname(file).toLowerCase() !== ".docx")
+  if (!inside(rules.root, file) || !kinds.includes(extname(file).toLowerCase()))
     return missing(name) as { ok: false; message: string };
   const large = {
     ok: false as const,
