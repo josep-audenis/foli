@@ -1,4 +1,5 @@
 export {
+  type BroadcastJSON,
   type CollabOptions,
   collab,
   getVersion,
@@ -6,6 +7,8 @@ export {
   type PresenceMessage,
   presence,
   presenceMessage,
+  type ReceivedBroadcast,
+  receiveBroadcast,
   receivePresence,
   receiveTransaction,
   removePresence,

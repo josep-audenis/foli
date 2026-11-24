@@ -9,7 +9,13 @@ import {
   parseDocument,
   SCHEMA_VERSION,
 } from "../v3/document.js";
-import { collab, getVersion, receiveTransaction, sendableSteps } from "./collab.js";
+import {
+  collab,
+  getVersion,
+  receiveBroadcast,
+  receiveTransaction,
+  sendableSteps,
+} from "./collab.js";
 import { createEditor, type Editor } from "./editor.js";
 import { insertNote } from "./notes.js";
 import { remote } from "./state.js";
@@ -334,6 +340,133 @@ describe("collaboration converges (22.7, 1000 runs)", () => {
         ),
         { numRuns: 300 },
       );
+    },
+    TIMEOUT,
+  );
+});
+
+/**
+ * A client over a channel that reorders, repeats and loses broadcasts, taking each as it comes
+ * with `receiveBroadcast` and catching up from the hub's log on a gap or a refusal (24.2).
+ */
+class Lossy extends Client {
+  static readonly seen = { applied: 0, had: 0, gap: 0 };
+
+  override send(): void {
+    const sendable = sendableSteps(this.editor.state);
+    if (!sendable) return;
+    const json = sendable.steps.map((s) => JSON.parse(JSON.stringify(s.toJSON())) as StepJSON);
+    if (!this.hub.receive(sendable.version, json, this.id)) this.catchUp();
+  }
+
+  override deliver(index: number): void {
+    const [message] = this.inbox.splice(index % this.inbox.length, 1);
+    if (message) this.take(message);
+  }
+
+  /** A broadcast delivered and kept, to come again. */
+  repeat(index: number): void {
+    const message = this.inbox[index % this.inbox.length];
+    if (message) this.take(message);
+  }
+
+  drop(index: number): void {
+    this.inbox.splice(index % this.inbox.length, 1);
+  }
+
+  take(message: Broadcast): void {
+    const result = receiveBroadcast(this.editor.state, message);
+    Lossy.seen[result.status]++;
+    if (result.status === "applied") this.editor.dispatch(result.transaction);
+    else if (result.status === "gap") {
+      // Lost or overtaken: what is missing comes from the log.
+      this.catchUp();
+    }
+  }
+
+  /** The hub's `stepsSince`: everything from this editor's version. */
+  catchUp(): void {
+    const version = getVersion(this.editor.state);
+    const missed = this.hub.log.slice(version);
+    if (!missed.length) return;
+    this.take({
+      version,
+      steps: missed.map((m) => m.step),
+      clientIDs: missed.map((m) => m.clientID),
+    });
+  }
+}
+
+describe("receiveBroadcast over an unreliable channel (24.2, 300 runs)", () => {
+  it(
+    "broadcasts reordered, repeated and lost: every editor ends as the hub, none applied twice",
+    () => {
+      const lossy = fc.record({
+        kind: fc.constantFrom(
+          "type",
+          "type",
+          "delete",
+          "bold",
+          "undo",
+          "send",
+          "deliver",
+          "deliver",
+          "repeat",
+          "drop",
+        ),
+        client: fc.nat(),
+        a: fraction,
+        b: fraction,
+      });
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2, max: 4 }),
+          fc.array(lossy, { maxLength: 40 }),
+          (n, ops) => {
+            let now = Date.UTC(2026, 10, 24);
+            const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+            try {
+              const hub = new Hub();
+              const clients: Lossy[] = [];
+              for (let id = 1; id <= n; id++) clients.push(new Lossy(id, hub));
+              ops.forEach((o, serial) => {
+                now += Math.floor(o.b * 900);
+                const c = clients[o.client % n] as Lossy;
+                const at = Math.floor(o.a * 1000);
+                if (o.kind === "repeat") c.repeat(at);
+                else if (o.kind === "drop") c.drop(at);
+                else run(c, o as Op, serial);
+              });
+              // Settled: what is left delivered, then each catches up and sends until quiet.
+              for (let round = 0; round < 50; round++) {
+                for (const c of clients) {
+                  // Newest first, each twice: overtaken and repeated to the end.
+                  while (c.inbox.length) {
+                    c.repeat(c.inbox.length - 1);
+                    c.deliver(c.inbox.length - 1);
+                  }
+                  c.catchUp();
+                  c.send();
+                }
+                if (clients.every((c) => !c.inbox.length && !sendableSteps(c.editor.state))) break;
+              }
+              const expected = hub.editor.getDocument();
+              for (const c of clients) {
+                expect(sendableSteps(c.editor.state)).toBeNull();
+                expect(getVersion(c.editor.state)).toBe(hub.log.length);
+                expect(c.editor.getDocument()).toEqual(expected);
+              }
+              expect(hub.refused).toBe(0);
+            } finally {
+              clock.mockRestore();
+            }
+          },
+        ),
+        { numRuns: 300 },
+      );
+      // The channel did misbehave: duplicates were recognised and gaps caught up, many times.
+      expect(Lossy.seen.had).toBeGreaterThan(50);
+      expect(Lossy.seen.gap).toBeGreaterThan(50);
     },
     TIMEOUT,
   );

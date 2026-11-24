@@ -35,7 +35,7 @@ place that says what is in progress; check it before starting work.
 | 21 Hardening              | ✅ Done                  | —                             | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                             | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | In review                | `phase-23/agent-parity`       | 23.1–23.9 merged (#253–#266); the release (agent 0.4.0, mcp 0.3.0, 1.7.0) waits for the owner                                                                                                 |
-| 24 Collab integration     | In progress              | `phase-24/collab-integration` | 24.1 done (#270); 24.2 next                                                                                                                                                                   |
+| 24 Collab integration     | In progress              | `phase-24/collab-integration` | 24.1–24.2 done; 24.3 next                                                                                                                                                                     |
 | 25 Word ribbon            | Ready                    | —                             | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -3582,8 +3582,13 @@ agent; if both change a shared file, whichever lands second merges the other in 
   Done: the guide's Versions and My edits stop sections, the collab README's Versions
   paragraph, TSDoc on `Broadcast`, `Received`, `getVersion`, `sendableSteps` and
   `receiveTransaction`; core's README links the guide.
-- [ ] 24.2 Core: `receiveBroadcast` with its three outcomes; the version check in
+- [x] 24.2 Core: `receiveBroadcast` with its three outcomes; the version check in
   `receiveTransaction`; the property test over reordered, duplicated and dropped broadcasts.
+  Done: `receiveBroadcast` (`applied`, `had`, `gap`; an overlapping broadcast applies only what
+  the editor lacks), `BroadcastJSON` and `ReceivedBroadcast`; `receiveTransaction`'s optional
+  fourth argument; `broadcast.test.ts`, and 300 property runs of 2–4 clients over a channel that
+  reorders, repeats and loses broadcasts, catching up from the log (each run's duplicates and
+  gaps counted: over 50 of each).
 - [ ] 24.3 Collab: `connect` and `hub`, their message types, presence through them; unit tests of
   each case (stale, gap, duplicate, reconnect, a client refused for good).
 - [ ] 24.4 The host-and-joiner test over an unreliable channel, both ways (raw functions,

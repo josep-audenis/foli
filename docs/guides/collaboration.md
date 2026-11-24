@@ -128,9 +128,11 @@ which:
 
 So a broadcast fits an editor when `broadcast.version === getVersion(editor.state)`; after it the
 editor is at `broadcast.version + broadcast.steps.length`. The sender gets its own broadcast too:
-that is how its steps are confirmed and its version moves. `receiveTransaction` does not check
-the version: apply a broadcast only when it fits, keep one from later until those before it
-arrive, and drop one from before (the editor has it).
+that is how its steps are confirmed and its version moves. `receiveBroadcast(state, broadcast)`
+checks it: it applies the part the editor lacks (`applied`, with the transaction to dispatch),
+says `had` for one it has, and `gap` for one from later (ask for `stepsSince` the editor's
+version). `receiveTransaction` checks only when given the broadcast's version as its fourth
+argument, and throws when it does not fit.
 
 ## My edits stop
 

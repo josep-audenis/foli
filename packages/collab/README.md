@@ -31,7 +31,7 @@ authority.stepsSince(version); // { version, steps, clientIDs } or { snapshot } 
 authority.snapshot(); // { version, document, package }: what to store
 ```
 
-The client side is `collab`, `sendableSteps`, `receiveTransaction` and `getVersion` in
+The client side is `collab`, `sendableSteps`, `receiveBroadcast` and `getVersion` in
 `@folijs/core`. Refusals: `stale`, `malformed`, `invalid` (a step does not apply, or an envelope
 or story step no longer finds what it changes), `too-large` (`limits`: message size, steps per
 message) and `unauthorized`. The log keeps `limits.log` steps (default 10 000); a client further
