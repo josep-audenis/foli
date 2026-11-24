@@ -36,6 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013) and 23.2 (tracked table formatting, schema 8) merged                                                                                                                |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
+| 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -119,6 +120,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.6.0, collab 0.1.0    | L    |
 | 23    | Agent editing parity      | Tables, formatting, lists, pictures, headers: the agent edits as a user does      | agent 0.4.0, mcp 0.3.0 | M    |
 | 24    | Collab, easy to integrate | Versions checked, a client loop over any transport, plugins switched in place     | 1.7.0, collab 0.2.0    | M    |
+| 25    | Word ribbon               | Captioned groups, contextual tabs, collapse, shrinking groups, KeyTips            | 1.8.0                  | M    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -3536,6 +3538,106 @@ agent; if both change a shared file, whichever lands second merges the other in 
   ADR-0008 amended. The riskiest task: a plugin whose state depends on another's is checked.
 - [ ] 24.6 Docs and release: READMEs, guide, limitations.md, the site's collab page; changesets;
   core 1.7.0 and collab 0.2.0 published with the owner's approval.
+## Phase 25 — Word ribbon · M → 1.8.0
+
+The toolbar looks and works like Word's ribbon: tabs of captioned groups (Home: Undo, Font,
+Paragraph, Styles…), the contextual tabs Word shows for a table and a picture, References and
+View tabs, large buttons, a group's dialog launcher, a ribbon that collapses, groups that shrink
+step by step before going under More, and KeyTips (Alt, then letters). Asked for by the owner
+on 2026-11-24 ("a pretty similar experience to Word"). Planned the same day, nothing built.
+
+The work lives in `@folijs/react` (`FoliToolbar.tsx`) and is built from commands core already
+has: no engine change, no schema change. It can run beside Phase 23 (`@folijs/agent` and
+`@folijs/mcp`) and Phase 24 (`@folijs/collab`), and touches no root tooling. The ribbon is
+opt-in: `FoliToolbar` without `tabs` and `defaultToolbarTabs` stay as they are (1.x semver;
+`defaultToolbarTabs` promises arrays only), and the Word ribbon is a new export,
+`wordRibbonTabs`.
+
+Not in this phase: the File tab and its backstage (open, save and print are the app's); a Quick
+Access Toolbar; zoom, a ruler, a status bar, format painter, showing ¶ marks, Paragraph and Font
+dialogs (the After 1.0 backlog: once one exists, its group gets a launcher); Mailings, Design,
+Draw and the other Word tabs with no commands behind them; Word's icons (Foli draws its own: no
+Microsoft artwork or branding beyond the tabs' ordinary words).
+
+**Starts from (1.6.0), checked 2026-11-24:**
+
+- Tabs and captioned groups exist (15.3, #152): `ToolbarTab { key, label, items, visible }`,
+  `ToolbarGroup { label, items }`, WAI-ARIA tabs, `tab`/`onTabChange`/`defaultTab`,
+  `overflow: "menu"` putting whole groups under More, `messages` for every string (api.md,
+  Toolbar tabs).
+- `defaultToolbarTabs` has Home, Insert, Layout and Review, every built-in item once, in
+  uncaptioned groups (`FoliToolbar.tsx:1321`). There is no References or View tab and no
+  contextual tab.
+- Table commands are entries of one Table menu (`FoliToolbar.tsx:532`: insert table, rows and
+  columns, delete, merge, column width, header row); `tableStyle` and `cellShading` are items of
+  Layout. A selected picture is edited through the picture dialog (alt text, size, crop,
+  rotation).
+- Fields, notes and controls are menus of Insert; the table of contents and cross-reference are
+  entries of Fields; `toggleFieldCodes` is Alt+F9 and the Fields menu's "Show field codes"
+  entry; the navigation pane is the `navigate` item, the review view the `reviewView` item;
+  Page Setup and note options are dialogs opened from the Section and Notes menus.
+- Every item is the same size (an icon or a short label); a group has no launcher; the ribbon
+  cannot be collapsed; nothing reacts to Alt.
+- The playground's editor (`apps/playground/src/edit.tsx:121`) shows the flat toolbar, not tabs.
+
+**Decisions to take in 25.1** (recorded in api.md; an ADR if one reaches past the toolbar):
+
+- KeyTips and the browser: Alt alone opens the menu bar in Firefox and some Windows browsers,
+  and Alt+letter is taken by browsers and screen readers. Proposed: Alt pressed and released
+  alone, with the focus in the editor or the toolbar, shows the KeyTips (Word's gesture); no key
+  is taken while a chord is in progress; an app turns KeyTips off with a prop. That NVDA and
+  JAWS keep their own Alt keys is a manual check, deferred as the other screen-reader checks are.
+- How groups shrink: Word's steps are large → small with label → icon only → the whole group as
+  one button opening its items. Proposed: one step at a time, from the rightmost group, before
+  `overflow: "menu"` takes whole groups; an item says which steps it allows.
+- Contextual tabs: Word shows them after the others under a coloured heading. Proposed: a
+  `contextual` label on `ToolbarTab` drawing that heading, `visible` as today.
+
+### Tasks
+
+- [ ] 25.1 The decisions above settled and written into api.md; the new props typed
+  (`ToolbarGroup.launcher`, an item's `size`, `ToolbarTab.contextual`, `collapsed`,
+  `keyTips`) and their strings added to `toolbarMessages`.
+- [ ] 25.2 `wordRibbonTabs`, captioned groups in Word's order, every built-in item reachable:
+  Home (Undo; Font; Paragraph; Styles; Editing: navigate), Insert (Tables; Illustrations;
+  Links; Header & Footer; Text: fields, controls; Pages: page and section breaks, horizontal
+  rule), Layout (Page Setup: section, columns; Paragraph: spacing, indents), References (Table
+  of Contents; Footnotes: notes, note options; Captions: cross-reference), Review (Comments;
+  Tracking; Changes), View (Show: navigation pane, field codes; review view).
+- [ ] 25.3 Contextual tabs: Table Design (table style, shading, header row) and Table Layout
+  (rows and columns, merge, delete, column width), new items made from the Table menu's
+  entries, while the selection is in a table; Picture Format (alt text, size, crop, rotation,
+  from the picture dialog's parts) while a picture is selected. The checks behind them exported for apps' own tabs.
+- [ ] 25.4 Large buttons and launchers: an item's `size: "large"` (icon over label, the
+  group's height); a group's `launcher` opening a toolbar dialog (Page Setup, note options,
+  insert table) or calling the app; keyboard and focus as for other items.
+- [ ] 25.5 Collapse: a double-click on a tab or Ctrl+F1 hides the panel; a click on a tab then
+  shows it over the document until the next command or Escape; a pin keeps it shown;
+  `collapsed` and `onCollapsedChange` for apps that keep it.
+- [ ] 25.6 Groups shrink step by step as the width falls (25.1's steps), then overflow; one
+  `ResizeObserver`, measured once per width, nothing measured while typing (bench: no keystroke
+  slower than 1.6.0 with the ribbon shown).
+- [ ] 25.7 KeyTips: the tabs' letters (Word's where free: H, N, P, S, R, W), then the shown
+  tab's items' letters; Escape steps back; letters in `messages`; off with `keyTips={false}`.
+- [ ] 25.8 The playground and the site's demo show `wordRibbonTabs`; e2e specs in Chromium,
+  Firefox and WebKit (tabs, a contextual tab coming and going, collapse, shrinking at three
+  widths, KeyTips); screenshots against a baseline.
+- [ ] 25.9 Docs and release: api.md, styling.md (the new classes), theming.md, keyboard.md
+  (Ctrl+F1, KeyTips), limitations.md (what Word's ribbon has that this does not); a changeset;
+  1.8.0 published with the owner's approval.
+
+### Acceptance
+
+- An app gets a Word-like ribbon with `<FoliEditor toolbar={wordRibbonTabs} />` and nothing else.
+- With the caret in a table, Table Design and Table Layout show and every table command is one
+  click away; a selected picture shows Picture Format; leaving hides them.
+- At 1366, 1024 and 768 px wide, groups shrink before anything goes under More, and every item
+  stays reachable.
+- Every tab and item is reachable by keyboard alone (one tab stop for the tabs, one for the
+  toolbar, KeyTips); axe finds no new violation.
+- Existing toolbars (`items`, `tabs`, `defaultToolbarTabs`) behave as in 1.6.0: the current
+  toolbar tests pass unchanged.
+- `pnpm check` green; the bench shows no keystroke slower than 1.6.0.
 
 ## After 1.0
 
