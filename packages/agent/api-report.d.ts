@@ -168,6 +168,11 @@ export interface Block {
      * with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
      */
     formatting?: string;
+    /** A header's or footer's block (`read` with `headers`): which story it is in. */
+    story?: {
+        id: string;
+        kind: "header" | "footer";
+    };
 }
 /**
  * Blocks as the text a model reads, a line each:
@@ -246,6 +251,12 @@ export interface ReadOptions {
     limit?: number;
     /** Also each paragraph's text formatting of its own (bold, font, size…): `Block.formatting`. */
     formatting?: boolean;
+    /**
+     * Also the headers and footers, after the body (in a read in parts, after its last part),
+     * each under a line saying where it is used; their blocks' handles are `h1`, `f1`… and
+     * `Block.story` names them (23.7).
+     */
+    headers?: boolean;
 }
 export interface ReadResult {
     /** The blocks as lines, each starting with its handle in brackets (`formatBlocks`). */
@@ -410,6 +421,9 @@ export interface Checkpoint {
  */
 export declare function openSession(document: EditorDocument, options: SessionOptions): Session;
 
+// stories.d.ts
+export {};
+
 // tables.d.ts
 export interface InsertTableOptions {
     /** Next to the block: after it (default) or before it. */
@@ -499,7 +513,7 @@ export declare const READ_LIMIT = 200;
  * What to say to the model once, before the tools (a system prompt's part). Each tool's
  * description stands without it.
  */
-export declare const INSTRUCTIONS = "These tools read and edit Word documents (.docx). Every edit is a tracked change a person will accept or reject in Word: change only what the task asks, and use comment to explain a change that is not obvious.\n\nWork on what read shows. read gives the document a line per block:\n  [b7] Clause, 1.1, changed: text\n[b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1: row and grid column; c1-2 a cell spanning two; \"merged down\" or \"merged up\" a vertical merge, its text in the top cell), its style, its list number, \"changed\" if it has tracked changes, its comments; after the colon, its text. \u21B5 is a line break. A line \"table, 3 rows, 2 columns\" is a table: its cells' blocks follow, indented. A line \"not editable: \u2026\" is content you cannot change.\nWords in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: \u2026] is a content control to fill with fill_control; \u00ABName\u00BB is a merge field to fill with update_fields.\nA handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.\nOnly the body is read and edited: headers, footers and the text of notes ([note]) are not shown.";
+export declare const INSTRUCTIONS = "These tools read and edit Word documents (.docx). Every edit is a tracked change a person will accept or reject in Word: change only what the task asks, and use comment to explain a change that is not obvious.\n\nWork on what read shows. read gives the document a line per block:\n  [b7] Clause, 1.1, changed: text\n[b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1: row and grid column; c1-2 a cell spanning two; \"merged down\" or \"merged up\" a vertical merge, its text in the top cell), its style, its list number, \"changed\" if it has tracked changes, its comments; after the colon, its text. \u21B5 is a line break. A line \"table, 3 rows, 2 columns\" is a table: its cells' blocks follow, indented. A line \"not editable: \u2026\" is content you cannot change.\nWords in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: \u2026] is a content control to fill with fill_control; \u00ABName\u00BB is a merge field to fill with update_fields.\nA handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.\nread shows the body; read with headers also shows the headers and footers after it, their handles h1, f1\u2026, which the same tools edit (comments go in the body only). The text of notes ([note]) is not shown.";
 /** What a tool answers the model: text, and whether it is a refusal. */
 export interface ToolAnswer {
     text: string;

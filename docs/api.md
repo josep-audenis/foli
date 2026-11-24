@@ -1301,6 +1301,9 @@ version. Details, the read format and examples: the
   `start?`; `horizontalRule`; `footnote` and `endnote` with `text`, `on?`); `imageInfo(bytes)`,
   a PNG's, JPEG's or GIF's size and type. `agentTools(session, ToolHost?)`: `picture(path)`
   gives the `insert` tool an image's bytes.
+- Headers and footers (0.4, 23.7): `read({ headers: true })` appends them (`Block.story`:
+  `{ id, kind }`); their handles (`h…`, `f…`) work with every operation but `comment`, and
+  `target` gives their story's id.
 - Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
   `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
   checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session

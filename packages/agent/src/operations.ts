@@ -47,6 +47,8 @@ export interface Context {
   editor: Editor;
   handles: Handles;
   author: string;
+  /** The header's or footer's story id when this is one's (23.7); the body's: none. */
+  story?: string;
 }
 
 type Attrs = Record<string, unknown>;
@@ -104,7 +106,10 @@ export function resolve(context: Context, handle: string): Refusal | { pos: numb
         "gone",
         `Block ${handle} is no longer in the document. Read again for the blocks there are.`,
       )
-    : refuse("unknown-handle", `There is no block ${handle}. Handles come from read: [b1], [b2]…`);
+    : refuse(
+        "unknown-handle",
+        `There is no block ${handle}. Handles come from read: [b1], [b2]… (headers' [h1] and footers' [f1] from read with headers).`,
+      );
 }
 
 /** @internal The blocks with these handles as they read now, in document order. */
@@ -175,7 +180,7 @@ export function replaceText(
   const from = target.pos;
   const to = target.pos + target.node.nodeSize;
   const matches = findAll(editor, query, { matchCase: true }).filter(
-    (m) => m.story === null && m.from >= from && m.to <= to,
+    (m) => m.story === (context.story ?? null) && m.from >= from && m.to <= to,
   );
   if (!matches.length) {
     const now = changed(context, [handle]).blocks[0]?.text ?? "";
@@ -468,7 +473,7 @@ export function placesIn(
   const query = typeof on === "string" ? typed(on) : "";
   if (!query) return refuse("invalid", "on must be text of the block, as read shows it.");
   const matches = findAll(context.editor, query, { matchCase: true }).filter(
-    (m) => m.story === null && m.from >= from && m.to <= to,
+    (m) => m.story === (context.story ?? null) && m.from >= from && m.to <= to,
   );
   if (matches.length === 1 || (all && matches.length))
     return matches.map((m) => ({ from: m.from, to: m.to }));

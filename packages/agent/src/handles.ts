@@ -1,4 +1,4 @@
-import type { Editor, Node } from "@folijs/core";
+import type { Editor, Mappable, Node, Transaction } from "@folijs/core";
 
 /**
  * @internal
@@ -18,22 +18,49 @@ export class Handles {
   /** Each handle's position: after its block. */
   readonly #ends = new Map<string, number>();
   #byEnd: Map<number, string> | null = null;
-  #issued = 0;
+  readonly #prefix: string;
+  /** Shared by the stories of a kind: no handle is given twice among them. */
+  readonly #counter: { n: number };
+  readonly #mine = new Set<string>();
 
-  constructor(editor: Editor) {
+  /**
+   * `prefix`: the body's blocks are `b1`…, a header's `h1`…, a footer's `f1`… (23.7); `counter`
+   * is shared by every story of one kind.
+   */
+  constructor(
+    editor: Editor,
+    prefix = "b",
+    counter: { n: number } = { n: 0 },
+    /**
+     * A story's editor (`editor`) tells its listeners of a change without its steps: its
+     * handles follow the body's editor, through the story's part of each change.
+     */
+    story?: { body: Editor; id: string },
+  ) {
     this.#editor = editor;
+    this.#prefix = prefix;
+    this.#counter = counter;
     let last = editor.state.doc;
-    editor.subscribe((state, transactions) => {
+    const mappingOf = (tr: Transaction): Mappable & { maps: readonly unknown[] } =>
+      story
+        ? // The story's positions through the change (core's, not in its published types).
+          (
+            tr.mapping as unknown as { storyMapping(id: string): Mappable & { maps: unknown[] } }
+          ).storyMapping(story.id)
+        : tr.mapping;
+    (story?.body ?? editor).subscribe((_state, transactions) => {
+      const doc = editor.state.doc;
       // `setDocument` tells without a transaction: no position of the old document holds.
-      if (!transactions.length && state.doc !== last) this.#ends.clear();
-      last = state.doc;
+      if (!transactions.length && doc !== last) this.#ends.clear();
+      last = doc;
       for (const tr of transactions) {
-        if (!tr.steps.length) continue;
+        const mapping = mappingOf(tr);
+        if (!mapping.maps.length) continue;
         for (const [handle, end] of this.#ends) {
           // The two sides of the block's closing. A block removed, or joined with the next,
           // loses one of them or sees them part, and the handle goes.
-          const before = tr.mapping.mapResult(end - 1, 1);
-          const after = tr.mapping.mapResult(end, -1);
+          const before = mapping.mapResult(end - 1, 1);
+          const after = mapping.mapResult(end, -1);
           if (before.deleted || after.deleted || after.pos !== before.pos + 1)
             this.#ends.delete(handle);
           else this.#ends.set(handle, after.pos);
@@ -49,7 +76,8 @@ export class Handles {
     this.#byEnd ??= new Map([...this.#ends].map(([handle, at]) => [at, handle]));
     let handle = this.#byEnd.get(end);
     if (!handle) {
-      handle = `b${++this.#issued}`;
+      handle = `${this.#prefix}${++this.#counter.n}`;
+      this.#mine.add(handle);
       this.#ends.set(handle, end);
       this.#byEnd.set(end, handle);
     }
@@ -70,10 +98,9 @@ export class Handles {
     this.#byEnd = null;
   }
 
-  /** Whether `handle` was ever issued. */
+  /** Whether `handle` was ever issued here. */
   issued(handle: string): boolean {
-    const n = /^b([1-9]\d*)$/.exec(handle);
-    return !!n && Number(n[1]) <= this.#issued;
+    return this.#mine.has(handle);
   }
 
   /** Where the block `handle` names is now (before it), with the block; null when it is gone. */

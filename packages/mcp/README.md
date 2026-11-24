@@ -58,7 +58,7 @@ with a handle (`[b7]`), and edits by handle:
 | Tool                              | What it does                                                      |
 | --------------------------------- | ----------------------------------------------------------------- |
 | `open`, `list_documents`, `close` | Opens a `.docx` (several at once, each with an id), lists, closes |
-| `read`                            | The body, 200 blocks at a time unless asked otherwise             |
+| `read`                            | The body, 200 blocks at a time; with `headers`, headers, footers  |
 | `replace_text`                    | Replaces text in a paragraph                                      |
 | `insert_paragraphs`               | New paragraphs before or after a block, in a style if named       |
 | `delete_block`                    | Deletes a paragraph, or a table                                   |
@@ -124,8 +124,9 @@ documents, as tracked changes.
   read's `(more: …)` line then names the first block cut away.
 - `null` for an argument that may be left out counts as leaving it out. A save the system
   refuses (the file open in Word, a folder not writable) says so.
-- The body only: headers, footers and notes are not read (`update_fields` updates their
-  fields).
+- Headers and footers are read with `read`'s `headers` and edited with the same tools (no
+  comments, breaks or notes there); the text of notes is not read (`update_fields` updates
+  their fields).
 - No pages: `update_fields` leaves page numbers as they are, and a table of contents too
   unless asked (`contents`), when its page numbers come back empty until Word updates it.
 - One client, over stdin and stdout. No network transport.

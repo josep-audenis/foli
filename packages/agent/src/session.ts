@@ -40,7 +40,8 @@ import {
   readBlocks,
   runFormatting,
 } from "./read.js";
-import { type Result, refuse } from "./result.js";
+import { type Refusal, type Result, refuse } from "./result.js";
+import { type StoryKind, storyUses } from "./stories.js";
 import {
   type CellText,
   deleteRows,
@@ -76,6 +77,12 @@ export interface ReadOptions {
   limit?: number;
   /** Also each paragraph's text formatting of its own (bold, font, size…): `Block.formatting`. */
   formatting?: boolean;
+  /**
+   * Also the headers and footers, after the body (in a read in parts, after its last part),
+   * each under a line saying where it is used; their blocks' handles are `h1`, `f1`… and
+   * `Block.story` names them (23.7).
+   */
+  headers?: boolean;
 }
 
 export interface ReadResult {
@@ -265,9 +272,64 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
 
   const context: Context = { editor, handles, author };
 
+  /** Headers' and footers' handles: `h1`…, `f1`…, each kind counted across its stories. */
+  const counters = { header: { n: 0 }, footer: { n: 0 } };
+  /** Each header's and footer's editor and handles, made when it is first read. */
+  const stories = new Map<string, Context & { id: string }>();
+  const storyContext = (id: string, kind: StoryKind): (Context & { id: string }) | null => {
+    let found = stories.get(id);
+    // The body's document replaced (`setDocument`): core made the story's editor anew.
+    if (found && editor.story(id) !== found.editor) {
+      stories.delete(id);
+      found = undefined;
+    }
+    if (!found) {
+      const story = editor.story(id);
+      if (!story) return null;
+      const prefix = kind === "header" ? "h" : "f";
+      found = {
+        id,
+        story: id,
+        editor: story,
+        handles: new Handles(story, prefix, counters[kind], { body: editor, id }),
+        author,
+      };
+      stories.set(id, found);
+    }
+    return found;
+  };
+  // `setDocument` on the body tells without a transaction: every story's handles go with it.
+  let lastBody = editor.state.doc;
+  editor.subscribe((state, transactions) => {
+    if (!transactions.length && state.doc !== lastBody) stories.clear();
+    lastBody = state.doc;
+  });
+  /** The context a handle's block is in: a header's or a footer's, else the body's. */
+  const contextOf = (handle: unknown): Context & { id?: string } => {
+    const first = Array.isArray(handle) ? handle[0] : handle;
+    if (typeof first === "string" && /^[hf][1-9]\d*$/.test(first))
+      for (const story of stories.values()) if (story.handles.issued(first)) return story;
+    return context;
+  };
+  /** Handles of several blocks: all in one story, or why not. */
+  const oneStory = (list: unknown): Refusal | null => {
+    if (!Array.isArray(list) || list.length < 2) return null;
+    const first = contextOf(list[0]);
+    return list.every((h) => contextOf(h) === first)
+      ? null
+      : refuse(
+          "invalid",
+          "These blocks are in different stories (the body, a header, a footer): one call for each.",
+        );
+  };
+  const NO_COMMENT = refuse(
+    "invalid",
+    "Word keeps no comments in headers and footers: comment a paragraph of the body.",
+  );
+
   const read = (options: ReadOptions = {}): Result<ReadResult> => {
     // A model's tool call may send null for an object left out.
-    const { from, limit, formatting } = options ?? {};
+    const { from, limit, formatting, headers } = options ?? {};
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
       return refuse("invalid", "limit must be a whole number above 0.");
     const all = readBlocks(editor.state, handles);
@@ -278,28 +340,47 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
       start = all.findIndex((block) => block.handle === from);
     }
     const blocks = all.slice(start, limit === undefined ? undefined : start + limit);
-    if (formatting === true)
-      for (const block of blocks) {
-        const node = block.kind === "paragraph" ? handles.resolve(block.handle)?.node : undefined;
+    const formatted = (list: Block[], where: Context) => {
+      if (formatting !== true) return;
+      for (const block of list) {
+        const node =
+          block.kind === "paragraph" ? where.handles.resolve(block.handle)?.node : undefined;
         const own = node
           ? [paragraphFormatting(node), runFormatting(node)].filter(Boolean).join("; ")
           : "";
         if (own) block.formatting = own;
       }
+    };
+    formatted(blocks, context);
     const next = all[start + blocks.length]?.handle ?? null;
-    return { ok: true, text: formatBlocks(blocks), blocks, next };
+    let text = formatBlocks(blocks);
+    if (headers === true && next === null)
+      for (const use of storyUses(editor.state)) {
+        const story = storyContext(use.id, use.kind);
+        if (!story) continue;
+        const own = readBlocks(story.editor.state, story.handles).map((b) => ({
+          ...b,
+          story: { id: use.id, kind: use.kind },
+        }));
+        formatted(own, story);
+        blocks.push(...own);
+        text += `\n${use.label}:${own.length ? `\n${formatBlocks(own)}` : " empty"}`;
+      }
+    return { ok: true, text, blocks, next };
   };
 
   const block = (handle: string): Result<{ block: Block; text: string }> => {
-    const target = resolve(context, handle);
+    const where = contextOf(handle);
+    const target = resolve(where, handle);
     if ("ok" in target) return target;
-    const { blocks, text } = changed(context, [handle]);
+    const { blocks, text } = changed(where, [handle]);
     return { ok: true, block: blocks[0] as Block, text };
   };
 
   const checkpoint = (): Checkpoint => {
     const start = editor.state.doc;
     const ends = handles.snapshot();
+    const storyEnds = [...stories.values()].map((s) => [s.handles, s.handles.snapshot()] as const);
     // What the document holds besides its body (styles, numbering…), and undo's own state: a
     // rollback puts both back as they are now. The history plugin is found by its key's name
     // (core does not export the key): its state, given back to it, is taken as it is.
@@ -356,6 +437,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
         if (!editor.state.doc.eq(start))
           throw new Error("checkpoint: the rollback did not give the document back");
         handles.restore(ends);
+        for (const [own, snapshot] of storyEnds) own.restore(snapshot);
       },
     };
   };
@@ -383,36 +465,41 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     read,
     block,
     replaceText: (handle, find, replacement, options) =>
-      replaceText(context, handle, find, replacement, options),
-    insertAfter: (handle, paragraphs) => insert(context, handle, paragraphs, "after"),
-    insertBefore: (handle, paragraphs) => insert(context, handle, paragraphs, "before"),
-    deleteBlock: (handle) => deleteBlock(context, handle),
+      replaceText(contextOf(handle), handle, find, replacement, options),
+    insertAfter: (handle, paragraphs) => insert(contextOf(handle), handle, paragraphs, "after"),
+    insertBefore: (handle, paragraphs) => insert(contextOf(handle), handle, paragraphs, "before"),
+    deleteBlock: (handle) => deleteBlock(contextOf(handle), handle),
     target: (handle) => {
-      const found = resolve(context, handle);
+      const where = contextOf(handle);
+      const found = resolve(where, handle);
       if ("ok" in found) return found;
-      // Its content: a paragraph's text, a table's cells.
+      // Its content: a paragraph's text, a table's cells; in its story, for a header's.
       const { pos, node } = found;
-      return { ok: true, target: { story: null, from: pos + 1, to: pos + node.nodeSize - 1 } };
+      const story = where.id ?? null;
+      return { ok: true, target: { story, from: pos + 1, to: pos + node.nodeSize - 1 } };
     },
     styles: () => styles(context),
-    setStyle: (handle, style) => setStyle(context, handle, style),
-    comment: (handle, text, options) => comment(context, handle, text, options),
+    setStyle: (handle, style) => setStyle(contextOf(handle), handle, style),
+    comment: (handle, text, options) =>
+      contextOf(handle) === context ? comment(context, handle, text, options) : NO_COMMENT,
     controls: () => controls(context),
     fillControl: (name, value) => fillControl(context, name, value),
     updateFields: (options) => updateFields(context, options),
     insertTable: (handle, cells, options) =>
-      whole(() => insertTable(context, handle, cells, options)),
+      whole(() => insertTable(contextOf(handle), handle, cells, options)),
     insertRows: (handle, row, cells, where) =>
-      whole(() => insertRows(context, handle, row, cells, where)),
-    deleteRows: (handle, rows) => whole(() => deleteRows(context, handle, rows)),
-    setCells: (handle, cells) => whole(() => setCells(context, handle, cells)),
+      whole(() => insertRows(contextOf(handle), handle, row, cells, where)),
+    deleteRows: (handle, rows) => whole(() => deleteRows(contextOf(handle), handle, rows)),
+    setCells: (handle, cells) => whole(() => setCells(contextOf(handle), handle, cells)),
     tableStyles: () => tableStyles(editor.state),
-    setTableStyle: (handle, style) => setTableStyle(context, handle, style),
-    shadeCells: (handle, fill, options) => shadeCells(context, handle, fill, options),
-    setHeaderRows: (handle, count) => setHeaderRows(context, handle, count),
-    insertItem: (handle, item, options) => whole(() => insertItem(context, handle, item, options)),
-    formatParagraphs: (handles, format) => whole(() => formatParagraphs(context, handles, format)),
+    setTableStyle: (handle, style) => setTableStyle(contextOf(handle), handle, style),
+    shadeCells: (handle, fill, options) => shadeCells(contextOf(handle), handle, fill, options),
+    setHeaderRows: (handle, count) => setHeaderRows(contextOf(handle), handle, count),
+    insertItem: (handle, item, options) =>
+      whole(() => insertItem(contextOf(handle), handle, item, options)),
+    formatParagraphs: (handles, format) =>
+      oneStory(handles) ?? whole(() => formatParagraphs(contextOf(handles), handles, format)),
     formatText: (handle, format, options) =>
-      whole(() => formatText(context, handle, format, options)),
+      whole(() => formatText(contextOf(handle), handle, format, options)),
   };
 }

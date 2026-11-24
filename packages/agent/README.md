@@ -53,7 +53,7 @@ every tracked change accepted:
 Handles come from read: [b1], [b2]…`). `styles()`, `controls()` and `document()` return theirs
 bare. Only `openSession` throws: on a document that does not validate, or an empty author.
 
-Not read: headers, footers, footnotes and endnotes.
+Headers and footers are read with `read({ headers: true })` (below); the text of footnotes and endnotes is not read.
 
 ## Editing
 
@@ -126,6 +126,22 @@ session.formatParagraphs(["b5", "b6", "b7"], { list: "numbered" }); // null: no 
 session.formatParagraphs("b6", { indent: "more" }); // in a list: a level deeper
 // [b2] Title, changed: Prices
 //        formatting: paragraph centered, space after 12 pt
+```
+
+## Headers and footers
+
+`read({ headers: true })` adds the headers and footers after the body, each under a line saying
+where it is used. Their blocks' handles are `h1`…, `f1`…, and every operation takes them (but
+`comment`: Word keeps no comments there).
+
+```ts
+session.read({ headers: true });
+// …
+// header of sections 1–2:
+// [h1] header: Quarterly Board Report - Q1 2026
+// footer of sections 1–2:
+// [f1] footer: Page 1 of 3
+session.replaceText("h1", "Q1 2026", "Q2 2026");
 ```
 
 ## Pictures, breaks and notes
