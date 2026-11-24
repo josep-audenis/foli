@@ -15,6 +15,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { FoliCanvas, FoliToolbar } from "./index.js";
+import { resetLocalFonts } from "./localFonts.js";
 
 const document3: FoliDocument = {
   schemaVersion: 5,
@@ -142,6 +143,48 @@ describe("FoliToolbar on a schema v3 document", () => {
     // One tab stop for the whole toolbar, selects included.
     const stops = [...screen.getAllByRole("button"), ...screen.getAllByRole("combobox")];
     expect(stops.filter((e) => e.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it("lists the machine's fonts once opening the Font box lets it read them", async () => {
+    const query = vi.fn(async () => [{ family: "Zapfino" }, { family: "Zapfino" }]);
+    vi.stubGlobal("queryLocalFonts", query);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+      resetLocalFonts();
+    });
+    setup();
+    // Not yet allowed: no prompt until the user opens the box.
+    await act(async () => {});
+    expect(query).not.toHaveBeenCalled();
+    // Passing it, or stepping its value, does not ask.
+    fireEvent.keyDown(select("Font"), { key: "ArrowRight" });
+    fireEvent.keyDown(select("Font"), { key: "ArrowDown" });
+    expect(query).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.mouseDown(select("Font"));
+    });
+    expect(query).toHaveBeenCalledTimes(1);
+    const fonts = [...select("Font").options].map((o) => o.value);
+    expect(fonts.filter((f) => f === "Zapfino")).toHaveLength(1);
+    expect(fonts).toContain("Arial");
+    // Asked once a page.
+    fireEvent.mouseDown(select("Font"));
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("never asks for the machine's fonts with localFonts={false}", async () => {
+    const query = vi.fn(async () => [{ family: "Zapfino" }]);
+    vi.stubGlobal("queryLocalFonts", query);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+      resetLocalFonts();
+    });
+    render(<FoliToolbar editor={createEditor({ document: document3 })} localFonts={false} />);
+    await act(async () => {
+      fireEvent.mouseDown(select("Font"));
+      fireEvent.keyDown(select("Font"), { key: "Enter" });
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("inserts Word's horizontal line: a paragraph's bottom border", () => {
