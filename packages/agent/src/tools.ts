@@ -59,7 +59,6 @@ export interface ScriptMethod {
   call(session: Session, args: readonly unknown[], host?: ToolHost): unknown;
 }
 
-/** A tool over any session: what `agentTools` binds, and what a server serves. */
 /**
  * What the app gives the tools that the document does not hold (23.6): a picture's bytes for a
  * path the model names. Without it, pictures are refused.
@@ -68,6 +67,7 @@ export interface ToolHost {
   picture?(path: string): Result<{ data: Uint8Array; contentType?: string }>;
 }
 
+/** A tool over any session: what `agentTools` binds, and what a server serves. */
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -811,7 +811,7 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
             if (!host?.picture)
               throw new Error("Pictures cannot be inserted here: the app gives no files.");
             const file = given(host.picture(String(item.path)));
-            const { path: _, ...rest } = item;
+            const { path: _, contentType: __, ...rest } = item;
             return {
               blocks: given(
                 session.insertItem(

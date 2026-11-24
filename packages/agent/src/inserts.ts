@@ -51,8 +51,27 @@ export interface InsertItemOptions {
   where?: "after" | "before";
 }
 
+/**
+ * A paragraph `insert` made to hold a picture or a rule: none of its neighbour's properties
+ * (a heading's style, a list's number), only the content controls it is in.
+ */
+function plain(context: Context, handle: string, extra: Record<string, unknown> = {}): boolean {
+  const found = context.handles.resolve(handle);
+  if (!found) return false;
+  const { editor } = context;
+  editor.dispatch(
+    editor.state.tr.setNodeMarkup(found.pos, found.node.type, {
+      controls: found.node.attrs.controls ?? null,
+      ...extra,
+    }),
+  );
+  return true;
+}
+
 /** EMU per point, as DrawingML measures. */
 const EMU = 12_700;
+/** The largest size a picture has, in EMU (as core's schema holds it). */
+const MAX_EMU = 2_147_483_647;
 /** The text width when the page does not say, in points (A4 with 2.54 cm margins). */
 const TEXT_WIDTH = 451;
 
@@ -65,10 +84,17 @@ export function imageInfo(
   const be32 = (i: number) =>
     ((at(i) << 24) >>> 0) + (at(i + 1) << 16) + (at(i + 2) << 8) + at(i + 3);
   // PNG: the signature, then IHDR's width and height.
-  if (at(0) === 0x89 && at(1) === 0x50 && at(2) === 0x4e && at(3) === 0x47)
+  if (
+    at(0) === 0x89 &&
+    at(1) === 0x50 &&
+    at(2) === 0x4e &&
+    at(3) === 0x47 &&
+    String.fromCharCode(at(12), at(13), at(14), at(15)) === "IHDR"
+  )
     return { width: be32(16), height: be32(20), contentType: "image/png" };
   // GIF: GIF87a or GIF89a, then the screen's width and height, little-endian.
-  if (at(0) === 0x47 && at(1) === 0x49 && at(2) === 0x46)
+  const gif = String.fromCharCode(at(0), at(1), at(2), at(3), at(4), at(5));
+  if (gif === "GIF87a" || gif === "GIF89a")
     return { width: at(6) | (at(7) << 8), height: at(8) | (at(9) << 8), contentType: "image/gif" };
   // JPEG: markers up to a start of frame (SOF0–SOF15 but DHT, JPG and DAC).
   if (at(0) === 0xff && at(1) === 0xd8) {
@@ -88,8 +114,14 @@ const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /** @internal Bytes as base64, with no platform's encoder (the package runs anywhere core does). */
 export function base64(bytes: Uint8Array): string {
-  const out: string[] = [];
+  const chunks: string[] = [];
+  let out: string[] = [];
   for (let i = 0; i < bytes.length; i += 3) {
+    // A string per 48 K characters, not an array of all of them: a large picture's memory.
+    if (out.length >= 0xc000) {
+      chunks.push(out.join(""));
+      out = [];
+    }
     const a = bytes[i] as number;
     const b = bytes[i + 1];
     const c = bytes[i + 2];
@@ -101,7 +133,8 @@ export function base64(bytes: Uint8Array): string {
       c === undefined ? "=" : (B64[n & 63] as string),
     );
   }
-  return out.join("");
+  chunks.push(out.join(""));
+  return chunks.join("");
 }
 
 /** The body's text width in points, from the last section's page. */
@@ -196,13 +229,12 @@ export function insertItem(
       editor.select(caret);
       if (!editor.run(insertSectionBreak(item.start ?? "nextPage")) || editor.state.doc === before)
         return failed("A section break");
-      // The paragraph split there: it, and the one the break starts.
-      const after = context.handles.resolve(handle);
-      const next = after
-        ? editor.state.doc.resolve(after.pos + after.node.nodeSize).nodeAfter
-        : null;
+      // The paragraph split there. The handle follows the paragraph mark, which is the second
+      // part's: the first part, ending the section, is a paragraph of its own.
+      const now = context.handles.resolve(handle);
+      const first = now ? editor.state.doc.resolve(now.pos).nodeBefore : null;
       const handles = [handle];
-      if (after && next) handles.push(context.handles.at(after.pos + after.node.nodeSize, next));
+      if (now && first) handles.unshift(context.handles.at(now.pos - first.nodeSize, first));
       return { ok: true, ...changed(context, handles) };
     }
     case "horizontalRule": {
@@ -210,14 +242,8 @@ export function insertItem(
       const made = insert(context, handle, [""], where);
       if (!made.ok) return made;
       const rule = made.blocks[0]?.handle as string;
-      const found = context.handles.resolve(rule);
-      if (!found) return failed("A horizontal line");
-      editor.dispatch(
-        editor.state.tr.setNodeMarkup(found.pos, found.node.type, {
-          ...found.node.attrs,
-          borders: { bottom: { style: "single", size: 6, space: 1, color: "auto" } },
-        }),
-      );
+      const borders = { bottom: { style: "single", size: 6, space: 1, color: "auto" } };
+      if (!plain(context, rule, { borders })) return failed("A horizontal line");
       return { ok: true, ...changed(context, [rule]) };
     }
     case "footnote":
@@ -250,6 +276,15 @@ export function insertItem(
           "invalid",
           "The image's type could not be told from its bytes: give its contentType (image/png, image/jpeg…).",
         );
+      if (
+        info &&
+        (info.width < 1 || info.height < 1) &&
+        (item.width === undefined || item.height === undefined)
+      )
+        return refuse(
+          "invalid",
+          "The image's header gives it no size: give its width and height in points.",
+        );
       if (!info && (item.width === undefined || item.height === undefined))
         return refuse(
           "invalid",
@@ -265,9 +300,15 @@ export function insertItem(
         height = (height * most) / width;
         width = most;
       }
+      if (width * EMU > MAX_EMU || height * EMU > MAX_EMU)
+        return refuse(
+          "invalid",
+          "The picture would be larger than Word holds (about 2,350 inches): give a smaller width or height.",
+        );
       const made = insert(context, handle, [""], where);
       if (!made.ok) return made;
       const holder = made.blocks[0]?.handle as string;
+      if (!plain(context, holder)) return failed("A picture");
       const found = context.handles.resolve(holder);
       if (!found) return failed("A picture");
       editor.select(found.pos + 1);

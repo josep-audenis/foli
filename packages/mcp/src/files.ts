@@ -80,10 +80,12 @@ export function fileRules(root: string, overwrite: boolean): FileRules {
   return { root: real, overwrite };
 }
 
-/** A path as a tool is given it: a `.docx`'s name relative to the root, or why it is not. */
 /** @internal The pictures `insert` reads (23.6), by extension. */
 export const PICTURE_KINDS: readonly string[] = [".png", ".jpg", ".jpeg", ".gif"];
+/** @internal The largest picture `insert` reads: well under what a document holds. */
+export const MAX_PICTURE_BYTES = 16 * 1024 * 1024;
 
+/** A path as a tool is given it: a `.docx`'s name relative to the root, or why it is not. */
 function named(path: unknown, kinds: readonly string[] = [".docx"]): string | Checked {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is refused
   if (typeof path !== "string" || !path.trim() || /[\u0000-\u001F\u007F]/.test(path))
@@ -113,6 +115,7 @@ export function read(
   rules: FileRules,
   path: unknown,
   kinds: readonly string[] = [".docx"],
+  most = MAX_FILE_BYTES,
 ): { ok: true; file: string; bytes: Uint8Array } | { ok: false; message: string } {
   const name = named(path, kinds);
   if (typeof name !== "string") return name as { ok: false; message: string };
@@ -126,15 +129,15 @@ export function read(
     return missing(name) as { ok: false; message: string };
   const large = {
     ok: false as const,
-    message: `${JSON.stringify(name)} is over ${MAX_FILE_BYTES / 1024 / 1024} MB: too large.`,
+    message: `${JSON.stringify(name)} is over ${most / 1024 / 1024} MB: too large.`,
   };
   try {
     const stat = statSync(file);
     if (!stat.isFile()) return { ok: false, message: `${JSON.stringify(name)} is not a file.` };
-    if (stat.size > MAX_FILE_BYTES) return large;
+    if (stat.size > most) return large;
     const bytes = readFileSync(file);
     // It may have grown since it was measured.
-    return bytes.length > MAX_FILE_BYTES ? large : { ok: true, file, bytes: new Uint8Array(bytes) };
+    return bytes.length > most ? large : { ok: true, file, bytes: new Uint8Array(bytes) };
   } catch {
     return { ok: false, message: `${JSON.stringify(name)} could not be read.` };
   }

@@ -429,9 +429,12 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   section break at a paragraph's end or start (a section break in the body only, and the
   paragraph splits there as in Word); a footnote or endnote at a paragraph's end or after text in
   it. A picture is inline, its size read from PNG, JPEG and GIF headers (else given), shown at
-  96 dpi and fitted to the text width; alt text is required. The MCP server reads a picture from
-  a .png, .jpg or .gif under its root, no larger than a document; an app gives bytes. No floating
-  pictures, captions or picture from a URL.
+  96 dpi and fitted to the text width; alt text is required. A picture or line paragraph has no
+  properties of its neighbour's. A section break after a paragraph splits it: its text, ending
+  the section, gets a new handle, and the old handle names the empty paragraph after the break.
+  The MCP server reads a picture from a .png, .jpg or .gif under its root, at most 16 MB, and
+  counts its bytes in the session's weight; an app gives bytes. EXIF rotation is not applied to
+  the size. No floating pictures, captions or picture from a URL.
 - No operation accepts or rejects changes. `session.editor` is the
   headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own

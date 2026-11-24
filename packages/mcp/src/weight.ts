@@ -60,6 +60,9 @@ export function weight(session: Session): number {
   if (word) {
     for (const story of word.stories.values()) w += nodeWeight(story.doc);
     w += objectWeight(word.envelope.comments);
+    // Pictures' bytes, as data URLs: what an inserted picture adds (23.6).
+    for (const resource of Object.values(word.envelope.resources ?? {}))
+      w += (resource as { data?: string }).data?.length ?? 0;
   }
   return w;
 }

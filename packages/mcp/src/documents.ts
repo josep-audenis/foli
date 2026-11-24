@@ -7,6 +7,7 @@ import { openSession, type Refusal, type Session } from "@folijs/agent";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
 import {
   type FileRules,
+  MAX_PICTURE_BYTES,
   PICTURE_KINDS,
   read,
   same,
@@ -77,10 +78,10 @@ export class Documents {
   }
   /**
    * A picture's bytes for `insert` (23.6): a .png, .jpg or .gif under the root, read as a
-   * document is (links followed, the same size limit).
+   * document is (links followed), at most `MAX_PICTURE_BYTES`.
    */
   picture(path: unknown): { ok: true; data: Uint8Array } | Refusal {
-    const checked = read(this.#rules, path, PICTURE_KINDS);
+    const checked = read(this.#rules, path, PICTURE_KINDS, MAX_PICTURE_BYTES);
     return checked.ok
       ? { ok: true, data: checked.bytes }
       : { ok: false, code: "invalid", message: checked.message };
