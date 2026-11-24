@@ -396,7 +396,10 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
     editor.run(deleteTable);
     if (editor.state.doc === before || changed(context, [handle]).blocks.length)
       return refuse("refused", `Table ${handle} was not deleted: the document refused the change.`);
-    return { ok: true, text: `Deleted table ${handle} with its cells.` };
+    return {
+      ok: true,
+      text: `Deleted table ${handle} with its cells${howDeleted(editor.state.doc, before, pos)}.`,
+    };
   }
   // Word's rules: a cell and the body end with a paragraph, two tables never touch, and a
   // paragraph mark that cannot join a paragraph after it stays when its deletion is accepted.
@@ -417,7 +420,8 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
   ) {
     // The session's own paragraph, never accepted: it goes for real, as its text would.
     editor.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize).setMeta(untracked, true));
-    if (editor.state.doc !== before) return { ok: true, text: `Deleted block ${handle}.` };
+    if (editor.state.doc !== before)
+      return { ok: true, text: `Deleted block ${handle}: your own insertion, removed.` };
   }
   if (stays && !hasContent(node))
     return refuse(
@@ -436,7 +440,18 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
       ok: true,
       text: `Block ${handle} was emptied but stays: ${stays ?? "its paragraph mark could not be deleted"}.\n${left.text}`,
     };
-  return { ok: true, text: `Deleted block ${handle}.` };
+  return { ok: true, text: `Deleted block ${handle}${howDeleted(editor.state.doc, before, pos)}.` };
+}
+
+/**
+ * Whether what was at `pos` stays as a tracked deletion or went for real (one's own insertion):
+ * what `deleteBlock` says it did.
+ */
+function howDeleted(doc: Node, before: Node, pos: number): string {
+  const was = before.nodeAt(pos);
+  const now = doc.nodeAt(pos);
+  const stays = !!now && !!was && now.type === was.type && now.nodeSize >= was.nodeSize;
+  return stays ? ", as a tracked deletion" : ": your own insertion, removed";
 }
 
 /** @internal The paragraph `handle` names, or why an operation on a paragraph cannot go on. */

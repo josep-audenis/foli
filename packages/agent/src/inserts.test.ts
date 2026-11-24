@@ -55,7 +55,7 @@ describe("inserting what is not text (23.6)", () => {
     });
     expect(done.ok).toBe(true);
     expect(text(session)).toMatch(
-      /^\[b\d+\] Normal: Before\n\[b\d+\] Normal, changed: \[picture\]\n/,
+      /^\[b\d+\] Normal: Before\n\[b\d+\] Normal, changed: \[picture: A chart\]\n/,
     );
     const picture = session.document().content.content?.[1]?.content?.[0];
     expect(picture?.type).toBe("picture");

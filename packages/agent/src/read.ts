@@ -14,7 +14,7 @@ export interface Block {
   number?: string;
   /**
    * A paragraph's text: tabs as tabs, line breaks as "\n". What is not text stands in brackets:
-   * "[picture]", "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
+   * "[picture]" (with its alt text: "[picture: …]"), "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
    * date]" (a content control showing its placeholder, by its title), "[object]". Text deleted
    * as a tracked change, hidden text and field codes are left out. A table: "". Other: what it
    * is.
@@ -33,6 +33,9 @@ export interface Block {
   depth: number;
   /** It holds tracked changes not yet accepted or rejected (anyone's). */
   changed: boolean;
+  /** A table's style, by name, and how many rows from its top repeat on each page (23.9). */
+  tableStyle?: string;
+  headerRows?: number;
   /** How many comments are anchored in it. */
   comments: number;
   /**
@@ -127,7 +130,12 @@ function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden
     else if (name === "tab") text += "\t";
     else if (name === "hardBreak") text += "\n";
     else if (child.type.spec.text) text += child.type.spec.text(child.attrs);
-    else if (!UNSEEN.has(name)) text += STANDS_AS[name] ?? "[object]";
+    else if (name === "picture" && typeof child.attrs.alt === "string" && child.attrs.alt.trim()) {
+      // Its alt text: what tells a model which picture it is (23.9's trial asked for it).
+      const alt = child.attrs.alt.replace(/[\s[\]]+/g, " ").trim();
+      const cut = [...alt];
+      text += `[picture: ${cut.length > 60 ? `${cut.slice(0, 57).join("")}…` : alt}]`;
+    } else if (!UNSEEN.has(name)) text += STANDS_AS[name] ?? "[object]";
   });
   return { text, changed, comments };
 }
@@ -232,6 +240,20 @@ export function readBlocks(state: EditorState, handles: Handles): Block[] {
         });
         table.rows = rows;
         table.columns = columns;
+        const styleId = node.attrs.style as string | null;
+        const style = styleId
+          ? (context?.envelope.styles.find((s) => s.id === styleId)?.name ?? styleId)
+          : null;
+        if (style) table.tableStyle = style;
+        // From the top, among the rows read (a row deleted as a tracked change is not).
+        let header = 0;
+        let counting = true;
+        node.forEach((row) => {
+          if (!counting || revisionOf(row)?.deletion) return;
+          if (row.attrs.header === true) header++;
+          else counting = false;
+        });
+        if (header) table.headerRows = header;
       } else {
         const text = node.type.spec.text?.(node.attrs) ?? String(node.attrs.label ?? name);
         add(
@@ -302,7 +324,11 @@ export function formatBlocks(blocks: readonly Block[]): string {
     ];
     if (block.kind === "table") {
       const size = [count(block.rows, "row"), count(block.columns, "column")];
-      return start + [...where, "table", ...size, ...flags].join(", ");
+      const look = [
+        ...(block.tableStyle ? [oneLine(block.tableStyle)] : []),
+        ...(block.headerRows ? [count(block.headerRows, "header row")] : []),
+      ];
+      return start + [...where, "table", ...size, ...look, ...flags].join(", ");
     }
     const text = oneLine(block.text);
     if (block.kind === "other") return `${start}${[...where, "not editable"].join(", ")}: ${text}`;

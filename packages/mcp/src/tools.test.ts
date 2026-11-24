@@ -159,7 +159,9 @@ describe("reading and editing", () => {
     expect(before.text).toMatch(/Clause, 1\.2, changed: Before\.$/);
 
     const gone = await handleOf("the existence and terms of the discussions");
-    expect((await call("delete_block", { handle: gone })).text).toBe(`Deleted block ${gone}.`);
+    expect((await call("delete_block", { handle: gone })).text).toBe(
+      `Deleted block ${gone}, as a tracked deletion.`,
+    );
     expect((await call("delete_block", { handle: gone })).refused).toBe(true);
 
     expect((await call("list_styles")).text.split("\n")).toEqual(

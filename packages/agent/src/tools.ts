@@ -215,7 +215,7 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
   {
     name: "insert_paragraphs",
     description:
-      "Inserts new paragraphs before or after a block (a paragraph, a table, any block), as a tracked change. Each is formatted like the paragraph it goes next to (after a heading: as body text) unless it names a style. Returns the new blocks with their handles.",
+      "Inserts new paragraphs before or after a block (a paragraph, a table, any block), as a tracked change. Each is formatted like the paragraph it goes next to, its style, indents and numbering included (after a heading: as body text), unless it names a style. Returns the new blocks with their handles.",
     inputSchema: args(
       {
         handle: HANDLE,
@@ -503,7 +503,11 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
             additionalProperties: false,
           },
         },
-        header: { type: "boolean", description: "insert_table: the first row is a header row." },
+        header: {
+          type: "boolean",
+          description:
+            "insert_table: the first row is a header row, repeated on each page (as header_rows 1).",
+        },
         style: {
           anyOf: [{ type: "string" }, { type: "null" }],
           description: "A table style's name (insert_table, set_style).",

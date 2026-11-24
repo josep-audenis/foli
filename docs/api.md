@@ -1309,6 +1309,9 @@ version. Details, the read format and examples: the
   `changes()` → `{ changes: ChangeInfo[], text }` (`id`, `kind`, `author`, `date`, `block`,
   `text`); `acceptChanges(ids | "all", { author? })`, `rejectChanges(…)`; the `review` tool,
   only in `toolsFor(session)` of a reviewing session.
+- The read format (0.4, 23.9): a picture with alt text reads `[picture: its alt text]`; a table's
+  line gives its style and header rows (`Block.tableStyle`, `Block.headerRows`); `deleteBlock`
+  says whether it was a tracked deletion or one's own insertion removed.
 - Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
   `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
   checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session
