@@ -9,15 +9,122 @@ document model; your app keeps the transport, authentication and storage
 | ----------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
 | The authority     | `@folijs/collab`, on your server                                   | Orders every step, validates it by applying it, gives what to broadcast and store |
 | The client plugin | `collab`, `sendableSteps`, `receiveBroadcast` in `@folijs/core`    | Sends its steps, rebases them over the others', keeps undo to its own changes     |
+| The protocol      | `createHub`, `connect` in `@folijs/collab`                         | The messages both sides send, and the client loop: catch-up, retries, presence    |
 | Presence          | `presenceMessage`, `receivePresence`, `presence` in `@folijs/core` | Who else edits, in what colour and where; drawn by `EditorView`                   |
-| The transport     | yours                                                              | WebSocket, SSE, HTTP, a queue: JSON messages                                      |
+| The transport     | yours                                                              | WebSocket, WebRTC, a Yjs channel, a queue: JSON text                              |
 | Who may edit      | yours (`authorize`)                                                | A read-only user's steps refused                                                  |
 | Storage           | yours                                                              | The authority's `snapshot()` (and the original `.docx` package beside it)         |
 
 [`examples/collab`](https://github.com/josep-audenis/foli/tree/main/examples/collab) is a
-complete app: a Node WebSocket server and a page.
+complete app: a Node WebSocket server and a page, on `createHub` and `connect`.
 
-## The server
+## A host in a browser
+
+No server of yours: one person's browser holds the authority, and the others join it over
+whatever carries text between browsers (WebRTC, a relay, a Yjs-backed channel used only as the
+pipe). `createHub` answers each message; `connect` runs every editor, the host's own included,
+connected in memory.
+
+```ts
+export interface Peer {
+  send(text: string): void;
+}
+```
+
+```ts
+export function host(document: EditorDocument, name: string, limits?: AuthorityLimits) {
+  const authority = createAuthority({ document, ...(limits ? { limits } : {}) });
+  const hub = createHub(authority);
+  const HOST = 1; // the others get 2, 3…: small integers keep their new ids apart
+  const peers = new Map<ClientID, Peer>();
+  const snapshot = authority.snapshot();
+  const editor = createEditor({
+    document: snapshot.document,
+    author: name,
+    plugins: [collab({ version: snapshot.version, clientID: HOST })],
+  });
+  // The host's messages arrive after the current dispatch, as a socket's would.
+  const self: Peer = { send: (text) => queueMicrotask(() => session.receive(text)) };
+  const deliver = (from: ClientID, out: Outgoing[]) => {
+    for (const { to, message } of out) {
+      const text = JSON.stringify(message);
+      for (const [id, peer] of [[HOST, self] as const, ...peers])
+        if (to === "everyone" || (to === "sender") === (id === from)) peer.send(text);
+    }
+  };
+  const session = connect(editor, {
+    send: (message) => deliver(HOST, hub.receive(message, HOST)),
+    name,
+    color: "#c2410c",
+  });
+  return {
+    editor,
+    authority,
+    joined(clientID: ClientID, peer: Peer) {
+      peers.set(clientID, peer);
+      deliver(clientID, hub.join(clientID)); // its snapshot and who else is here
+    },
+    received: (clientID: ClientID, text: string) => deliver(clientID, hub.receive(text, clientID)),
+    left(clientID: ClientID) {
+      peers.delete(clientID);
+      deliver(clientID, hub.leave(clientID));
+    },
+  };
+}
+```
+
+Each person joining gives the host a `Peer` to answer them by and an id (2, 3…, unique while they
+are connected); `received` takes their messages, `left` their leaving. On their side:
+
+```ts
+export function joinHost(
+  send: (text: string) => void,
+  name: string,
+  color: string,
+  show: (editor: Editor) => void,
+) {
+  let session: Session | null = null;
+  const start = (snapshot: { version: number; document: FoliDocument; clientID: ClientID }) => {
+    const editor = createEditor({
+      document: snapshot.document,
+      author: name,
+      plugins: [collab({ version: snapshot.version, clientID: snapshot.clientID })],
+    });
+    show(editor);
+    session = connect(editor, {
+      send: (message) => send(JSON.stringify(message)),
+      name,
+      color,
+      onSnapshot: start,
+      onError: (reason) => console.warn(`Your changes were refused (${reason}).`),
+    });
+  };
+  return {
+    received(text: string) {
+      const message = JSON.parse(text);
+      if (!session && message.type === "snapshot") start(message);
+      else session?.receive(message);
+    },
+    /** The connection is back after a drop: what was missed comes, what was not sent goes. */
+    resumed: () => session?.resume(),
+  };
+}
+```
+
+`connect` sends one batch at a time, checks every broadcast against the editor's version
+(`receiveBroadcast`), catches up after a gap or a `stale` refusal, sends presence and shows the
+others'. A drop that outlasts the authority's log brings a new snapshot: `onSnapshot` makes the
+editor again, and what it had not sent is lost. When the host leaves, the session ends: its
+document is the one to keep (`authority.snapshot()`). This code runs in the guide's tests, over a
+channel that reorders, repeats and drops messages
+([`collab.test.ts`](https://github.com/josep-audenis/foli/blob/main/apps/site/src/guides/collab.test.ts)).
+
+With a server, the same two calls: `createHub(authority)` where the authority lives, each
+connection's messages to `hub.receive`, and `connect` in every page.
+
+## By hand: the server
+
+What `createHub` does, written out: for an app with a protocol of its own.
 
 ```ts
 export function serve(
@@ -60,10 +167,10 @@ one process (a Durable Object, a single worker, a lock in your store). `receive`
 message that is not JSON steps of the document's schema, a step that does not apply, a stale
 version and a message over its `limits`, changing nothing.
 
-## The client
+## By hand: the client
 
 ```ts
-export function join(snapshot: Snapshot, clientID: number, name: string, socket: WebSocket) {
+export function join(snapshot: Snapshot, clientID: number, name: string, socket: Peer) {
   const editor = createEditor({
     document: snapshot.document,
     author: name,
@@ -71,6 +178,7 @@ export function join(snapshot: Snapshot, clientID: number, name: string, socket:
   });
 
   let inFlight = false;
+  let stopped = false;
   function send() {
     const sendable = sendableSteps(editor.state);
     if (!sendable || inFlight || stopped) return;
@@ -79,33 +187,31 @@ export function join(snapshot: Snapshot, clientID: number, name: string, socket:
     socket.send(JSON.stringify({ type: "steps", version: sendable.version, steps }));
   }
   editor.subscribe(send);
+  const catchUp = () =>
+    socket.send(JSON.stringify({ type: "catchup", version: getVersion(editor.state) }));
 
-  // Broadcasts that arrived before the ones before them.
-  const early = new Map<number, Broadcast>();
   function receive(message: Broadcast) {
-    early.set(message.version, message);
-    for (
-      let next = early.get(getVersion(editor.state));
-      next;
-      next = early.get(getVersion(editor.state))
-    ) {
-      early.delete(next.version);
-      const steps = next.steps.map((json) => Step.fromJSON(editor.state.schema, json));
-      editor.dispatch(receiveTransaction(editor.state, steps, next.clientIDs));
-      if (next.clientIDs.includes(clientID)) inFlight = false;
+    const result = receiveBroadcast(editor.state, message);
+    if (result.status === "gap") return catchUp(); // one was lost or overtaken
+    if (result.status === "applied") {
+      editor.dispatch(result.transaction);
+      if (message.clientIDs.includes(clientID)) inFlight = false;
     }
     send();
   }
   // Stale: what was missed comes first, then the steps go again, rebased. Any other reason
   // would come again with the same steps: stop sending and tell the user.
-  let stopped = false;
   function refused(reason: string) {
     inFlight = false;
-    if (reason === "stale")
-      socket.send(JSON.stringify({ type: "catchup", version: getVersion(editor.state) }));
+    if (reason === "stale") catchUp();
     else stopped = true;
   }
-  return { editor, receive, refused };
+  // The connection is back: what was missed first, then the steps again.
+  function resumed() {
+    inFlight = false;
+    catchUp();
+  }
+  return { editor, receive, refused, resumed };
 }
 ```
 
@@ -156,7 +262,7 @@ causes it:
 ## Presence
 
 ```ts
-export function presenceOf(editor: Editor, socket: WebSocket, name: string) {
+export function presenceOf(editor: Editor, socket: Peer, name: string) {
   const sendPresence = () =>
     socket.send(
       JSON.stringify({

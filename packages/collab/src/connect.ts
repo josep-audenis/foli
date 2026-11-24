@@ -27,7 +27,7 @@ export interface ConnectOptions {
    * editor again from it (`collab({ version })`) and connect that one; this one stops. Without
    * it, the connection stops and `onError` is told.
    */
-  onSnapshot?(snapshot: { version: number; document: FoliDocument }): void;
+  onSnapshot?(snapshot: { version: number; document: FoliDocument; clientID: ClientID }): void;
   /** The hub refused this editor's steps for good (`invalid`, `unauthorized`…): they are not sent again. */
   onError?(reason: Refusal | "snapshot", message?: string): void;
 }
@@ -130,7 +130,7 @@ export function connect(editor: Editor, options: ConnectOptions): Connection {
       const { version, document } = m;
       stopped = true;
       unsubscribe();
-      if (options.onSnapshot) options.onSnapshot({ version, document });
+      if (options.onSnapshot) options.onSnapshot({ version, document, clientID });
       else options.onError?.("snapshot");
     } else if (m.type === "presence") editor.dispatch(receivePresence(editor.state, m));
     else if (m.type === "left") editor.dispatch(removePresence(editor.state, m.clientID));
