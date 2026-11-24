@@ -1,4 +1,4 @@
-import { controlsIn, type EditorState, fieldsIn, type Node } from "@folijs/core";
+import { controlsIn, type EditorState, fieldsIn, type Mark, type Node } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import type { Handles } from "./handles.js";
 
@@ -35,6 +35,11 @@ export interface Block {
   changed: boolean;
   /** How many comments are anchored in it. */
   comments: number;
+  /**
+   * The text's own formatting, when `read` was asked for it (`formatting`): runs of text that
+   * have some, each with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
+   */
+  formatting?: string;
 }
 
 type Attrs = Record<string, unknown>;
@@ -303,7 +308,70 @@ export function formatBlocks(blocks: readonly Block[]): string {
       oneLine(block.style ?? "paragraph"),
       ...(block.number ? [oneLine(block.number)] : []),
     ];
-    return `${start}${[...head, ...flags].join(", ")}: ${text}`;
+    const own = block.formatting
+      ? `
+${" ".repeat(start.length)}  formatting: ${block.formatting}`
+      : "";
+    return `${start}${[...head, ...flags].join(", ")}: ${text}${own}`;
   };
   return blocks.map(line).join("\n");
+}
+
+/** What a run's own marks make it, in words; empty for none. */
+function described(marks: readonly Mark[]): string[] {
+  const out: string[] = [];
+  for (const mark of marks) {
+    const a = mark.attrs;
+    switch (mark.type.name) {
+      case "bold":
+      case "italic":
+      case "strike":
+        out.push(a.value === false ? `not ${mark.type.name}` : mark.type.name);
+        break;
+      case "underline":
+        out.push(a.style === "none" ? "not underlined" : "underlined");
+        break;
+      case "font": {
+        const name = a.ascii ?? a.hAnsi;
+        if (name) out.push(`font ${JSON.stringify(name)}`);
+        break;
+      }
+      case "fontSize":
+        if (typeof a.value === "number") out.push(`${a.value / 2} pt`);
+        break;
+      case "color":
+        if (a.value && a.value !== "auto") out.push(`color ${a.value as string}`);
+        break;
+      case "highlight":
+        if (a.value && a.value !== "none") out.push(`highlight ${a.value as string}`);
+        break;
+      case "link":
+        out.push(`link ${JSON.stringify(a.href)}`);
+        break;
+    }
+  }
+  return out;
+}
+
+/**
+ * @internal
+ * A paragraph's runs that have formatting of their own, as `Block.formatting` gives them; text
+ * deleted as a tracked change is left out, as `read` leaves it out.
+ */
+export function runFormatting(paragraph: Node): string {
+  const runs: { what: string; text: string }[] = [];
+  paragraph.forEach((child) => {
+    if (!child.isText || child.marks.some((m) => m.type.name === "deletion")) return;
+    const what = described(child.marks).join(", ");
+    const last = runs[runs.length - 1];
+    if (last && last.what === what) last.text += child.text;
+    else runs.push({ what, text: child.text as string });
+  });
+  return runs
+    .filter((r) => r.what)
+    .map(
+      (r) =>
+        `${r.what}: ${JSON.stringify(r.text.length > 80 ? `${r.text.slice(0, 77)}…` : r.text)}`,
+    )
+    .join("; ");
 }

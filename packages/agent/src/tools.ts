@@ -125,11 +125,17 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
         maximum: 2000,
         description: "At most this many blocks.",
       },
+      formatting: {
+        type: "boolean",
+        description:
+          "Also show each paragraph's text formatting of its own (bold, font, size, color, links), on a line under it.",
+      },
     }),
-    run(session, { from, limit }) {
+    run(session, { from, limit, formatting }) {
       const result = session.read({
         ...(from === undefined ? {} : { from: from as string }),
         limit: (limit as number | undefined) ?? READ_LIMIT,
+        ...(formatting === true ? { formatting: true } : {}),
       });
       return told(result, result.ok && result.next ? `\n(more: read from "${result.next}")` : "");
     },
@@ -137,8 +143,13 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       {
         name: "blocks",
         signature:
-          "doc.blocks(): Block[]            // every block of the body, in order, as it reads now (a copy: call again after edits)",
-        call: (session) => given(session.read()).blocks,
+          "doc.blocks({ formatting? }): Block[]   // every block of the body, in order, as it reads now (a copy: call again after edits)",
+        call: (session, [a]: Args) =>
+          given(
+            session.read({
+              formatting: (a as { formatting?: unknown } | undefined)?.formatting === true,
+            }),
+          ).blocks,
       },
       {
         name: "block",
@@ -562,9 +573,12 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       },
       {
         name: "deleteRows",
-        signature: "doc.deleteRows(table, rows): { text }",
+        signature: "doc.deleteRows(table, rows): { text, rows }",
         effect: "delete",
-        call: (session, [a, b]: Args) => ({ text: given(session.deleteRows(a, b)).text }),
+        call(session, [a, b]: Args) {
+          const { text, rows } = given(session.deleteRows(a, b));
+          return { text, rows };
+        },
       },
       {
         name: "setCells",
@@ -594,6 +608,53 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
         signature: "doc.setHeaderRows(table, count): { blocks }",
         effect: "edit",
         call: (session, [a, b]: Args) => ({ blocks: given(session.setHeaderRows(a, b)).blocks }),
+      },
+    ],
+  },
+  {
+    name: "format_text",
+    description:
+      "Formats a paragraph's text, as a tracked formatting change: all of it, or on text in it (exactly as read shows it, there once, or every place with all). format says what to change, the rest stays: bold, italic, underline, strike (true or false), font (a name), size (points), color (RRGGBB), highlight (a Word highlight color by name: yellow, green…), link (an address; null takes a link off); null gives font, size or color back to the style. read with formatting shows what text has now. Returns the block as it reads now.",
+    inputSchema: args(
+      {
+        handle: HANDLE,
+        format: {
+          type: "object",
+          description: 'What to change: { "bold": true, "color": "1F3864" }.',
+          properties: {
+            bold: { type: "boolean" },
+            italic: { type: "boolean" },
+            underline: { type: "boolean" },
+            strike: { type: "boolean" },
+            font: { anyOf: [{ type: "string" }, { type: "null" }] },
+            size: { anyOf: [{ type: "number" }, { type: "null" }] },
+            color: { anyOf: [{ type: "string" }, { type: "null" }] },
+            highlight: { anyOf: [{ type: "string" }, { type: "null" }] },
+            link: { anyOf: [{ type: "string" }, { type: "null" }] },
+          },
+          additionalProperties: false,
+        },
+        on: {
+          type: "string",
+          description: "Text of the block to format, exactly as read shows it. Default: all of it.",
+        },
+        all: { type: "boolean", description: "Every place on is in the block." },
+      },
+      ["handle", "format"],
+    ),
+    run: (session, { handle, format, on, all }) =>
+      told(
+        session.formatText(handle as string, format as never, {
+          ...(on === undefined ? {} : { on: on as string }),
+          ...(all === true ? { all: true } : {}),
+        }),
+      ),
+    methods: [
+      {
+        name: "formatText",
+        signature: "doc.formatText(handle, format, { on?, all? }): { blocks }",
+        effect: "edit",
+        call: (session, [a, b, c]: Args) => ({ blocks: given(session.formatText(a, b, c)).blocks }),
       },
     ],
   },

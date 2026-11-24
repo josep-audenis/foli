@@ -158,6 +158,39 @@ function tableBlocks(context: Context, handle: string): Changed {
 /** Puts the caret in a cell's first paragraph. */
 const caretIn = (context: Context, cell: { pos: number }) => context.editor.select(cell.pos + 2);
 
+/**
+ * Puts the caret where core's row commands act on `row` alone: a cell not in a vertical merge
+ * (a merged cell stands for every row of its merge). False when every cell of the row is.
+ */
+function caretInRow(context: Context, row: Row): boolean {
+  const cell = row.cells.find((c) => !c.node.attrs.vMerge);
+  if (cell) caretIn(context, cell);
+  return !!cell;
+}
+const MERGED = (table: string, row: number) =>
+  `Every cell of row ${row} of table ${table} is part of a vertical merge, which runs over rows around it: Foli cannot insert or delete next to it alone. Nothing was changed.`;
+
+/** Handles of the paragraphs in `node` (at `pos`): a row's or a cell's. */
+function paragraphsIn(context: Context, pos: number, node: Node): string[] {
+  const out: string[] = [];
+  node.descendants((child, offset) => {
+    if (child.type.name !== "paragraph") return true;
+    out.push(context.handles.at(pos + 1 + offset, child));
+    return false;
+  });
+  return out;
+}
+
+/**
+ * The answer of a table operation: the blocks it changed (their handles; default the table's
+ * own line), and the whole table as it reads now.
+ */
+function answer(context: Context, table: string, changedHandles?: readonly string[]): Changed {
+  const whole = tableBlocks(context, table);
+  const wanted = new Set(changedHandles ?? [table]);
+  return { blocks: whole.blocks.filter((b) => wanted.has(b.handle)), text: whole.text };
+}
+
 /** Rows of cell texts as a model gives them, or why they are not. */
 function cellTexts(value: unknown, what: string): string[][] | Refusal {
   const rows = Array.isArray(value) ? value : null;
@@ -185,8 +218,11 @@ function fill(
   const tr = editor.state.tr;
   // From the last: a filled cell moves the ones after it.
   for (let i = Math.min(cells.length, texts.length) - 1; i >= 0; i--) {
+    const cell = cells[i] as { pos: number; node: Node };
+    // A cell a vertical merge goes on through takes no text: it is the merge's top cell's.
+    if (cell.node.attrs.vMerge === "continue") continue;
     const nodes = inline(editor, texts[i] as string);
-    if (nodes.length) tr.insert((cells[i] as { pos: number }).pos + 2, nodes);
+    if (nodes.length) tr.insert(cell.pos + 2, nodes);
   }
   if (tr.docChanged) editor.dispatch(tr);
 }
@@ -196,8 +232,8 @@ export interface InsertTableOptions {
   where?: "after" | "before";
   /** Make the first row a header row (repeated on each page). */
   header?: boolean;
-  /** A table style by name, as `tableStyles` lists them. Default: Word's Table Grid. */
-  style?: string;
+  /** A table style by name, as `tableStyles` lists them; null: none. Default: Word's Table Grid. */
+  style?: string | null;
 }
 
 /** The table style named `name` (capitals do not count), or why there is none. */
@@ -260,7 +296,10 @@ export function insertTable(
   const where = options.where ?? "after";
   if (where !== "after" && where !== "before")
     return refuse("invalid", 'where is "after" or "before".');
-  const style = options.style === undefined ? null : tableStyle(context, options.style);
+  const style =
+    options.style === undefined || options.style === null
+      ? null
+      : tableStyle(context, options.style);
   if (style && typeof style !== "string") return style;
   const found = resolve(context, handle);
   if ("ok" in found) return found;
@@ -275,7 +314,7 @@ export function insertTable(
   if (!editor.run(insertTableCommand(texts.length, columns)) || editor.state.doc === before)
     return refuse(
       "refused",
-      `A table could not be inserted ${where} block ${handle} (a locked content control?).`,
+      `A table could not be inserted ${where} block ${handle} (a locked content control?). Nothing was changed.`,
     );
   // The caret is in its first cell.
   const $from = editor.state.selection.$from;
@@ -298,11 +337,16 @@ export function insertTable(
   );
   if (options.header) {
     caretIn(context, made().rows[0]?.cells[0] as Placed);
-    editor.run(toggleHeaderRow);
+    if (!editor.run(toggleHeaderRow))
+      return refuse(
+        "refused",
+        "The table's first row could not be made a header row. Nothing was changed.",
+      );
   }
-  if (style && style !== "Table Grid") {
+  if ((style && style !== "Table Grid") || options.style === null) {
     caretIn(context, made().rows[0]?.cells[0] as Placed);
-    editor.run(setTableStyleCommand(style));
+    if (!editor.run(setTableStyleCommand(style ?? null)))
+      return refuse("refused", "The table's style could not be set. Nothing was changed.");
   }
   return { ok: true, ...tableBlocks(context, table.handle) };
 }
@@ -332,7 +376,8 @@ export function insertRows(
       `A new row is made like row ${row}, which has ${count(most, "cell")}: row ${long + 1} of cells gives ${texts[long]?.length}.`,
     );
   if (texts.length > MAX_ROWS) return refuse("invalid", `At most ${MAX_ROWS} rows at once.`);
-  caretIn(context, reference.cells[0] as Placed);
+  if (!caretInRow(context, reference)) return refuse("refused", MERGED(table.handle, row));
+  const made: number[] = [];
   for (const [i, rowTexts] of texts.entries()) {
     const before = editor.state.doc;
     // The first next to the reference row; the others after the one just made.
@@ -342,21 +387,24 @@ export function insertRows(
     )
       return refuse(
         "refused",
-        `Rows could not be inserted in table ${table.handle} (a locked content control?).`,
+        `Rows could not be inserted in table ${table.handle} (a locked content control?). Nothing was changed.`,
       );
     const $from = editor.state.selection.$from;
     const depth = cellDepth($from);
-    const made = rowsOf(table.pos, editor.state.doc.nodeAt(table.pos) as Node).find(
-      (r) => r.pos === $from.before(depth - 1),
-    );
-    if (made) fill(context, made.cells, rowTexts);
-    // The caret back in the new row (filling moved it).
-    const now = rowsOf(table.pos, editor.state.doc.nodeAt(table.pos) as Node).find(
-      (r) => made && r.index === made.index,
-    );
-    if (now) caretIn(context, now.cells[0] as Placed);
+    const rows = () => rowsOf(table.pos, editor.state.doc.nodeAt(table.pos) as Node);
+    const index = rows().find((r) => r.pos === $from.before(depth - 1))?.index;
+    if (index === undefined) break;
+    made.push(index);
+    const fresh = rows().find((r) => r.index === index) as Row;
+    fill(context, fresh.cells, rowTexts);
+    // The caret back in the new row (filling moved it): the next one goes after it.
+    caretInRow(context, rows().find((r) => r.index === index) as Row);
   }
-  return { ok: true, ...tableBlocks(context, table.handle) };
+  const node = editor.state.doc.nodeAt(table.pos) as Node;
+  const handles = rowsOf(table.pos, node)
+    .filter((r) => made.includes(r.index))
+    .flatMap((r) => paragraphsIn(context, r.pos, r.node));
+  return { ok: true, ...answer(context, table.handle, handles) };
 }
 
 /** @internal */
@@ -364,7 +412,7 @@ export function deleteRows(
   context: Context,
   handle: string,
   rows: readonly number[],
-): Result<{ text: string; blocks: Changed["blocks"] }> {
+): Result<{ text: string; blocks: Changed["blocks"]; rows: number }> {
   const { editor } = context;
   const table = tableOf(context, handle);
   if ("ok" in table) return table;
@@ -383,23 +431,27 @@ export function deleteRows(
     if (node?.type.name !== "table") break;
     const now = rowsOf(table.pos, node).find((r) => r.index === row.index);
     if (!now) continue;
-    caretIn(context, now.cells[0] as Placed);
+    const number = table.rows.indexOf(row) + 1;
+    if (!caretInRow(context, now)) return refuse("refused", MERGED(table.handle, number));
     const before = editor.state.doc;
     if (!editor.run(deleteRowsCommand) || editor.state.doc === before)
       return refuse(
         "refused",
-        `Row ${table.rows.indexOf(row) + 1} of table ${table.handle} could not be deleted (a locked content control?).`,
+        `Row ${number} of table ${table.handle} could not be deleted (a locked content control?). Nothing was changed.`,
       );
   }
   const all = picked.length === table.rows.length;
   const numbers = [...new Set(rows)].sort((a, b) => a - b).join(", ");
-  const { blocks, text } = all ? { blocks: [], text: "" } : tableBlocks(context, table.handle);
+  const { text } = all ? { text: "" } : tableBlocks(context, table.handle);
+  // A row of one's own insertion goes; any other stays, a tracked deletion.
+  const how = "(a tracked deletion; a row you inserted yourself is removed)";
   return {
     ok: true,
-    blocks,
+    blocks: [],
+    rows: picked.length,
     text: all
-      ? `Deleted table ${table.handle}, every row of it, as a tracked change.`
-      : `Deleted ${picked.length === 1 ? "row" : "rows"} ${numbers} of table ${table.handle}, as tracked changes. The table now reads:\n${text}`,
+      ? `Deleted table ${table.handle}, every row of it ${how}.`
+      : `Deleted ${picked.length === 1 ? "row" : "rows"} ${numbers} of table ${table.handle} ${how}. The table now reads:\n${text}`,
   };
 }
 
@@ -462,9 +514,15 @@ export function setCells(
   if (tr.docChanged && editor.state.doc === before)
     return refuse(
       "refused",
-      `The cells of table ${table.handle} could not be changed (a locked content control?).`,
+      `The cells of table ${table.handle} could not be changed (a locked content control?). Nothing was changed.`,
     );
-  return { ok: true, ...tableBlocks(context, table.handle) };
+  const now = tableOf(context, table.handle);
+  if ("ok" in now) return { ok: true, ...tableBlocks(context, table.handle) };
+  const handles = cells.flatMap((c) => {
+    const cell = cellAt(now, c.row, c.column);
+    return "ok" in cell ? [] : paragraphsIn(context, cell.pos, cell.node);
+  });
+  return { ok: true, ...answer(context, table.handle, handles) };
 }
 
 /** @internal */
@@ -481,7 +539,7 @@ export function setTableStyle(
   caretIn(context, table.rows[0]?.cells[0] as Placed);
   if (!editor.run(setTableStyleCommand(name)))
     return refuse("refused", `The style of table ${table.handle} could not be set.`);
-  return { ok: true, ...tableBlocks(context, table.handle) };
+  return { ok: true, ...answer(context, table.handle) };
 }
 
 export interface ShadeOptions {
@@ -532,33 +590,31 @@ export function shadeCells(
   );
   if (!editor.run(setCellShading(color)))
     return refuse("refused", `The cells of table ${table.handle} could not be shaded.`);
-  return { ok: true, ...tableBlocks(context, table.handle) };
+  return { ok: true, ...answer(context, table.handle) };
 }
 
-/** @internal Makes the first `count` rows the header rows (repeated on each page), and no others. */
+/**
+ * @internal
+ * Makes the first `count` rows the header rows (repeated on each page), and no others: each
+ * row's own property, tracked as its formatting change (23.2).
+ */
 export function setHeaderRows(context: Context, handle: string, count: number): Result<Changed> {
   const { editor } = context;
-  let table = tableOf(context, handle);
+  const table = tableOf(context, handle);
   if ("ok" in table) return table;
   if (!Number.isInteger(count) || count < 0 || count > table.rows.length)
     return refuse(
       "invalid",
       `count is how many rows from the top are header rows: 0 to ${table.rows.length}.`,
     );
-  const header = (r: Row | undefined) => r?.node.attrs.header === true;
-  const again = () => tableOf(context, (table as Table).handle) as Table;
-  // On through the count's row (the rows above it come too), then off from the row after it.
-  if (count > 0 && !table.rows.slice(0, count).every(header)) {
-    caretIn(context, table.rows[count - 1]?.cells[0] as Placed);
-    editor.run(toggleHeaderRow);
-    table = again();
-  }
-  if (header(table.rows[count])) {
-    caretIn(context, table.rows[count]?.cells[0] as Placed);
-    editor.run(toggleHeaderRow);
-    table = again();
-  }
-  return { ok: true, ...tableBlocks(context, table.handle) };
+  const tr = editor.state.tr;
+  table.rows.forEach((row, i) => {
+    const header = i < count;
+    if ((row.node.attrs.header === true) !== header)
+      tr.setNodeMarkup(row.pos, row.node.type, { ...row.node.attrs, header: header || null });
+  });
+  if (tr.docChanged) editor.dispatch(tr);
+  return { ok: true, ...answer(context, table.handle) };
 }
 
 /** @internal What the table actions Foli cannot record as tracked changes say. */

@@ -434,7 +434,8 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
 }
 
 /** @internal The paragraph `handle` names, or why an operation on a paragraph cannot go on. */
-function paragraphAt(
+/** @internal The paragraph `handle` names, or why it is not one. */
+export function paragraphAt(
   context: Context,
   handle: string,
   what: string,
@@ -445,6 +446,41 @@ function paragraphAt(
     "not-a-paragraph",
     `Block ${handle} is not a paragraph: ${what} (a table's are its cells' blocks).`,
   );
+}
+
+/**
+ * @internal
+ * Where text `on` is in a paragraph (`on` is text as read shows it; without it, the whole
+ * paragraph): once, or with `all` every place; refused when it is not there, or is there more
+ * than once without `all`.
+ */
+export function placesIn(
+  context: Context,
+  handle: string,
+  target: { pos: number; node: Node },
+  on: unknown,
+  all: boolean,
+): Refusal | { from: number; to: number }[] {
+  const from = target.pos + 1;
+  const to = target.pos + target.node.nodeSize - 1;
+  if (on === undefined) return [{ from, to }];
+  const query = typeof on === "string" ? typed(on) : "";
+  if (!query) return refuse("invalid", "on must be text of the block, as read shows it.");
+  const matches = findAll(context.editor, query, { matchCase: true }).filter(
+    (m) => m.story === null && m.from >= from && m.to <= to,
+  );
+  if (matches.length === 1 || (all && matches.length))
+    return matches.map((m) => ({ from: m.from, to: m.to }));
+  const now = changed(context, [handle]).blocks[0]?.text ?? "";
+  return matches.length
+    ? refuse(
+        "several-matches",
+        `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer text that is there once${all ? "" : ", or pass all"}.`,
+      )
+    : refuse(
+        "no-match",
+        `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${quote(now, 2000)}`,
+      );
 }
 
 /** @internal The paragraph styles there are to name, as `read` names them. */
@@ -496,30 +532,9 @@ export function comment(
   if ("ok" in target) return target;
   const content = typeof text === "string" ? typed(text).trim() : "";
   if (!content) return refuse("invalid", "A comment needs its text, a string.");
-  let from = target.pos + 1;
-  let to = target.pos + target.node.nodeSize - 1;
-  const on = options?.on;
-  if (on !== undefined) {
-    const query = typeof on === "string" ? typed(on) : "";
-    if (!query) return refuse("invalid", "on must be text of the block, as read shows it.");
-    const matches = findAll(editor, query, { matchCase: true }).filter(
-      (m) => m.story === null && m.from >= from && m.to <= to,
-    );
-    const match = matches[0];
-    if (!match || matches.length > 1) {
-      const now = changed(context, [handle]).blocks[0]?.text ?? "";
-      return match
-        ? refuse(
-            "several-matches",
-            `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer text that is there once.`,
-          )
-        : refuse(
-            "no-match",
-            `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${quote(now, 2000)}`,
-          );
-    }
-    ({ from, to } = match);
-  }
+  const places = placesIn(context, handle, target, options?.on, false);
+  if (!Array.isArray(places)) return places;
+  const { from, to } = places[0] as { from: number; to: number };
   const ids = () => new Set(wordContext(editor.state)?.envelope.comments.map((c) => c.id));
   const before = ids();
   editor.select(from, to);

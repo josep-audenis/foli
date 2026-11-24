@@ -102,6 +102,21 @@ many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `n
 the wrong kind), `refused` (the document would not take the change). No method of a session
 throws.
 
+## Formatting
+
+`formatText` changes a paragraph's text, or `on` text in it (`all`: every place it is), as a
+tracked formatting change; what `format` leaves out stays. `read({ formatting: true })` adds a
+line under each paragraph with the formatting its text has of its own.
+
+```ts
+session.formatText("b7", { bold: true, color: "1F3864" }, { on: "Total due" });
+session.formatText("b7", { size: 14, font: "Arial" }); // the whole paragraph
+session.formatText("b7", { link: "https://example.com" }, { on: "our site" }); // null: off
+session.formatText("b7", { highlight: "yellow" }, { on: "TBD", all: true });
+// [b7] Normal, changed: Total due: 40.
+//        formatting: bold, color 1F3864: "Total due"
+```
+
 ## Tables
 
 A table is named by its handle (its `table, 3 rows, 2 columns` line), or by a paragraph's in one
@@ -126,6 +141,9 @@ session.shadeCells("b9", "D9E2F3", { row: 1 }); // a row, a column, a cell, or t
 session.setHeaderRows("b9", 1);
 ```
 
+An operation of several edits (rows, cells, a new table) is all or nothing: one that is
+refused partway takes back what it did. A cell a vertical merge goes on through takes no text
+(it is the merge's top cell's), and a row whose every cell is in a vertical merge is refused.
 Adding or deleting columns, merging or splitting cells and column widths are not offered: they
 cannot be recorded as tracked changes. The `edit_table` tool says so, with what to do instead.
 

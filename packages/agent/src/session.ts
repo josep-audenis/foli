@@ -14,6 +14,7 @@ import {
   untracked,
 } from "@folijs/core";
 import { withEnvelope, withTrackState, wordContext } from "@folijs/core/internal";
+import { type FormatOptions, formatText, type TextFormat } from "./formatting.js";
 import { Handles } from "./handles.js";
 import {
   type Changed,
@@ -30,7 +31,7 @@ import {
   setStyle,
   styles,
 } from "./operations.js";
-import { type Block, formatBlocks, readBlocks } from "./read.js";
+import { type Block, formatBlocks, readBlocks, runFormatting } from "./read.js";
 import { type Result, refuse } from "./result.js";
 import {
   type CellText,
@@ -65,6 +66,8 @@ export interface ReadOptions {
   from?: string;
   /** At most this many blocks. Default: all of them. */
   limit?: number;
+  /** Also each paragraph's text formatting of its own (bold, font, size…): `Block.formatting`. */
+  formatting?: boolean;
 }
 
 export interface ReadResult {
@@ -182,8 +185,8 @@ export interface Session {
     cells: readonly (readonly string[])[],
     where?: "after" | "before",
   ): Result<Changed>;
-  /** Deletes a table's rows; every row deletes the table. */
-  deleteRows(handle: string, rows: readonly number[]): Result<Changed>;
+  /** Deletes a table's rows (`rows`: how many); every row deletes the table. */
+  deleteRows(handle: string, rows: readonly number[]): Result<Changed & { rows: number }>;
   /** Sets cells' whole text (a merged cell's is its top cell's). Returns the table's blocks. */
   setCells(handle: string, cells: readonly CellText[]): Result<Changed>;
   /** The table styles there are, by the names `setTableStyle` takes. */
@@ -194,6 +197,12 @@ export interface Session {
   shadeCells(handle: string, fill: string | null, options?: ShadeOptions): Result<Changed>;
   /** Makes the first `count` rows a table's header rows, repeated on each page; 0: none. */
   setHeaderRows(handle: string, count: number): Result<Changed>;
+  /**
+   * Formats a paragraph's text, or `on` text in it (once, or every place with `all`): bold,
+   * italic, underline, strike, font, size, color, highlight, a link. What `format` leaves out
+   * stays. A tracked formatting change; a link, the text deleted and inserted again with it.
+   */
+  formatText(handle: string, format: TextFormat, options?: FormatOptions): Result<Changed>;
   /**
    * Marks the document as it is now, to come back to: `rollback` takes back every edit made
    * since, the session's own and those made through `editor`, as if none had been (no tracked
@@ -238,7 +247,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
 
   const read = (options: ReadOptions = {}): Result<ReadResult> => {
     // A model's tool call may send null for an object left out.
-    const { from, limit } = options ?? {};
+    const { from, limit, formatting } = options ?? {};
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
       return refuse("invalid", "limit must be a whole number above 0.");
     const all = readBlocks(editor.state, handles);
@@ -249,6 +258,12 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
       start = all.findIndex((block) => block.handle === from);
     }
     const blocks = all.slice(start, limit === undefined ? undefined : start + limit);
+    if (formatting === true)
+      for (const block of blocks) {
+        const node = block.kind === "paragraph" ? handles.resolve(block.handle)?.node : undefined;
+        const own = node ? runFormatting(node) : "";
+        if (own) block.formatting = own;
+      }
     const next = all[start + blocks.length]?.handle ?? null;
     return { ok: true, text: formatBlocks(blocks), blocks, next };
   };
@@ -323,6 +338,21 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     };
   };
 
+  /** An operation of several edits, all or none: a refusal takes back what it did before it. */
+  const whole = <T>(operation: () => Result<T>): Result<T> => {
+    const point = checkpoint();
+    let result: Result<T>;
+    try {
+      result = operation();
+    } catch (error) {
+      point.release();
+      throw error;
+    }
+    if (result.ok) point.release();
+    else point.rollback();
+    return result;
+  };
+
   return {
     checkpoint,
     editor,
@@ -348,13 +378,17 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     controls: () => controls(context),
     fillControl: (name, value) => fillControl(context, name, value),
     updateFields: (options) => updateFields(context, options),
-    insertTable: (handle, cells, options) => insertTable(context, handle, cells, options),
-    insertRows: (handle, row, cells, where) => insertRows(context, handle, row, cells, where),
-    deleteRows: (handle, rows) => deleteRows(context, handle, rows),
-    setCells: (handle, cells) => setCells(context, handle, cells),
+    insertTable: (handle, cells, options) =>
+      whole(() => insertTable(context, handle, cells, options)),
+    insertRows: (handle, row, cells, where) =>
+      whole(() => insertRows(context, handle, row, cells, where)),
+    deleteRows: (handle, rows) => whole(() => deleteRows(context, handle, rows)),
+    setCells: (handle, cells) => whole(() => setCells(context, handle, cells)),
     tableStyles: () => tableStyles(editor.state),
     setTableStyle: (handle, style) => setTableStyle(context, handle, style),
     shadeCells: (handle, fill, options) => shadeCells(context, handle, fill, options),
     setHeaderRows: (handle, count) => setHeaderRows(context, handle, count),
+    formatText: (handle, format, options) =>
+      whole(() => formatText(context, handle, format, options)),
   };
 }

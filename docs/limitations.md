@@ -413,8 +413,12 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   table styles, shading and header rows set. Columns, merging and splitting cells and column
   widths are refused: they cannot be recorded as tracked changes, and every edit of a session is
   one. A table put after an empty paragraph goes before it.
-- No operation inserts a picture, changes a run's formatting (bold, color), or accepts or
-  rejects changes. `session.editor` is the headless editor for those, by positions.
+- Text formatting (23.4): bold, italic, underline, strike, font, size, color, highlight and
+  links, on a paragraph or text in it. `read({ formatting: true })` shows a run's own formatting,
+  not what its style gives; underline is on or off (Word's other underline styles are kept, not
+  set); highlight is one of Word's named colors.
+- No operation inserts a picture, or accepts or rejects changes. `session.editor` is the
+  headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
   block; Word's final view shows it joined with the next paragraph.
 - Text is matched with its capitals and spaces as read; what stands in brackets in a read

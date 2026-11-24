@@ -1,3 +1,4 @@
+export type { FormatOptions, TextFormat } from "./formatting.js";
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";

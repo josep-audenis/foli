@@ -45,7 +45,7 @@ const PRELUDE = `(() => {
 export const DOC_TYPES = `${[...METHODS.values()].map((m) => m.signature).join("\n")}
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
-  cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments }   // column: the grid column
+  cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting? }   // column: the grid column; formatting: with blocks({ formatting: true })
 blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. Only the body is there: headers, footers and the text of notes are not.`;
 
 /**
@@ -135,7 +135,8 @@ export async function runCode(
         : [];
     for (const block of blocks) touched.add(block.handle);
     if (method.effect === "insert") inserted += blocks.length;
-    if (method.effect === "delete") deleted++;
+    // A block, or rows of a table (`rows`: how many).
+    if (method.effect === "delete") deleted += (value as { rows?: number }).rows ?? 1;
     if (method.effect === "fields") fields = true;
     return value;
   };
