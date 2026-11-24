@@ -158,4 +158,18 @@ describe("inserting what is not text (23.6)", () => {
     expect(huge.ok).toBe(true);
     expect(imageInfo(new TextEncoder().encode("GIF is a format"))).toBeNull();
   });
+
+  it("leaves nothing when a picture or line is rejected (23.6 review)", () => {
+    for (const where of ["after", "before"] as const) {
+      const session = open("A", "B");
+      const [a] = handles(session) as [string];
+      expect(session.insertItem(a, { kind: "horizontalRule" }, { where }).ok).toBe(true);
+      expect(
+        session.insertItem(a, { kind: "picture", data: png(10, 10), alt: "x" }, { where }).ok,
+      ).toBe(true);
+      expect(session.document().content.content).toHaveLength(4);
+      session.editor.commands.rejectAllChanges();
+      expect(session.document().content.content).toHaveLength(2);
+    }
+  });
 });

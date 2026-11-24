@@ -62,6 +62,8 @@ function plain(context: Context, handle: string, extra: Record<string, unknown> 
   editor.dispatch(
     editor.state.tr.setNodeMarkup(found.pos, found.node.type, {
       controls: found.node.attrs.controls ?? null,
+      // Its own insertion stays recorded: rejecting it takes the paragraph out.
+      revision: found.node.attrs.revision ?? null,
       ...extra,
     }),
   );
@@ -117,7 +119,7 @@ export function base64(bytes: Uint8Array): string {
   const chunks: string[] = [];
   let out: string[] = [];
   for (let i = 0; i < bytes.length; i += 3) {
-    // A string per 48 K characters, not an array of all of them: a large picture's memory.
+    // A string per 196 K characters (48 K entries of 4), not one array of all: a large picture's memory.
     if (out.length >= 0xc000) {
       chunks.push(out.join(""));
       out = [];
