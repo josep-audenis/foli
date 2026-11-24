@@ -41,6 +41,8 @@ export interface Block {
    * with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
    */
   formatting?: string;
+  /** A header's or footer's block (`read` with `headers`): which story it is in. */
+  story?: { id: string; kind: "header" | "footer" };
 }
 
 type Attrs = Record<string, unknown>;

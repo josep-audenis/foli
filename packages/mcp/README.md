@@ -58,7 +58,7 @@ with a handle (`[b7]`), and edits by handle:
 | Tool                              | What it does                                                      |
 | --------------------------------- | ----------------------------------------------------------------- |
 | `open`, `list_documents`, `close` | Opens a `.docx` (several at once, each with an id), lists, closes |
-| `read`                            | The body, 200 blocks at a time unless asked otherwise             |
+| `read`                            | The body, 200 blocks at a time; with `headers`, headers, footers  |
 | `replace_text`                    | Replaces text in a paragraph                                      |
 | `insert_paragraphs`               | New paragraphs before or after a block, in a style if named       |
 | `delete_block`                    | Deletes a paragraph, or a table                                   |

@@ -24,7 +24,7 @@ Work on what read shows. read gives the document a line per block:
 [b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1: row and grid column; c1-2 a cell spanning two; "merged down" or "merged up" a vertical merge, its text in the top cell), its style, its list number, "changed" if it has tracked changes, its comments; after the colon, its text. ↵ is a line break. A line "table, 3 rows, 2 columns" is a table: its cells' blocks follow, indented. A line "not editable: …" is content you cannot change.
 Words in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: …] is a content control to fill with fill_control; «Name» is a merge field to fill with update_fields.
 A handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.
-Only the body is read and edited: headers, footers and the text of notes ([note]) are not shown.`;
+read shows the body; read with headers also shows the headers and footers after it, their handles h1, f1…, which the same tools edit (comments go in the body only). The text of notes ([note]) is not shown.`;
 
 /** What a tool answers the model: text, and whether it is a refusal. */
 export interface ToolAnswer {
@@ -138,12 +138,18 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
         description:
           "Also show each paragraph's text formatting of its own (bold, font, size, color, links), on a line under it.",
       },
+      headers: {
+        type: "boolean",
+        description:
+          "Also read the headers and footers, after the body, each under a line saying where it is used. Their handles are h1, f1…; the other tools edit them as the body's.",
+      },
     }),
-    run(session, { from, limit, formatting }) {
+    run(session, { from, limit, formatting, headers }) {
       const result = session.read({
         ...(from === undefined ? {} : { from: from as string }),
         limit: (limit as number | undefined) ?? READ_LIMIT,
         ...(formatting === true ? { formatting: true } : {}),
+        ...(headers === true ? { headers: true } : {}),
       });
       return told(result, result.ok && result.next ? `\n(more: read from "${result.next}")` : "");
     },
@@ -151,13 +157,16 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       {
         name: "blocks",
         signature:
-          "doc.blocks({ formatting? }): Block[]   // every block of the body, in order, as it reads now (a copy: call again after edits)",
-        call: (session, [a]: Args) =>
-          given(
+          "doc.blocks({ formatting?, headers? }): Block[]   // every block of the body (headers: then headers' and footers', each with story), in order, as it reads now (a copy: call again after edits)",
+        call: (session, [a]: Args) => {
+          const options = (a ?? {}) as { formatting?: unknown; headers?: unknown };
+          return given(
             session.read({
-              formatting: (a as { formatting?: unknown } | undefined)?.formatting === true,
+              formatting: options.formatting === true,
+              headers: options.headers === true,
             }),
-          ).blocks,
+          ).blocks;
+        },
       },
       {
         name: "block",

@@ -405,9 +405,13 @@ Real-time editing (Phase 22, 1.6; ADR-0012; [the guide](guides/collaboration.md)
 
 Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 
-- Only the body is read and edited: not headers, footers, footnotes or endnotes. One
-  exception: `updateFields` also updates the fields there (core's does), as tracked changes the
-  session does not read back, and does not report what it skipped there.
+- The body is read and edited, and with `read({ headers: true })` the headers and footers
+  (23.7): their blocks have handles `h1`…, `f1`…, each story under a line saying which sections
+  use it (a section without its own goes on with the one before's), and every operation takes
+  them but `comment` (Word keeps no comments there). The text of footnotes and endnotes is not
+  read; `insertItem` writes a new note's. A rollback (a refused operation of several edits, a
+  failed script) keeps a header's handles only when they were read before it. `updateFields`
+  updates the fields in every story, as tracked changes it does not report there.
 - Tables (23.3): a table is inserted next to a paragraph (next to a table, the paragraph after
   or before it is used; with none, it is refused), rows inserted and deleted, cells' text set,
   table styles, shading and header rows set. Columns, merging and splitting cells and column

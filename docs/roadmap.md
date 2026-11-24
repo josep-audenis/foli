@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.6 merged                                                                                                     |
+| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.7 merged                                                                                                     |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 | 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
@@ -3445,8 +3445,12 @@ lands second merges the other in (no rebase: force push is blocked).
   `imageInfo`, the `insert` tool and `doc.insert`; a `ToolHost` gives the tools a picture's bytes
   by path (the MCP server reads .png, .jpg and .gif under its root). 18 tools, 15,709 characters
   with schemas (19, 19,579 with `--code`).
-- [ ] 23.7 Agent: headers and footers read and edited (the stories), handles marked
+- [x] 23.7 Agent: headers and footers read and edited (the stories), handles marked
   with their story in a read; the existing tools take them.
+  Done: `read({ headers: true })` and the read tool's `headers`, each story under where its
+  sections use it; handles `h…` and `f…` (a `Handles` per story, following the body editor's
+  changes through the story's mapping); every operation runs in the story's editor, `comment`
+  refused there; the server's instructions and `run`'s summary say so.
 - [ ] 23.8 Agent: review (list changes, accept or reject), a session option turning it on;
   the tools behind `--review` in the MCP server.
 - [ ] 23.9 A scenario per area run twice with a model's kind of calls: through `agentTools`

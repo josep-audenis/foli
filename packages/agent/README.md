@@ -128,6 +128,22 @@ session.formatParagraphs("b6", { indent: "more" }); // in a list: a level deeper
 //        formatting: paragraph centered, space after 12 pt
 ```
 
+## Headers and footers
+
+`read({ headers: true })` adds the headers and footers after the body, each under a line saying
+where it is used. Their blocks' handles are `h1`…, `f1`…, and every operation takes them (but
+`comment`: Word keeps no comments there).
+
+```ts
+session.read({ headers: true });
+// …
+// header of sections 1–2:
+// [h1] header: Quarterly Board Report - Q1 2026
+// footer of sections 1–2:
+// [f1] footer: Page 1 of 3
+session.replaceText("h1", "Q1 2026", "Q2 2026");
+```
+
 ## Pictures, breaks and notes
 
 `insertItem` inserts what is not text next to or in a paragraph, as tracked insertions: a

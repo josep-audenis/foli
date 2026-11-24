@@ -46,7 +46,7 @@ export const DOC_TYPES = `${[...METHODS.values()].map((m) => m.signature).join("
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
   cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting? }   // column: the grid column; formatting: with blocks({ formatting: true })
-blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. Only the body is there: headers, footers and the text of notes are not.`;
+blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. blocks() is the body; a header's or footer's handle (h1, f1, from the read tool with headers) works with the methods too. The text of notes is not there.`;
 
 /**
  * @internal
