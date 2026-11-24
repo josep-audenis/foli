@@ -3577,8 +3577,11 @@ agent's review. Starts after Phase 22 (done). Independent of Phase 23: it touche
 agent; if both change a shared file, whichever lands second merges the other in (no rebase).
 
 - [x] Claim phase, branch `phase-24/collab-integration`
-- [ ] 24.1 The version contract in TSDoc, both READMEs and the guide, with the "my edits stop"
+- [x] 24.1 The version contract in TSDoc, both READMEs and the guide, with the "my edits stop"
   section. Docs only: what 0.1.0 already does.
+  Done: the guide's Versions and My edits stop sections, the collab README's Versions
+  paragraph, TSDoc on `Broadcast`, `Received`, `getVersion`, `sendableSteps` and
+  `receiveTransaction`; core's README links the guide.
 - [ ] 24.2 Core: `receiveBroadcast` with its three outcomes; the version check in
   `receiveTransaction`; the property test over reordered, duplicated and dropped broadcasts.
 - [ ] 24.3 Collab: `connect` and `hub`, their message types, presence through them; unit tests of
