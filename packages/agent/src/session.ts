@@ -14,6 +14,7 @@ import {
   untracked,
 } from "@folijs/core";
 import { withEnvelope, withTrackState, wordContext } from "@folijs/core/internal";
+import { type ChangeInfo, listChanges, type ResolveOptions, resolveChanges } from "./changes.js";
 import { type FormatOptions, formatText, type TextFormat } from "./formatting.js";
 import { Handles } from "./handles.js";
 import { type InsertItem, type InsertItemOptions, insertItem } from "./inserts.js";
@@ -68,6 +69,11 @@ export interface SessionOptions {
   author: string;
   /** The app's custom node and mark types, as `createEditor` takes them. */
   extensions?: readonly Extension[];
+  /**
+   * The session may list, accept and reject the document's tracked changes, its own and
+   * others' (23.8). Off by default: an agent's edits are proposals for a person to decide.
+   */
+  review?: boolean;
 }
 
 export interface ReadOptions {
@@ -102,6 +108,8 @@ export interface Session {
    */
   readonly editor: Editor;
   readonly author: string;
+  /** Whether the session reviews changes (`SessionOptions.review`). */
+  readonly reviewing: boolean;
   /** The document as it is now, to save or to export (`exportDocx` of `@folijs/docx`). */
   document(): FoliDocument;
   /**
@@ -218,6 +226,18 @@ export interface Session {
    * stays. A tracked formatting change; a link, the text deleted and inserted again with it.
    */
   formatText(handle: string, format: TextFormat, options?: FormatOptions): Result<Changed>;
+  /** The body's tracked changes, a line each: `[c12] inserted, Bob (2026-11-20), in [b7]: "…"`. */
+  changes(): Result<{ changes: ChangeInfo[]; text: string }>;
+  /** Accepts changes by id, or "all" (every story too; `author`: only theirs). */
+  acceptChanges(
+    ids: readonly number[] | "all",
+    options?: ResolveOptions | null,
+  ): Result<{ text: string }>;
+  /** Rejects changes by id, or "all", as `acceptChanges` accepts them. */
+  rejectChanges(
+    ids: readonly number[] | "all",
+    options?: ResolveOptions | null,
+  ): Result<{ text: string }>;
   /**
    * Formats paragraphs (one handle, or several: those next to each other become one list):
    * alignment, line spacing, space before and after, indentation (a list level in a list),
@@ -252,7 +272,7 @@ export interface Checkpoint {
  * Throws on a document that does not validate, and on an empty `author`.
  */
 export function openSession(document: EditorDocument, options: SessionOptions): Session {
-  const { author, extensions } = options;
+  const { author, extensions, review = false } = options;
   if (!author.trim()) throw new TypeError("openSession: `author` must name who edits");
   const editor = createEditor({
     document,
@@ -322,6 +342,10 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
           "These blocks are in different stories (the body, a header, a footer): one call for each.",
         );
   };
+  const NO_REVIEW = refuse(
+    "refused",
+    "This session does not review changes: a person accepts or rejects them in Word.",
+  );
   const NO_COMMENT = refuse(
     "invalid",
     "Word keeps no comments in headers and footers: comment a paragraph of the body.",
@@ -461,6 +485,12 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     checkpoint,
     editor,
     author,
+    reviewing: review,
+    changes: () => (review ? { ok: true, ...listChanges(context) } : NO_REVIEW),
+    acceptChanges: (ids, options) =>
+      review ? resolveChanges(context, ids, true, options) : NO_REVIEW,
+    rejectChanges: (ids, options) =>
+      review ? resolveChanges(context, ids, false, options) : NO_REVIEW,
     document: () => editor.getDocument(),
     read,
     block,

@@ -3,7 +3,7 @@
  * sees `doc`, whose methods are the functions below over the document's session: what the
  * tools do, and nothing the tools cannot. A run that fails is taken back whole.
  */
-import { AGENT_TOOLS, formatBlocks, type ToolHost } from "@folijs/agent";
+import { AGENT_TOOLS, formatBlocks, type ToolHost, toolsFor } from "@folijs/agent";
 import type { OpenDocument } from "./documents.js";
 import type { ToolResult } from "./protocol.js";
 import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits, StopRun } from "./sandbox.js";
@@ -41,8 +41,13 @@ const PRELUDE = `(() => {
   globalThis.console = Object.freeze({ log: (...args) => { ask("log", [args.map(shown).join(" ")]); } });
 })();`;
 
-/** @internal What a script is told of `doc`: part of the tool's description. */
-export const DOC_TYPES = `${[...METHODS.values()].map((m) => m.signature).join("\n")}
+/**
+ * @internal What a script is told of `doc`: part of the tool's description; the review methods
+ * only on a server that reviews (a session that does not refuses them).
+ */
+export const docTypes = (review = false) => `${toolsFor({ reviewing: review })
+  .flatMap((tool) => tool.methods.map((m) => m.signature))
+  .join("\n")}
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
   cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting?, story? }   // column: the grid column; formatting: with blocks({ formatting: true })

@@ -42,6 +42,33 @@ async function opened(name: string) {
 }
 
 describe("the tools a client lists", () => {
+  it("add review with --review, over a redlined document (23.8)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "foli-mcp-"));
+    made.push(root);
+    copyFileSync(new URL("02-services-agreement-redlined.docx", CORPUS), join(root, "02.docx"));
+    const plain = await connect(foliServer({ root, version: "0.0.0", author: "Agent" }));
+    expect((await plain.listTools()).tools.some((t) => t.name === "review")).toBe(false);
+    await plain.close();
+    const client = await connect(
+      foliServer({ root, version: "0.0.0", author: "Agent", review: true }),
+    );
+    const call = async (tool: string, args: Record<string, unknown> = {}) => {
+      const result = await client.callTool({ name: tool, arguments: args });
+      return {
+        text: (result.content as { text: string }[])[0]?.text ?? "",
+        refused: result.isError === true,
+      };
+    };
+    await call("open", { path: "02.docx" });
+    const listed = await call("review", { action: "list" });
+    expect(listed.text).toMatch(/^\[c\d+\] /m);
+    expect((await call("review", { action: "accept", ids: "all" })).refused).toBe(false);
+    expect((await call("review", { action: "list" })).text).toBe(
+      "The body has no tracked changes.",
+    );
+    await client.close();
+  });
+
   it("are these, each described, with a schema the SDK's client takes", async () => {
     const { client } = await opened("01-mutual-nda");
     expect(client.getInstructions()).toBe(INSTRUCTIONS);

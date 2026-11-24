@@ -144,6 +144,20 @@ session.read({ headers: true });
 session.replaceText("h1", "Q1 2026", "Q2 2026");
 ```
 
+## Review
+
+A session opened with `review: true` may decide the document's tracked changes, its own and
+others', as a person does in Word; without it, these refuse (an agent's edits are proposals).
+
+```ts
+const session = openSession(document, { author: "Reviewer", review: true });
+session.changes();
+// [c12] inserted, Bob (2026-11-20), in [b7]: "net 30 days"
+// [c13] deleted, Bob (2026-11-20), in [b7]: "net 60 days"
+session.acceptChanges([12, 13]);
+session.rejectChanges("all", { author: "Bob" }); // every story too
+```
+
 ## Pictures, breaks and notes
 
 `insertItem` inserts what is not text next to or in a paragraph, as tracked insertions: a

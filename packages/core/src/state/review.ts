@@ -553,6 +553,8 @@ function command(
   filter?: ChangeFilter,
   /** Every story too: accepting or rejecting all changes of the document. */
   everywhere = false,
+  /** The changes themselves, in place of those `range` touches. */
+  pick?: (state: EditorState) => Change[],
 ): Command {
   const run: Command = (state, dispatch) => {
     if (!state.schema.marks.insertion) return false;
@@ -566,10 +568,13 @@ function command(
       !readOnlyAt(doc, controls, c.from, c.to);
     // A change around several selected cells (a row revision, a move's partner) counts once.
     const seen = new Set<string>();
-    const changes = range(state)
-      .flatMap((r) =>
-        changesIn(state.doc, wordContext(state)?.envelope.section, r.from, r.to, filter),
-      )
+    const changes = (
+      pick
+        ? pick(state)
+        : range(state).flatMap((r) =>
+            changesIn(state.doc, wordContext(state)?.envelope.section, r.from, r.to, filter),
+          )
+    )
       .filter(open(state.doc))
       .filter((c) => {
         const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
@@ -632,6 +637,23 @@ const everything = (state: EditorState) => [{ from: 0, to: state.doc.content.siz
 export const acceptChange: Command = command(true, selected);
 /** Rejects the change at the caret, or the changes in the selection. */
 export const rejectChange: Command = command(false, selected);
+/** The changes with these ids (as `trackedChanges` gives them), with a move's other end. */
+const byId = (ids: readonly number[]) => (state: EditorState) => {
+  const wanted = new Set(ids);
+  const all = trackedChanges(state.doc, wordContext(state)?.envelope.section);
+  const picked = all.filter((c) => wanted.has(c.id));
+  const moves = new Set(picked.map((c) => c.move).filter((m) => m !== null));
+  return all.filter((c) => wanted.has(c.id) || (c.move !== null && moves.has(c.move)));
+};
+/**
+ * Accepts the changes with these ids (`Change.id`, from `trackedChanges`), and only those (with a
+ * tracked move's other end), in the editor's own tree. False when there is none of them.
+ */
+export const acceptChangesById = (ids: readonly number[]): Command =>
+  command(true, () => [], undefined, false, byId(ids));
+/** Rejects the changes with these ids, as `acceptChangesById` accepts them. */
+export const rejectChangesById = (ids: readonly number[]): Command =>
+  command(false, () => [], undefined, false, byId(ids));
 /** Accepts every change (of `author`, if given). */
 export const acceptAllChanges = (author?: string): Command =>
   command(true, everything, author === undefined ? {} : { author }, true);

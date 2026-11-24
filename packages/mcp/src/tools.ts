@@ -5,11 +5,11 @@
  */
 import {
   INSTRUCTIONS as AGENT_INSTRUCTIONS,
-  AGENT_TOOLS,
   READ_LIMIT,
   type Session,
+  toolsFor,
 } from "@folijs/agent";
-import { DOC_TYPES, HEAVY, runCode } from "./code.js";
+import { docTypes, HEAVY, runCode } from "./code.js";
 import type { Documents, OpenDocument } from "./documents.js";
 import type { Tool, ToolResult } from "./protocol.js";
 import type { SandboxLimits } from "./sandbox.js";
@@ -43,10 +43,10 @@ const args = (
 });
 
 /** The tool of code mode (ADR-0010): there only when the server was started with it. */
-const runTool = (documents: Documents, limits: SandboxLimits): Tool => ({
+const runTool = (documents: Documents, limits: SandboxLimits, review: boolean): Tool => ({
   name: "run",
   description: `Runs a JavaScript script over an open document: use it when a task is the same step on many blocks (every heading, every table cell), where the other tools would take a call each. The script is a function's body: it uses doc, and what it returns is the answer. Every edit is a tracked change, as with the other tools. All or nothing: if the script throws or is stopped, none of its edits is kept, and the answer says the line.
-${DOC_TYPES}
+${docTypes(review)}
 A method that cannot do what it is asked throws an Error whose message says why (replaceText when find is not in the block, or is there twice without all): test first (block.text.includes(find)) or use try and catch. Handles are the ones read shows. Plain JavaScript, no await, no imports, no timers; ${limits.ms / 1000} seconds and ${limits.calls} calls to doc at most. Nothing is saved: save is a tool.
 Example: let n = 0; for (const b of doc.blocks()) if (b.kind === "paragraph" && b.text.includes("Acme Ltd")) n += doc.replaceText(b.handle, "Acme Ltd", "Acme Limited", { all: true }).replaced; return n;`,
   inputSchema: args({ code: { type: "string", description: "The script: a function's body." } }, [
@@ -61,7 +61,11 @@ Example: let n = 0; for (const b of doc.blocks()) if (b.kind === "paragraph" && 
 });
 
 /** @internal */
-export function tools(documents: Documents, code: SandboxLimits | false = false): Tool[] {
+export function tools(
+  documents: Documents,
+  code: SandboxLimits | false = false,
+  review = false,
+): Tool[] {
   /** A tool over an open document's session. */
   const on = (
     name: string,
@@ -129,7 +133,7 @@ export function tools(documents: Documents, code: SandboxLimits | false = false)
         };
       },
     },
-    ...AGENT_TOOLS.map((tool) =>
+    ...toolsFor({ reviewing: review }).map((tool) =>
       on(
         tool.name,
         tool.description,
@@ -166,6 +170,6 @@ export function tools(documents: Documents, code: SandboxLimits | false = false)
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       run: () => documents.list(),
     },
-    ...(code ? [runTool(documents, code)] : []),
+    ...(code ? [runTool(documents, code, review)] : []),
   ];
 }

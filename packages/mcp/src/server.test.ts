@@ -472,17 +472,20 @@ describe("files", () => {
 
 describe("the command line", () => {
   it("reads its options, and says what it does not know", () => {
-    expect(parseArgs([])).toEqual({ root: ".", overwrite: false, code: false });
+    expect(parseArgs([])).toEqual({ root: ".", overwrite: false, code: false, review: false });
+    expect(parseArgs(["--review"])).toMatchObject({ review: true });
     expect(parseArgs(["--root", "docs", "--author", "Ada", "--overwrite"])).toEqual({
       root: "docs",
       author: "Ada",
       overwrite: true,
       code: false,
+      review: false,
     });
     expect(parseArgs(["--author", ""])).toEqual({
       root: ".",
       overwrite: false,
       code: false,
+      review: false,
       author: "",
     });
     expect(parseArgs(["--help"])).toMatchObject({ code: 0 });

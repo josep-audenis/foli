@@ -207,6 +207,7 @@ export {
 export {
   acceptAllChanges,
   acceptChange,
+  acceptChangesById,
   type Change,
   type ChangeFilter,
   type ChangeKind,
@@ -214,6 +215,7 @@ export {
   previousChange,
   rejectAllChanges,
   rejectChange,
+  rejectChangesById,
   trackedChanges,
 } from "./review.js";
 export {
