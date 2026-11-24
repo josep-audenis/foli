@@ -21,8 +21,11 @@ export type HubMessage =
   | ({ type: "steps" } & Broadcast)
   /** Its message changed nothing (`Received`): `stale` catches up and sends again. */
   | { type: "refused"; reason: Refusal; version: number; message?: string }
-  /** The whole document, for a client joining or too far behind for the log. */
-  | { type: "snapshot"; version: number; document: FoliDocument }
+  /**
+   * The whole document, for a client joining or too far behind for the log; `clientID`: the one
+   * the connection is (an editor made from it takes `collab({ version, clientID })`).
+   */
+  | { type: "snapshot"; version: number; document: FoliDocument; clientID: ClientID }
   /** Another client's presence. */
   | { type: "presence"; [key: string]: unknown }
   /** A client left: its presence goes. */
@@ -56,20 +59,20 @@ const PRESENCE_SIZE = 4000;
  */
 export function createHub(authority: Authority): Hub {
   const presence = new Map<string, Outgoing["message"]>();
-  const snapshot = (): Outgoing => {
+  const snapshot = (clientID: ClientID): Outgoing => {
     const { version, document } = authority.snapshot();
     // The package (the .docx's parts) stays on the server: clients need the document only.
-    return { to: "sender", message: { type: "snapshot", version, document } };
+    return { to: "sender", message: { type: "snapshot", version, document, clientID } };
   };
-  const catchUp = (version: unknown): Outgoing => {
-    if (typeof version !== "number") return snapshot();
+  const catchUp = (version: unknown, clientID: ClientID): Outgoing => {
+    if (typeof version !== "number") return snapshot(clientID);
     const missed = authority.stepsSince(version);
-    if ("snapshot" in missed) return snapshot();
+    if ("snapshot" in missed) return snapshot(clientID);
     return { to: "sender", message: { type: "steps", ...missed } };
   };
   return {
-    join: () => [
-      snapshot(),
+    join: (clientID) => [
+      snapshot(clientID),
       ...[...presence.values()].map((message) => ({ to: "sender" as const, message })),
     ],
     receive(message, clientID) {
@@ -107,7 +110,7 @@ export function createHub(authority: Authority): Hub {
         if (result.ok) return [{ to: "everyone", message: { type: "steps", ...result.broadcast } }];
         return refused(result.reason, result.version, result.message);
       }
-      if (type === "catchup") return [catchUp((value as { version?: unknown }).version)];
+      if (type === "catchup") return [catchUp((value as { version?: unknown }).version, clientID)];
       if (type === "presence") {
         let size: number;
         try {

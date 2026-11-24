@@ -65,8 +65,9 @@ test("two people edit one paragraph and converge", async ({ browser }) => {
   // Each sees the other: the name in the list and a caret labelled with it.
   await expect(a.locator("#people")).toContainText("Bob");
   await expect(b.locator("#people")).toContainText("Ann");
-  await expect(a.locator("[data-foli-peer]")).toContainText("Bob");
-  await expect(b.locator("[data-foli-peer]")).toContainText("Ann");
+  // The named one: other browsers' runs share the server, and their people show too.
+  await expect(a.locator("[data-foli-peer]", { hasText: "Bob" }).first()).toBeAttached();
+  await expect(b.locator("[data-foli-peer]", { hasText: "Ann" }).first()).toBeAttached();
 
   // Tracked: each change in its author's name. (The server's document may say so already.)
   if ((await a.locator("#track").getAttribute("aria-pressed")) !== "true")

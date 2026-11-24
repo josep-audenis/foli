@@ -35,7 +35,7 @@ place that says what is in progress; check it before starting work.
 | 21 Hardening              | ✅ Done                  | —                             | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                             | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                             | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
-| 24 Collab integration     | In progress              | `phase-24/collab-integration` | 24.1–24.3 done; 24.4 next                                                                                                                                                                     |
+| 24 Collab integration     | In progress              | `phase-24/collab-integration` | 24.1–24.4 done; 24.5 next                                                                                                                                                                     |
 | 25 Word ribbon            | Ready                    | —                             | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -3601,9 +3601,16 @@ agent; if both change a shared file, whichever lands second merges the other in 
   and `connect(editor, options)` (`receive`, `resume`, `destroy`; `onSnapshot`, `onError`), with
   `ClientMessage` and `HubMessage`; `connect.test.ts` covers each case over hand-delivered
   queues. A snapshot still means a new editor (24.5 reconfigures plugins, not the document).
-- [ ] 24.4 The host-and-joiner test over an unreliable channel, both ways (raw functions,
+- [x] 24.4 The host-and-joiner test over an unreliable channel, both ways (raw functions,
   `connect` and `hub`); the guide's host-in-a-browser example from it; `examples/collab` and
   its e2e on `connect` and `hub`.
+  Done: the guide's samples (`apps/site/src/guides/collab.ts`) are `host` (an authority, its hub
+  and the host's editor connected in memory) and `joinHost`, and the by-hand `serve` and `join`
+  (on `receiveBroadcast`); `collab.test.ts` beside them runs both over lanes that reorder,
+  repeat and drop messages (three seeds for the host, one with a log short enough that the
+  joiner starts again from a snapshot; two by-hand clients). The guide opens with A host in a
+  browser. The hub's `snapshot` message now carries its client id. `examples/collab` on
+  `createHub` and `connect`.
 - [ ] 24.5 Core: `editor.reconfigure({ plugins })`, tests that undo survives adding and removing
   `collab` and that every kept plugin's state carries over; React's `plugins` prop through it;
   ADR-0008 amended. The riskiest task: a plugin whose state depends on another's is checked.

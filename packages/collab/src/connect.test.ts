@@ -228,6 +228,19 @@ describe("connect and createHub (24.3)", () => {
     expect(b.errors).toEqual([]);
   });
 
+  it("a snapshot gives the id the hub says, not the editor's own", () => {
+    const editor = createEditor({ document: DOCUMENT, plugins: [collab({ clientID: 2 })] });
+    const got: (string | number)[] = [];
+    const c = connect(editor, {
+      send: () => {},
+      name: "x",
+      color: "#123",
+      onSnapshot: (snapshot) => got.push(snapshot.clientID),
+    });
+    c.receive({ type: "snapshot", version: 0, document: DOCUMENT, clientID: 9 });
+    expect(got).toEqual([9]);
+  });
+
   it("presence: sent on selection, shown by the others, kept for those who join, gone on leave", () => {
     const net = new Net();
     const a = net.join(1);

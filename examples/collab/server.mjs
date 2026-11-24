@@ -1,5 +1,5 @@
-// A WebSocket server for the collab example (22.11): the authority of one document
-// (`@folijs/collab`), a JSON file as its store, and the built page. What the app keeps (ADR-0012):
+// A WebSocket server for the collab example (22.11, 24.4): the authority of one document and the
+// hub that speaks for it (`@folijs/collab`), a JSON file as its store, and the built page. What the app keeps (ADR-0012):
 // the transport, the store, who the clients are. Run `npm run build` first, then
 // `node server.mjs [--port 5184] [--store store.json]`.
 //
@@ -10,7 +10,7 @@ import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "n
 import { createServer } from "node:http";
 import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createAuthority } from "@folijs/collab";
+import { createAuthority, createHub } from "@folijs/collab";
 import { createDocument } from "@folijs/core";
 import { WebSocketServer } from "ws";
 
@@ -37,6 +37,7 @@ const authority = createAuthority({
   ...(saved?.log ? { log: saved.log } : {}),
   limits: { messageSize: MESSAGE_SIZE },
 });
+const hub = createHub(authority);
 /** Who the clients are: the secret token each was given, and its id. Kept with the document. */
 const tokens = new Map(Object.entries(saved?.tokens ?? {}));
 /** Small integers, one per client ever seen: they also keep the clients' new ids apart. */
@@ -79,11 +80,16 @@ const server = createServer((request, response) => {
 });
 
 const sockets = new WebSocketServer({ server, maxPayload: MESSAGE_SIZE });
-/** The ids connected now: a token is honoured by one connection at a time. */
-const connected = new Set();
+/** The connected clients' sockets, by id: a token is honoured by one connection at a time. */
+const connected = new Map();
 const send = (socket, message) => socket.readyState === 1 && socket.send(JSON.stringify(message));
-const everyone = (message) => {
-  for (const socket of sockets.clients) send(socket, message);
+/** What the hub gave, to whom it goes: everyone, the sender or the others. */
+const deliver = (from, out) => {
+  for (const { to, message } of out) {
+    if (message.type === "steps" && to === "everyone") persist(); // accepted steps
+    for (const [id, socket] of connected)
+      if (to === "everyone" || (to === "sender") === (id === from)) send(socket, message);
+  }
 };
 
 sockets.on("connection", (socket) => {
@@ -91,50 +97,38 @@ sockets.on("connection", (socket) => {
   // otherwise. A client never names its own id.
   let clientID = null;
   socket.on("message", (data) => {
+    if (clientID !== null) {
+      deliver(clientID, hub.receive(String(data), clientID));
+      return;
+    }
     let message;
     try {
       message = JSON.parse(String(data));
     } catch {
       return;
     }
-    if (clientID === null) {
-      if (message?.type !== "hello") return;
-      const known = typeof message.token === "string" ? tokens.get(message.token) : undefined;
-      const back = known !== undefined && !connected.has(known);
-      let token = message.token;
-      if (back) clientID = known;
-      else {
-        clientID = nextClient++;
-        token = randomUUID();
-        tokens.set(token, clientID);
-        persist();
-      }
-      connected.add(clientID);
-      // Back from a version the log still has: the steps since. Otherwise the whole document.
-      const missed = back ? authority.stepsSince(Number(message.version)) : null;
-      if (missed && !("snapshot" in missed)) send(socket, { type: "steps", ...missed });
-      else send(socket, { type: "init", clientID, token, snapshot: authority.snapshot() });
-      return;
+    if (message?.type !== "hello") return;
+    const known = typeof message.token === "string" ? tokens.get(message.token) : undefined;
+    const back = known !== undefined && !connected.has(known);
+    let token = message.token;
+    if (back) clientID = known;
+    else {
+      clientID = nextClient++;
+      token = randomUUID();
+      tokens.set(token, clientID);
+      persist();
     }
-    if (message?.type === "steps") {
-      const result = authority.receive(message, clientID);
-      if (result.ok) {
-        persist();
-        everyone({ type: "steps", ...result.broadcast });
-      } else send(socket, { type: "refused", reason: result.reason, version: result.version });
-    } else if (message?.type === "catchup") {
-      const missed = authority.stepsSince(Number(message.version));
-      if ("snapshot" in missed) send(socket, { type: "init", clientID, ...missed });
-      else send(socket, { type: "steps", ...missed });
-    } else if (message?.type === "presence") {
-      for (const other of sockets.clients)
-        if (other !== socket) send(other, { ...message, clientID });
-    }
+    connected.set(clientID, socket);
+    send(socket, { type: "hello", token });
+    // A new client gets the document; one back resumes (it asks for what it missed) and gets
+    // who is here now (it missed those who left meanwhile).
+    const joined = hub.join(clientID);
+    deliver(clientID, back ? joined.slice(1) : joined);
   });
   socket.on("close", () => {
-    if (clientID === null) return;
+    if (clientID === null || connected.get(clientID) !== socket) return;
     connected.delete(clientID);
-    everyone({ type: "leave", clientID });
+    deliver(clientID, hub.leave(clientID));
   });
 });
 

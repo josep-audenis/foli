@@ -8,7 +8,7 @@
  */
 import { type Editor, type FoliDocument } from "@folijs/core";
 import type { ClientMessage } from "./hub.js";
-import type { Refusal } from "./index.js";
+import type { ClientID, Refusal } from "./index.js";
 export interface ConnectOptions {
     /** Sends a message to the hub (as JSON text, or the value: the transport's choice). */
     send(message: ClientMessage): void;
@@ -23,6 +23,7 @@ export interface ConnectOptions {
     onSnapshot?(snapshot: {
         version: number;
         document: FoliDocument;
+        clientID: ClientID;
     }): void;
     /** The hub refused this editor's steps for good (`invalid`, `unauthorized`…): they are not sent again. */
     onError?(reason: Refusal | "snapshot", message?: string): void;
@@ -80,11 +81,15 @@ export type HubMessage =
     version: number;
     message?: string;
 }
-/** The whole document, for a client joining or too far behind for the log. */
+/**
+ * The whole document, for a client joining or too far behind for the log; `clientID`: the one
+ * the connection is (an editor made from it takes `collab({ version, clientID })`).
+ */
  | {
     type: "snapshot";
     version: number;
     document: FoliDocument;
+    clientID: ClientID;
 }
 /** Another client's presence. */
  | {
