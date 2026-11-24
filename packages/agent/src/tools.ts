@@ -79,6 +79,8 @@ export interface ToolDefinition {
   run(session: Session, args: Record<string, unknown>, host?: ToolHost): ToolAnswer;
   /** Its methods in code mode, in the order they are listed. */
   methods: readonly ScriptMethod[];
+  /** Only for a session that reviews changes (`SessionOptions.review`, 23.8). */
+  review?: true;
 }
 
 const HANDLE: JsonSchema = {
@@ -840,6 +842,57 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       },
     ],
   },
+  {
+    name: "review",
+    review: true,
+    description:
+      'Lists the document\'s tracked changes, a line each ([c12] inserted, Bob (2026-11-20), in [b7]: "text"), and accepts or rejects them as Word does: by their numbers (ids: [12] for c12), or all of them (ids: "all", every header and footer too; author: only that person\'s). Accepted insertions stay, accepted deletions go; rejecting does the opposite. The list shows deleted text that read leaves out.',
+    inputSchema: args(
+      {
+        action: { type: "string", enum: ["list", "accept", "reject"], description: "What to do." },
+        ids: {
+          anyOf: [
+            { type: "array", items: { type: "integer" } },
+            { type: "string", enum: ["all"] },
+          ],
+          description: 'accept, reject: the changes\' numbers ([12] for c12), or "all".',
+        },
+        author: { type: "string", description: 'With ids "all": only this person\'s changes.' },
+      },
+      ["action"],
+    ),
+    run(session, { action, ids, author }) {
+      if (action === "list") return told(session.changes());
+      if (ids === undefined) return { text: `${action as string} needs ids.`, isError: true };
+      const options = typeof author === "string" ? { author } : {};
+      return told(
+        action === "accept"
+          ? session.acceptChanges(ids as number[] | "all", options)
+          : session.rejectChanges(ids as number[] | "all", options),
+      );
+    },
+    methods: [
+      {
+        name: "changes",
+        signature:
+          "doc.changes(): { changes, text }   // changes: { id, kind, author, date, block, text }[], in order",
+        call(session) {
+          const { changes, text } = given(session.changes());
+          return { changes, text };
+        },
+      },
+      {
+        name: "acceptChanges",
+        signature: 'doc.acceptChanges(ids | "all", { author? }): { text }',
+        call: (session, [a, b]: Args) => ({ text: given(session.acceptChanges(a, b)).text }),
+      },
+      {
+        name: "rejectChanges",
+        signature: 'doc.rejectChanges(ids | "all", { author? }): { text }',
+        call: (session, [a, b]: Args) => ({ text: given(session.rejectChanges(a, b)).text }),
+      },
+    ],
+  },
 ];
 
 /**
@@ -847,8 +900,12 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
  * `INSTRUCTIONS` and each tool's name, description and schema, and pass its calls to `run`.
  * A call whose arguments do not fit the schema is answered with why, as a refusal.
  */
+/** The tools a session is given: the review tool only to one that reviews changes. */
+export const toolsFor = (session: { reviewing: boolean }): readonly ToolDefinition[] =>
+  AGENT_TOOLS.filter((tool) => !tool.review || session.reviewing);
+
 export function agentTools(session: Session, host: ToolHost = {}): AgentTool[] {
-  return AGENT_TOOLS.map(({ name, description, inputSchema, run }) => ({
+  return toolsFor(session).map(({ name, description, inputSchema, run }) => ({
     name,
     description,
     inputSchema,

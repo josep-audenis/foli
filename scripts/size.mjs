@@ -143,6 +143,8 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * formatting, pictures, headers, review), which are the session's own code.
  * Agent raised again in 23.4 (91.6 kB, 100.0 allowed): tables and text formatting, about half of
  * it the words a model reads (descriptions, refusals); the phase's last four areas to come.
+ * Agent raised again in 23.8 (100.2 kB, 104.0 allowed): pictures, headers and footers, review;
+ * the phase's code is in, its last tasks are tests and docs.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
@@ -151,7 +153,7 @@ const BUNDLES = [
   { name: "FoliEditor only", entry: appEntry, budget: 184_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 102_400 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */

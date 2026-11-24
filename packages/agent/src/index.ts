@@ -1,3 +1,4 @@
+export type { ChangeInfo, ResolveOptions } from "./changes.js";
 export type { FormatOptions, TextFormat } from "./formatting.js";
 export {
   type InsertItem,
@@ -30,4 +31,5 @@ export {
   type ToolAnswer,
   type ToolDefinition,
   type ToolHost,
+  toolsFor,
 } from "./tools.js";

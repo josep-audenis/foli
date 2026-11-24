@@ -16,6 +16,11 @@ export interface FoliServerOptions {
    * Default false.
    */
   code?: boolean;
+  /**
+   * Review (23.8): the `review` tool lists, accepts and rejects the documents' tracked changes,
+   * anyone's. Default false: the model's edits are proposals for a person to decide.
+   */
+  review?: boolean;
   version: string;
   log?: (message: string) => void;
 }
@@ -44,12 +49,14 @@ export function foliServer(options: FoliServerOptions): ServerOptions {
   const given = options.author === undefined ? "" : authorName(options.author);
   if (options.author !== undefined && !given)
     throw new Error("--author needs a name that can be written beside a change");
-  const documents = new Documents(rules, () => given || client || "Agent");
+  const documents = new Documents(rules, () => given || client || "Agent", undefined, {
+    review: options.review === true,
+  });
   return {
     name: "foli",
     version: options.version,
     instructions: INSTRUCTIONS,
-    tools: tools(documents, options.code ? SANDBOX_LIMITS : false),
+    tools: tools(documents, options.code ? SANDBOX_LIMITS : false, options.review === true),
     onClient: (name) => {
       client = authorName(name) || undefined;
     },
@@ -60,12 +67,13 @@ export function foliServer(options: FoliServerOptions): ServerOptions {
 /** @internal */
 export const USAGE = `foli-mcp: an MCP server that reads and edits .docx files, every edit a tracked change.
 
-Usage: foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code]
+Usage: foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code] [--review]
 
   --root <folder>   The folder files are read from and written to. Default: where it is started.
   --author <name>   Whose tracked changes the edits are. Default: the client's name.
   --overwrite       Let save write over existing files, the original included.
   --code            Add the run tool: a script the model writes, run in a sandbox.
+  --review          Add the review tool: list, accept and reject tracked changes, anyone's.
   --version, --help
 
 It speaks the Model Context Protocol on stdin and stdout: an MCP client starts it.`;
@@ -74,18 +82,20 @@ It speaks the Model Context Protocol on stdin and stdout: an MCP client starts i
 export function parseArgs(
   argv: readonly string[],
 ):
-  | { root: string; overwrite: boolean; code: boolean; author?: string }
+  | { root: string; overwrite: boolean; code: boolean; review: boolean; author?: string }
   | { print: string; code: number } {
   let root = ".";
   let author: string | undefined;
   let overwrite = false;
   let code = false;
+  let review = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") return { print: USAGE, code: 0 };
     if (arg === "--version" || arg === "-v") return { print: "", code: 0 };
     if (arg === "--overwrite") overwrite = true;
     else if (arg === "--code") code = true;
+    else if (arg === "--review") review = true;
     else if (arg === "--root" || arg === "--author") {
       const value = argv[++i];
       if (value === undefined) return { print: `${arg} needs a value.\n\n${USAGE}`, code: 2 };
@@ -94,5 +104,5 @@ export function parseArgs(
     } else return { print: `Unknown argument: ${arg}\n\n${USAGE}`, code: 2 };
   }
   // An author given is an author to check, an empty one too.
-  return { root, overwrite, code, ...(author === undefined ? {} : { author }) };
+  return { root, overwrite, code, review, ...(author === undefined ? {} : { author }) };
 }

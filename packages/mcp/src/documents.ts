@@ -71,7 +71,15 @@ export class Documents {
   readonly #budget: number;
   #issued = 0;
 
-  constructor(rules: FileRules, author: () => string, budget = MAX_OPEN_SIZE) {
+  readonly #review: boolean;
+
+  constructor(
+    rules: FileRules,
+    author: () => string,
+    budget = MAX_OPEN_SIZE,
+    options: { review?: boolean } = {},
+  ) {
+    this.#review = options.review === true;
     this.#rules = rules;
     this.#author = author;
     this.#budget = budget;
@@ -124,7 +132,10 @@ export class Documents {
     try {
       const imported = await importDocx(checked.bytes, READ_LIMITS);
       pkg = imported.package;
-      session = openSession(imported.document, { author: this.#author() });
+      session = openSession(imported.document, {
+        author: this.#author(),
+        ...(this.#review ? { review: true } : {}),
+      });
     } catch (error) {
       // Not a .docx Word wrote, damaged, or over the reader's limits: said, not thrown.
       const why = error instanceof Error ? oneLine(error.message) : "it could not be read";

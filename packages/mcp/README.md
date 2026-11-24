@@ -17,7 +17,7 @@ Foli's own packages and, for the sandbox of `--code`, QuickJS as WebAssembly (MI
 The server is a program the client starts. It needs Node 20.19 or later.
 
 ```
-foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code]
+foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code] [--review]
 ```
 
 In Claude Code, for the project you are in:
@@ -47,6 +47,9 @@ Clients that are configured with a file take the same command, in the shape most
   them. Default: the name the client gives itself, or "Agent".
 - **`--overwrite`**: lets `save` write over existing files, the original included. Without it
   a save writes over nothing but its own earlier saves.
+- **`--review`**: adds the `review` tool, which lists the documents' tracked changes and
+  accepts or rejects them, anyone's, by id or all at once. Off by default: without it, the
+  model's edits are proposals a person accepts or rejects in Word.
 - **`--code`**: adds the `run` tool, which runs a script the model writes in a sandbox
   ([code mode](#code-mode---code)). Without it the server runs no code it is given.
 
@@ -72,6 +75,7 @@ with a handle (`[b7]`), and edits by handle:
 | `insert`                          | Pictures (a file under the root), breaks, lines, footnotes        |
 | `save`                            | Writes a `.docx`                                                  |
 | `run` (with `--code` only)        | Runs a script the model writes over a document, in a sandbox      |
+| `review` (with `--review` only)   | Lists tracked changes; accepts or rejects them, by id or all      |
 
 What the tools return, the read format and what each operation refuses are `@folijs/agent`'s:
 see [its README](../agent/README.md). The server tells the model the format in its

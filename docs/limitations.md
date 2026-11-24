@@ -441,7 +441,10 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   The MCP server reads a picture from a .png, .jpg or .gif under its root, at most 16 MB, and
   counts its bytes in the session's weight; an app gives bytes. EXIF rotation is not applied to
   the size. No floating pictures, captions or picture from a URL.
-- No operation accepts or rejects changes. `session.editor` is the
+- Review (23.8) only in a session opened with `review: true` (the MCP server's `--review`): the
+  body's changes are listed and accepted or rejected by id; "all" reaches every story. A
+  header's or footer's changes are not listed one by one. Accepting or rejecting a change in a
+  locked content control follows Word's rule (what leaves the text as it shows goes through). `session.editor` is the
   headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
   block; Word's final view shows it joined with the next paragraph.

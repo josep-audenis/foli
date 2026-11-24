@@ -94,6 +94,11 @@ export interface FoliServerOptions {
      * Default false.
      */
     code?: boolean;
+    /**
+     * Review (23.8): the `review` tool lists, accepts and rejects the documents' tracked changes,
+     * anyone's. Default false: the model's edits are proposals for a person to decide.
+     */
+    review?: boolean;
     version: string;
     log?: (message: string) => void;
 }
