@@ -99,7 +99,9 @@ function inverseOf(step: Step, before: Node, comments: readonly CommentJSON[] = 
     if (!node.isInline) return true;
     const from = Math.max(pos, step.from);
     const to = Math.min(pos + node.nodeSize, step.to);
-    const now = after.nodeAt(pos);
+    // At `from`, not `pos`: a node starting before the step has its old marks at `pos` in
+    // `after` too, and read there no mark would be taken back from its part in the step.
+    const now = after.nodeAt(from);
     if (!now || from >= to) return false;
     for (const mark of now.marks)
       if (!mark.isInSet(node.marks)) removes.push(new RemoveMarkStep(from, to, mark));

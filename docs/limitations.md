@@ -403,12 +403,12 @@ Real-time editing (Phase 22, 1.6; Phase 24; ADR-0012; [the guide](guides/collabo
   without pause roughly double to quintuple keystroke-to-paint p95 on a 50-page document
   ([benchmarks](benchmarks.md#typing-while-others-edit-2212)).
 - **Convergence is tested, not proven.** The property test (2–5 clients, 10–40 random edits a run,
-  1000 runs) passes; a heavier run of it (30–80 edits, eight seeds of 1000 runs) found one case in
-  8000 where a client ended with a bold mark the others did not have (bold, deletions and undo
-  close together), which did not replay alone. 24.2's run over an unreliable channel (2–4
-  clients, 30–60 edits) meets it about once in 4000 runs and shrank one that replays alone: two
-  clients bolding overlapping text, deletions and an undo. It is pinned as an expected failure in
-  `collab.property.test.ts`, and that run uses a fixed seed. Not fixed yet: such a client stays apart
+  1000 runs) passes, and so does 24.2's run over an unreliable channel (2–4 clients, 30–60 edits,
+  broadcasts reordered, repeated and lost) across 50 seeds of 300 runs, with catch-ups that end
+  inside another client's batch too. The one divergence these runs found (a client left with a
+  bold mark the others did not have, about one run in 4000) is fixed: taking back a mark step over
+  text partly marked already read the marks outside the step. Its shrunk case stays in
+  `collab.property.test.ts`. Passing runs are not a proof: a client that does end apart stays so
   until it loads the authority's snapshot again (a reload).
 - The agent library and the MCP server do not edit a shared document.
 - Not tried by hand: a document edited together and exported opened in Word (the e2e reads it

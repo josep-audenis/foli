@@ -392,12 +392,13 @@ class Lossy extends Client {
 
   /**
    * The hub's `stepsSince`: everything from this editor's version, or from `back` steps before it
-   * (a catch-up that overlaps what the editor has). Always to the log's end, as an authority's:
-   * one ending inside another client's batch can leave a mark apart (limitations.md).
+   * (a catch-up that overlaps what the editor has), to the log's end or `short` steps before it
+   * (a reply cut short, ending inside another client's batch: the rest comes later).
    */
-  catchUp(back = 0): void {
+  catchUp(back = 0, short = 0): void {
     const version = Math.max(0, getVersion(this.editor.state) - back);
-    const missed = this.hub.log.slice(version);
+    const all = this.hub.log.slice(version);
+    const missed = all.slice(0, Math.max(1, all.length - short));
     if (!missed.length) return;
     this.take({
       version,
@@ -423,7 +424,7 @@ function lossyRun(n: number, ops: readonly (Omit<Op, "kind"> & { kind: string })
       const kind: string = o.kind;
       if (kind === "repeat") c.repeat(at);
       else if (kind === "drop") c.drop(at);
-      else if (kind === "catchup") c.catchUp(Math.floor(o.a * 4));
+      else if (kind === "catchup") c.catchUp(Math.floor(o.a * 4), Math.floor(o.b * 4));
       else run(c, o as Op, serial);
     });
     Lossy.counting = false;
@@ -452,11 +453,12 @@ function lossyRun(n: number, ops: readonly (Omit<Op, "kind"> & { kind: string })
   }
 }
 
-describe("known limit: a bold mark left apart (limitations.md, Collaboration)", () => {
+describe("a bold mark left apart, fixed (limitations.md, Collaboration)", () => {
   // Found by 24.2's property run and shrunk: two clients bolding overlapping text, deletions and
-  // an undo close together; client 2 ends with a bold mark the hub does not have. Replays alone.
-  // When it passes, the limit is fixed: make it `it` and update limitations.md.
-  it.fails("two clients end with the same document", () => {
+  // an undo close together; client 2 ended with a bold mark the hub did not have. A mark step's
+  // inverse built node by node read the marks of a node starting before the step outside it, so
+  // taking the step back left its mark on that node's part.
+  it("two clients end with the same document", () => {
     const ops = (
       [
         ["type", 0, 0.4744, 0.4744],
@@ -524,7 +526,7 @@ describe("receiveBroadcast over an unreliable channel (24.2, 300 runs)", () => {
           fc.array(lossy, { minLength: 30, maxLength: 60 }),
           lossyRun,
         ),
-        // A fixed seed: about one run in 4000 meets the known mark divergence (below).
+        // A fixed seed: `pnpm check` gives the same runs every time.
         { numRuns: 300, seed: 24 },
       );
       // The channel did misbehave while the ops ran: duplicates, gaps and partial overlaps.
