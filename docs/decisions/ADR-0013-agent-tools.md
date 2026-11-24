@@ -60,6 +60,13 @@ The tools a client lists, `@folijs/mcp` with this change and without it: the sam
 Each later task records its tools' cost here or in the roadmap; the aim is to stay under 20
 tools and about 15,000 characters with schemas, `run` included.
 
+| After task          | Tools | Description characters | With schemas | With `--code` (tools, with schemas) |
+| ------------------- | ----: | ---------------------: | -----------: | ----------------------------------: |
+| 23.3 (`edit_table`) |    15 |                  3,738 |       10,942 |                          16, 14,428 |
+
+`run`'s summary of `doc` grows with each method (23.3's eight added about 800 characters): the
+later tasks keep their method lines short.
+
 ## Consequences
 
 - `@folijs/agent` gains a public surface (`AGENT_TOOLS`, `agentTools`, `INSTRUCTIONS`,

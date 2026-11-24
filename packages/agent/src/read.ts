@@ -190,20 +190,22 @@ export function readBlocks(state: EditorState, handles: Handles): Block[] {
         if (!stays) return;
         const handle = handles.at(pos, node);
         const table = add(
-          { handle, kind: "table", text: "", changed: false, comments: 0 },
+          { handle, kind: "table", text: "", changed: !!node.attrs.formatChange, comments: 0 },
           cell,
           depth,
         );
         let rows = 0;
         let columns = 0;
         node.forEach((row, rowOffset) => {
-          if (revisionOf(row)) table.changed = true;
+          if (revisionOf(row) || row.attrs.formatChange) table.changed = true;
           if (revisionOf(row)?.deletion) return;
           rows++;
           const rowStart = pos + 1 + rowOffset + 1;
-          // The grid column each cell starts at: the cells before it, and what they span.
-          let grid = 1;
+          // The grid column each cell starts at: the columns the row leaves empty before its
+          // first cell, the cells before it, and what they span.
+          let grid = 1 + ((row.attrs.gridBefore as number | null) ?? 0);
           row.forEach((cellNode, cellOffset) => {
+            if (cellNode.attrs.formatChange) table.changed = true;
             const span = (cellNode.attrs.gridSpan as number | null) ?? 1;
             const merge = cellNode.attrs.vMerge as string | null;
             const place = {

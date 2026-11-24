@@ -9,6 +9,7 @@ export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";
 export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
+export type { CellText, InsertTableOptions, ShadeOptions } from "./tables.js";
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 export { AGENT_TOOLS, type AgentTool, agentTools, INSTRUCTIONS, READ_LIMIT, type ScriptMethod, type ToolAnswer, type ToolDefinition, } from "./tools.js";
 
@@ -133,6 +134,7 @@ import { type DocumentTarget, type Editor, type EditorDocument, type Extension, 
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
+import { type CellText, type InsertTableOptions, type ShadeOptions } from "./tables.js";
 import { type Control, type Unfilled, type UpdateFieldsOptions } from "./templates.js";
 export interface SessionOptions {
     /** Whose tracked changes and comments the session's edits are. */
@@ -245,6 +247,30 @@ export interface Session {
         text: string;
     }>;
     /**
+     * Inserts a table next to a block (after it by default), its cells' texts given row by row
+     * (rows shorter than the longest get empty cells), in Word's Table Grid style unless `style`
+     * names another; `header` makes its first row a header row. Returns the table's blocks.
+     */
+    insertTable(handle: string, cells: readonly (readonly string[])[], options?: InsertTableOptions): Result<Changed>;
+    /**
+     * Inserts rows after (or before) row `row` of a table, made like it, with these cells' texts.
+     * A table is named by its handle or by a paragraph's in one of its cells; rows and columns
+     * are numbered as `read` prints them (`r1 c1`). Returns the table's blocks.
+     */
+    insertRows(handle: string, row: number, cells: readonly (readonly string[])[], where?: "after" | "before"): Result<Changed>;
+    /** Deletes a table's rows; every row deletes the table. */
+    deleteRows(handle: string, rows: readonly number[]): Result<Changed>;
+    /** Sets cells' whole text (a merged cell's is its top cell's). Returns the table's blocks. */
+    setCells(handle: string, cells: readonly CellText[]): Result<Changed>;
+    /** The table styles there are, by the names `setTableStyle` takes. */
+    tableStyles(): string[];
+    /** Gives a table a table style by name (capitals do not count), or none (null). */
+    setTableStyle(handle: string, style: string | null): Result<Changed>;
+    /** Shades a table's cells (`RRGGBB`; null takes it off): all, a row's, a column's or one. */
+    shadeCells(handle: string, fill: string | null, options?: ShadeOptions): Result<Changed>;
+    /** Makes the first `count` rows a table's header rows, repeated on each page; 0: none. */
+    setHeaderRows(handle: string, count: number): Result<Changed>;
+    /**
      * Marks the document as it is now, to come back to: `rollback` takes back every edit made
      * since, the session's own and those made through `editor`, as if none had been (no tracked
      * change is left of them, and every handle names the block it named). `release` ends the
@@ -264,6 +290,28 @@ export interface Checkpoint {
  * Throws on a document that does not validate, and on an empty `author`.
  */
 export declare function openSession(document: EditorDocument, options: SessionOptions): Session;
+
+// tables.d.ts
+export interface InsertTableOptions {
+    /** Next to the block: after it (default) or before it. */
+    where?: "after" | "before";
+    /** Make the first row a header row (repeated on each page). */
+    header?: boolean;
+    /** A table style by name, as `tableStyles` lists them. Default: Word's Table Grid. */
+    style?: string;
+}
+/** A cell's new text: where it is, as read prints it. */
+export interface CellText {
+    row: number;
+    column: number;
+    text: string;
+}
+export interface ShadeOptions {
+    /** Only this row (with `column`: only that cell). */
+    row?: number;
+    /** Only this column (with `row`: only that cell). */
+    column?: number;
+}
 
 // templates.d.ts
 import { type ControlValue } from "@folijs/core";

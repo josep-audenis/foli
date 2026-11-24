@@ -408,8 +408,13 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 - Only the body is read and edited: not headers, footers, footnotes or endnotes. One
   exception: `updateFields` also updates the fields there (core's does), as tracked changes the
   session does not read back, and does not report what it skipped there.
-- No operation inserts a table or a picture, changes a run's formatting (bold, color), or
-  accepts or rejects changes. `session.editor` is the headless editor for those, by positions.
+- Tables (23.3): a table is inserted next to a paragraph (next to a table, the paragraph after
+  or before it is used; with none, it is refused), rows inserted and deleted, cells' text set,
+  table styles, shading and header rows set. Columns, merging and splitting cells and column
+  widths are refused: they cannot be recorded as tracked changes, and every edit of a session is
+  one. A table put after an empty paragraph goes before it.
+- No operation inserts a picture, changes a run's formatting (bold, color), or accepts or
+  rejects changes. `session.editor` is the headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
   block; Word's final view shows it joined with the next paragraph.
 - Text is matched with its capitals and spaces as read; what stands in brackets in a read

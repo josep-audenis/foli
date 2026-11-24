@@ -10,6 +10,7 @@ export {
   type Session,
   type SessionOptions,
 } from "./session.js";
+export type { CellText, InsertTableOptions, ShadeOptions } from "./tables.js";
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 export {
   AGENT_TOOLS,

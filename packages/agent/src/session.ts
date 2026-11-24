@@ -9,6 +9,7 @@ import {
   type Node,
   Slice,
   type Step,
+  tableStyles,
   trackState,
   untracked,
 } from "@folijs/core";
@@ -31,6 +32,18 @@ import {
 } from "./operations.js";
 import { type Block, formatBlocks, readBlocks } from "./read.js";
 import { type Result, refuse } from "./result.js";
+import {
+  type CellText,
+  deleteRows,
+  type InsertTableOptions,
+  insertRows,
+  insertTable,
+  type ShadeOptions,
+  setCells,
+  setHeaderRows,
+  setTableStyle,
+  shadeCells,
+} from "./tables.js";
 import {
   type Control,
   controls,
@@ -148,6 +161,39 @@ export interface Session {
    * need a layout and are left), and fills its merge fields from `data`. A tracked change.
    */
   updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & { text: string }>;
+  /**
+   * Inserts a table next to a block (after it by default), its cells' texts given row by row
+   * (rows shorter than the longest get empty cells), in Word's Table Grid style unless `style`
+   * names another; `header` makes its first row a header row. Returns the table's blocks.
+   */
+  insertTable(
+    handle: string,
+    cells: readonly (readonly string[])[],
+    options?: InsertTableOptions,
+  ): Result<Changed>;
+  /**
+   * Inserts rows after (or before) row `row` of a table, made like it, with these cells' texts.
+   * A table is named by its handle or by a paragraph's in one of its cells; rows and columns
+   * are numbered as `read` prints them (`r1 c1`). Returns the table's blocks.
+   */
+  insertRows(
+    handle: string,
+    row: number,
+    cells: readonly (readonly string[])[],
+    where?: "after" | "before",
+  ): Result<Changed>;
+  /** Deletes a table's rows; every row deletes the table. */
+  deleteRows(handle: string, rows: readonly number[]): Result<Changed>;
+  /** Sets cells' whole text (a merged cell's is its top cell's). Returns the table's blocks. */
+  setCells(handle: string, cells: readonly CellText[]): Result<Changed>;
+  /** The table styles there are, by the names `setTableStyle` takes. */
+  tableStyles(): string[];
+  /** Gives a table a table style by name (capitals do not count), or none (null). */
+  setTableStyle(handle: string, style: string | null): Result<Changed>;
+  /** Shades a table's cells (`RRGGBB`; null takes it off): all, a row's, a column's or one. */
+  shadeCells(handle: string, fill: string | null, options?: ShadeOptions): Result<Changed>;
+  /** Makes the first `count` rows a table's header rows, repeated on each page; 0: none. */
+  setHeaderRows(handle: string, count: number): Result<Changed>;
   /**
    * Marks the document as it is now, to come back to: `rollback` takes back every edit made
    * since, the session's own and those made through `editor`, as if none had been (no tracked
@@ -302,5 +348,13 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     controls: () => controls(context),
     fillControl: (name, value) => fillControl(context, name, value),
     updateFields: (options) => updateFields(context, options),
+    insertTable: (handle, cells, options) => insertTable(context, handle, cells, options),
+    insertRows: (handle, row, cells, where) => insertRows(context, handle, row, cells, where),
+    deleteRows: (handle, rows) => deleteRows(context, handle, rows),
+    setCells: (handle, cells) => setCells(context, handle, cells),
+    tableStyles: () => tableStyles(editor.state),
+    setTableStyle: (handle, style) => setTableStyle(context, handle, style),
+    shadeCells: (handle, fill, options) => shadeCells(context, handle, fill, options),
+    setHeaderRows: (handle, count) => setHeaderRows(context, handle, count),
   };
 }

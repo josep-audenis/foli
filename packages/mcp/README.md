@@ -66,6 +66,7 @@ with a handle (`[b7]`), and edits by handle:
 | `comment`                         | A comment on a paragraph, or on text in it                        |
 | `list_controls`, `fill_control`   | A template's content controls: text, lists, dates, check boxes    |
 | `update_fields`                   | Fills merge fields from data; updates dates and references        |
+| `edit_table`                      | Inserts tables; rows in and out, cells' text, style, shading      |
 | `save`                            | Writes a `.docx`                                                  |
 | `run` (with `--code` only)        | Runs a script the model writes over a document, in a sandbox      |
 

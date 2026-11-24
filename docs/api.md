@@ -1271,6 +1271,11 @@ version. Details, the read format and examples: the
   `session.editor`, for core's `hint` or `goTo` in a view of that editor (0.3).
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
+- Tables (0.4, 23.3): `insertTable(handle, cells, { where?, header?, style? })`,
+  `insertRows(table, row, cells, where?)`, `deleteRows(table, rows)`, `setCells(table,
+  CellText[])` (`{ row, column, text }`), `tableStyles()`, `setTableStyle(table, style | null)`,
+  `shadeCells(table, fill | null, ShadeOptions?)` (`{ row?, column? }`), `setHeaderRows(table,
+  count)`; a table by its handle or a cell paragraph's, rows and columns as `read` numbers them.
 - Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
   `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
   checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session

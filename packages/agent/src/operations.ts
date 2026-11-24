@@ -82,7 +82,8 @@ const cut = (text: string, most: number): string => {
   return text.slice(0, low >= 0xdc00 && low <= 0xdfff ? most - 1 : most);
 };
 
-const quote = (text: string, most = 80) =>
+/** @internal A text quoted for a message, cut, with look-alike characters shown. */
+export const quote = (text: string, most = 80) =>
   JSON.stringify(text.length > most ? `${cut(text, most - 3)}…` : text).replace(
     LOOKALIKE,
     (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
@@ -224,8 +225,8 @@ export function replaceText(
   return { ok: true, replaced, refused, ...result };
 }
 
-/** A new paragraph's content: its text, line breaks and tabs. */
-function inline(editor: Editor, text: string): Node[] {
+/** @internal Text as a model writes it, as inline nodes: ↵ a line break, a tab a tab. */
+export function inline(editor: Editor, text: string): Node[] {
   const { schema } = editor.state;
   const nodes: Node[] = [];
   for (const part of typed(text).split(/(\n|\t)/)) {
