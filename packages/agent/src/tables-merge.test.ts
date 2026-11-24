@@ -53,12 +53,12 @@ describe("tables with a vertical merge (23.3 review)", () => {
 
   it("inserts after the row named, the merge going on through it", () => {
     const session = merged();
-    const done = session.insertRows(tableOf(session), 1, [
-      ["x", "Quince"],
-      ["y", "Fig"],
+    const table = tableOf(session);
+    const done = session.insertRows(table, 1, [
+      ["", "Quince"],
+      ["", "Fig"],
     ]);
     expect(done.ok).toBe(true);
-    // The new rows' text in the merged column is the merge's: only the other cells take text.
     expect(texts(session).filter((t) => /Quince|Fig|Apple|Pear/.test(t))).toEqual([
       "1:Apple",
       "2:Quince",
@@ -67,6 +67,22 @@ describe("tables with a vertical merge (23.3 review)", () => {
     ]);
     // Code mode counts the new rows' blocks, not the table's.
     expect(done.ok && done.blocks.length).toBe(4);
+    // Text for the merged cell is refused, and nothing is changed.
+    const before = session.editor.state.doc;
+    const refused = session.insertRows(table, 1, [["x", "Kiwi"]]);
+    expect(refused.ok || refused.message).toMatch(/goes on the vertical merge above it.*give ""/);
+    expect(session.editor.state.doc.eq(before)).toBe(true);
+  });
+
+  it("deletes a merge's first row only with the rows it covers", () => {
+    const session = merged();
+    const table = tableOf(session);
+    const refused = session.deleteRows(table, [1]);
+    expect(refused.ok || refused.message).toMatch(
+      /starts a vertical merge in column 1 that goes on to row 3/,
+    );
+    expect(session.deleteRows(table, [1, 2, 3]).ok).toBe(true);
+    expect(texts(session)).toEqual(["1:Veg", "1:Leek"]);
   });
 
   it("sets header rows on exactly the rows asked", () => {

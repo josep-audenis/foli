@@ -142,8 +142,9 @@ session.setHeaderRows("b9", 1);
 ```
 
 An operation of several edits (rows, cells, a new table) is all or nothing: one that is
-refused partway takes back what it did. A cell a vertical merge goes on through takes no text
-(it is the merge's top cell's), and a row whose every cell is in a vertical merge is refused.
+refused partway takes back what it did. In a vertical merge, a new row's cell the merge goes on
+through takes no text (give `""`: the text is the merge's top cell's); a row whose every cell is
+merged, and a merge's first row without the rows it covers, are refused.
 Adding or deleting columns, merging or splitting cells and column widths are not offered: they
 cannot be recorded as tracked changes. The `edit_table` tool says so, with what to do instead.
 

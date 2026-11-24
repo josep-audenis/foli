@@ -393,9 +393,22 @@ export function insertRows(
     const depth = cellDepth($from);
     const rows = () => rowsOf(table.pos, editor.state.doc.nodeAt(table.pos) as Node);
     const index = rows().find((r) => r.pos === $from.before(depth - 1))?.index;
-    if (index === undefined) break;
+    if (index === undefined)
+      return refuse(
+        "refused",
+        `Rows could not be inserted in table ${table.handle}. Nothing was changed.`,
+      );
     made.push(index);
     const fresh = rows().find((r) => r.index === index) as Row;
+    // A cell a vertical merge goes on through has no text of its own: text for it is refused.
+    const merged = fresh.cells.findIndex(
+      (c, k) => c.node.attrs.vMerge === "continue" && (rowTexts[k] ?? "") !== "",
+    );
+    if (merged >= 0)
+      return refuse(
+        "invalid",
+        `Cell ${merged + 1} of a new row (column ${fresh.cells[merged]?.column}) goes on the vertical merge above it, whose text is its top cell's: give "" for it. Nothing was changed.`,
+      );
     fill(context, fresh.cells, rowTexts);
     // The caret back in the new row (filling moved it): the next one goes after it.
     caretInRow(context, rows().find((r) => r.index === index) as Row);
@@ -423,6 +436,27 @@ export function deleteRows(
     const found = rowAt(table, r);
     if ("ok" in found) return found;
     picked.push(found);
+  }
+  // A row starting a vertical merge that goes on below it: its text is the merge's, which a
+  // tracked deletion would hide. Deleted only with every row the merge covers.
+  for (const row of picked) {
+    const at = table.rows.indexOf(row);
+    for (const cell of row.cells) {
+      if (cell.node.attrs.vMerge !== "restart") continue;
+      const covered: Row[] = [];
+      for (const below of table.rows.slice(at + 1)) {
+        const goesOn = below.cells.some(
+          (c) => c.column === cell.column && c.node.attrs.vMerge === "continue",
+        );
+        if (!goesOn) break;
+        covered.push(below);
+      }
+      if (covered.some((r) => !picked.includes(r)))
+        return refuse(
+          "refused",
+          `Row ${at + 1} of table ${table.handle} starts a vertical merge in column ${cell.column} that goes on to row ${table.rows.indexOf(covered[covered.length - 1] as Row) + 1}, and holds its text: delete those rows with it, or set the text of a row that stays first. Nothing was changed.`,
+        );
+    }
   }
   // From the last: rows deleted as tracked changes stay, and those before keep their place.
   picked.sort((a, b) => b.index - a.index);
@@ -613,7 +647,15 @@ export function setHeaderRows(context: Context, handle: string, count: number): 
     if ((row.node.attrs.header === true) !== header)
       tr.setNodeMarkup(row.pos, row.node.type, { ...row.node.attrs, header: header || null });
   });
-  if (tr.docChanged) editor.dispatch(tr);
+  if (tr.docChanged) {
+    const before = editor.state.doc;
+    editor.dispatch(tr);
+    if (editor.state.doc === before)
+      return refuse(
+        "refused",
+        `The header rows of table ${table.handle} could not be set (a locked content control?).`,
+      );
+  }
   return { ok: true, ...answer(context, table.handle) };
 }
 
