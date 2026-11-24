@@ -79,7 +79,7 @@ test("highlight takes Word's colors", async ({ page }) => {
   await open(page, [paragraph("Marked")]);
   await page.keyboard.press(`${MOD}+a`);
   await toolbar(page).getByRole("button", { name: "Highlight" }).click();
-  await page.getByRole("menuitemradio", { name: "Yellow" }).click();
+  await page.getByRole("menuitemradio", { name: "Yellow", exact: true }).click();
   await expect(editor(page).locator("p span").first()).toHaveCSS(
     "background-color",
     "rgb(255, 255, 0)",

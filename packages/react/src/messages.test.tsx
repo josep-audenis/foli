@@ -204,7 +204,9 @@ describe("the toolbar's messages", () => {
       if (item.text) expect(listed).toContain(item.text);
       if (typeof item.icon === "string" && /[A-Za-z]/.test(item.icon))
         expect(listed).toContain(item.icon);
-      for (const color of item.colors?.options ?? []) expect(listed).toContain(color.name);
+      const colors = item.colors?.options;
+      for (const color of (typeof colors === "function" ? colors(editor.state) : colors) ?? [])
+        expect(listed).toContain(color.name);
       const actions = typeof item.actions === "function" ? item.actions(editor) : item.actions;
       for (const action of actions ?? []) expect(listed).toContain(action.label);
     }

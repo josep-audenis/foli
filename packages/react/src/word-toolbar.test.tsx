@@ -217,7 +217,7 @@ describe("FoliToolbar on a schema v3 document", () => {
     fireEvent.click(screen.getByRole("button", { name: "Highlight" }));
     const items = screen
       .getAllByRole("menuitemradio")
-      .map((i) => i.textContent ?? i.getAttribute("aria-label"));
+      .map((i) => i.getAttribute("aria-label") ?? i.textContent);
     expect(items.join(" ")).toContain("Bright green");
   });
 
@@ -410,7 +410,7 @@ describe("FoliToolbar's table menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Shading" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Light blue" }));
     const cell = tableIn(editor)?.content?.[0]?.content?.[0];
-    expect(cell?.attrs?.shading).toMatchObject({ fill: "DEEAF6" });
+    expect(cell?.attrs?.shading).toMatchObject({ fill: "00B0F0" });
   });
 
   it("picks another table style from the box", () => {

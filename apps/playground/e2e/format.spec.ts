@@ -37,9 +37,9 @@ test("alignment and color menus apply to the selection; the open menu passes axe
   await expect(menu.getByRole("menuitemradio", { name: "Automatic" })).toBeFocused();
   const violations = (await new AxeBuilder({ page }).include(".foli-toolbar").analyze()).violations;
   expect(violations.map((v) => v.id)).toEqual([]);
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  await expect(menu.getByRole("menuitemradio", { name: "Red" })).toBeFocused();
+  // Down a column of Word's grid: Background 1, its five shades, then Dark red.
+  for (let i = 0; i < 7; i++) await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitemradio", { name: "Dark red" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(menu).toHaveCount(0);
   await expect(button(page, "Text color")).toBeFocused();
@@ -47,7 +47,7 @@ test("alignment and color menus apply to the selection; the open menu passes axe
 
   // Highlight with the mouse: the focus goes back to the document.
   await button(page, "Highlight").click();
-  await page.getByRole("menuitemradio", { name: "Yellow" }).click();
+  await page.getByRole("menuitemradio", { name: "Yellow", exact: true }).click();
   await expect(editor(page)).toBeFocused();
   // Word's yellow highlight.
   await expect(editor(page).locator('span[style*="background"]')).toHaveCSS(

@@ -137,10 +137,14 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, tracked while tracking) · Picture… (a dialog) · page break, horizontal line · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of cell fills; both in a table, tracked while tracking) · Picture… (a dialog) · page break, horizontal line · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
-items) with a palette (Word's highlight colors; an app gives another, [Toolbar items](#toolbar-items)), the current color checked; arrow keys,
+items) with a palette, the current color checked: Text color and Shading show Word's grid (the
+document's theme colors, Office's when it has none, five shades each, then the ten standard
+colors, and "More colors…" for any color), Highlight Word's highlight colors; an app gives
+another palette ([Toolbar items](#toolbar-items)). Arrow keys (in a grid, Left and Right along
+a row, Up and Down along a column),
 Home and End move, Enter picks, Escape closes back to the button. The alignment buttons show
 the selection's alignment pressed (none when mixed).
 A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons
@@ -261,9 +265,14 @@ the focus on the item, ArrowDown opens a menu. A copy of a built-in item with an
   `value` the one shown (null or "": a blank entry; one that is not offered shows itself),
   `pick` the command a choice runs. `label` is its accessible name.
 - `colors: { options, value(state), pick(color) }`: a color menu button (as Text color).
-  `options` are `ToolbarColor`s (`{ name, color }`, `color` a lowercase `#rrggbb`, or null for
-  the entry that removes it), `value` the color at the selection (checked in the menu, shown on
-  the button), `pick` the command a choice runs. `custom: true` adds a last entry, "More
+  `options` are `ToolbarColor`s (`{ name, color, shade? }`, `color` a lowercase `#rrggbb`, or
+  null for the entry that removes it; `shade` a percent, lighter above 0, darker below, that the
+  swatch's name says: "Accent 1, Lighter 80%"), or a function of the state giving them (the
+  built-ins' grid follows the document's theme), `value` the color at the selection (checked in
+  the menu, shown on the button), `pick` the command a choice runs. `columns: n` shows the
+  colors as swatches in a grid n wide, under the null entry, each named by its tooltip and
+  accessible name (the built-ins: 10, Highlight 5); without it, a list of named rows. `custom:
+  true` adds a last entry, "More
   colors…", that opens the browser's color field (an `input type="color"` kept out of sight,
   `.foli-toolbar-color-input`, opened on the color at the selection): `pick` then gets the
   color chosen, any `#rrggbb`, when the field says it changed (`change`), for the selection

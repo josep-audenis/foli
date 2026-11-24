@@ -172,29 +172,37 @@ describe("FoliToolbar", () => {
     fireEvent.keyDown(textColor, { key: "ArrowDown" });
     screen.getByRole("menu", { name: "Text color" });
     expect(textColor.getAttribute("aria-expanded")).toBe("true");
+    // Word's grid: Automatic, then ten theme colors (Office's theme here) with five shades each,
+    // then ten standard colors; each swatch named by its accessible name.
     const items = screen.getAllByRole("menuitemradio");
-    expect(items.map((item) => item.textContent)).toEqual([
-      "Automatic",
-      "Gray",
-      "Red",
-      "Orange",
-      "Green",
-      "Blue",
-      "Purple",
-    ]);
+    const names = items.map((item) => item.getAttribute("aria-label") ?? item.textContent);
+    expect(items).toHaveLength(71);
+    expect(names.slice(0, 3)).toEqual(["Automatic", "Background 1", "Text 1"]);
+    expect(names[11]).toBe("Background 1, Darker 5%");
+    expect(names[12]).toBe("Text 1, Lighter 50%");
+    expect(names[15]).toBe("Accent 1, Lighter 80%");
+    expect(names.slice(61, 63)).toEqual(["Dark red", "Red"]);
     expect(document.activeElement).toBe(items[0]); // the checked one: no color yet
     expect(items[0]?.getAttribute("aria-checked")).toBe("true");
-    // Arrow keys stay in the menu (the toolbar does not move).
+    // Arrow keys stay in the menu (the toolbar does not move): Down and Up along a column,
+    // Left and Right along a row.
     fireEvent.keyDown(items[0] as HTMLElement, { key: "ArrowDown" });
     expect(document.activeElement).toBe(items[1]);
-    fireEvent.keyDown(items[1] as HTMLElement, { key: "End" });
-    expect(document.activeElement).toBe(items[6]);
-    fireEvent.keyDown(items[6] as HTMLElement, { key: "ArrowUp" });
-    fireEvent.keyDown(items[5] as HTMLElement, { key: "ArrowUp" });
-    fireEvent.click(items[4] as HTMLElement, { detail: 0 }); // Green, by keyboard
+    fireEvent.keyDown(items[1] as HTMLElement, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(items[2]);
+    fireEvent.keyDown(items[2] as HTMLElement, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items[12]);
+    fireEvent.keyDown(items[12] as HTMLElement, { key: "ArrowUp" });
+    fireEvent.keyDown(items[2] as HTMLElement, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(items[0]); // out of the grid, to the row above it
+    fireEvent.keyDown(items[0] as HTMLElement, { key: "End" });
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "More colors…" }));
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(items[70]); // Purple, the last swatch
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Green" }), { detail: 0 });
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(textColor);
-    expect(contentJSON(editor)).toContain('{"type":"color","attrs":{"value":"2E7D32"}}');
+    expect(contentJSON(editor)).toContain('{"type":"color","attrs":{"value":"00B050"}}');
     // Open again: Green is checked and focused; Escape closes back to the button.
     fireEvent.click(textColor, { detail: 0 });
     const green = screen.getByRole("menuitemradio", { name: "Green" });
