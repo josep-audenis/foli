@@ -589,6 +589,16 @@ export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";
 
+// localFonts.d.ts
+/**
+ * The fonts installed on the machine, for the Font box: the Local Font Access API
+ * (`queryLocalFonts`, Chromium browsers). Asking needs the user's permission, and a first ask
+ * a user gesture: the box asks when the user opens it. Elsewhere (Firefox, Safari, a refusal)
+ * the list stays empty and the box offers its own fonts.
+ * @internal
+ */
+export {};
+
 // messages.d.ts
 /**
  * Every string the toolbar shows or announces, in English: its items and their tooltips, menu

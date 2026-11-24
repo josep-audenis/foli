@@ -119,6 +119,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   development,
@@ -128,6 +129,7 @@ import {
   useEditorState,
   useIsomorphicLayoutEffect,
 } from "./editor.js";
+import { loadLocalFonts, localFontFamilies, subscribeLocalFonts } from "./localFonts.js";
 import {
   MessagesContext,
   type ToolbarMessage,
@@ -973,6 +975,14 @@ const FONTS = [
   "Trebuchet MS",
   "Verdana",
 ];
+/** The Font box's entries: the theme's fonts, `FONTS`, and the machine's once it lets us read them. */
+const fontOptions = (state: EditorState) => {
+  const theme = wordContext(state)?.envelope.theme?.fonts;
+  const names = [theme?.minor.latin, theme?.major.latin, ...FONTS, ...localFontFamilies()];
+  return [...new Set(names.filter((n): n is string => !!n))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => ({ value: name, label: name }));
+};
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
 const REVIEW_VIEWS = [
@@ -1002,13 +1012,7 @@ const GROUPS: Item[][] = [
       text: "Font",
       enabled: hasTextblock,
       select: {
-        options: (state) => {
-          const theme = wordContext(state)?.envelope.theme?.fonts;
-          const names = [theme?.minor.latin, theme?.major.latin, ...FONTS];
-          return [...new Set(names.filter((n): n is string => !!n))]
-            .sort((a, b) => a.localeCompare(b))
-            .map((name) => ({ value: name, label: name }));
-        },
+        options: fontOptions,
         value: fontFamilyAt,
         pick: (name) => setFontFamily(name),
       },
@@ -1662,6 +1666,11 @@ export function FoliToolbar({
     return { groups, items, selectStates: statesOf(items, body) };
   }, [stableGroups, comments, body]);
   const states = useEditorState(selectStates, { editor, isEqual: sameStates });
+  // The Font box lists the machine's fonts once read: at once when already allowed.
+  useSyncExternalStore(subscribeLocalFonts, localFontFamilies, localFontFamilies);
+  useEffect(() => {
+    void loadLocalFonts(false);
+  }, []);
   const [focused, setActive] = useState(0);
   const buttons = useRef<(HTMLElement | null)[]>([]);
   // `overflow="menu"`: how many groups fit the row (null: not known yet, or `"wrap"`); the rest
@@ -2386,9 +2395,17 @@ export function FoliToolbar({
                       onMouseDown={() => {
                         pointer.current = true;
                         stepped.current = false;
+                        // Opening the built-in Font box asks for the machine's fonts (a gesture).
+                        if (select.options === fontOptions) void loadLocalFonts(true);
                       }}
                       onKeyDown={(event) => {
                         pointer.current = false;
+                        // Keys that open or step the box, not the toolbar's Left and Right past it.
+                        if (
+                          select.options === fontOptions &&
+                          (STEP_KEYS.has(event.key) || [" ", "Enter", "F4"].includes(event.key))
+                        )
+                          void loadLocalFonts(true);
                         // Alt+Down opens the list, and on Apple platforms the arrows do: a pick
                         // there is a pick, applied at once.
                         stepped.current = STEP_KEYS.has(event.key) && !event.altKey && !IS_APPLE;
