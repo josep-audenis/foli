@@ -324,6 +324,8 @@ export type ReceivedBroadcast =
  */
 export function receiveBroadcast(state: EditorState, broadcast: BroadcastJSON): ReceivedBroadcast {
   const version = stateOf(state).version;
+  if (typeof broadcast !== "object" || broadcast === null)
+    throw new RangeError("receiveBroadcast: not a broadcast");
   const { version: from, steps, clientIDs } = broadcast;
   if (!Number.isSafeInteger(from) || from < 0)
     throw new RangeError(`receiveBroadcast: version ${from} is not a version`);

@@ -8,7 +8,7 @@ document model; your app keeps the transport, authentication and storage
 | Piece             | Where                                                              | What it does                                                                      |
 | ----------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
 | The authority     | `@folijs/collab`, on your server                                   | Orders every step, validates it by applying it, gives what to broadcast and store |
-| The client plugin | `collab`, `sendableSteps`, `receiveTransaction` in `@folijs/core`  | Sends its steps, rebases them over the others', keeps undo to its own changes     |
+| The client plugin | `collab`, `sendableSteps`, `receiveBroadcast` in `@folijs/core`    | Sends its steps, rebases them over the others', keeps undo to its own changes     |
 | Presence          | `presenceMessage`, `receivePresence`, `presence` in `@folijs/core` | Who else edits, in what colour and where; drawn by `EditorView`                   |
 | The transport     | yours                                                              | WebSocket, SSE, HTTP, a queue: JSON messages                                      |
 | Who may edit      | yours (`authorize`)                                                | A read-only user's steps refused                                                  |

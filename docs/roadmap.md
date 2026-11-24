@@ -3586,9 +3586,12 @@ agent; if both change a shared file, whichever lands second merges the other in 
   `receiveTransaction`; the property test over reordered, duplicated and dropped broadcasts.
   Done: `receiveBroadcast` (`applied`, `had`, `gap`; an overlapping broadcast applies only what
   the editor lacks), `BroadcastJSON` and `ReceivedBroadcast`; `receiveTransaction`'s optional
-  fourth argument; `broadcast.test.ts`, and 300 property runs of 2–4 clients over a channel that
-  reorders, repeats and loses broadcasts, catching up from the log (each run's duplicates and
-  gaps counted: over 50 of each).
+  fourth argument; `broadcast.test.ts` (an overlap starting inside the editor's own batch
+  included), and 300 property runs (fixed seed) of 2–4 clients, 30–60 edits, over a channel that
+  reorders, repeats and loses broadcasts and catches up from before the editor's version
+  (counted while the edits run: over 50 duplicates, 20 gaps and 50 partial overlaps). The run
+  found Phase 22's known mark divergence about once in 4000 runs and shrank one that replays
+  alone: pinned as an expected failure, limitations.md updated; fixing it is not this phase's.
 - [ ] 24.3 Collab: `connect` and `hub`, their message types, presence through them; unit tests of
   each case (stale, gap, duplicate, reconnect, a client refused for good).
 - [ ] 24.4 The host-and-joiner test over an unreliable channel, both ways (raw functions,

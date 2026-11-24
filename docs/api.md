@@ -915,12 +915,12 @@ Real-time editing by several people through a central authority (1.6, ADR-0012; 
   overlaps what the editor has applies only the part it lacks), `{ status: "had" }` (nothing
   to do) or `{ status: "gap", version, from }` (ask the authority for the steps since
   `version`). Throws a `RangeError` on a broadcast that is not one.
-- `receiveTransaction(state, steps, clientIDs, version?)`: the transaction that applies steps the
+- `receiveTransaction(state, steps, clientIDs, from?)`: the transaction that applies steps the
   authority broadcast from this editor's version (`Step.fromJSON` each); dispatch it. This
   editor's own steps among them are confirmed; the others are applied, its unconfirmed steps
   rebased over them. It is `remote`: not undoable, not tracked; undo maps the user's own changes
   over it. Apply broadcasts in version order (keep a later one until those before it arrive).
-  Given `version` (the broadcast's), it throws a `RangeError` naming both when it is not the
+  Given `from` (the broadcast's version), it throws a `RangeError` naming both when it is not the
   editor's; `receiveBroadcast` does that check and more.
 - `getVersion(state)`: the authority's version this editor has.
 - Authorship (22.10): each editor's tracked changes and comments carry its own `author`; a

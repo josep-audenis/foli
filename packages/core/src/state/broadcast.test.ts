@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { StepJSON } from "../transform/steps.js";
+import { Step, type StepJSON } from "../transform/steps.js";
 import { createDocument, type FoliDocument, SCHEMA_VERSION } from "../v3/document.js";
 import {
   type BroadcastJSON,
@@ -71,6 +71,30 @@ describe("receiveBroadcast (24.2)", () => {
     expect(receive(editor, both)).toBe("applied");
     expect(editor.state.doc.textContent).toBe("yxab");
     expect(getVersion(editor.state)).toBe(both.steps.length);
+  });
+
+  it("an overlap that starts inside the editor's own batch confirms the rest of it", () => {
+    const editor = client(1);
+    editor.select(3);
+    editor.commands.insertText("!");
+    editor.select(1);
+    editor.commands.insertText(">");
+    const own = (sendableSteps(editor.state)?.steps ?? []).map((s) => s.toJSON() as StepJSON);
+    expect(own.length).toBeGreaterThan(1);
+    // The first of its steps confirmed alone (a catch-up that ended inside the batch)...
+    const first = Step.fromJSON(editor.state.schema, own[0]);
+    editor.dispatch(receiveTransaction(editor.state, [first], [1], 0));
+    // ...then the whole broadcast, with another client's step after its own.
+    const theirs = typed(2, "x", own.length);
+    const all: BroadcastJSON = {
+      version: 0,
+      steps: [...own, ...theirs.steps],
+      clientIDs: [...own.map(() => 1), ...theirs.clientIDs],
+    };
+    expect(receive(editor, all)).toBe("applied");
+    expect(sendableSteps(editor.state)).toBeNull();
+    expect(getVersion(editor.state)).toBe(all.steps.length);
+    expect(editor.state.doc.textContent).toBe("x>ab!");
   });
 
   it("says a gap, with both versions, and changes nothing", () => {
