@@ -83,7 +83,7 @@ describe("read", () => {
       cell: { table: table.handle, row: 1, column: 1 },
     });
     const lines = text.split("\n");
-    expect(lines[2]).toBe("[b3] table, 41 rows, 5 columns");
+    expect(lines[2]).toMatch(/^\[b3\] table, 41 rows, 5 columns, Medium/);
     expect(lines[3]).toBe("[b4]   r1 c1, Normal: Category");
     expect(lines[15]).toBe("[b16]   r3 c2, table, 2 rows, 2 columns");
     expect(lines[16]).toBe("[b17]     r1 c1, Normal: 1-9");

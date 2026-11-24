@@ -237,7 +237,10 @@ describe("deleteBlock", () => {
     const original = blocks(session);
     const clause = starting(original, "Clause headings do not affect");
     const result = session.deleteBlock(clause.handle);
-    expect(result).toMatchObject({ ok: true, text: `Deleted block ${clause.handle}.` });
+    expect(result).toMatchObject({
+      ok: true,
+      text: `Deleted block ${clause.handle}, as a tracked deletion.`,
+    });
     const now = blocks(session);
     expect(now).toHaveLength(original.length - 1);
     expect(now.some((b) => b.handle === clause.handle)).toBe(false);
@@ -349,7 +352,7 @@ describe("what the review of #140 found", () => {
     const date = starting(original, "Date: [empty: Offer date]");
     expect(session.deleteBlock(date.handle)).toMatchObject({
       ok: true,
-      text: `Deleted block ${date.handle}.`,
+      text: `Deleted block ${date.handle}, as a tracked deletion.`,
     });
     expect(blocks(session).some((b) => b.handle === date.handle)).toBe(false);
     expectTracked(session, original);
@@ -387,7 +390,7 @@ describe("what the review of #140 found", () => {
     if (!made.ok) throw new Error(made.message);
     expect(session.deleteBlock(made.blocks[0]?.handle as string)).toMatchObject({
       ok: true,
-      text: `Deleted block ${made.blocks[0]?.handle}.`,
+      text: `Deleted block ${made.blocks[0]?.handle}: your own insertion, removed.`,
     });
     expect(blocks(session)).toEqual(original);
     expect(trackedChanges(session.editor.state.doc)).toHaveLength(0);

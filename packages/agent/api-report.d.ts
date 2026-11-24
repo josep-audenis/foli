@@ -185,6 +185,9 @@ export interface Block {
     depth: number;
     /** It holds tracked changes not yet accepted or rejected (anyone's). */
     changed: boolean;
+    /** A table's style, by name, and how many rows from its top repeat on each page (23.9). */
+    tableStyle?: string;
+    headerRows?: number;
     /** How many comments are anchored in it. */
     comments: number;
     /**

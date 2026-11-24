@@ -417,7 +417,8 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
   ) {
     // The session's own paragraph, never accepted: it goes for real, as its text would.
     editor.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize).setMeta(untracked, true));
-    if (editor.state.doc !== before) return { ok: true, text: `Deleted block ${handle}.` };
+    if (editor.state.doc !== before)
+      return { ok: true, text: `Deleted block ${handle}: your own insertion, removed.` };
   }
   if (stays && !hasContent(node))
     return refuse(
@@ -436,7 +437,7 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
       ok: true,
       text: `Block ${handle} was emptied but stays: ${stays ?? "its paragraph mark could not be deleted"}.\n${left.text}`,
     };
-  return { ok: true, text: `Deleted block ${handle}.` };
+  return { ok: true, text: `Deleted block ${handle}, as a tracked deletion.` };
 }
 
 /** @internal The paragraph `handle` names, or why an operation on a paragraph cannot go on. */

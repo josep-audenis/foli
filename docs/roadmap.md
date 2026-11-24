@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.8 merged                                                                                                     |
+| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 to 23.9 merged                                                                                                     |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 | 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
@@ -3457,12 +3457,30 @@ lands second merges the other in (no rebase: force push is blocked).
   selection); `SessionOptions.review`, `changes`, `acceptChanges`, `rejectChanges`; the `review`
   tool, offered only to a reviewing session (`toolsFor`), and `--review` in the MCP server;
   `run`'s summary lists the review methods only there.
-- [ ] 23.9 A scenario per area run twice with a model's kind of calls: through `agentTools`
+- [x] 23.9 A scenario per area run twice with a model's kind of calls: through `agentTools`
   on a session alone (no MCP), and through the MCP server (`mcp/src/server.test.ts` with
   `testing/client.ts`): build a table from data, add a row to an existing one, format a
   heading, make a list, insert a picture; each exported and opened again. Then a fresh model
   given only the tools' own words does the same tasks, as in 14.8 and 16.6; what it got wrong
   goes into the descriptions, and the result is recorded here.
+  Done (2026-11-24). Scenarios on the corpus's 04-board-report through `agentTools` alone
+  (`agent/src/scenarios-23.test.ts`) and through the server with the SDK's client
+  (`mcp/src/scenarios-23.test.ts`): a table built from data with a header row, a row added to
+  the appendix's table, a heading colored and centered, a numbered (bulleted) list made of new
+  paragraphs, a picture inserted from a file, the header edited; exported and opened again,
+  every change the agent's. Then a fresh Claude agent, told only what the built server says of
+  itself, through the SDK's client against `dist/bin.js` (each call replayed in a fresh server):
+  five tasks on the report and three on the business letter (a price table in place of three
+  tabbed lines, the subject bold, a paragraph's sentences as a bulleted list). 22 calls, none
+  refused; it saw the subject was bold already, and left a comment where the report had a
+  picture it could not identify. Word 16.0 opens both files, every revision the trial's
+  author's (2 tables, the picture and the comment in the report; the table in the letter). What
+  it found unclear, now in the tools' words: what `insert_table`'s `header` does; that new
+  paragraphs take the neighbour's indents and numbering; a picture, now read as
+  `[picture: its alt text]`; a table's style and header rows, now on its line
+  (`table, 3 rows, 2 columns, Table Grid, 1 header row`); `delete_block`'s answer, which now
+  says a tracked deletion (or its own insertion removed). Left as is: a table's borders are
+  not read, and an answer gives the blocks changed, not where they are (a read shows it).
 - [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
   server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
   core patch) published with the owner's approval.

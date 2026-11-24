@@ -34,7 +34,7 @@ describe("tables (23.3)", () => {
         },
       ),
     );
-    expect(made.text).toMatch(/^\[b\d+\] table, 3 rows, 2 columns, changed$/m);
+    expect(made.text).toMatch(/^\[b\d+\] table, 3 rows, 2 columns, [^\n]*changed$/m);
     expect(made.text).toMatch(/r1 c1, Normal, changed: Item/);
     expect(made.text).toMatch(/r3 c2, Normal, changed: $/m);
     expect(lines(session).split("\n")[0]).toMatch(/Prices$/);

@@ -142,7 +142,7 @@ return doc.tableStyles().length > 0;`);
       alt: "Logo",
     });
     expect(done.refused).toBe(false);
-    expect(done.text).toMatch(/changed: \[picture\]/);
+    expect(done.text).toMatch(/changed: \[picture: Logo\]/);
     for (const path of ["../logo.png", "contract.docx", "logo.txt"])
       expect(
         (await call("insert", { handle: first, what: "picture", path, alt: "x" })).refused,
