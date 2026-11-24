@@ -200,6 +200,11 @@ export function insertItem(
     "it goes next to or in a paragraph",
   );
   if ("ok" in target) return target;
+  if (context.story && item.kind !== "picture" && item.kind !== "horizontalRule")
+    return refuse(
+      "invalid",
+      `A header or footer holds no page or section breaks and no notes: put the ${item.kind === "footnote" || item.kind === "endnote" ? "note" : "break"} in the body.`,
+    );
   const locked = lockedControls(context, target.pos, target.node)[0];
   if (locked)
     return refuse(

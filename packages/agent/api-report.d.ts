@@ -252,8 +252,9 @@ export interface ReadOptions {
     /** Also each paragraph's text formatting of its own (bold, font, size…): `Block.formatting`. */
     formatting?: boolean;
     /**
-     * Also the headers and footers, after the body, each under a line saying where it is used;
-     * their blocks' handles are `h1`, `f1`… and `Block.story` names them (23.7).
+     * Also the headers and footers, after the body (in a read in parts, after its last part),
+     * each under a line saying where it is used; their blocks' handles are `h1`, `f1`… and
+     * `Block.story` names them (23.7).
      */
     headers?: boolean;
 }

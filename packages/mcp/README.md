@@ -124,8 +124,9 @@ documents, as tracked changes.
   read's `(more: …)` line then names the first block cut away.
 - `null` for an argument that may be left out counts as leaving it out. A save the system
   refuses (the file open in Word, a folder not writable) says so.
-- The body only: headers, footers and notes are not read (`update_fields` updates their
-  fields).
+- Headers and footers are read with `read`'s `headers` and edited with the same tools (no
+  comments, breaks or notes there); the text of notes is not read (`update_fields` updates
+  their fields).
 - No pages: `update_fields` leaves page numbers as they are, and a table of contents too
   unless asked (`contents`), when its page numbers come back empty until Word updates it.
 - One client, over stdin and stdout. No network transport.

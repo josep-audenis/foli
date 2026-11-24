@@ -106,7 +106,10 @@ export function resolve(context: Context, handle: string): Refusal | { pos: numb
         "gone",
         `Block ${handle} is no longer in the document. Read again for the blocks there are.`,
       )
-    : refuse("unknown-handle", `There is no block ${handle}. Handles come from read: [b1], [b2]…`);
+    : refuse(
+        "unknown-handle",
+        `There is no block ${handle}. Handles come from read: [b1], [b2]… (headers' [h1] and footers' [f1] from read with headers).`,
+      );
 }
 
 /** @internal The blocks with these handles as they read now, in document order. */

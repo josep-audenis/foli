@@ -56,6 +56,9 @@ export function storyUses(state: EditorState): StoryUse[] {
   const stories = wordContext(state)?.stories;
   if (!stories) return [];
   const uses = new Map<string, { kind: StoryKind; slots: Map<Slot, number[]> }>();
+  // As Word shows them: a first page's own only with the section's title page on, even pages'
+  // only with the document's even-and-odd setting.
+  const evenAndOdd = wordContext(state)?.envelope.settings?.evenAndOddHeaders === true;
   const kinds: StoryKind[] = ["header", "footer"];
   const current: Record<StoryKind, Partial<Record<Slot, string>>> = { header: {}, footer: {} };
   sections(state).forEach((section, i) => {
@@ -63,6 +66,8 @@ export function storyUses(state: EditorState): StoryUse[] {
       const own = section[kind === "header" ? "headers" : "footers"];
       if (own) current[kind] = { ...current[kind], ...own };
       for (const slot of SLOTS) {
+        if (slot === "first" && section.titlePage !== true) continue;
+        if (slot === "even" && !evenAndOdd) continue;
         const id = current[kind][slot];
         if (!id || stories.get(id)?.kind !== kind) continue;
         const use = uses.get(id) ?? { kind, slots: new Map() };
@@ -82,6 +87,6 @@ export function storyUses(state: EditorState): StoryUse[] {
   }
   for (const [id, story] of stories)
     if ((story.kind === "header" || story.kind === "footer") && !uses.has(id))
-      out.push({ id, kind: story.kind, label: `${story.kind} no section uses` });
+      out.push({ id, kind: story.kind, label: `${story.kind} not shown (no section uses it)` });
   return out;
 }

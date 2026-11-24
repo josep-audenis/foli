@@ -40,7 +40,7 @@ import {
   readBlocks,
   runFormatting,
 } from "./read.js";
-import { type Result, refuse } from "./result.js";
+import { type Refusal, type Result, refuse } from "./result.js";
 import { type StoryKind, storyUses } from "./stories.js";
 import {
   type CellText,
@@ -78,8 +78,9 @@ export interface ReadOptions {
   /** Also each paragraph's text formatting of its own (bold, font, size…): `Block.formatting`. */
   formatting?: boolean;
   /**
-   * Also the headers and footers, after the body, each under a line saying where it is used;
-   * their blocks' handles are `h1`, `f1`… and `Block.story` names them (23.7).
+   * Also the headers and footers, after the body (in a read in parts, after its last part),
+   * each under a line saying where it is used; their blocks' handles are `h1`, `f1`… and
+   * `Block.story` names them (23.7).
    */
   headers?: boolean;
 }
@@ -277,6 +278,11 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   const stories = new Map<string, Context & { id: string }>();
   const storyContext = (id: string, kind: StoryKind): (Context & { id: string }) | null => {
     let found = stories.get(id);
+    // The body's document replaced (`setDocument`): core made the story's editor anew.
+    if (found && editor.story(id) !== found.editor) {
+      stories.delete(id);
+      found = undefined;
+    }
     if (!found) {
       const story = editor.story(id);
       if (!story) return null;
@@ -292,12 +298,29 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     }
     return found;
   };
+  // `setDocument` on the body tells without a transaction: every story's handles go with it.
+  let lastBody = editor.state.doc;
+  editor.subscribe((state, transactions) => {
+    if (!transactions.length && state.doc !== lastBody) stories.clear();
+    lastBody = state.doc;
+  });
   /** The context a handle's block is in: a header's or a footer's, else the body's. */
   const contextOf = (handle: unknown): Context & { id?: string } => {
     const first = Array.isArray(handle) ? handle[0] : handle;
     if (typeof first === "string" && /^[hf][1-9]\d*$/.test(first))
       for (const story of stories.values()) if (story.handles.issued(first)) return story;
     return context;
+  };
+  /** Handles of several blocks: all in one story, or why not. */
+  const oneStory = (list: unknown): Refusal | null => {
+    if (!Array.isArray(list) || list.length < 2) return null;
+    const first = contextOf(list[0]);
+    return list.every((h) => contextOf(h) === first)
+      ? null
+      : refuse(
+          "invalid",
+          "These blocks are in different stories (the body, a header, a footer): one call for each.",
+        );
   };
   const NO_COMMENT = refuse(
     "invalid",
@@ -331,7 +354,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     formatted(blocks, context);
     const next = all[start + blocks.length]?.handle ?? null;
     let text = formatBlocks(blocks);
-    if (headers === true)
+    if (headers === true && next === null)
       for (const use of storyUses(editor.state)) {
         const story = storyContext(use.id, use.kind);
         if (!story) continue;
@@ -357,6 +380,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   const checkpoint = (): Checkpoint => {
     const start = editor.state.doc;
     const ends = handles.snapshot();
+    const storyEnds = [...stories.values()].map((s) => [s.handles, s.handles.snapshot()] as const);
     // What the document holds besides its body (styles, numbering…), and undo's own state: a
     // rollback puts both back as they are now. The history plugin is found by its key's name
     // (core does not export the key): its state, given back to it, is taken as it is.
@@ -413,6 +437,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
         if (!editor.state.doc.eq(start))
           throw new Error("checkpoint: the rollback did not give the document back");
         handles.restore(ends);
+        for (const [own, snapshot] of storyEnds) own.restore(snapshot);
       },
     };
   };
@@ -473,7 +498,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     insertItem: (handle, item, options) =>
       whole(() => insertItem(contextOf(handle), handle, item, options)),
     formatParagraphs: (handles, format) =>
-      whole(() => formatParagraphs(contextOf(handles), handles, format)),
+      oneStory(handles) ?? whole(() => formatParagraphs(contextOf(handles), handles, format)),
     formatText: (handle, format, options) =>
       whole(() => formatText(contextOf(handle), handle, format, options)),
   };

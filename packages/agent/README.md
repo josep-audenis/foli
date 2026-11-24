@@ -53,7 +53,7 @@ every tracked change accepted:
 Handles come from read: [b1], [b2]…`). `styles()`, `controls()` and `document()` return theirs
 bare. Only `openSession` throws: on a document that does not validate, or an empty author.
 
-Not read: headers, footers, footnotes and endnotes.
+Headers and footers are read with `read({ headers: true })` (below); the text of footnotes and endnotes is not read.
 
 ## Editing
 

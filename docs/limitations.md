@@ -409,8 +409,10 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   (23.7): their blocks have handles `h1`…, `f1`…, each story under a line saying which sections
   use it (a section without its own goes on with the one before's), and every operation takes
   them but `comment` (Word keeps no comments there). The text of footnotes and endnotes is not
-  read; `insertItem` writes a new note's. A rollback (a refused operation of several edits, a
-  failed script) keeps a header's handles only when they were read before it. `updateFields`
+  read; `insertItem` writes a new note's. A header's or footer's label counts its first-page
+  part only for sections with a title page, and its even-page part only with the document's
+  even-and-odd setting; the others are "not shown". No breaks or notes go in a header or
+  footer. `updateFields`
   updates the fields in every story, as tracked changes it does not report there.
 - Tables (23.3): a table is inserted next to a paragraph (next to a table, the paragraph after
   or before it is used; with none, it is refused), rows inserted and deleted, cells' text set,
