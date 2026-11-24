@@ -3472,8 +3472,9 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   Layout. A selected picture is edited through the picture dialog (alt text, size, crop,
   rotation).
 - Fields, notes and controls are menus of Insert; the table of contents and cross-reference are
-  entries of Fields; `toggleFieldCodes` is Alt+F9 only; the navigation pane is the `navigate`
-  item.
+  entries of Fields; `toggleFieldCodes` is Alt+F9 and the Fields menu's "Show field codes"
+  entry; the navigation pane is the `navigate` item, the review view the `reviewView` item;
+  Page Setup and note options are dialogs opened from the Section and Notes menus.
 - Every item is the same size (an icon or a short label); a group has no launcher; the ribbon
   cannot be collapsed; nothing reacts to Alt.
 - The playground's editor (`apps/playground/src/edit.tsx:121`) shows the flat toolbar, not tabs.
@@ -3503,9 +3504,9 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   of Contents; Footnotes: notes, note options; Captions: cross-reference), Review (Comments;
   Tracking; Changes), View (Show: navigation pane, field codes; review view).
 - [ ] 24.3 Contextual tabs: Table Design (table style, shading, header row) and Table Layout
-  (rows and columns, merge, delete, column width) while the selection is in a table; Picture
-  Format (alt text, size, crop, rotation, from the picture dialog's parts) while a picture is
-  selected. The checks behind them exported for apps' own tabs.
+  (rows and columns, merge, delete, column width), new items made from the Table menu's
+  entries, while the selection is in a table; Picture Format (alt text, size, crop, rotation,
+  from the picture dialog's parts) while a picture is selected. The checks behind them exported for apps' own tabs.
 - [ ] 24.4 Large buttons and launchers: an item's `size: "large"` (icon over label, the
   group's height); a group's `launcher` opening a toolbar dialog (Page Setup, note options,
   insert table) or calling the app; keyboard and focus as for other items.
