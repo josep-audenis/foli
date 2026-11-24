@@ -113,8 +113,8 @@ export interface Session {
   /** The document as it is now, to save or to export (`exportDocx` of `@folijs/docx`). */
   document(): FoliDocument;
   /**
-   * The body as it would be with every tracked change accepted, a block per line. Headers,
-   * footers and notes are not read. Refused when `from` names no block.
+   * The body as it would be with every tracked change accepted, a block per line. With
+   * `headers`, the headers and footers after it; the text of notes is not read. Refused when `from` names no block.
    */
   read(options?: ReadOptions): Result<ReadResult>;
   /** One block by its handle. */

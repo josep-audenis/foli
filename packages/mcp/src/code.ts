@@ -50,7 +50,7 @@ export const docTypes = (review = false) => `${toolsFor({ reviewing: review })
   .join("\n")}
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
-  cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting?, story? }   // column: the grid column; formatting: with blocks({ formatting: true })
+  cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments, formatting?, story?, tableStyle?, headerRows? }   // column: the grid column; formatting: with blocks({ formatting: true })
 blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. blocks() is the body, blocks({ headers: true }) the headers' and footers' blocks after it (each with story); their handles (h1, f1) work with the methods too. The text of notes is not there.`;
 
 /**
@@ -181,13 +181,14 @@ export async function runCode(
   point.release();
   // JSON has no line end of its own; a script that replaced JSON.stringify may return any text.
   const returned = oneLine(ran.value);
-  if (session.editor.state.doc !== before) document.dirty = true;
+  // A header's edit leaves the body as it was: the blocks the run touched say it changed.
+  if (session.editor.state.doc !== before || touched.size) document.dirty = true;
   const value =
     returned === ""
       ? "The script returned nothing."
       : `Returned: ${returned.length > VALUE_CHARS ? `${returned.slice(0, VALUE_CHARS)}… (cut: ${returned.length} characters)` : returned}`;
   // The blocks its operations returned, as they read now; those it deleted since are not read.
-  const read = touched.size ? session.read() : null;
+  const read = touched.size ? session.read({ headers: true }) : null;
   const blocks = read?.ok ? read.blocks.filter((block) => touched.has(block.handle)) : [];
   const shown = blocks.slice(0, CHANGED_LINES);
   const changed = [
@@ -207,7 +208,7 @@ export async function runCode(
     text:
       [
         value,
-        ...(changed.length || session.editor.state.doc !== before
+        ...(changed.length || touched.size || session.editor.state.doc !== before
           ? changed
           : ["The document was not changed."]),
       ].join("\n") + said,

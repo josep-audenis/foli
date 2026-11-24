@@ -1257,7 +1257,8 @@ version. Details, the read format and examples: the
 
 - `openSession(document, { author, extensions? }): Session`: opens a document (validated and
   migrated as `createEditor` does) with tracking on in `author`'s name. Throws on a document
-  that does not validate and on an empty author; no method of a `Session` throws.
+  that does not validate and on an empty author; no method of a `Session` throws (a
+  checkpoint's `rollback` and `release` do, when used twice).
 - Every `Session` method but `document`, `styles` and `controls` returns a `Result`:
   `{ ok: true, … }` or a `Refusal` `{ ok: false, code, message }`, the message written for the
   model. Codes: `unknown-handle`, `gone`, `not-a-paragraph`, `no-match`, `several-matches`,
@@ -1303,8 +1304,8 @@ version. Details, the read format and examples: the
   a PNG's, JPEG's or GIF's size and type. `agentTools(session, ToolHost?)`: `picture(path)`
   gives the `insert` tool an image's bytes.
 - Headers and footers (0.4, 23.7): `read({ headers: true })` appends them (`Block.story`:
-  `{ id, kind }`); their handles (`h…`, `f…`) work with every operation but `comment`, and
-  `target` gives their story's id.
+  `{ id, kind }`); their handles (`h…`, `f…`) work with the operations but `comment`, breaks and notes (a
+  header's content controls are not listed or filled), and `target` gives their story's id.
 - Review (0.4, 23.8): `openSession(document, { review: true })`; `session.reviewing`;
   `changes()` → `{ changes: ChangeInfo[], text }` (`id`, `kind`, `author`, `date`, `block`,
   `text`); `acceptChanges(ids | "all", { author? })`, `rejectChanges(…)`; the `review` tool,
@@ -1322,7 +1323,7 @@ version. Details, the read format and examples: the
 ## `@folijs/mcp`
 
 An MCP server over `@folijs/agent` (Phase 14, ADR-0009). **Unstable: 0.x.** A program first
-(`foli-mcp [--root <folder>] [--author <name>] [--overwrite]`, the tools and what it does to
+(`foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code] [--review]`, the tools and what it does to
 files: the [package README](../packages/mcp/README.md)); Node 20.19+. Its dependencies are
 Foli's packages, at exact versions.
 
@@ -1336,7 +1337,7 @@ Foli's packages, at exact versions.
   `run(args)` returning a `ToolResult` `{ text, isError? }` or a promise of one. Arguments are
   checked against the schema before `run`.
 - `foliServer(options: FoliServerOptions): ServerOptions` (`root`, `overwrite?`, `author?`,
-  `code?`, `version`, `log?`): this server's
+  `code?`, `review?`, `version`, `log?`): this server's
   tools over the `.docx` files under `root`. Throws when `root` is not a folder or is a whole
   drive, and on an `author` with nothing writable in it.
 - `PROTOCOL_VERSIONS`, `MAX_MESSAGE_BYTES` (8 MB), `MAX_RESULT_CHARS` (200,000).

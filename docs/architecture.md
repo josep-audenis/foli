@@ -1178,7 +1178,8 @@ folder. Node only; no dependency but Foli's packages.
   taken from the MCP SDK, whose client is the conformance check in the tests. One message at a
   time; a tool's arguments checked against its schema first; a refusal or wrong arguments are
   a result the model reads (`isError`), not a protocol error.
-- **Files** (`files.ts`): the trust boundary to the disk. A path is a relative `.docx` name
+- **Files** (`files.ts`): the trust boundary to the disk. A path is a relative `.docx` name (a
+  picture's for `insert`: `.png`, `.jpg`, `.jpeg`, `.gif`, read up to 16 MB)
   whose real path is under the root's; a save goes to a new file made exclusively and renamed
   into place, never over what is not a plain file, and over a file only if the server wrote it
   or was started with `--overwrite`.

@@ -156,6 +156,18 @@ return doc.tableStyles().length > 0;`);
     await client.close();
   });
 
+  it("tells a header's edit as a change (Phase 23 docs review)", async () => {
+    const { client, call, run } = await opened("04-board-report");
+    await call("read", { headers: true });
+    const ran = await run(`doc.formatText("h1", { bold: true }); return 1;`);
+    expect(ran.refused).toBe(false);
+    expect(ran.text).toMatch(
+      /^Returned: 1\nChanged 1 block, as tracked changes:\n\[h1\] header, changed:/,
+    );
+    expect((await call("list_documents")).text).toContain("changes not saved");
+    await client.close();
+  });
+
   it("takes back every edit of a script that fails, and says the line", async () => {
     const { client, call, run, read } = await opened("01-mutual-nda");
     const before = await read();

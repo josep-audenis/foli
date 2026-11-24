@@ -340,7 +340,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 ## Tracked changes and comments
 
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
-  block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
+  block) is not made; tables are tracked row by row, and so are their style, header rows and cells' shading (23.2). Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
 - Your own inserted paragraph, deleted whole while tracking, goes without a trace, at the end of
   the document or of a cell too, except as the last after a table (a table cannot end the
@@ -407,8 +407,9 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 
 - The body is read and edited, and with `read({ headers: true })` the headers and footers
   (23.7): their blocks have handles `h1`…, `f1`…, each story under a line saying which sections
-  use it (a section without its own goes on with the one before's), and every operation takes
-  them but `comment` (Word keeps no comments there). The text of footnotes and endnotes is not
+  use it (a section without its own goes on with the one before's), and the operations take them
+  but `comment` (Word keeps no comments there), breaks and notes; their content controls are not
+  listed or filled. The text of footnotes and endnotes is not
   read; `insertItem` writes a new note's. A header's or footer's label counts its first-page
   part only for sections with a title page, and its even-page part only with the document's
   even-and-odd setting; the others are "not shown". No breaks or notes go in a header or
@@ -420,7 +421,8 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   widths are refused: they cannot be recorded as tracked changes, and every edit of a session is
   one. A table put after an empty paragraph goes before it.
 - Text formatting (23.4): bold, italic, underline, strike, font, size, color, highlight and
-  links, on a paragraph or text in it. `read({ formatting: true })` shows a run's own formatting,
+  links, on a paragraph or text in it; not superscript or subscript (core has no command for them
+  yet). `read({ formatting: true })` shows a run's own formatting,
   not what its style gives; underline is on or off (Word's other underline styles are kept, not
   set); highlight is one of Word's named colors.
 - Paragraph formatting (23.5): alignment, line spacing as a multiple, space before and after,
@@ -506,7 +508,8 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
   of the editor under it.
 - Documents live in memory: unsaved edits are lost when the server stops, and nothing is saved
   on its own. A file is open once.
-- Only `.docx`, up to 64 MB and 64 MB unpacked; the open documents hold about 3 million
+- Only `.docx` (and, for `insert`, pictures: `.png`, `.jpg`, `.jpeg`, `.gif` up to 16 MB), up to
+  64 MB and 64 MB unpacked; the open documents hold about 3 million
   characters of body together, so a very long document may be refused, or leave no room for
   another. An answer over 200,000 characters is cut: read less at a time.
 - A save beside the original takes the first free name up to `.agent-100.docx`; when all are

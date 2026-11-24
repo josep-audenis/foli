@@ -485,7 +485,7 @@ Migrations never drop content. A published version never changes in place.
 | 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
 | 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
 | 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                          |
-| 8       | 1.7.0       | — (the current version: a table's, row's or cell's recorded formatting, `formatChange`, ADR-0013)                    |
+| 8       | 1.7.0       | — (the current version: a table's, row's or cell's recorded formatting, `formatChange`, 23.2)                        |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that

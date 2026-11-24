@@ -3285,7 +3285,7 @@ lets the agent library return steps); 22.7 onwards build it.
   wire a transport and a store), limitations.md (no CRDT, no long offline, what the app must
   do), changesets; 1.6.0 and `@folijs/collab` 0.1.0 published with the owner's approval.
 
-## Phase 23 — Agent editing parity · M → agent 0.4.0, mcp 0.3.0, core patches
+## Phase 23 — Agent editing parity · M → agent 0.4.0, mcp 0.3.0, 1.7.0 (schema 8)
 
 The agent does what a person does in the editor, not only text: it inserts tables and edits
 their rows, columns, cells and styles; formats text (bold, italic, font, size, colour,
@@ -3485,10 +3485,12 @@ lands second merges the other in (no rebase: force push is blocked).
   server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
   core patch) published with the owner's approval.
   (Docs done 2026-11-24: the agent and MCP READMEs (the site's Agents and MCP server pages),
-  limitations.md's Agent editing, the server's instructions, architecture.md, api.md, ADR-0013's
-  cost table; changesets: `@folijs/agent` minor (0.4.0), `@folijs/mcp` minor (0.3.0),
+  limitations.md's Agent editing, the server's instructions, architecture.md, api.md, ADR-0013
+  (its cost table to the end of the phase); changesets: `@folijs/agent` minor (0.4.0), `@folijs/mcp` minor (0.3.0),
   `@folijs/core` and `@folijs/docx` minor (1.7.0, schema 8), `@folijs/react` patch. Publishing
-  waits for the owner's approval.)
+  waits for the owner's approval. The 1.7.0 release would also carry another phase's
+  `@folijs/react` change already on main, `.changeset/react-word-colors-fonts.md`. Superscript
+  and subscript, in this phase's list, were not built: core has no command for them.)
 
 ## Phase 24 — Collaboration, easy to integrate · M → 1.7.0, `@folijs/collab` 0.2.0
 
