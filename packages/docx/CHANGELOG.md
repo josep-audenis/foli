@@ -1,5 +1,13 @@
 # @folijs/docx
 
+## 1.8.0
+
+### Patch Changes
+
+- Updated dependencies [27ff32e]
+- Updated dependencies [04bf62f]
+  - @folijs/core@1.8.0
+
 ## 1.7.0
 
 ### Minor Changes

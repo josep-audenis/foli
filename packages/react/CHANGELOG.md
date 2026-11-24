@@ -1,5 +1,19 @@
 # @folijs/react
 
+## 1.8.0
+
+### Minor Changes
+
+- 04bf62f: `editor.reconfigure({ plugins })` replaces an editor's plugins in place, keeping the document, the selection, undo history and the state of the plugins in both lists; open stories' editors and `editor.commands` follow. React's `plugins` prop now follows changes through it instead of warning (`extensions` are still read once). `useCommand(name)` no longer throws for a command the editor does not have: it is disabled until a plugin gives it (a plugin the parent adds in the same render), and a removed plugin's command goes with it. Starting or leaving a shared session no longer needs a new editor.
+- 0ec54a2: The Font box lists the fonts installed on the machine in Chromium browsers (the Local Font Access API): opening the built-in box the first time asks the browser's permission; once allowed, they are listed at once on later visits. Elsewhere, or when refused, the box offers its own fonts as before. `FoliToolbar`'s `localFonts={false}` (or `FoliEditor`'s `toolbarProps`) never asks.
+
+### Patch Changes
+
+- Updated dependencies [27ff32e]
+- Updated dependencies [04bf62f]
+  - @folijs/core@1.8.0
+  - @folijs/view@1.8.0
+
 ## 1.7.0
 
 ### Minor Changes
