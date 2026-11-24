@@ -421,7 +421,10 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   indentation by half-inch steps (a list level in a list) and bullet or numbered lists of
   Word's default kinds. Exact line spacing, right and first-line indents, borders, tabs and
   other list formats are not offered. A paragraph's own properties are what
-  `read({ formatting: true })` shows, not its style's.
+  `read({ formatting: true })` shows, not its style's (exact line spacing and right indents are
+  not shown). Numbering paragraphs already in two numbered lists leaves two lists; table cells
+  are apart, each its own list. A paragraph in a locked content control is refused, and so is
+  the call. Left and right are Word's `left` and `right` (not checked in right-to-left text).
 - No operation inserts a picture, or accepts or rejects changes. `session.editor` is the
   headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own

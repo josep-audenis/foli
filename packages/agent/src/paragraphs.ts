@@ -14,7 +14,14 @@ import {
   toggleList,
   wrapInList,
 } from "@folijs/core";
-import { type Changed, type Context, changed, paragraphAt, quote } from "./operations.js";
+import {
+  type Changed,
+  type Context,
+  changed,
+  lockedControls,
+  paragraphAt,
+  quote,
+} from "./operations.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
 /** What to change of the paragraphs; what is left out stays as it is. */
@@ -56,9 +63,9 @@ function wrong(format: unknown): string | null {
   if (
     f.lineSpacing !== undefined &&
     f.lineSpacing !== null &&
-    !(typeof f.lineSpacing === "number" && f.lineSpacing > 0 && f.lineSpacing <= 132)
+    !(typeof f.lineSpacing === "number" && f.lineSpacing >= 0.25 && f.lineSpacing <= 132)
   )
-    return "lineSpacing is a multiple of single spacing (1, 1.15, 1.5, 2), or null.";
+    return "lineSpacing is a multiple of single spacing (1, 1.15, 1.5, 2; at least 0.25), or null.";
   if (f.spaceBefore !== undefined && !points(f.spaceBefore))
     return "spaceBefore is in points, 0 to 1584, or null.";
   if (f.spaceAfter !== undefined && !points(f.spaceAfter))
@@ -103,11 +110,19 @@ export function formatParagraphs(
       "paragraphs are formatted",
     );
     if ("ok" in target) return target;
+    // A locked control refuses an edit of any paragraph in it, and with it the whole run's.
+    const locked = lockedControls(context, target.pos, target.node)[0];
+    if (locked)
+      return refuse(
+        "read-only",
+        `Block ${handle} is in the locked content control ${quote(locked)}: its formatting cannot be changed. Nothing was changed.`,
+      );
     targets.push(target);
   }
   const before = editor.state.doc;
-  // Each run of paragraphs from the last: nothing here moves positions but a list (none).
-  for (const run of runsOf(targets).reverse()) {
+  // No step here moves positions: each run as it comes.
+  const was = new Map(targets.map((t) => [t.pos, t.node]));
+  for (const run of runsOf(targets)) {
     const first = run[0] as { from: number };
     const last = run[run.length - 1] as { to: number };
     const select = () => editor.select(first.from, last.to);
@@ -132,7 +147,12 @@ export function formatParagraphs(
       select();
       const now = listKindAt(editor.state);
       if (format.list === null) {
-        if (now) editor.run(toggleList(now));
+        // Paragraph by paragraph: a run in two lists, or partly numbered, reads as no list.
+        for (const range of run) {
+          editor.select(range.from, range.to);
+          const kind = listKindAt(editor.state);
+          if (kind) editor.run(toggleList(kind));
+        }
       } else {
         const kind = format.list === "bullet" ? "bulletList" : "orderedList";
         if (now !== kind) editor.run(wrapInList(kind));
@@ -149,8 +169,20 @@ export function formatParagraphs(
     return {
       ok: true,
       blocks: read.blocks,
-      text: `Nothing changed: the paragraphs already are so (or are in a locked content control).\n${read.text}`,
+      text: `Nothing changed: the paragraphs already are so.\n${read.text}`,
     };
   }
-  return { ok: true, ...changed(context, handlesNow) };
+  // Paragraphs a command left as they were (an indent past what the list defines, less of none).
+  const same = [...new Set(list)].filter((h) => {
+    const found = context.handles.resolve(h);
+    return found && was.get(found.pos) === found.node;
+  });
+  const read = changed(context, handlesNow);
+  return {
+    ok: true,
+    blocks: read.blocks,
+    text: same.length
+      ? `${read.text}\n(unchanged, already so or no further to go: ${same.join(", ")})`
+      : read.text,
+  };
 }
