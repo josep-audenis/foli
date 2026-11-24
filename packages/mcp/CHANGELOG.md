@@ -1,5 +1,34 @@
 # @folijs/mcp
 
+## 0.3.0
+
+### Minor Changes
+
+- 8d93bda: The `format_text` tool and `read`'s `formatting` argument (23.4); `run` counts a table method's changed blocks and deleted rows as they are.
+- 7aa04b3: The `insert` tool (23.6): a picture from a .png, .jpg or .gif under the root, page and section breaks, horizontal lines, footnotes and endnotes; `doc.insert` in code mode.
+- a49809d: The `format_paragraph` tool (23.5): alignment, spacing, indentation and lists.
+- aaae3e0: `--review` (23.8): the `review` tool lists the documents' tracked changes and accepts or rejects them, by id or all; `FoliServerOptions.review`.
+- 230f4f4: `read` takes `headers` (23.7): headers and footers, edited with the same tools; the instructions and `run`'s summary say so.
+- 638c7c5: The `edit_table` tool (23.3): insert a table from data, insert and delete rows, set cells' text, a table style, shading and header rows, as tracked changes; and `run`'s table methods.
+
+### Patch Changes
+
+- f4f6e0b: The tools and code mode's `doc` methods are built from `@folijs/agent`'s definitions (23.1, ADR-0013). At that step (23.1) what a client lists was the same, to the byte; the new tools came after.
+- Updated dependencies [8d93bda]
+- Updated dependencies [7aa04b3]
+- Updated dependencies [a49809d]
+- Updated dependencies [b10816a]
+- Updated dependencies [aaae3e0]
+- Updated dependencies [230f4f4]
+- Updated dependencies [638c7c5]
+- Updated dependencies [f4f6e0b]
+- Updated dependencies [aaae3e0]
+- Updated dependencies [d4b4d41]
+- Updated dependencies [d4b4d41]
+  - @folijs/agent@0.4.0
+  - @folijs/core@1.7.0
+  - @folijs/docx@1.7.0
+
 ## 0.2.4
 
 ### Patch Changes
