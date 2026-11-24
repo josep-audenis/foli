@@ -3,9 +3,19 @@
  * `@folijs/agent` session over it, kept in memory under an id until it is closed.
  */
 import { basename, dirname, extname, join } from "node:path";
-import { openSession, type Session } from "@folijs/agent";
+import { openSession, type Refusal, type Session } from "@folijs/agent";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
-import { type FileRules, read, same, shown, stamp, standing, target, write } from "./files.js";
+import {
+  type FileRules,
+  PICTURE_KINDS,
+  read,
+  same,
+  shown,
+  stamp,
+  standing,
+  target,
+  write,
+} from "./files.js";
 import type { ToolResult } from "./protocol.js";
 import { MAX_GROWTH, weight } from "./weight.js";
 
@@ -64,6 +74,16 @@ export class Documents {
     this.#rules = rules;
     this.#author = author;
     this.#budget = budget;
+  }
+  /**
+   * A picture's bytes for `insert` (23.6): a .png, .jpg or .gif under the root, read as a
+   * document is (links followed, the same size limit).
+   */
+  picture(path: unknown): { ok: true; data: Uint8Array } | Refusal {
+    const checked = read(this.#rules, path, PICTURE_KINDS);
+    return checked.ok
+      ? { ok: true, data: checked.bytes }
+      : { ok: false, code: "invalid", message: checked.message };
   }
 
   /**

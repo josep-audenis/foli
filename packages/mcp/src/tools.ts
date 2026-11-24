@@ -54,7 +54,9 @@ Example: let n = 0; for (const b of doc.blocks()) if (b.kind === "paragraph" && 
   ]),
   async run({ document: id, code }) {
     const document = documents.get(id);
-    return "session" in document ? runCode(document, code as string, limits) : document;
+    return "session" in document
+      ? runCode(document, code as string, limits, { picture: (path) => documents.picture(path) })
+      : document;
   },
 });
 
@@ -132,7 +134,7 @@ export function tools(documents: Documents, code: SandboxLimits | false = false)
         tool.name,
         tool.description,
         { ...tool.inputSchema, properties: { ...tool.inputSchema.properties, document: DOCUMENT } },
-        (session, a) => tool.run(session, a),
+        (session, a) => tool.run(session, a, { picture: (path) => documents.picture(path) }),
       ),
     ),
     {

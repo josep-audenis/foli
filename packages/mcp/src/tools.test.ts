@@ -62,6 +62,7 @@ describe("the tools a client lists", () => {
       "edit_table",
       "format_text",
       "format_paragraph",
+      "insert",
       "save",
       "close",
       "list_documents",

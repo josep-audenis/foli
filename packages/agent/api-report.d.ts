@@ -30,6 +30,7 @@ export {};
 
 // index.d.ts
 export type { FormatOptions, TextFormat } from "./formatting.js";
+export { type InsertItem, type InsertItemOptions, imageInfo, type PictureItem, } from "./inserts.js";
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export type { ParagraphFormat } from "./paragraphs.js";
 export { type Block, formatBlocks } from "./read.js";
@@ -38,7 +39,50 @@ export { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";
 export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
 export type { CellText, InsertTableOptions, ShadeOptions } from "./tables.js";
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
-export { AGENT_TOOLS, type AgentTool, agentTools, INSTRUCTIONS, READ_LIMIT, type ScriptMethod, type ToolAnswer, type ToolDefinition, } from "./tools.js";
+export { AGENT_TOOLS, type AgentTool, agentTools, INSTRUCTIONS, READ_LIMIT, type ScriptMethod, type ToolAnswer, type ToolDefinition, type ToolHost, } from "./tools.js";
+
+// inserts.d.ts
+/**
+ * Inserting what is not text (23.6): pictures, page and section breaks, horizontal rules,
+ * footnotes and endnotes, next to or in a paragraph, each through core's command for it so
+ * every insertion is tracked as the editor tracks it.
+ */
+import { type SectionBreakKind } from "@folijs/core";
+/** A picture's image: its bytes, its type, and what it shows for a reader who cannot see it. */
+export interface PictureItem {
+    kind: "picture";
+    data: Uint8Array;
+    /** `image/png`, `image/jpeg`, `image/gif`: left out, read from the bytes. */
+    contentType?: string;
+    /** Alt text, required: what the picture shows. */
+    alt: string;
+    /** In points; with one of them, the other keeps the image's proportions. Default: its size, fitted to the page. */
+    width?: number;
+    height?: number;
+}
+/** What `insertItem` inserts. */
+export type InsertItem = PictureItem | {
+    kind: "pageBreak";
+} | {
+    kind: "sectionBreak";
+    start?: SectionBreakKind;
+} | {
+    kind: "horizontalRule";
+} | {
+    kind: "footnote" | "endnote";
+    text: string;
+    on?: string;
+};
+export interface InsertItemOptions {
+    /** A picture or a rule as a paragraph of its own after (default) or before the block; a break at the paragraph's end or start. */
+    where?: "after" | "before";
+}
+/** An image's size in pixels and its type, from its first bytes; null when not known. */
+export declare function imageInfo(bytes: Uint8Array): {
+    width: number;
+    height: number;
+    contentType: string;
+} | null;
 
 // operations.d.ts
 import { type Block } from "./read.js";
@@ -182,6 +226,7 @@ export declare function invalid(value: unknown, schema: JsonSchemaOrAny, path?: 
 // session.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
 import { type FormatOptions, type TextFormat } from "./formatting.js";
+import { type InsertItem, type InsertItemOptions } from "./inserts.js";
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type ParagraphFormat } from "./paragraphs.js";
 import { type Block } from "./read.js";
@@ -339,6 +384,12 @@ export interface Session {
      */
     formatParagraphs(handles: string | readonly string[], format: ParagraphFormat): Result<Changed>;
     /**
+     * Inserts a picture or a horizontal line as a paragraph of its own after (or before) a
+     * paragraph, a page or section break at its end (or start), a footnote or endnote at its end
+     * or after `on` text in it. Tracked as insertions. Returns the blocks it changed or made.
+     */
+    insertItem(handle: string, item: InsertItem, options?: InsertItemOptions): Result<Changed>;
+    /**
      * Marks the document as it is now, to come back to: `rollback` takes back every edit made
      * since, the session's own and those made through `editor`, as if none had been (no tracked
      * change is left of them, and every handle names the block it named). `release` ends the
@@ -433,6 +484,13 @@ export interface UpdateFieldsOptions {
 }
 
 // tools.d.ts
+/**
+ * The tools (ADR-0013): what a model is given to edit a session's document, with the words it
+ * reads (names, descriptions, JSON Schemas, the instructions). An app running its own model
+ * loop gives it `agentTools(session)`; `@folijs/mcp` serves the same definitions, and its code
+ * mode (`run`) gets its methods from them.
+ */
+import type { Result } from "./result.js";
 import { type JsonSchema } from "./schema.js";
 import type { Session } from "./session.js";
 /** Blocks the `read` tool gives when it is not told how many. */
@@ -472,9 +530,19 @@ export interface ScriptMethod {
      * how many; `delete`, a block deleted or emptied; `fields`, fields updated.
      */
     effect?: "edit" | "insert" | "delete" | "fields";
-    call(session: Session, args: readonly unknown[]): unknown;
+    call(session: Session, args: readonly unknown[], host?: ToolHost): unknown;
 }
 /** A tool over any session: what `agentTools` binds, and what a server serves. */
+/**
+ * What the app gives the tools that the document does not hold (23.6): a picture's bytes for a
+ * path the model names. Without it, pictures are refused.
+ */
+export interface ToolHost {
+    picture?(path: string): Result<{
+        data: Uint8Array;
+        contentType?: string;
+    }>;
+}
 export interface ToolDefinition {
     name: string;
     description: string;
@@ -485,7 +553,7 @@ export interface ToolDefinition {
      * Arguments are taken as checked against `inputSchema` (`invalid` first: `agentTools` does);
      * others may be there.
      */
-    run(session: Session, args: Record<string, unknown>): ToolAnswer;
+    run(session: Session, args: Record<string, unknown>, host?: ToolHost): ToolAnswer;
     /** Its methods in code mode, in the order they are listed. */
     methods: readonly ScriptMethod[];
 }
@@ -496,4 +564,4 @@ export declare const AGENT_TOOLS: readonly ToolDefinition[];
  * `INSTRUCTIONS` and each tool's name, description and schema, and pass its calls to `run`.
  * A call whose arguments do not fit the schema is answered with why, as a refusal.
  */
-export declare function agentTools(session: Session): AgentTool[];
+export declare function agentTools(session: Session, host?: ToolHost): AgentTool[];

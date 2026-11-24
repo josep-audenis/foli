@@ -128,6 +128,22 @@ session.formatParagraphs("b6", { indent: "more" }); // in a list: a level deeper
 //        formatting: paragraph centered, space after 12 pt
 ```
 
+## Pictures, breaks and notes
+
+`insertItem` inserts what is not text next to or in a paragraph, as tracked insertions: a
+picture or a horizontal line as a paragraph of its own, a page or section break at the
+paragraph's end (or start), a footnote or endnote at its end or after `on` text.
+
+```ts
+session.insertItem("b4", { kind: "picture", data: bytes, alt: "Sales by region" }); // fitted to the page
+session.insertItem("b4", { kind: "pageBreak" });
+session.insertItem("b9", { kind: "sectionBreak", start: "continuous" });
+session.insertItem("b9", { kind: "footnote", text: "Source: 2025 accounts.", on: "revenue" });
+```
+
+The tools take a picture by path: `agentTools(session, { picture(path) { … } })` gives them its
+bytes (the MCP server reads it under its root); without it, pictures are refused.
+
 ## Tables
 
 A table is named by its handle (its `table, 3 rows, 2 columns` line), or by a paragraph's in one

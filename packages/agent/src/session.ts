@@ -16,6 +16,7 @@ import {
 import { withEnvelope, withTrackState, wordContext } from "@folijs/core/internal";
 import { type FormatOptions, formatText, type TextFormat } from "./formatting.js";
 import { Handles } from "./handles.js";
+import { type InsertItem, type InsertItemOptions, insertItem } from "./inserts.js";
 import {
   type Changed,
   type CommentOptions,
@@ -217,6 +218,12 @@ export interface Session {
    */
   formatParagraphs(handles: string | readonly string[], format: ParagraphFormat): Result<Changed>;
   /**
+   * Inserts a picture or a horizontal line as a paragraph of its own after (or before) a
+   * paragraph, a page or section break at its end (or start), a footnote or endnote at its end
+   * or after `on` text in it. Tracked as insertions. Returns the blocks it changed or made.
+   */
+  insertItem(handle: string, item: InsertItem, options?: InsertItemOptions): Result<Changed>;
+  /**
    * Marks the document as it is now, to come back to: `rollback` takes back every edit made
    * since, the session's own and those made through `editor`, as if none had been (no tracked
    * change is left of them, and every handle names the block it named). `release` ends the
@@ -403,6 +410,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     setTableStyle: (handle, style) => setTableStyle(context, handle, style),
     shadeCells: (handle, fill, options) => shadeCells(context, handle, fill, options),
     setHeaderRows: (handle, count) => setHeaderRows(context, handle, count),
+    insertItem: (handle, item, options) => whole(() => insertItem(context, handle, item, options)),
     formatParagraphs: (handles, format) => whole(() => formatParagraphs(context, handles, format)),
     formatText: (handle, format, options) =>
       whole(() => formatText(context, handle, format, options)),
