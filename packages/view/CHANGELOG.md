@@ -1,5 +1,13 @@
 # @folijs/view
 
+## 1.7.0
+
+### Patch Changes
+
+- Updated dependencies [aaae3e0]
+- Updated dependencies [d4b4d41]
+  - @folijs/core@1.7.0
+
 ## 1.6.0
 
 ### Minor Changes

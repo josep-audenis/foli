@@ -1,5 +1,24 @@
 # @folijs/agent
 
+## 0.4.0
+
+### Minor Changes
+
+- 8d93bda: Text formatting (23.4): `formatText(handle, format, { on?, all? })` sets bold, italic, underline, strike, font, size, color, highlight and links on a paragraph or text in it, as tracked changes; `read({ formatting: true })` shows each paragraph's own run formatting (`Block.formatting`). The `format_text` tool, `read`'s `formatting` argument and `doc.formatText` in code mode. Table operations of several edits are all or nothing, and act on the row named in a vertically merged table.
+- 7aa04b3: Inserting (23.6): `insertItem(handle, item, { where? })` inserts a picture (bytes, alt text, size read from PNG, JPEG or GIF and fitted to the page), a page or section break, a horizontal line, a footnote or an endnote, as tracked insertions; `imageInfo(bytes)`; the `insert` tool and `doc.insert`. `agentTools(session, host)` takes a `ToolHost` whose `picture(path)` gives the tools an image's bytes.
+- a49809d: Paragraph formatting and lists (23.5): `formatParagraphs(handles, format)` sets alignment, line spacing, space before and after, indentation and bullet or numbered lists, as tracked formatting changes; `read({ formatting: true })` shows a paragraph's own properties; the `format_paragraph` tool and `doc.formatParagraphs`.
+- b10816a: From a fresh model's trial (23.9): `read` shows a picture's alt text (`[picture: Revenue by month]`) and a table's style and header rows on its line (`Block.tableStyle`, `Block.headerRows`); `deleteBlock` says whether it made a tracked deletion or removed one's own insertion; the tools say what `insert_table`'s `header` does and what a new paragraph takes from its neighbour.
+- aaae3e0: Review (23.8): `openSession(document, { review: true })` lets a session list (`changes()`), accept and reject (`acceptChanges`, `rejectChanges`, by id or "all") tracked changes, anyone's; `session.reviewing`; the `review` tool, offered only to a reviewing session (`toolsFor`).
+- 230f4f4: Headers and footers (23.7): `read({ headers: true })` reads them after the body, each under the sections that use it, with handles `h1`…, `f1`… that the operations take (but `comment`, breaks and notes; their content controls are not filled); the read tool's `headers` argument. The instructions say so.
+- 638c7c5: Tables (23.3): `insertTable`, `insertRows`, `deleteRows`, `setCells`, `tableStyles`, `setTableStyle`, `shadeCells` and `setHeaderRows` on a session, a table named by its handle or a cell paragraph's and its rows and columns as `read` numbers them, every edit a tracked change; the `edit_table` tool and their code-mode methods. `read` counts the grid columns a row leaves empty before its first cell (`gridBefore`), and marks a table whose formatting was changed as changed. Columns, merging, splitting and widths are refused: they cannot be recorded as tracked changes.
+- f4f6e0b: The tools come with the package (23.1, ADR-0013): `agentTools(session)` gives a model loop each tool's name, description and JSON Schema, and a `run` that checks the arguments and answers in words; `AGENT_TOOLS` are the same over any session, `INSTRUCTIONS` what to tell the model once, `READ_LIMIT` the blocks `read` gives by default. `invalid` and the `JsonSchema` types moved here from `@folijs/mcp`, which re-exports the types.
+
+### Patch Changes
+
+- Updated dependencies [aaae3e0]
+- Updated dependencies [d4b4d41]
+  - @folijs/core@1.7.0
+
 ## 0.3.3
 
 ### Patch Changes
