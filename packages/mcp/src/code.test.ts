@@ -58,7 +58,7 @@ describe("the run tool", { timeout: 30_000 }, () => {
     expect(await names(false)).not.toContain("run");
     const withCode = await names(true);
     expect(withCode.at(-1)).toBe("run");
-    expect(withCode).toHaveLength(15);
+    expect(withCode).toHaveLength(17);
   });
 
   it("does a loop over the document in one call, every edit a tracked change", async () => {
@@ -86,6 +86,36 @@ return { n };`);
     const changes = trackedChanges(createEditor({ document: await saved() }).state.doc);
     expect(changes.length).toBeGreaterThanOrEqual(count);
     expect(changes.every((c) => c.author === "Agent")).toBe(true);
+    await client.close();
+  });
+
+  it("edits tables through edit_table and doc's table methods (23.3)", async () => {
+    const { client, call, run, read, saved } = await opened("04-board-report");
+    const tableLine = /^\[(b\d+)\] table, (\d+) rows/m.exec(await read());
+    expect(tableLine).not.toBeNull();
+    const [, table, rows] = tableLine as RegExpExecArray;
+    const added = await call("edit_table", {
+      handle: table,
+      action: "insert_rows",
+      row: Number(rows),
+      cells: [["Added by the tool"]],
+    });
+    expect(added.refused).toBe(false);
+    expect(added.text).toMatch(new RegExp(`r${Number(rows) + 1} c1, .*changed: Added by the tool`));
+    const ran = await run(`doc.shadeCells(${JSON.stringify(table)}, "D9E2F3", { row: 1 });
+return doc.tableStyles().length > 0;`);
+    expect(ran.refused).toBe(false);
+    expect(ran.text).toMatch(
+      /^Returned: true\nChanged 1 block, as tracked changes:\n\[b\d+\] table, /,
+    );
+    const refused = await call("edit_table", { handle: table, action: "insert_columns" });
+    expect(refused.refused).toBe(true);
+    expect(refused.text).toMatch(/cannot be recorded as tracked changes/);
+    const kinds = trackedChanges(createEditor({ document: await saved() }).state.doc).map(
+      (c) => c.kind,
+    );
+    expect(kinds).toContain("rowInsertion");
+    expect(kinds).toContain("tableFormatting");
     await client.close();
   });
 

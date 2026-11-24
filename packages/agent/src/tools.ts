@@ -7,6 +7,7 @@
 import type { Ok, Result } from "./result.js";
 import { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";
 import type { Session } from "./session.js";
+import { UNTRACKED_TABLE_EDIT } from "./tables.js";
 import type { Control } from "./templates.js";
 
 /** Blocks the `read` tool gives when it is not told how many. */
@@ -124,11 +125,17 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
         maximum: 2000,
         description: "At most this many blocks.",
       },
+      formatting: {
+        type: "boolean",
+        description:
+          "Also show each paragraph's text formatting of its own (bold, font, size, color, links), on a line under it.",
+      },
     }),
-    run(session, { from, limit }) {
+    run(session, { from, limit, formatting }) {
       const result = session.read({
         ...(from === undefined ? {} : { from: from as string }),
         limit: (limit as number | undefined) ?? READ_LIMIT,
+        ...(formatting === true ? { formatting: true } : {}),
       });
       return told(result, result.ok && result.next ? `\n(more: read from "${result.next}")` : "");
     },
@@ -136,8 +143,13 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
       {
         name: "blocks",
         signature:
-          "doc.blocks(): Block[]            // every block of the body, in order, as it reads now (a copy: call again after edits)",
-        call: (session) => given(session.read()).blocks,
+          "doc.blocks({ formatting? }): Block[]   // every block of the body, in order, as it reads now (a copy: call again after edits)",
+        call: (session, [a]: Args) =>
+          given(
+            session.read({
+              formatting: (a as { formatting?: unknown } | undefined)?.formatting === true,
+            }),
+          ).blocks,
       },
       {
         name: "block",
@@ -408,6 +420,241 @@ export const AGENT_TOOLS: readonly ToolDefinition[] = [
           const { updated, unchanged, rebuilt, text } = given(session.updateFields(a));
           return { updated, unchanged, rebuilt, text };
         },
+      },
+    ],
+  },
+  {
+    name: "edit_table",
+    description:
+      "Tables, as tracked changes. handle names a table: its \"table\" line's, or a paragraph's in one of its cells; row and column are numbered as read prints them (r2 c1). Actions: insert_table, a new table after (or before) the block handle names, cells its rows of texts; insert_rows after (or before) row, made like it, cells their texts; delete_rows, rows their numbers; set_cells, values [{ row, column, text }], each cell's whole text; set_style, style a table style's name (null: none); shade, fill RRGGBB (null: none) on the table, a row, a column or one cell; header_rows, count rows from the top repeated on each page (0: none). Columns, merging, splitting and widths cannot be tracked: the answer says what to do instead. Returns the table as it reads now.",
+    inputSchema: args(
+      {
+        handle: {
+          ...HANDLE,
+          description:
+            "A table's handle, or a paragraph's in one of its cells (insert_table: the block to put it next to).",
+        },
+        action: {
+          type: "string",
+          enum: [
+            "insert_table",
+            "insert_rows",
+            "delete_rows",
+            "set_cells",
+            "set_style",
+            "shade",
+            "header_rows",
+            "insert_columns",
+            "delete_columns",
+            "merge_cells",
+            "split_cell",
+            "column_width",
+          ],
+          description: "What to do; the description says which arguments each takes.",
+        },
+        where: { type: "string", enum: ["after", "before"], description: "Default: after." },
+        cells: {
+          type: "array",
+          description:
+            'Rows of cell texts: [["Item", "Price"], ["Tea", "3.50"]]. ↵ is a line break.',
+          items: { type: "array", items: { type: "string" } },
+        },
+        row: { type: "integer", minimum: 1, description: "A row, as read numbers it: r2 is 2." },
+        column: {
+          type: "integer",
+          minimum: 1,
+          description: "A grid column, as read numbers it: c1 is 1.",
+        },
+        rows: {
+          type: "array",
+          description: "delete_rows: the rows, as read numbers them.",
+          items: { type: "integer", minimum: 1 },
+        },
+        values: {
+          type: "array",
+          description: "set_cells: each cell's row, column and whole new text.",
+          items: {
+            type: "object",
+            properties: {
+              row: { type: "integer", minimum: 1 },
+              column: { type: "integer", minimum: 1 },
+              text: { type: "string" },
+            },
+            required: ["row", "column", "text"],
+            additionalProperties: false,
+          },
+        },
+        header: { type: "boolean", description: "insert_table: the first row is a header row." },
+        style: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+          description: "A table style's name (insert_table, set_style).",
+        },
+        fill: { anyOf: [{ type: "string" }, { type: "null" }], description: "RRGGBB: D9E2F3." },
+        count: {
+          type: "integer",
+          minimum: 0,
+          description: "header_rows: how many rows from the top.",
+        },
+      },
+      ["handle", "action"],
+    ),
+    run(session, a) {
+      const handle = a.handle as string;
+      const need = (...keys: string[]) => {
+        const missing = keys.filter((k) => a[k] === undefined);
+        return missing.length
+          ? { text: `${a.action as string} needs ${missing.join(" and ")}.`, isError: true }
+          : null;
+      };
+      switch (a.action) {
+        case "insert_table":
+          return (
+            need("cells") ??
+            told(
+              session.insertTable(handle, a.cells as string[][], {
+                ...(a.where === undefined ? {} : { where: a.where as "after" | "before" }),
+                ...(a.header === true ? { header: true } : {}),
+                ...(typeof a.style === "string" ? { style: a.style } : {}),
+              }),
+            )
+          );
+        case "insert_rows":
+          return (
+            need("row", "cells") ??
+            told(
+              session.insertRows(
+                handle,
+                a.row as number,
+                a.cells as string[][],
+                a.where === "before" ? "before" : "after",
+              ),
+            )
+          );
+        case "delete_rows":
+          return need("rows") ?? told(session.deleteRows(handle, a.rows as number[]));
+        case "set_cells":
+          return need("values") ?? told(session.setCells(handle, a.values as never));
+        case "set_style":
+          return need("style") ?? told(session.setTableStyle(handle, a.style as string | null));
+        case "shade":
+          return (
+            need("fill") ??
+            told(
+              session.shadeCells(handle, a.fill as string | null, {
+                ...(a.row === undefined ? {} : { row: a.row as number }),
+                ...(a.column === undefined ? {} : { column: a.column as number }),
+              }),
+            )
+          );
+        case "header_rows":
+          return need("count") ?? told(session.setHeaderRows(handle, a.count as number));
+        default:
+          return { text: UNTRACKED_TABLE_EDIT, isError: true };
+      }
+    },
+    methods: [
+      {
+        name: "insertTable",
+        signature:
+          'doc.insertTable(handle, cells, { where?, header?, style? }): { blocks }   // cells: [["Item", "Price"], ["Tea", "3.50"]]; blocks: the table and its cells',
+        effect: "insert",
+        call: (session, [a, b, c]: Args) => ({
+          blocks: given(session.insertTable(a, b, c)).blocks,
+        }),
+      },
+      {
+        name: "insertRows",
+        signature:
+          'doc.insertRows(table, row, cells, where?): { blocks }   // where: "after" | "before"',
+        effect: "insert",
+        call: (session, [a, b, c, d]: Args) => ({
+          blocks: given(session.insertRows(a, b, c, d)).blocks,
+        }),
+      },
+      {
+        name: "deleteRows",
+        signature: "doc.deleteRows(table, rows): { text, rows }",
+        effect: "delete",
+        call(session, [a, b]: Args) {
+          const { text, rows } = given(session.deleteRows(a, b));
+          return { text, rows };
+        },
+      },
+      {
+        name: "setCells",
+        signature: "doc.setCells(table, [{ row, column, text }]): { blocks }",
+        effect: "edit",
+        call: (session, [a, b]: Args) => ({ blocks: given(session.setCells(a, b)).blocks }),
+      },
+      {
+        name: "tableStyles",
+        signature: "doc.tableStyles(): string[]",
+        call: (session) => session.tableStyles(),
+      },
+      {
+        name: "setTableStyle",
+        signature: "doc.setTableStyle(table, style | null): { blocks }",
+        effect: "edit",
+        call: (session, [a, b]: Args) => ({ blocks: given(session.setTableStyle(a, b)).blocks }),
+      },
+      {
+        name: "shadeCells",
+        signature: "doc.shadeCells(table, fill | null, { row?, column? }): { blocks }",
+        effect: "edit",
+        call: (session, [a, b, c]: Args) => ({ blocks: given(session.shadeCells(a, b, c)).blocks }),
+      },
+      {
+        name: "setHeaderRows",
+        signature: "doc.setHeaderRows(table, count): { blocks }",
+        effect: "edit",
+        call: (session, [a, b]: Args) => ({ blocks: given(session.setHeaderRows(a, b)).blocks }),
+      },
+    ],
+  },
+  {
+    name: "format_text",
+    description:
+      "Formats a paragraph's text, as a tracked formatting change: all of it, or on text in it (exactly as read shows it, there once, or every place with all). format says what to change, the rest stays: bold, italic, underline, strike (true or false), font (a name), size (points), color (RRGGBB), highlight (a Word highlight color by name: yellow, green…), link (an address; null takes a link off); null gives font, size or color back to the style. read with formatting shows what text has now. Returns the block as it reads now.",
+    inputSchema: args(
+      {
+        handle: HANDLE,
+        format: {
+          type: "object",
+          description: 'What to change: { "bold": true, "color": "1F3864" }.',
+          properties: {
+            bold: { type: "boolean" },
+            italic: { type: "boolean" },
+            underline: { type: "boolean" },
+            strike: { type: "boolean" },
+            font: { anyOf: [{ type: "string" }, { type: "null" }] },
+            size: { anyOf: [{ type: "number" }, { type: "null" }] },
+            color: { anyOf: [{ type: "string" }, { type: "null" }] },
+            highlight: { anyOf: [{ type: "string" }, { type: "null" }] },
+            link: { anyOf: [{ type: "string" }, { type: "null" }] },
+          },
+          additionalProperties: false,
+        },
+        on: {
+          type: "string",
+          description: "Text of the block to format, exactly as read shows it. Default: all of it.",
+        },
+        all: { type: "boolean", description: "Every place on is in the block." },
+      },
+      ["handle", "format"],
+    ),
+    run: (session, { handle, format, on, all }) =>
+      told(
+        session.formatText(handle as string, format as never, {
+          ...(on === undefined ? {} : { on: on as string }),
+          ...(all === true ? { all: true } : {}),
+        }),
+      ),
+    methods: [
+      {
+        name: "formatText",
+        signature: "doc.formatText(handle, format, { on?, all? }): { blocks }",
+        effect: "edit",
+        call: (session, [a, b, c]: Args) => ({ blocks: given(session.formatText(a, b, c)).blocks }),
       },
     ],
   },

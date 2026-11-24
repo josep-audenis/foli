@@ -102,6 +102,52 @@ many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `n
 the wrong kind), `refused` (the document would not take the change). No method of a session
 throws.
 
+## Formatting
+
+`formatText` changes a paragraph's text, or `on` text in it (`all`: every place it is), as a
+tracked formatting change; what `format` leaves out stays. `read({ formatting: true })` adds a
+line under each paragraph with the formatting its text has of its own.
+
+```ts
+session.formatText("b7", { bold: true, color: "1F3864" }, { on: "Total due" });
+session.formatText("b7", { size: 14, font: "Arial" }); // the whole paragraph
+session.formatText("b7", { link: "https://example.com" }, { on: "our site" }); // null: off
+session.formatText("b7", { highlight: "yellow" }, { on: "TBD", all: true });
+// [b7] Normal, changed: Total due: 40.
+//        formatting: bold, color 1F3864: "Total due"
+```
+
+## Tables
+
+A table is named by its handle (its `table, 3 rows, 2 columns` line), or by a paragraph's in one
+of its cells; rows and columns are numbered as `read` prints them (`r2 c1`: rows as with every
+change accepted, grid columns; a merged cell by its top cell). Each returns the table as it
+reads now.
+
+```ts
+session.insertTable(
+  "b4",
+  [
+    ["Item", "Price"],
+    ["Tea", "3.50"],
+  ],
+  { header: true },
+); // after b4
+session.insertRows("b9", 2, [["Cake", "2.00"]]); // after row 2; "before" as a 4th argument
+session.deleteRows("b9", [3]);
+session.setCells("b9", [{ row: 2, column: 2, text: "4.00" }]);
+session.setTableStyle("b9", "Light List"); // session.tableStyles() lists them; null: none
+session.shadeCells("b9", "D9E2F3", { row: 1 }); // a row, a column, a cell, or the table
+session.setHeaderRows("b9", 1);
+```
+
+An operation of several edits (rows, cells, a new table) is all or nothing: one that is
+refused partway takes back what it did. In a vertical merge, a new row's cell the merge goes on
+through takes no text (give `""`: the text is the merge's top cell's); a row whose every cell is
+merged, and a merge's first row without the rows it covers, are refused.
+Adding or deleting columns, merging or splitting cells and column widths are not offered: they
+cannot be recorded as tracked changes. The `edit_table` tool says so, with what to do instead.
+
 ## Templates
 
 A template's blanks are Word's content controls and merge fields. A read shows an unfilled

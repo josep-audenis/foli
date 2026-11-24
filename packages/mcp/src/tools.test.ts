@@ -59,6 +59,8 @@ describe("the tools a client lists", () => {
       "list_controls",
       "fill_control",
       "update_fields",
+      "edit_table",
+      "format_text",
       "save",
       "close",
       "list_documents",

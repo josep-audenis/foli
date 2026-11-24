@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013) and 23.2 (tracked table formatting, schema 8) merged                                                                                                                |
+| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013), 23.2 (tracked table formatting, schema 8), 23.3 and 23.4 merged                                                                                                    |
 | 24 Collab integration     | Ready                    | —                       | Planned 2026-11-24 from an integrator's feedback on `@folijs/collab` 0.1.0                                                                                                                    |
 | 25 Word ribbon            | Ready                    | —                       | Planned 2026-11-24, nothing built: a Word-like ribbon in `@folijs/react`; can run beside 23 and 24                                                                                            |
 
@@ -3416,11 +3416,23 @@ lands second merges the other in (no rebase: force push is blocked).
   refused while tracking, with the reason in limitations.md: column insertion and deletion,
   merging and splitting, column widths (each needs cells inserted or deleted, a grid change and
   cell formatting recorded together).
-- [ ] 23.3 Agent: tables. `insertTable` next to a block (rows, columns, header row,
+- [x] 23.3 Agent: tables. `insertTable` next to a block (rows, columns, header row,
   cell text), rows and columns in and out, merge and split, style, shading, widths, header
   rows; one tool `edit_table`; `run` methods.
-- [ ] 23.4 Agent: text formatting and links on a block or on `on` text; `read` option
+  Done: `insertTable`, `insertRows`, `deleteRows`, `setCells`, `tableStyles`,
+  `setTableStyle`, `shadeCells`, `setHeaderRows` on the session, the `edit_table` tool and
+  eight `run` methods; `read` counts a row's `gridBefore` and marks a table with recorded
+  formatting as changed. Columns, merging, splitting and widths are refused with what to do
+  instead (23.2 left them untracked). Tools: 15 and 10,942 characters with schemas (16 and
+  14,428 with `--code`).
+- [x] 23.4 Agent: text formatting and links on a block or on `on` text; `read` option
   showing run formatting; one tool `format_text`.
+  Done (merged with 23.3 in one PR: they were built together): `formatText`, `read`'s
+  `formatting` option (a line under a paragraph with its runs' own formatting), the
+  `format_text` tool and `formatText` in `run`. 16 tools, 12,646 characters with schemas (17,
+  16,262 with `--code`); ADR-0013's aim raised for `--code`. 23.3's review fixed with it: row
+  commands in a vertically merged table act on the row named; several edits all or nothing;
+  code mode counts what changed, not the whole table.
 - [ ] 23.5 Agent: paragraph formatting and lists; one tool `format_paragraph`.
 - [ ] 23.6 Agent: insert pictures (bytes and type in the package; in the MCP server a path
   under the root, size limits as `open`'s; alt text), page and section breaks, horizontal

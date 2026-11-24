@@ -55,6 +55,8 @@ const TOOLS = [
   "list_controls",
   "fill_control",
   "update_fields",
+  "edit_table",
+  "format_text",
   "save",
   "close",
   "list_documents",
