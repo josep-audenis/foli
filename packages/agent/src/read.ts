@@ -36,8 +36,9 @@ export interface Block {
   /** How many comments are anchored in it. */
   comments: number;
   /**
-   * The text's own formatting, when `read` was asked for it (`formatting`): runs of text that
-   * have some, each with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
+   * The paragraph's own formatting, when `read` was asked for it (`formatting`): its own
+   * properties (`paragraph centered, space after 6 pt`), then runs of text that have some, each
+   * with what it has (`bold, 14 pt: "Total"`). The style's is not shown.
    */
   formatting?: string;
 }
@@ -374,4 +375,37 @@ export function runFormatting(paragraph: Node): string {
         `${r.what}: ${JSON.stringify(r.text.length > 80 ? `${r.text.slice(0, 77)}…` : r.text)}`,
     )
     .join("; ");
+}
+
+/**
+ * @internal
+ * A paragraph's own properties in words (alignment, spacing, indentation), as
+ * `Block.formatting` starts with them; empty when it has none of its own.
+ */
+export function paragraphFormatting(paragraph: Node): string {
+  const a = paragraph.attrs as Record<string, Record<string, unknown> | string | null>;
+  const out: string[] = [];
+  const align: Record<string, string> = {
+    center: "centered",
+    right: "right aligned",
+    end: "right aligned",
+    both: "justified",
+    distribute: "justified",
+    left: "left aligned",
+    start: "left aligned",
+  };
+  if (typeof a.justification === "string" && align[a.justification])
+    out.push(align[a.justification] as string);
+  const spacing = (a.spacing ?? {}) as Record<string, unknown>;
+  if (typeof spacing.line === "number" && (spacing.lineRule ?? "auto") === "auto")
+    out.push(`line spacing ${Math.round((spacing.line / 240) * 100) / 100}`);
+  if (typeof spacing.before === "number") out.push(`space before ${spacing.before / 20} pt`);
+  if (typeof spacing.after === "number") out.push(`space after ${spacing.after / 20} pt`);
+  const indent = (a.indent ?? {}) as Record<string, unknown>;
+  if (typeof indent.left === "number" && indent.left) out.push(`indent ${indent.left / 20} pt`);
+  if (typeof indent.firstLine === "number" && indent.firstLine)
+    out.push(`first line ${indent.firstLine / 20} pt`);
+  if (typeof indent.hanging === "number" && indent.hanging)
+    out.push(`hanging ${indent.hanging / 20} pt`);
+  return out.length ? `paragraph ${out.join(", ")}` : "";
 }

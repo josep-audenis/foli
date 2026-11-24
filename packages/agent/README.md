@@ -117,6 +117,17 @@ session.formatText("b7", { highlight: "yellow" }, { on: "TBD", all: true });
 //        formatting: bold, color 1F3864: "Total due"
 ```
 
+`formatParagraphs` formats paragraphs: one handle, or several (those next to each other become
+one list). `read({ formatting: true })` starts a paragraph's line with its own properties.
+
+```ts
+session.formatParagraphs("b2", { align: "center", spaceAfter: 12 });
+session.formatParagraphs(["b5", "b6", "b7"], { list: "numbered" }); // null: no numbering
+session.formatParagraphs("b6", { indent: "more" }); // in a list: a level deeper
+// [b2] Title, changed: Prices
+//        formatting: paragraph centered, space after 12 pt
+```
+
 ## Tables
 
 A table is named by its handle (its `table, 3 rows, 2 columns` line), or by a paragraph's in one

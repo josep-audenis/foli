@@ -1292,6 +1292,10 @@ version. Details, the read format and examples: the
   `underline`, `strike`, `font`, `size` in points, `color` RRGGBB, `highlight` by Word's name,
   `link`; null gives font, size or color back to the style, takes highlight and link off);
   `read({ formatting: true })` fills `Block.formatting`.
+- Paragraphs (0.4, 23.5): `formatParagraphs(handles, ParagraphFormat)` (`align` left, center,
+  right or justify; `lineSpacing` a multiple; `spaceBefore`, `spaceAfter` in points; `indent`
+  "more" or "less"; `list` "bullet", "numbered" or null); `Block.formatting` starts with the
+  paragraph's own properties.
 - Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
   `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
   checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session

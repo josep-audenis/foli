@@ -136,7 +136,8 @@ export function styleId(context: Context, name: string): string | Refusal {
 }
 
 /** The content controls `node` at `pos` is in or holds that may not be edited, by name. */
-function lockedControls(context: Context, pos: number, node: Node): string[] {
+/** @internal The locked content controls a block is in or holds, by name. */
+export function lockedControls(context: Context, pos: number, node: Node): string[] {
   const { state } = context.editor;
   const ids = new Set<string>((node.attrs.controls as string[] | null) ?? []);
   const end = pos + node.nodeSize;

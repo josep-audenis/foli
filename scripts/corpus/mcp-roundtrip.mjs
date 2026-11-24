@@ -57,6 +57,7 @@ const TOOLS = [
   "update_fields",
   "edit_table",
   "format_text",
+  "format_paragraph",
   "save",
   "close",
   "list_documents",
