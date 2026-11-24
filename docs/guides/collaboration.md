@@ -56,6 +56,8 @@ export function host(document: EditorDocument, name: string, limits?: AuthorityL
     send: (message) => deliver(HOST, hub.receive(message, HOST)),
     name,
     color: "#c2410c",
+    // The host's steps meet the same limits: one refused (too large, say) stops its sending.
+    onError: (reason) => console.warn(`Your changes were refused (${reason}).`),
   });
   return {
     editor,
@@ -115,7 +117,8 @@ export function joinHost(
 (`receiveBroadcast`), catches up after a gap or a `stale` refusal, sends presence and shows the
 others'. A drop that outlasts the authority's log brings a new snapshot: `onSnapshot` makes the
 editor again, and what it had not sent is lost. When the host leaves, the session ends: its
-document is the one to keep (`authority.snapshot()`). This code runs in the guide's tests, over a
+document is the one to keep (`authority.snapshot()`). The host's own steps meet the authority's
+limits like anyone's: one refused for good stops its sending, and `onError` says so. This code runs in the guide's tests, over a
 channel that reorders, repeats and drops messages
 ([`collab.test.ts`](https://github.com/josep-audenis/foli/blob/main/apps/site/src/guides/collab.test.ts)).
 

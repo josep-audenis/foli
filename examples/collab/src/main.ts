@@ -9,6 +9,7 @@ import {
   type Editor,
   type FoliDocument,
   presence,
+  removePresence,
   sendableSteps,
 } from "@folijs/core";
 import { exportDocx } from "@folijs/docx";
@@ -94,7 +95,16 @@ function open(): void {
   own.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data));
     if (message.type === "hello") {
+      // A new token: the server took this page for a new client (its old connection was still
+      // open there); the snapshot that follows starts it again under its new id.
+      if (token !== null && message.token !== token) {
+        connection?.destroy();
+        connection = null;
+      }
       token = message.token;
+      // Who is here comes again from the server: the ones shown may have left meanwhile.
+      for (const peer of editor ? presence(editor.state) : [])
+        editor?.dispatch(removePresence(editor.state, peer.clientID));
       connection?.resume();
     } else if (message.type === "snapshot" && !connection) start(message);
     else connection?.receive(message);

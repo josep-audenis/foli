@@ -55,6 +55,8 @@ export function host(document: EditorDocument, name: string, limits?: AuthorityL
     send: (message) => deliver(HOST, hub.receive(message, HOST)),
     name,
     color: "#c2410c",
+    // The host's steps meet the same limits: one refused (too large, say) stops its sending.
+    onError: (reason) => console.warn(`Your changes were refused (${reason}).`),
   });
   return {
     editor,

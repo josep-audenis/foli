@@ -120,8 +120,10 @@ sockets.on("connection", (socket) => {
     }
     connected.set(clientID, socket);
     send(socket, { type: "hello", token });
-    // A new client gets the document; one back resumes (it asks for what it missed).
-    if (!back) deliver(clientID, hub.join(clientID));
+    // A new client gets the document; one back resumes (it asks for what it missed) and gets
+    // who is here now (it missed those who left meanwhile).
+    const joined = hub.join(clientID);
+    deliver(clientID, back ? joined.slice(1) : joined);
   });
   socket.on("close", () => {
     if (clientID === null || connected.get(clientID) !== socket) return;
