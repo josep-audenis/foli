@@ -1,5 +1,6 @@
 import {
   acceptAllChanges,
+  createDocument,
   createEditor,
   rejectAllChanges,
   trackedChanges,
@@ -301,7 +302,7 @@ describe("what the review of #140 found", () => {
 
     expect(session.deleteBlock(tables[0]?.handle as string)).toMatchObject({
       ok: true,
-      text: `Deleted table ${tables[0]?.handle} with its cells.`,
+      text: `Deleted table ${tables[0]?.handle} with its cells, as a tracked deletion.`,
     });
     // Both tables and every cell are gone from the read; the paragraphs around stay.
     expect(blocks(session)).toEqual(original.filter((b) => b.depth === 0 && b.kind !== "table"));
@@ -458,5 +459,25 @@ describe("what the review of #140 found", () => {
     const result = session.replaceText(date.handle, "[empty: Offer date]", "1 May");
     expect(result).toMatchObject({ ok: false, code: "no-match" });
     expect(!result.ok && result.message).toContain("in brackets");
+  });
+
+  it("says its own paragraph in the middle was removed, not tracked (23.9 review)", () => {
+    const session = openSession(
+      createDocument({
+        type: "doc",
+        content: ["One", "Two"].map((text) => ({
+          type: "paragraph",
+          content: [{ type: "text", text }],
+        })),
+      }),
+      { author: "Agent" },
+    );
+    const first = (session.read() as { blocks: { handle: string }[] }).blocks[0]?.handle as string;
+    const made = session.insertAfter(first, "Mine");
+    const mine = made.ok ? (made.blocks[0]?.handle as string) : "";
+    const done = session.deleteBlock(mine);
+    expect(done.ok && done.text).toBe(`Deleted block ${mine}: your own insertion, removed.`);
+    const other = session.deleteBlock(first);
+    expect(other.ok && other.text).toBe(`Deleted block ${first}, as a tracked deletion.`);
   });
 });

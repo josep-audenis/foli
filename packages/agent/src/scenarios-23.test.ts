@@ -69,12 +69,12 @@ describe("Phase 23's areas through agentTools alone (23.9)", () => {
     ).toMatch(/r5 c1, Normal, changed: Total/);
     // A heading formatted: its color, centered.
     const summary = handle("heading 1: Executive summary");
-    expect(call("format_text", { handle: summary, format: { color: "1F3864" } })).toContain(
-      "Executive summary",
+    expect(call("format_text", { handle: summary, format: { color: "1F3864" } })).not.toMatch(
+      /^Nothing changed/,
     );
-    expect(call("format_paragraph", { handles: [summary], format: { align: "center" } })).toContain(
-      "changed",
-    );
+    expect(
+      call("format_paragraph", { handles: [summary], format: { align: "center" } }),
+    ).not.toMatch(/^Nothing changed/);
     // A list: three new paragraphs, numbered.
     const made = call("insert_paragraphs", {
       handle: handle("The Board is asked to approve"),
@@ -117,6 +117,10 @@ describe("Phase 23's areas through agentTools alone (23.9)", () => {
       "Q1 2026 (draft)",
     ])
       expect(text).toContain(expected);
+    // The heading's color and alignment, as saved.
+    expect(
+      (again.read({ limit: 2000, formatting: true }) as { text: string }).text,
+    ).toMatch(/Executive summary\n +formatting: paragraph centered; color 1F3864: "Executive summary"/);
     const changes = trackedChanges(createEditor({ document: saved }).state.doc);
     expect(changes.length).toBeGreaterThan(10);
     expect(new Set(changes.map((c) => c.author))).toEqual(new Set(["Agent"]));

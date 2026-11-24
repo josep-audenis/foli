@@ -62,8 +62,12 @@ describe("Phase 23's areas through the MCP server (23.9)", () => {
       }),
     ).toMatch(/r5 c1, Normal, changed: Total/);
     const summary = await handle("heading 1: Executive summary");
-    await call("format_text", { handle: summary, format: { color: "1F3864" } });
-    await call("format_paragraph", { handles: [summary], format: { align: "center" } });
+    expect(await call("format_text", { handle: summary, format: { color: "1F3864" } })).not.toMatch(
+      /^Nothing changed/,
+    );
+    expect(
+      await call("format_paragraph", { handles: [summary], format: { align: "center" } }),
+    ).not.toMatch(/^Nothing changed/);
     const added = [
       ...(
         await call("insert_paragraphs", {
@@ -101,6 +105,11 @@ describe("Phase 23's areas through the MCP server (23.9)", () => {
       "(draft)",
     ])
       expect(text).toContain(expected);
+    const heading = document.content.content?.find(
+      (b) => JSON.stringify(b).includes("Executive summary") && b.attrs?.style === "Heading1",
+    );
+    expect(heading?.attrs?.justification).toBe("center");
+    expect(JSON.stringify(heading)).toContain('"1F3864"');
     const changes = trackedChanges(createEditor({ document }).state.doc);
     expect(new Set(changes.map((c) => c.author))).toEqual(new Set(["Agent"]));
   });

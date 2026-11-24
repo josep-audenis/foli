@@ -14,7 +14,7 @@ export interface Block {
   number?: string;
   /**
    * A paragraph's text: tabs as tabs, line breaks as "\n". What is not text stands in brackets:
-   * "[picture]", "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
+   * "[picture]" (with its alt text: "[picture: …]"), "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
    * date]" (a content control showing its placeholder, by its title), "[object]". Text deleted
    * as a tracked change, hidden text and field codes are left out. A table: "". Other: what it
    * is.
@@ -132,8 +132,9 @@ function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden
     else if (child.type.spec.text) text += child.type.spec.text(child.attrs);
     else if (name === "picture" && typeof child.attrs.alt === "string" && child.attrs.alt.trim()) {
       // Its alt text: what tells a model which picture it is (23.9's trial asked for it).
-      const alt = child.attrs.alt.replace(/[\s\]]+/g, " ").trim();
-      text += `[picture: ${alt.length > 60 ? `${alt.slice(0, 57)}…` : alt}]`;
+      const alt = child.attrs.alt.replace(/[\s[\]]+/g, " ").trim();
+      const cut = [...alt];
+      text += `[picture: ${cut.length > 60 ? `${cut.slice(0, 57).join("")}…` : alt}]`;
     } else if (!UNSEEN.has(name)) text += STANDS_AS[name] ?? "[object]";
   });
   return { text, changed, comments };
@@ -244,8 +245,14 @@ export function readBlocks(state: EditorState, handles: Handles): Block[] {
           ? (context?.envelope.styles.find((s) => s.id === styleId)?.name ?? styleId)
           : null;
         if (style) table.tableStyle = style;
+        // From the top, among the rows read (a row deleted as a tracked change is not).
         let header = 0;
-        for (let r = 0; r < node.childCount && node.child(r).attrs.header === true; r++) header++;
+        let counting = true;
+        node.forEach((row) => {
+          if (!counting || revisionOf(row)?.deletion) return;
+          if (row.attrs.header === true) header++;
+          else counting = false;
+        });
         if (header) table.headerRows = header;
       } else {
         const text = node.type.spec.text?.(node.attrs) ?? String(node.attrs.label ?? name);

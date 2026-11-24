@@ -160,7 +160,7 @@ export interface Block {
     number?: string;
     /**
      * A paragraph's text: tabs as tabs, line breaks as "\n". What is not text stands in brackets:
-     * "[picture]", "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
+     * "[picture]" (with its alt text: "[picture: …]"), "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
      * date]" (a content control showing its placeholder, by its title), "[object]". Text deleted
      * as a tracked change, hidden text and field codes are left out. A table: "". Other: what it
      * is.
