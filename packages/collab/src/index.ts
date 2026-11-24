@@ -290,3 +290,6 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
     },
   };
 }
+
+export { type Connection, type ConnectOptions, connect } from "./connect.js";
+export { type ClientMessage, createHub, type Hub, type HubMessage, type Outgoing } from "./hub.js";

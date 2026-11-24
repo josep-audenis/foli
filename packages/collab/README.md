@@ -31,6 +31,41 @@ authority.stepsSince(version); // { version, steps, clientIDs } or { snapshot } 
 authority.snapshot(); // { version, document, package }: what to store
 ```
 
+Or let `createHub` and `connect` speak the protocol, and carry their messages over whatever you
+have (a WebSocket, a Yjs channel, WebRTC, BroadcastChannel):
+
+```ts
+import { connect, createHub } from "@folijs/collab";
+
+// Where the authority lives (a server, or the hosting browser):
+const hub = createHub(authority);
+const deliver = (from, out) => {
+  for (const { to, message } of out) sendTo(to, from, JSON.stringify(message)); // everyone, sender or others
+};
+onJoin((clientID) => deliver(clientID, hub.join(clientID))); // its snapshot first
+onMessage((clientID, text) => deliver(clientID, hub.receive(text, clientID)));
+onClose((clientID) => deliver(clientID, hub.leave(clientID)));
+
+// In each client, once the snapshot came: an editor with `collab`, connected.
+const editor = createEditor({
+  document: snapshot.document,
+  plugins: [collab({ version: snapshot.version, clientID })],
+});
+const connection = connect(editor, {
+  send: (message) => socket.send(JSON.stringify(message)),
+  name: "Ada",
+  color: "#c2410c",
+  onSnapshot: (snapshot) => restart(snapshot), // too far behind: create the editor again
+  onError: (reason) => showError(reason), // refused for good: its steps are not sent again
+});
+socket.onmessage = (event) => connection.receive(event.data);
+socket.onreconnect = () => connection.resume();
+```
+
+`connect` sends one batch at a time, checks every broadcast against the editor's version,
+catches up after a gap or a `stale` refusal and sends and shows presence (`EditorView` draws the
+others' carets).
+
 The client side is `collab`, `sendableSteps`, `receiveBroadcast` and `getVersion` in
 `@folijs/core`. Refusals: `stale`, `malformed`, `invalid` (a step does not apply, or an envelope
 or story step no longer finds what it changes), `too-large` (`limits`: message size, steps per

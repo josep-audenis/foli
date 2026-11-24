@@ -1376,6 +1376,21 @@ The authority of a shared document (0.x, unstable; ADR-0012; [package README](..
   inserted at one place meet; a table ends the body) are restored by the authority: a paragraph
   goes between, its steps broadcast after the client's under the client id `AUTHORITY`
   (`"@folijs/collab"`; never give a client that id).
+- `createHub(authority)` (24.3): `Hub`, the messages between an authority and its clients, so
+  the app only carries them (as JSON text, over any transport). `hub.join(clientID)`,
+  `hub.receive(message, clientID)` (a client's text or value, from the connection that
+  authenticated `clientID`; never throws on it) and `hub.leave(clientID)` each give `Outgoing[]`:
+  `{ to: "everyone" | "sender" | "others", message }`. Messages: `ClientMessage` (`steps`,
+  `catchup`, `presence`) and `HubMessage` (`steps`, a `Broadcast`; `refused`; `snapshot`, the
+  document without its package; `presence`, relayed under the connection's id; `left`). A joining
+  client gets the snapshot and the others' last presence.
+- `connect(editor, { send, name, color, onSnapshot?, onError? })` (24.3): `Connection`, the client
+  loop for an editor made with `collab` from the hub's snapshot. It sends one batch of steps at a
+  time, checks each broadcast (`receiveBroadcast`), catches up after a gap or `stale`, and sends
+  and shows presence. `connection.receive(message)` takes each message from the hub;
+  `connection.resume()` after the transport reconnects; `connection.destroy()`. A `snapshot`
+  (the editor was too far behind) and a refusal for good stop it: `onSnapshot` creates the
+  editor again, `onError(reason)` tells the user.
 
 ## `@folijs/pdf`
 
