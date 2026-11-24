@@ -118,9 +118,9 @@ describe("Phase 23's areas through agentTools alone (23.9)", () => {
     ])
       expect(text).toContain(expected);
     // The heading's color and alignment, as saved.
-    expect(
-      (again.read({ limit: 2000, formatting: true }) as { text: string }).text,
-    ).toMatch(/Executive summary\n +formatting: paragraph centered; color 1F3864: "Executive summary"/);
+    expect((again.read({ limit: 2000, formatting: true }) as { text: string }).text).toMatch(
+      /Executive summary\n +formatting: paragraph centered; color 1F3864: "Executive summary"/,
+    );
     const changes = trackedChanges(createEditor({ document: saved }).state.doc);
     expect(changes.length).toBeGreaterThan(10);
     expect(new Set(changes.map((c) => c.author))).toEqual(new Set(["Agent"]));
