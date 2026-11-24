@@ -38,3 +38,11 @@ message) and `unauthorized`. The log keeps `limits.log` steps (default 10 000); 
 behind gets a snapshot. Pass `log` (`authority.log`, stored) and `version` to start again after a
 restart. Locked content controls are not checked again by the authority (their rules depend on
 the command that made an edit): an app whose clients may be hostile checks them in `authorize`.
+
+**Versions.** A version counts steps. `broadcast.version` is the version _before_ the
+broadcast's steps: a client applies it when `broadcast.version === getVersion(editor.state)`, keeps
+one from later until those before it arrive, and drops one it already has. `received.version` is
+the authority's version _after_ them. Broadcast to everyone, the sender too: its own broadcast is
+how its steps are confirmed. A client that skips it, applies a broadcast twice or drops a `stale`
+refusal is refused as `stale` until it catches up, or for good: see the guide's
+[My edits stop](https://github.com/josep-audenis/foli/blob/main/docs/guides/collaboration.md#my-edits-stop).

@@ -36,7 +36,11 @@ export interface StepsMessage {
   steps: StepJSON[];
 }
 
-/** What everyone receives (the sender too): steps from `version`, each with its author. */
+/**
+ * What everyone receives (the sender too: it confirms its steps): steps from `version`, each with
+ * its author. `version` is the version before these steps: a client applies the broadcast when
+ * it is `getVersion(state)`, and is at `version + steps.length` after it.
+ */
 export interface Broadcast {
   version: number;
   steps: StepJSON[];
@@ -46,6 +50,7 @@ export interface Broadcast {
 /** Why a message changed nothing. `stale`: the client catches up, rebases and sends again. */
 export type Refusal = "stale" | "malformed" | "invalid" | "too-large" | "unauthorized";
 
+/** A message's outcome. `version`: the authority's, after the steps when `ok`. */
 export type Received =
   | { ok: true; version: number; broadcast: Broadcast }
   | { ok: false; reason: Refusal; version: number; message?: string };

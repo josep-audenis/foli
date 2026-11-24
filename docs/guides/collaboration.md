@@ -114,6 +114,43 @@ else's. A client that loses its connection keeps editing; when it comes back it 
 since its version and sends its own, rebased. When the authority's log no longer has them, it gets
 a snapshot and starts from it.
 
+## Versions
+
+A version is a count of steps: the authority's is the number it has accepted, an editor's
+(`getVersion`) the number of the authority's steps it has applied. Three numbers, and which is
+which:
+
+| Number                         | Means                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| `sendableSteps(state).version` | The editor's version: the steps it sends start from it                   |
+| `broadcast.version`            | The version **before** the broadcast's steps: an editor applies it there |
+| `received.version` (`ok`)      | The authority's version **after** them: not for the clients              |
+
+So a broadcast fits an editor when `broadcast.version === getVersion(editor.state)`; after it the
+editor is at `broadcast.version + broadcast.steps.length`. The sender gets its own broadcast too:
+that is how its steps are confirmed and its version moves. `receiveTransaction` does not check
+the version: apply a broadcast only when it fits, keep one from later until those before it
+arrive, and drop one from before (the editor has it).
+
+## My edits stop
+
+An editor whose version is off sends steps the authority refuses as `stale`. One that catches up on
+`stale` recovers; one that also drops the refusal, or is ahead of the authority (only a snapshot
+brings it back), stops for good. It looks like "the first character works, then nothing". What
+causes it:
+
+- **The sender skips its own broadcast** (sending to the others only). Its steps stay
+  unconfirmed and its version stays behind.
+- **A broadcast applied twice**, or out of order: a reconnect or a catch-up overlapping a
+  broadcast already received. Compare `broadcast.version` with `getVersion` first.
+- **`received.version` sent as the broadcast's version.** It is the version after the steps.
+- **Refusals dropped.** On `stale`, ask for `stepsSince(getVersion(editor.state))`, apply it,
+  then send again (the steps are rebased). When it gives `{ snapshot }` (the log no longer has the
+  steps, or the editor is ahead: a broadcast applied twice), create the editor again from it. Any other reason comes back for the same steps: stop
+  sending them and tell the user.
+- **A new editor at version 0** for a document the authority has at another version: create it
+  with `collab({ version: snapshot.version })`, the version of the snapshot it loads.
+
 ## Presence
 
 ```ts

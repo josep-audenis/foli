@@ -208,10 +208,17 @@ const stateOf = (state: EditorState): CollabState => {
   return value;
 };
 
-/** The authority's version this editor has received up to. */
+/**
+ * The authority's version this editor has received up to: how many of the authority's steps it
+ * has applied. A broadcast fits when its `version` (the version before its steps) is this one.
+ */
 export const getVersion = (state: EditorState): number => stateOf(state).version;
 
-/** The steps to send the authority, or null when every step of this editor is confirmed. */
+/**
+ * The steps to send the authority, or null when every step of this editor is confirmed. Their
+ * `version` is this editor's (`getVersion`): the authority refuses them as `stale` when it has
+ * moved on, and they go again after the editor catches up.
+ */
 export function sendableSteps(state: EditorState): SendableSteps | null {
   const { version, unconfirmed, clientID } = stateOf(state);
   return unconfirmed.length ? { version, steps: unconfirmed.map((u) => u.step), clientID } : null;
@@ -221,7 +228,8 @@ export function sendableSteps(state: EditorState): SendableSteps | null {
  * The transaction that applies `steps` the authority broadcast (from this editor's version, in
  * its order, `clientIDs[i]` the author of `steps[i]`): dispatch it. This editor's own steps
  * among them are confirmed; the others are applied, its unconfirmed steps rebased over them.
- * It is `remote`: not undoable, not tracked, nothing appended; history maps over it.
+ * It is `remote`: not undoable, not tracked, nothing appended; history maps over it. The version
+ * is not checked: give it only a broadcast whose `version` is `getVersion(state)`, once.
  */
 export function receiveTransaction(
   state: EditorState,
