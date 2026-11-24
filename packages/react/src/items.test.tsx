@@ -301,7 +301,10 @@ describe("toolbar items", () => {
     expect(button.getAttribute("aria-haspopup")).toBe("menu");
     fireEvent.click(button, { detail: 0 });
     const items = screen.getAllByRole("menuitemradio");
-    expect(items.map((item) => item.textContent)).toEqual(["None", "Brand"]);
+    expect(items.map((item) => item.getAttribute("aria-label") ?? item.textContent)).toEqual([
+      "None",
+      "Brand",
+    ]);
     fireEvent.click(items[1] as HTMLElement, { detail: 0 });
     expect(picked).toEqual(["#123456"]);
     expect(screen.queryByRole("menu")).toBeNull();
@@ -311,10 +314,11 @@ describe("toolbar items", () => {
 
     selectAll(editor);
     fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
-    expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual([
-      "None",
-      "Brand",
-    ]);
+    expect(
+      screen
+        .getAllByRole("menuitemradio")
+        .map((item) => item.getAttribute("aria-label") ?? item.textContent),
+    ).toEqual(["None", "Brand"]);
     // The copy still does what the built-in does.
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Brand" }), { detail: 0 });
     expect(JSON.stringify(editor.state.doc.toJSON())).toContain("123456");

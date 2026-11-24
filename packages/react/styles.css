@@ -243,7 +243,34 @@
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
 }
 
+/* A palette as Word's grid: swatches only, each named by its tooltip and accessible name. */
+.foli-menu-grid {
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+}
+
+.foli-menu-cell {
+  display: flex;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
+
+.foli-menu-cell:hover,
+.foli-menu-cell:focus-visible {
+  background: var(--foli-toolbar-hover);
+}
+
+.foli-menu-cell:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: -1px;
+}
+
 /* The checked color: a ring around its swatch (an outline also shows in forced colors). */
+.foli-menu-cell[aria-checked="true"] .foli-menu-swatch,
 .foli-menu-item[aria-checked="true"] .foli-menu-swatch {
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: 1px;

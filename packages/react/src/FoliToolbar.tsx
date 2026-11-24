@@ -135,6 +135,7 @@ import {
   translator,
   useT,
 } from "./messages.js";
+import { shade, shadesOf } from "./palette.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -316,6 +317,11 @@ export interface ToolbarColor {
   readonly name: string;
   /** Lowercase `#rrggbb`; null is the entry that removes the color. */
   readonly color: string | null;
+  /**
+   * A shade of the color `name` names, in percent: lighter above 0, darker below. Its
+   * accessible name says so ("Accent 1, lighter 80%").
+   */
+  readonly shade?: number | undefined;
 }
 
 /**
@@ -325,7 +331,13 @@ export interface ToolbarColor {
  */
 export interface ToolbarColorMenu extends ToolbarItemBase {
   readonly colors: {
-    readonly options: readonly ToolbarColor[];
+    /** The palette, or one for the state (the document's theme colors, say). */
+    readonly options: readonly ToolbarColor[] | ((state: EditorState) => readonly ToolbarColor[]);
+    /**
+     * The colors as swatches in a grid of this many columns, as Word's (the null entry a row
+     * above it). Default: a list, each color by its name.
+     */
+    readonly columns?: number | undefined;
     /** The color at the selection (null: none, or mixed). Runs after every transaction. */
     readonly value: (state: EditorState) => string | null;
     /** What picking a color runs (null: the entry that removes it). */
@@ -482,37 +494,99 @@ interface Action extends ToolbarAction {
   movesFocus?: boolean;
 }
 
-/**
- * The palettes (fixed: a document should not need a color picker). Text colors keep at least
- * 4.5:1 contrast on white; highlights keep dark text readable.
- */
-const TEXT_COLORS: readonly ToolbarColor[] = [
-  { name: "Automatic", color: null },
-  { name: "Gray", color: "#5f6368" },
-  { name: "Red", color: "#c00000" },
-  { name: "Orange", color: "#b45309" },
-  { name: "Green", color: "#2e7d32" },
-  { name: "Blue", color: "#1f5fbf" },
+/** Office's default theme (2023) for a document without one: its colors as `RRGGBB`. */
+const OFFICE_THEME: Readonly<Record<string, string>> = {
+  lt1: "FFFFFF",
+  dk1: "000000",
+  lt2: "E8E8E8",
+  dk2: "0E2841",
+  accent1: "156082",
+  accent2: "E97132",
+  accent3: "196B24",
+  accent4: "0F9ED5",
+  accent5: "A02B93",
+  accent6: "4EA72E",
+};
+/** Word's theme columns, in its order: the theme's slot, and its name. */
+const THEME_SLOTS = [
+  ["lt1", "Background 1"],
+  ["dk1", "Text 1"],
+  ["lt2", "Background 2"],
+  ["dk2", "Text 2"],
+  ["accent1", "Accent 1"],
+  ["accent2", "Accent 2"],
+  ["accent3", "Accent 3"],
+  ["accent4", "Accent 4"],
+  ["accent5", "Accent 5"],
+  ["accent6", "Accent 6"],
+] as const;
+/** Word's standard colors, the row under the theme's. */
+const STANDARD_COLORS: readonly ToolbarColor[] = [
+  { name: "Dark red", color: "#c00000" },
+  { name: "Red", color: "#ff0000" },
+  { name: "Orange", color: "#ffc000" },
+  { name: "Yellow", color: "#ffff00" },
+  { name: "Light green", color: "#92d050" },
+  { name: "Green", color: "#00b050" },
+  { name: "Light blue", color: "#00b0f0" },
+  { name: "Blue", color: "#0070c0" },
+  { name: "Dark blue", color: "#002060" },
   { name: "Purple", color: "#7030a0" },
 ];
-/** Word's highlight colors (a document opened in Word shows these exactly). */
+
+/** Word's color grid for a theme: each theme color and five shades, then the standard colors. */
+const themeGrid = (theme: Readonly<Record<string, string>>): ToolbarColor[] => {
+  const columns = THEME_SLOTS.map(([slot, name]) => {
+    const value = theme[slot];
+    const color = `#${(value && /^[0-9a-f]{6}$/i.test(value) ? value : (OFFICE_THEME[slot] as string)).toLowerCase()}`;
+    return { name, color, shades: shadesOf(color) };
+  });
+  const rows: ToolbarColor[] = columns.map(({ name, color }) => ({ name, color }));
+  for (let row = 0; row < 5; row++)
+    for (const { name, color, shades } of columns) {
+      const percent = shades[row] as number;
+      rows.push({ name, color: shade(color, percent), shade: percent });
+    }
+  return [...rows, ...STANDARD_COLORS];
+};
+// One grid per theme: it is the same until the theme changes.
+const grids = new WeakMap<object, ToolbarColor[]>();
+const themeColors = (state: EditorState): readonly ToolbarColor[] => {
+  const theme = wordContext(state)?.envelope.theme?.colors ?? OFFICE_THEME;
+  let grid = grids.get(theme);
+  if (!grid) {
+    grid = themeGrid(theme);
+    grids.set(theme, grid);
+  }
+  return grid;
+};
+const TEXT_COLORS = (state: EditorState): readonly ToolbarColor[] => [
+  { name: "Automatic", color: null },
+  ...themeColors(state),
+];
+/** Word's highlight colors, in its order (a document opened in Word shows these exactly). */
 const HIGHLIGHTS: readonly ToolbarColor[] = [
   { name: "None", color: null },
   { name: "Yellow", color: "#ffff00" },
   { name: "Bright green", color: "#00ff00" },
   { name: "Turquoise", color: "#00ffff" },
   { name: "Pink", color: "#ff00ff" },
-  { name: "Gray", color: "#c0c0c0" },
+  { name: "Blue", color: "#0000ff" },
+  { name: "Red", color: "#ff0000" },
+  { name: "Dark blue", color: "#000080" },
+  { name: "Teal", color: "#008080" },
+  { name: "Green", color: "#008000" },
+  { name: "Violet", color: "#800080" },
+  { name: "Dark red", color: "#800000" },
+  { name: "Dark yellow", color: "#808000" },
+  { name: "Gray 50%", color: "#808080" },
+  { name: "Gray 25%", color: "#c0c0c0" },
+  { name: "Black", color: "#000000" },
 ];
-
-/** Cell shadings: light fills that keep text readable. */
-const SHADINGS: readonly ToolbarColor[] = [
+/** Cell shadings: Word's grid, as the text color's. */
+const SHADINGS = (state: EditorState): readonly ToolbarColor[] => [
   { name: "None", color: null },
-  { name: "Light gray", color: "#d9d9d9" },
-  { name: "Light blue", color: "#deeaf6" },
-  { name: "Light green", color: "#e2efd9" },
-  { name: "Light yellow", color: "#fff2cc" },
-  { name: "Light orange", color: "#fbe4d5" },
+  ...themeColors(state),
 ];
 
 /** The cell around the selection's start, if any (cheap: the start's ancestors). */
@@ -860,15 +934,43 @@ const mark = (key: string, label: string, icon: string): Item => ({
 
 const capitalized = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
-/** The fonts the font box offers (with the document's theme fonts, and the one shown now). */
+/**
+ * The fonts the font box offers (with the document's theme fonts, and the one shown now):
+ * Office's and the web's common ones. A font the machine lacks shows in a substitute; the
+ * document keeps its name.
+ */
 const FONTS = [
   "Aptos",
+  "Aptos Display",
   "Arial",
+  "Arial Black",
+  "Arial Narrow",
+  "Bahnschrift",
+  "Book Antiqua",
+  "Bookman Old Style",
   "Calibri",
+  "Calibri Light",
   "Cambria",
+  "Candara",
+  "Century Gothic",
+  "Comic Sans MS",
+  "Consolas",
+  "Constantia",
+  "Corbel",
   "Courier New",
+  "Franklin Gothic Medium",
+  "Garamond",
   "Georgia",
+  "Gill Sans MT",
+  "Helvetica",
+  "Impact",
+  "Lucida Console",
+  "Lucida Sans Unicode",
+  "Palatino Linotype",
+  "Segoe UI",
+  "Tahoma",
   "Times New Roman",
+  "Trebuchet MS",
   "Verdana",
 ];
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
@@ -947,6 +1049,8 @@ const GROUPS: Item[][] = [
       enabled: hasTextblock,
       colors: {
         options: TEXT_COLORS,
+        columns: 10,
+        custom: true,
         value: (state) => colorAt(state, "textColor"),
         pick: setTextColor,
       },
@@ -958,6 +1062,7 @@ const GROUPS: Item[][] = [
       enabled: hasTextblock,
       colors: {
         options: HIGHLIGHTS,
+        columns: 5,
         value: (state) => colorAt(state, "highlight"),
         pick: setHighlight,
       },
@@ -1151,6 +1256,8 @@ const GROUPS: Item[][] = [
       enabled: inTable,
       colors: {
         options: SHADINGS,
+        columns: 10,
+        custom: true,
         value: (state) => {
           const fill = (cellAt(state)?.attrs.shading as { fill?: string } | null)?.fill;
           return fill && fill.toLowerCase() !== "auto" ? `#${fill.toLowerCase()}` : null;
@@ -1705,7 +1812,7 @@ export function FoliToolbar({
       return;
     }
     if (item.actions && !actionsOf(item, body).length) return;
-    if (item.colors && !item.colors.options.length) return;
+    if (item.colors && !paletteOf(item.colors, editor.state).length) return;
     if (item.colors || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
@@ -2232,7 +2339,7 @@ export function FoliToolbar({
                   !state?.enabled ||
                   (item.dialog === "picture" && state?.value === "insert" && !upload) ||
                   (item.actions !== undefined && actionsOf(item, body).length === 0) ||
-                  item.colors?.options.length === 0;
+                  (item.colors !== undefined && paletteOf(item.colors, editor.state).length === 0);
                 if (item.render) {
                   return (
                     <CustomItem
@@ -2394,7 +2501,7 @@ export function FoliToolbar({
                     </span>
                   );
                 }
-                const options = item.colors?.options;
+                const options = item.colors && paletteOf(item.colors, editor.state);
                 if (!options || !item.colors) return button;
                 const { pick } = item.colors;
                 return (
@@ -2404,6 +2511,7 @@ export function FoliToolbar({
                       <ColorMenu
                         label={trLabel(item.label)}
                         options={options}
+                        columns={item.colors.columns}
                         current={state?.value ?? null}
                         onPick={(color, pointer) => {
                           editor.run(pick(color));
@@ -2664,14 +2772,20 @@ function AppDialog({
   );
 }
 
+/** A color menu's palette for `state`. */
+const paletteOf = (colors: ToolbarColorMenu["colors"], state: EditorState) =>
+  typeof colors.options === "function" ? colors.options(state) : colors.options;
+
 /**
  * A color menu (WAI-ARIA menu with radio items): the current color checked and focused on
- * open; arrow keys, Home and End move; Enter or Space (or a click) picks; Escape closes it back
- * to its button, Tab closes it and moves on; leaving it (a click elsewhere) closes it.
+ * open; arrow keys, Home and End move (in a grid, Left and Right along a row, Up and Down along
+ * a column); Enter or Space (or a click) picks; Escape closes it back to its button, Tab closes
+ * it and moves on; leaving it (a click elsewhere) closes it.
  */
 function ColorMenu({
   label,
   options,
+  columns,
   current,
   onPick,
   onClose,
@@ -2679,6 +2793,8 @@ function ColorMenu({
 }: {
   label: string;
   options: readonly ToolbarColor[];
+  /** With it, the colors are swatches in a grid this wide, under the null entries. */
+  columns?: number | undefined;
   current: string | null;
   onPick: (color: string | null, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;
@@ -2687,21 +2803,44 @@ function ColorMenu({
 }) {
   const t = useT();
   const items = useRef<(HTMLButtonElement | null)[]>([]);
-  const checked = Math.max(
-    0,
-    options.findIndex((option) => option.color === current),
-  );
+  // One entry checked, also when two swatches have the same color.
+  const checked = options.findIndex((option) => option.color === current);
+  const grid = columns !== undefined && columns > 0;
+  const rows = options.flatMap((option, i) => (grid && option.color === null ? [i] : []));
+  const swatches = options.flatMap((option, i) => (grid && option.color === null ? [] : [i]));
+  // The entries in the order shown: the rows, the swatches, "More colors…".
+  const order = [...rows, ...swatches, ...(onCustom ? [options.length] : [])];
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, on open.
   useEffect(() => {
-    items.current[checked]?.focus();
+    items.current[checked >= 0 ? checked : (order[0] ?? 0)]?.focus();
   }, []);
 
+  const nameOf = (option: ToolbarColor) => {
+    const name = t(option.name as ToolbarMessage);
+    if (option.shade === undefined) return name;
+    const percent = Math.abs(option.shade);
+    return `${name}, ${option.shade > 0 ? t("Lighter {percent}%", { percent }) : t("Darker {percent}%", { percent })}`;
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
-    const count = options.length + (onCustom ? 1 : 0);
-    const at = items.current.indexOf(event.target as HTMLButtonElement);
-    const moves: Record<string, number> = {
-      ArrowDown: (at + 1) % count,
-      ArrowUp: (at - 1 + count) % count,
+    const count = order.length;
+    const at = order.indexOf(items.current.indexOf(event.target as HTMLButtonElement));
+    const step = (by: number) => (at + by + count) % count;
+    const first = rows.length;
+    const end = rows.length + swatches.length;
+    const inGrid = grid && at >= first && at < end;
+    // Up and Down in the grid: the swatch above or below, or out of the grid at its edge.
+    const vertical = (by: number) => {
+      const to = at + by;
+      if (to >= first && to < end) return to;
+      if (to >= end) return end % count;
+      return first > 0 ? first - 1 : count - 1;
+    };
+    const moves: Record<string, number | undefined> = {
+      ArrowDown: inGrid ? vertical(columns as number) : step(1),
+      ArrowUp: inGrid ? vertical(-(columns as number)) : step(-1),
+      ArrowRight: inGrid ? step(1) : undefined,
+      ArrowLeft: inGrid ? step(-1) : undefined,
       Home: 0,
       End: count - 1,
     };
@@ -2710,7 +2849,7 @@ function ColorMenu({
     event.stopPropagation();
     if (next !== undefined) {
       event.preventDefault();
-      items.current[next]?.focus();
+      items.current[order[next] as number]?.focus();
     } else if (event.key === "Escape") {
       event.preventDefault();
       onClose(true);
@@ -2718,6 +2857,36 @@ function ColorMenu({
       // Back to the button, then the browser's Tab moves on from it (out of the toolbar).
       onClose(true);
     }
+  };
+
+  const entry = (i: number) => {
+    const option = options[i] as ToolbarColor;
+    const name = nameOf(option);
+    const cell = grid && option.color !== null;
+    return (
+      <button
+        key={i}
+        ref={(element) => {
+          items.current[i] = element;
+        }}
+        type="button"
+        role="menuitemradio"
+        aria-checked={i === checked}
+        aria-label={cell ? name : undefined}
+        title={cell ? name : undefined}
+        tabIndex={-1}
+        className={cell ? "foli-menu-cell" : "foli-menu-item"}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => onPick(option.color, event.detail > 0)}
+      >
+        <span
+          className="foli-menu-swatch"
+          aria-hidden="true"
+          style={{ background: option.color ?? "transparent" }}
+        />
+        {!cell && name}
+      </button>
+    );
   };
 
   return (
@@ -2730,28 +2899,20 @@ function ColorMenu({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose(false);
       }}
     >
-      {options.map((option, i) => (
-        <button
-          key={option.name}
-          ref={(element) => {
-            items.current[i] = element;
-          }}
-          type="button"
-          role="menuitemradio"
-          aria-checked={option.color === current}
-          tabIndex={-1}
-          className="foli-menu-item"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={(event) => onPick(option.color, event.detail > 0)}
-        >
-          <span
-            className="foli-menu-swatch"
-            aria-hidden="true"
-            style={{ background: option.color ?? "transparent" }}
-          />
-          {t(option.name as ToolbarMessage)}
-        </button>
-      ))}
+      {grid ? (
+        <>
+          {rows.map(entry)}
+          <div
+            role="none"
+            className="foli-menu-grid"
+            style={{ gridTemplateColumns: `repeat(${columns}, auto)` }}
+          >
+            {swatches.map(entry)}
+          </div>
+        </>
+      ) : (
+        swatches.map(entry)
+      )}
       {onCustom && (
         <button
           ref={(element) => {
