@@ -160,6 +160,11 @@ export interface FoliToolbarProps {
    */
   comments?: boolean | undefined;
   /**
+   * The Font box also lists the fonts installed on the machine (Chromium browsers): opening it
+   * the first time asks the browser's permission. Default true; false never asks.
+   */
+  localFonts?: boolean | undefined;
+  /**
    * Where an inserted picture's image file goes (`EditorViewOptions.upload`): with it, "Picture"
    * inserts one from a file; without it, it only edits a selected picture.
    */
@@ -978,11 +983,30 @@ const FONTS = [
 /** The Font box's entries: the theme's fonts, `FONTS`, and the machine's once it lets us read them. */
 const fontOptions = (state: EditorState) => {
   const theme = wordContext(state)?.envelope.theme?.fonts;
-  const names = [theme?.minor.latin, theme?.major.latin, ...FONTS, ...localFontFamilies()];
-  return [...new Set(names.filter((n): n is string => !!n))]
-    .sort((a, b) => a.localeCompare(b))
+  const minor = theme?.minor.latin;
+  const major = theme?.major.latin;
+  const families = localFontFamilies();
+  // Read after every transaction: built again only when its inputs change (hundreds of fonts).
+  const last = fontCache;
+  if (last && last.minor === minor && last.major === major && last.families === families)
+    return last.options;
+  const names = [minor, major, ...FONTS, ...families];
+  const options = [...new Set(names.filter((n): n is string => !!n))]
+    .sort(collator.compare)
     .map((name) => ({ value: name, label: name }));
+  fontCache = { minor, major, families, options };
+  return options;
 };
+const collator = new Intl.Collator();
+let fontCache: {
+  minor: string | undefined;
+  major: string | undefined;
+  families: readonly string[];
+  options: { value: string; label: string }[];
+} | null = null;
+/** Keys that open a box's list (not the arrows that step its value on Windows). */
+const OPEN_KEYS = new Set([" ", "Enter", "F4"]);
+const NO_FONTS: readonly string[] = [];
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
 const REVIEW_VIEWS = [
@@ -1602,6 +1626,7 @@ export function FoliToolbar({
   label: givenLabel,
   className,
   comments = false,
+  localFonts = true,
   upload,
   items: givenGroups,
   tabs: allTabs,
@@ -1667,10 +1692,11 @@ export function FoliToolbar({
   }, [stableGroups, comments, body]);
   const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   // The Font box lists the machine's fonts once read: at once when already allowed.
-  useSyncExternalStore(subscribeLocalFonts, localFontFamilies, localFontFamilies);
+  // The server renders none (hydration matches); the client re-renders when they come.
+  useSyncExternalStore(subscribeLocalFonts, localFontFamilies, () => NO_FONTS);
   useEffect(() => {
-    void loadLocalFonts(false);
-  }, []);
+    if (localFonts) void loadLocalFonts(false);
+  }, [localFonts]);
   const [focused, setActive] = useState(0);
   const buttons = useRef<(HTMLElement | null)[]>([]);
   // `overflow="menu"`: how many groups fit the row (null: not known yet, or `"wrap"`); the rest
@@ -2396,14 +2422,16 @@ export function FoliToolbar({
                         pointer.current = true;
                         stepped.current = false;
                         // Opening the built-in Font box asks for the machine's fonts (a gesture).
-                        if (select.options === fontOptions) void loadLocalFonts(true);
+                        if (localFonts && select.options === fontOptions) void loadLocalFonts(true);
                       }}
                       onKeyDown={(event) => {
                         pointer.current = false;
-                        // Keys that open or step the box, not the toolbar's Left and Right past it.
+                        // Keys that open the list (Alt+Down too), not the arrows that step it: a
+                        // prompt taking the focus would drop the stepped value.
                         if (
+                          localFonts &&
                           select.options === fontOptions &&
-                          (STEP_KEYS.has(event.key) || [" ", "Enter", "F4"].includes(event.key))
+                          (OPEN_KEYS.has(event.key) || (event.altKey && event.key === "ArrowDown"))
                         )
                           void loadLocalFonts(true);
                         // Alt+Down opens the list, and on Apple platforms the arrows do: a pick

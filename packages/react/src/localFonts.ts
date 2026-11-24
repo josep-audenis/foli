@@ -40,7 +40,8 @@ export async function loadLocalFonts(gesture: boolean): Promise<void> {
     families = [...new Set(fonts.map((font) => font.family))];
     for (const listener of listeners) listener();
   } catch {
-    // Refused, or not allowed here (a frame without the permission): the box's own fonts.
+    // Refused, or not allowed here (a frame without the permission): the box's own fonts. Not
+    // asked again this page (`asked` stays): a refusal is the user's answer, not a hiccup.
   }
 }
 

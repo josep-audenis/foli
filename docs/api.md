@@ -133,7 +133,7 @@ Word's controls: paragraph style (with Word's Heading 1 to 3 when the document h
 them yet), font and size boxes (the font box: the document's theme fonts, about thirty common
 ones, and, in Chromium browsers, the fonts installed on the machine: opening the box the first
 time asks the browser's permission to read them, `queryLocalFonts`; once allowed they are
-listed at once on later visits) · bold, italic, underline, strikethrough, link, text color,
+listed at once on later visits; `localFonts={false}` never asks) · bold, italic, underline, strikethrough, link, text color,
 highlight · align left, center, align right, justify, line spacing · bulleted list, numbered
 list (pressed inside one), decrease and increase indent (list levels, else half-inch stops) ·
 New comment (with `comments`: on the selection, written in the pane), Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),

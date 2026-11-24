@@ -196,6 +196,11 @@ export interface FoliToolbarProps {
      */
     comments?: boolean | undefined;
     /**
+     * The Font box also lists the fonts installed on the machine (Chromium browsers): opening it
+     * the first time asks the browser's permission. Default true; false never asks.
+     */
+    localFonts?: boolean | undefined;
+    /**
      * Where an inserted picture's image file goes (`EditorViewOptions.upload`): with it, "Picture"
      * inserts one from a file; without it, it only edits a selected picture.
      */
@@ -497,7 +502,7 @@ export declare const defaultToolbarTabs: readonly (ToolbarTab & {
     /** Arrays only, no captioned groups: `tab.items.map((group) => group.filter(…))` works. */
     readonly items: readonly (readonly ToolbarItem[])[];
 })[];
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label: givenLabel, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts

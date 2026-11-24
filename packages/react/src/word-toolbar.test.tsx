@@ -156,7 +156,9 @@ describe("FoliToolbar on a schema v3 document", () => {
     // Not yet allowed: no prompt until the user opens the box.
     await act(async () => {});
     expect(query).not.toHaveBeenCalled();
+    // Passing it, or stepping its value, does not ask.
     fireEvent.keyDown(select("Font"), { key: "ArrowRight" });
+    fireEvent.keyDown(select("Font"), { key: "ArrowDown" });
     expect(query).not.toHaveBeenCalled();
     await act(async () => {
       fireEvent.mouseDown(select("Font"));
@@ -168,6 +170,21 @@ describe("FoliToolbar on a schema v3 document", () => {
     // Asked once a page.
     fireEvent.mouseDown(select("Font"));
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("never asks for the machine's fonts with localFonts={false}", async () => {
+    const query = vi.fn(async () => [{ family: "Zapfino" }]);
+    vi.stubGlobal("queryLocalFonts", query);
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+      resetLocalFonts();
+    });
+    render(<FoliToolbar editor={createEditor({ document: document3 })} localFonts={false} />);
+    await act(async () => {
+      fireEvent.mouseDown(select("Font"));
+      fireEvent.keyDown(select("Font"), { key: "Enter" });
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it("inserts Word's horizontal line: a paragraph's bottom border", () => {
