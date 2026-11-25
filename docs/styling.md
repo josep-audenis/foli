@@ -33,10 +33,10 @@ the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it 
 | `--foli-focus-ring`                | `#2367dc`                                                  | focus outline, pressed border   |
 | `--foli-error-color`               | `#b3261e`                                                  | link dialog: invalid URL        |
 | `--foli-ribbon-contextual`         | `#7a2e9e`                                                  | tabs of the selection (ribbon)  |
-| `--foli-dialog-input-height`       | `32px`                                                     | dialog fields and buttons       |
-| `--foli-dialog-radius`             | `4px`                                                      | dialog fields and buttons       |
-| `--foli-dialog-primary-background` | `transparent`                                              | dialog main button (Apply, OK)  |
-| `--foli-dialog-primary-color`      | `var(--foli-toolbar-color)`                                | dialog main button text         |
+| `--foli-dialog-input-height`       | `32px`                                                     | dialog inputs and buttons       |
+| `--foli-dialog-radius`             | `4px`                                                      | dialog inputs and buttons       |
+| `--foli-dialog-primary-background` | `transparent`                                              | dialog and panel submit button  |
+| `--foli-dialog-primary-color`      | `currentcolor`                                             | dialog main button text         |
 | `--foli-dialog-primary-border`     | `var(--foli-border-color)`                                 | dialog main button border       |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change (the

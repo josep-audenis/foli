@@ -22,7 +22,7 @@
   --foli-dialog-radius: 4px;
   /* The main button's defaults match the others; set these to make it stand out. */
   --foli-dialog-primary-background: transparent;
-  --foli-dialog-primary-color: var(--foli-toolbar-color);
+  --foli-dialog-primary-color: currentcolor;
   --foli-dialog-primary-border: var(--foli-border-color);
 }
 
@@ -415,7 +415,7 @@
 }
 
 .foli-find-panel select {
-  min-height: 32px;
+  min-height: var(--foli-dialog-input-height);
 }
 
 .foli-find-option {
