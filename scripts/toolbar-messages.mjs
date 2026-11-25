@@ -24,6 +24,8 @@ const patterns = [
   // mark("bold", "Bold", "B") and align("start", "Align left", …)
   new RegExp(`\\b(?:mark|align)\\(\\s*"[^"]*",\\s*${string}`, "g"),
   new RegExp(`\\bmark\\(\\s*"[^"]*",\\s*"[^"]*",\\s*${string}`, "g"),
+  // the ribbon's group captions: group("Font", …)
+  new RegExp(`\\bgroup\\(\\s*${string}`, "g"),
   // a letter for an icon (A for text color); symbols (•, №) are not words
   /\bicon:\s*"([A-Z])"/g,
   // [value, label] pairs (section starts, note formats)
