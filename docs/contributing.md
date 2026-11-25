@@ -270,8 +270,9 @@ them, the same way.
    (`pnpm examples`), then runs `pnpm check`, publishes every version not yet on npm with
    [provenance](https://docs.npmjs.com/generating-provenance-statements), then tags every
    current version that is on npm and has no tag yet (`@folijs/core@0.1.0`…) and pushes the
-   tags. A failed run can be re-run: published versions are skipped, and their missing tags
-   are added. Run on another branch, the workflow runs the Windows job only: try it there after
+   tags, then creates a GitHub Release for each tag that has none, its notes the version's
+   `CHANGELOG.md` section (`@folijs/core` marked Latest). A failed run can be re-run: published
+   versions are skipped, and their missing tags and releases are added. Run on another branch, the workflow runs the Windows job only: try it there after
    changing the tests or the workflow.
 
 The owner set up, once (done before 0.1.0; repeat when a token expires or moves):
