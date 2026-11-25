@@ -12,6 +12,7 @@
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
 import { Fragment, Slice } from "../model/index.js";
+import { Mapping } from "../transform/stepmap.js";
 import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
@@ -748,10 +749,22 @@ function resolveAndNext(resolveChange: Command): Command {
     if (!resolveChange(state, (tr) => (resolved = tr))) return nextChangeWrapping(state, dispatch);
     if (!dispatch || !resolved) return true;
     const tr = resolved;
-    const after = state.apply(tr);
+    const { state: after, transactions } = state.applyTransaction(tr);
+    // Plugins may add steps of their own (a comment whose reference went loses its anchors):
+    // the next change is found after them, and selected in `tr`, before them.
+    const back = new Mapping(
+      transactions
+        .slice(1)
+        .flatMap((t) => t.mapping.maps)
+        .reverse()
+        .map((map) => map.invert()),
+    );
     // From where the resolved change was: the change right there next.
-    const at = tr.mapping.map(state.selection.from, -1);
-    const target = stopFrom(after, at, at, true, true, true);
+    const at = transactions
+      .slice(1)
+      .reduce((pos, t) => t.mapping.map(pos, -1), tr.mapping.map(state.selection.from, -1));
+    const found = stopFrom(after, at, at, true, true, true);
+    const target = found && { ...found, from: back.map(found.from), to: back.map(found.to) };
     dispatch(target ? select(tr, target) : tr);
     return true;
   };

@@ -258,6 +258,44 @@ describe("accepting and rejecting changes", () => {
     expect([editor.state.selection.from, editor.state.selection.to]).toEqual([2, 3]);
   });
 
+  it("selects the next change where it is after a plugin's own steps (a comment going)", () => {
+    // Deleting "Y" takes the comment's reference with it: the comments plugin removes the
+    // anchors before it too, so the change after it moves back two places.
+    const anchor = (type: string): NodeJSON => ({ type, attrs: { id: 0 } });
+    const reference: NodeJSON = { type: "commentReference", attrs: { id: 0 }, marks: [del(2)] };
+    const editor = createEditor({
+      document: {
+        schemaVersion: 5,
+        section: {},
+        defaults: {},
+        styles: STYLES,
+        numbering: { abstracts: [], instances: [] },
+        comments: [{ id: 0, author: "A", content: [p({}, text("note"))] }],
+        content: {
+          type: "doc",
+          content: [
+            p(
+              {},
+              anchor("commentStart"),
+              text("a"),
+              anchor("commentEnd"),
+              text("Y", [del(2)]),
+              reference,
+              text("b"),
+              text("X", [ins(1)]),
+            ),
+          ],
+        },
+      },
+    });
+    const y = trackedChanges(editor.state.doc).find((c) => c.kind === "deletion");
+    editor.select(y?.from ?? 0, y?.to ?? 0);
+    expect(editor.run(acceptChangeAndNext)).toBe(true);
+    expect(editor.getDocument().comments).toEqual([]);
+    const { from, to } = editor.state.selection;
+    expect(editor.state.doc.textBetween(from, to)).toBe("X");
+  });
+
   it("accepts only the selected part of a change", () => {
     const editor = editorOf(p({}, text("XXXXXX", [ins(1)])));
     editor.select(3, 5);
