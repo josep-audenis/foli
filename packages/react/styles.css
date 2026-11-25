@@ -17,6 +17,7 @@
   --foli-toolbar-hover: #f0f0ee;
   --foli-focus-ring: #2367dc;
   --foli-error-color: #b3261e;
+  --foli-ribbon-contextual: #7a2e9e;
 }
 
 .foli-canvas {
@@ -545,6 +546,16 @@
 .foli-ribbon-tab:focus-visible {
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: -2px;
+}
+/* A tab of the selection (Word's Table Design): its own color, after a gap. */
+.foli-ribbon-tab-contextual {
+  color: var(--foli-ribbon-contextual);
+}
+.foli-ribbon-tab-contextual[aria-selected="true"] {
+  border-bottom-color: var(--foli-ribbon-contextual);
+}
+.foli-ribbon-tab:not(.foli-ribbon-tab-contextual) + .foli-ribbon-tab-contextual {
+  margin-inline-start: 12px;
 }
 
 /* Forced colors (Windows High Contrast) drop backgrounds: mark pressed buttons another way. */

@@ -32,6 +32,7 @@ the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it 
 | `--foli-toolbar-pressed`    | `#dfe8f8`                                                  | pressed (active) toggle         |
 | `--foli-focus-ring`         | `#2367dc`                                                  | focus outline, pressed border   |
 | `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL        |
+| `--foli-ribbon-contextual`  | `#7a2e9e`                                                  | tabs of the selection (ribbon)  |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change (the
 document's, or CSS over it) re-flows the pages. The document's fonts must be available (loaded web fonts or installed ones); the view
@@ -59,7 +60,7 @@ the [theming guide](guides/theming.md). This page is the reference it builds on.
 | `.foli-toolbar`                         | `FoliToolbar` (`className` is added here)                                                                                                                                                                                                              |
 | `.foli-toolbar-button`                  | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                                                                                                                                   |
 | `.foli-toolbar-select`                  | each box (a `select`), plus `.foli-toolbar-<key>`                                                                                                                                                                                                      |
-| `.foli-ribbon-tabs`, `.foli-ribbon-tab` | inside `.foli-ribbon` (which takes `className` while there are tabs): the tab list over the toolbar and each tab (`.foli-ribbon-tab-<key>`; the selected one is `[aria-selected="true"]`); `.foli-ribbon-panel` wraps the toolbar while there are tabs |
+| `.foli-ribbon-tabs`, `.foli-ribbon-tab` | inside `.foli-ribbon` (which takes `className` while there are tabs): the tab list over the toolbar and each tab (`.foli-ribbon-tab-<key>`; the selected one is `[aria-selected="true"]`, a `contextual` one `.foli-ribbon-tab-contextual`); `.foli-ribbon-panel` wraps the toolbar while there are tabs |
 | `.foli-toolbar-dialog`                  | an app's dialog under the toolbar (`ToolbarDialog`; also `.foli-link-dialog` and `.foli-toolbar-<key>-dialog`)                                                                                                                                         |
 | `.foli-toolbar-group`                   | a group with a caption (`role="group"`): its items in `.foli-toolbar-group-items`, the caption in `.foli-toolbar-group-label`                                                                                                                          |
 | `.foli-toolbar-overflow`                | the toolbar with `overflow="menu"` (one row); `.foli-toolbar-more` its More button, `.foli-toolbar-more-panel` the panel of the groups that do not fit; `.foli-toolbar-measuring` while it measures                                                    |

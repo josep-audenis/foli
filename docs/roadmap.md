@@ -36,7 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0, `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1 on npm (2026-11-25)                                                                         |
-| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Claimed 2026-11-25: building 25.1-25.3                                                                                                                                                        |
+| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.3 (ribbon tabs, contextual tabs) done                                                                                                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3686,19 +3686,23 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
 
 ### Tasks
 
-- [ ] 25.1 The decisions above settled and written into api.md; the new props typed
-  (`ToolbarGroup.launcher`, an item's `size`, `ToolbarTab.contextual`, `collapsed`,
-  `keyTips`) and their strings added to `toolbarMessages`.
-- [ ] 25.2 `wordRibbonTabs`, captioned groups in Word's order, every built-in item reachable:
-  Home (Undo; Font; Paragraph; Styles; Editing: navigate), Insert (Tables; Illustrations;
-  Links; Header & Footer; Text: fields, controls; Pages: page and section breaks, horizontal
-  rule), Layout (Page Setup: section, columns; Paragraph: spacing, indents), References (Table
-  of Contents; Footnotes: notes, note options; Captions: cross-reference), Review (Comments;
-  Tracking; Changes), View (Show: navigation pane, field codes; review view).
-- [ ] 25.3 Contextual tabs: Table Design (table style, shading, header row) and Table Layout
-  (rows and columns, merge, delete, column width), new items made from the Table menu's
-  entries, while the selection is in a table; Picture Format (alt text, size, crop, rotation,
-  from the picture dialog's parts) while a picture is selected. The checks behind them exported for apps' own tabs.
+- [x] 25.1 The decisions above settled; each prop comes with the task that builds it (none
+  typed ahead of its behaviour). Decided: KeyTips as proposed (Alt pressed and released alone,
+  the focus in the ribbon or the document; `keyTips={false}` turns them off; a letter from the
+  item's label unless its `keyTip` says, Word's for the tabs). Groups shrink in two steps, not
+  four: large items become small, then a captioned group becomes one button opening its items;
+  rightmost first, then `overflow: "menu"` takes whole groups (the built-ins have text, not
+  icons, so an icon-only step would show nothing). A tab of the selection is `contextual: true`,
+  drawn in its own color, without the heading over it (Word 365 has none). Picture Format keeps
+  the picture dialog whole (alt text, size, crop and rotation are one dialog), with a quarter
+  turn left and right beside it.
+- [x] 25.2 `wordRibbonTabs` (api.md, Word ribbon): Home, Insert, Layout, References, Review,
+  View in captioned groups, every built-in item in them; 26 new built-ins in `toolbarItems`
+  (menus' entries as buttons: rows and columns, the dialogs, notes, fields, field codes, the
+  navigation pane, rotation), not in the default toolbar.
+- [x] 25.3 Contextual tabs: Table Design and Table Layout while the selection is in a table
+  (`selectionInTable` exported), Picture Format while a picture is selected;
+  `ToolbarTab.contextual` and `--foli-ribbon-contextual`.
 - [ ] 25.4 Large buttons and launchers: an item's `size: "large"` (icon over label, the
   group's height); a group's `launcher` opening a toolbar dialog (Page Setup, note options,
   insert table) or calling the app; keyboard and focus as for other items.
