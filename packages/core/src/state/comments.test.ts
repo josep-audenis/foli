@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
-import type { Step } from "../transform/steps.js";
+import { Fragment, type Mark, type MarkType, type NodeType, Slice } from "../model/index.js";
+import { ReplaceStep, type Step } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument } from "../v3/document.js";
 import { commentOnly, onlyCommentSteps } from "./comments.js";
 import { createEditor, type Editor } from "./editor.js";
 import { remote } from "./state.js";
+import { CommentStep } from "./word.js";
 
 const text = (value: string): NodeJSON => ({ type: "text", text: value });
 const p = (...content: NodeJSON[]): NodeJSON => ({
@@ -299,5 +301,38 @@ describe("comment-only mode", () => {
     expect(onlyCommentSteps(doc, steps)).toBe(false);
     // A step that does not apply to the document is refused, not thrown.
     expect(onlyCommentSteps(commenter([p()]).state.doc, steps)).toBe(false);
+  });
+  it("refuses forged anchors and other people's comments (review of 26.1)", () => {
+    const editor = commenter(
+      [p(text("Hello "), start(0), text("world"), end(0), ref(0))],
+      [{ id: 0, author: "Ana", content: note("Which?") }],
+    );
+    const { doc, schema } = editor.state;
+    const reference = schema.nodes.commentReference as NodeType;
+    const anchor = (attrs: Record<string, unknown>, marks: Mark[] = []) =>
+      new ReplaceStep(3, 3, new Slice(Fragment.from(reference.create(attrs, null, marks)), 0, 0));
+    // An anchor for no comment the steps add, or with marks or kept attributes.
+    expect(onlyCommentSteps(doc, [anchor({ id: 0 })])).toBe(false);
+    const add = new CommentStep(5, { id: 5, author: "Me", content: note("x") }, null, 1);
+    expect(onlyCommentSteps(doc, [anchor({ id: 5 }), add])).toBe(true);
+    expect(
+      onlyCommentSteps(doc, [anchor({ id: 5 }, [(schema.marks.bold as MarkType).create()]), add]),
+    ).toBe(false);
+    expect(onlyCommentSteps(doc, [anchor({ id: 5, attributes: { "w:x": "1" } }), add])).toBe(false);
+    // Removing another comment's anchors without deleting it.
+    expect(onlyCommentSteps(doc, [new ReplaceStep(14, 15, Slice.empty)])).toBe(false);
+    // With an author: no rewriting, deleting or forging Ana's comment; resolving it is fine.
+    const ana = comments(editor)[0] as CommentJSON;
+    const me = { author: "Me" };
+    const rewrite = new CommentStep(0, { ...ana, content: note("Mine now") }, ana, 0);
+    expect(onlyCommentSteps(doc, [rewrite])).toBe(true);
+    expect(onlyCommentSteps(doc, [rewrite], me)).toBe(false);
+    expect(onlyCommentSteps(doc, [new CommentStep(0, null, ana, 0)], me)).toBe(false);
+    expect(onlyCommentSteps(doc, [new CommentStep(0, { ...ana, done: true }, ana, 0)], me)).toBe(
+      true,
+    );
+    const forged = new CommentStep(5, { id: 5, author: "Boss", content: note("x") }, null, 1);
+    expect(onlyCommentSteps(doc, [anchor({ id: 5 }), forged], me)).toBe(false);
+    expect(onlyCommentSteps(doc, [anchor({ id: 5 }), add], me)).toBe(true);
   });
 });

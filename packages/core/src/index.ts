@@ -88,6 +88,7 @@ export {
   type CommentContent,
   type CommentMatch,
   type CommentOptions,
+  type CommentStepsOptions,
   type ControlInsertOptions,
   type ControlPropertiesPatch,
   type ControlRange,

@@ -92,7 +92,8 @@ describe("the authority (22.8)", () => {
   it("gives `authorize` its document: a commenter comments and edits nothing (26.1)", () => {
     const authority = createAuthority({
       document: DOCUMENT,
-      authorize: (clientID, steps, doc) => clientID !== 3 || onlyCommentSteps(doc, steps),
+      authorize: (clientID, steps, doc) =>
+        clientID !== 3 || onlyCommentSteps(doc, steps, { author: "C3" }),
     });
     const commenter = client(DOCUMENT, 3);
     commenter.select(1, 6);

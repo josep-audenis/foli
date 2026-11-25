@@ -40,6 +40,7 @@ export {
   addComment,
   type CommentContent,
   type CommentOptions,
+  type CommentStepsOptions,
   commentAnchors,
   commentOnly,
   deleteAllComments,

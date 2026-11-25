@@ -37,7 +37,7 @@ place that says what is in progress; check it before starting work.
 | 23 Agent editing parity   | ✅ Done                  | —                       | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                       | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
 | 25 Word ribbon            | In review                | `phase-25/word-ribbon`  | 25.1-25.8 merged (#282, #284, #285, #287); docs closing; 1.9.0 waits on the owner                                                                                                             |
-| 26 Comment-only mode      | In progress              | `phase-26/comment-only` | Asked for by the owner on 2026-11-25                                                                                                                                                          |
+| 26 Comment-only mode      | In review                | `phase-26/comment-only` | 26.1-26.3 built; release waits on owner                                                                                                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3773,14 +3773,17 @@ control (the app's server decides who may save; the filter keeps an honest clien
   flat `ReplaceStep` that inserts and removes nothing but comment anchors) and `commentOnly()`, a
   plugin whose `filterTransaction` refuses every other local transaction (received ones pass: the
   others still edit). `authorize` in `@folijs/collab` also gets the authority's document, so a
-  server can refuse a commenter's other steps with the same check.
-- [ ] 26.2 React: `FoliEditor`'s `commentOnly`: the canvas read-only (select, copy, find), the
+  server can refuse a commenter's other steps with the same check. After an agent's review:
+  inserted anchors must be plain and belong to a comment the same steps add, removed ones to a
+  comment they delete; `{ author }` limits a commenter to their own comments (and resolving).
+- [x] 26.2 React: `FoliEditor`'s `commentOnly`: the canvas read-only (select, copy, find), the
   `commentOnly()` plugin added, the toolbar's items off but "New comment", review navigation and
   the View tab (`FoliToolbar`'s `commentOnly`), the comments pane writing, `onlyOwnComments` on
   unless given. Tested: typing, paste, drop and shortcuts change nothing; a comment and a reply
   are made and undone.
-- [ ] 26.3 Docs (api.md, the React and collab READMEs, limitations), changesets; the playground
-  at `edit.html?comment-only`. Released with the next minor, with the owner's approval.
+- [x] 26.3 Docs (api.md, the React and collab READMEs, limitations), changesets; the playground
+  at `edit.html?comment-only` (checked in Chromium: Delete and typing change nothing, a comment
+  is made and deleted). Left: released with the next minor, with the owner's approval.
 
 ### Acceptance
 

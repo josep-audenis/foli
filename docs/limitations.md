@@ -372,6 +372,12 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   with formatting other than its paragraph style is not editable there, only replied to,
   resolved or deleted. A comment anchored inside content Foli keeps verbatim (an opaque block)
   stays: its anchors there cannot be removed.
+- Comment-only mode (`commentOnly`, 1.10) is enforced in the client by a transaction filter: an
+  app that lets untrusted users save checks their changes on its server (`onlyCommentSteps`).
+  Comments stay body-only, so a commenter cannot comment in headers, footers or notes. Without
+  `author`, the check lets any comment change through (the pane only hides Edit and Delete on
+  others'); with it, a commenter cannot delete their own comment once others replied to it, and
+  cannot undo deleting a comment whose anchors Word wrote with attributes Foli keeps.
 - Revisions carry no initials (Word has none); comments do.
 - Since 1.6, undo takes back a style, list definition, resource or control's properties added with
   an edit, with the edit (before, they stayed; not checked against what Word does). The tracking switch is the

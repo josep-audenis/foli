@@ -6,6 +6,7 @@
  * itself and may give up (`docs/keyboard.md`), recording each it gets (`e2e/keymaps.spec.ts`).
  */
 import {
+  commentOnly,
   createEditor,
   type Editor,
   type FoliDocument,
@@ -97,8 +98,11 @@ const OVERRIDABLE = [
   ...["Mod-Alt-f", "Mod-Alt-d", "Alt-Shift-n", "Mod-f", "Mod-h", "Mod-g", "F3", "Shift-F3"],
   "Mod-Shift-F5",
 ];
-const plugins =
-  new URLSearchParams(location.search).get("keys") === "override"
+// `?comment-only`: comment-only mode (26.x) put together by hand, as `FoliEditor`'s `commentOnly` does.
+const commenting = new URLSearchParams(location.search).has("comment-only");
+const plugins = [
+  ...(commenting ? [commentOnly()] : []),
+  ...(new URLSearchParams(location.search).get("keys") === "override"
     ? [
         new Plugin({
           keymap: Object.fromEntries(
@@ -106,9 +110,10 @@ const plugins =
           ),
         }),
       ]
-    : [];
+    : []),
+];
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user", plugins });
-let view = new EditorView(host, editor, { upload });
+let view = new EditorView(host, editor, { upload, editable: !commenting });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
@@ -123,13 +128,14 @@ const showToolbar = () => {
     <FoliToolbar
       editor={editor}
       comments
+      commentOnly={commenting}
       upload={upload}
       onClickCommand={() => view.focus()}
       {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
     />,
   );
-  commentsPane.render(<FoliComments editor={editor} />);
-  navigation.render(<FoliNavigation editor={editor} />);
+  commentsPane.render(<FoliComments editor={editor} onlyOwnComments={commenting} />);
+  navigation.render(<FoliNavigation editor={editor} readOnly={commenting} />);
 };
 showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */
@@ -148,7 +154,11 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
     trackChanges,
     plugins,
   });
-  view = new EditorView(host, editor, { upload, ...(images ? { resource: images.url } : {}) });
+  view = new EditorView(host, editor, {
+    upload,
+    editable: !commenting,
+    ...(images ? { resource: images.url } : {}),
+  });
   original = from;
   showToolbar();
 }

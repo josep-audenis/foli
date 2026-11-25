@@ -42,26 +42,27 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 Word's toolbar; schema v5 since 0.6.0): a document saved by 0.1.0 to 0.5.0 given to it is
 migrated (`parseDocument`), and what it reports is v5.
 
-| Prop              | Type                                                                                                     | Default      | Notes                                                                                                                                                                |
-| ----------------- | -------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initialContent`  | `EditorDocument`                                                                                         | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                                                                           |
-| `plugins`         | `readonly Plugin[]`                                                                                      | `[]`         | Other plugins later replace them in place (`editor.reconfigure`): document and undo stay.                                                                            |
-| `extensions`      | `readonly Extension[]`                                                                                   | `[]`         | Read once, on mount: other extensions later are ignored, with a dev warning; use a new `key`.                                                                        |
-| `author`          | `string`                                                                                                 | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                                                                                        |
-| `trackChanges`    | `boolean`                                                                                                | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                                                                                        |
-| `reviewView`      | `ReviewView`                                                                                             | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                                                                                        |
-| `onChange`        | `(change: FoliChange) => void`                                                                           | —            | After every content change made through transactions. Not for selection changes or `setDocument`.                                                                    |
-| `toolbar`         | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs` or `wordRibbonTabs`). |
-| `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —            | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                                       |
-| `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
-| `onlyOwnComments` | `boolean`                                                                                                | `false`      | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
-| `readOnly`        | `boolean`                                                                                                | `false`      | Read, select, copy; no editing. Disables the toolbar.                                                                                                                |
-| `placeholder`     | `string`                                                                                                 | `""`         | Shown while the document is empty.                                                                                                                                   |
-| `label`           | `string`                                                                                                 | `"Document"` | Accessible name of the editable area.                                                                                                                                |
-| `upload`          | `(file) => Promise<…>`                                                                                   | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too.                                                                  |
-| `resource`        | `(key, resource) => string \| null \| undefined`                                                         | —            | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box.                                                                  |
-| `className`       | `string`                                                                                                 | —            | Added to the `.foli-canvas` element.                                                                                                                                 |
-| `children`        | `ReactNode`                                                                                              | —            | Rendered between the toolbar and the pages, inside the editor's context.                                                                                             |
+| Prop              | Type                                                                                                     | Default       | Notes                                                                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initialContent`  | `EditorDocument`                                                                                         | empty A4      | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                                                                           |
+| `plugins`         | `readonly Plugin[]`                                                                                      | `[]`          | Other plugins later replace them in place (`editor.reconfigure`): document and undo stay.                                                                            |
+| `extensions`      | `readonly Extension[]`                                                                                   | `[]`          | Read once, on mount: other extensions later are ignored, with a dev warning; use a new `key`.                                                                        |
+| `author`          | `string`                                                                                                 | `"Author"`    | Read once: who edits (tracked changes are made in this name).                                                                                                        |
+| `trackChanges`    | `boolean`                                                                                                | `false`       | Read once: record edits as tracked changes (the toolbar turns it on and off).                                                                                        |
+| `reviewView`      | `ReviewView`                                                                                             | `"markup"`    | Read once: how tracked changes show (the toolbar changes it).                                                                                                        |
+| `onChange`        | `(change: FoliChange) => void`                                                                           | —             | After every content change made through transactions. Not for selection changes or `setDocument`.                                                                    |
+| `toolbar`         | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`        | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs` or `wordRibbonTabs`). |
+| `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                                       |
+| `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
+| `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
+| `readOnly`        | `boolean`                                                                                                | `false`       | Read, select, copy; no editing. Disables the toolbar.                                                                                                                |
+| `commentOnly`     | `boolean`                                                                                                | `false`       | Select, copy, find and comment; no other change. Read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin. 1.10.                       |
+| `placeholder`     | `string`                                                                                                 | `""`          | Shown while the document is empty.                                                                                                                                   |
+| `label`           | `string`                                                                                                 | `"Document"`  | Accessible name of the editable area.                                                                                                                                |
+| `upload`          | `(file) => Promise<…>`                                                                                   | —             | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too.                                                                  |
+| `resource`        | `(key, resource) => string \| null \| undefined`                                                         | —             | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box.                                                                  |
+| `className`       | `string`                                                                                                 | —             | Added to the `.foli-canvas` element.                                                                                                                                 |
+| `children`        | `ReactNode`                                                                                              | —             | Rendered between the toolbar and the pages, inside the editor's context.                                                                                             |
 
 `ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void; hint(target, options?): boolean }`
 (`hint`, 1.3: core's `hint` on its editor) (`editor.setDocument` takes
@@ -201,21 +202,22 @@ closes it and calls `onClickCommand` (the focus goes to the document, where the 
 Cancel returns the focus to the Table button. A change to the document or the selection closes
 it, and only one of the link and insert table dialogs is open at a time.
 
-| Prop                | Type                    | Default               | Notes                                                                                                          |
-| ------------------- | ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `editor`            | `Editor`                | context               |                                                                                                                |
-| `disabled`          | `boolean`               | `false`               | Pass it whenever the canvas is `readOnly`.                                                                     |
-| `onClickCommand`    | `() => void`            | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).                                            |
-| `label`             | `string`                | `"Formatting"`        | Accessible name.                                                                                               |
-| `comments`          | `boolean`               | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).                                          |
-| `upload`            | `(file) => Promise<…>`  | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own).                                      |
-| `items`             | `ToolbarGroups`         | `defaultToolbarItems` | The items, in groups (a separator between groups).                                                             |
-| `tabs`              | `readonly ToolbarTab[]` | —                     | Tabs over the toolbar, each with its groups of items, in place of `items` ([Toolbar tabs](#toolbar-tabs)).     |
-| `tab`, `defaultTab` | `string`                | the first tab         | The tab shown, by key: `tab` when the app decides, `defaultTab` only at first.                                 |
-| `onTabChange`       | `(key: string) => void` | —                     | Someone picked another tab.                                                                                    |
-| `overflow`          | `"wrap" \| "menu"`      | `"wrap"`              | What happens to items that do not fit: more rows, or one row and a More panel ([Overflow](#toolbar-overflow)). |
-| `messages`          | `ToolbarMessages`       | English               | The toolbar's strings in another language, each by its English text ([Toolbar messages](#toolbar-messages)).   |
-| `className`         | `string`                | —                     | Added to `.foli-toolbar`.                                                                                      |
+| Prop                | Type                    | Default               | Notes                                                                                                                     |
+| ------------------- | ----------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `editor`            | `Editor`                | context               |                                                                                                                           |
+| `disabled`          | `boolean`               | `false`               | Pass it whenever the canvas is `readOnly`.                                                                                |
+| `commentOnly`       | `boolean`               | `false`               | Every item off but New comment, Show changes as, previous and next change, Navigate, the navigation pane and field codes. |
+| `onClickCommand`    | `() => void`            | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).                                                       |
+| `label`             | `string`                | `"Formatting"`        | Accessible name.                                                                                                          |
+| `comments`          | `boolean`               | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).                                                     |
+| `upload`            | `(file) => Promise<…>`  | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own).                                                 |
+| `items`             | `ToolbarGroups`         | `defaultToolbarItems` | The items, in groups (a separator between groups).                                                                        |
+| `tabs`              | `readonly ToolbarTab[]` | —                     | Tabs over the toolbar, each with its groups of items, in place of `items` ([Toolbar tabs](#toolbar-tabs)).                |
+| `tab`, `defaultTab` | `string`                | the first tab         | The tab shown, by key: `tab` when the app decides, `defaultTab` only at first.                                            |
+| `onTabChange`       | `(key: string) => void` | —                     | Someone picked another tab.                                                                                               |
+| `overflow`          | `"wrap" \| "menu"`      | `"wrap"`              | What happens to items that do not fit: more rows, or one row and a More panel ([Overflow](#toolbar-overflow)).            |
+| `messages`          | `ToolbarMessages`       | English               | The toolbar's strings in another language, each by its English text ([Toolbar messages](#toolbar-messages)).              |
+| `className`         | `string`                | —                     | Added to `.foli-toolbar`.                                                                                                 |
 
 #### Toolbar items
 
@@ -674,9 +676,12 @@ accepted). `commentAnchors(doc)` gives each comment's range and reference positi
 Comment-only mode (1.10): `commentOnly()` is a plugin that refuses every local transaction
 changing more than comments, so typing, paste, drop and other commands change nothing while
 comments, replies, resolving, deleting and their undo work; received (collab) transactions pass.
-`onlyCommentSteps(doc, steps)` is its check: each step a `CommentStep` or a `ReplaceStep` in
-one textblock that inserts and removes only comment anchors. Not access control: a server checks
-what it receives (`authorize` below).
+`onlyCommentSteps(doc, steps, { author? })` is its check: each step a `CommentStep` or a
+`ReplaceStep` in one textblock that inserts and removes only comment anchors (inserted ones plain,
+for a comment the steps add; removed ones of a comment they delete). With `author`, a comment
+added or deleted must be that author's, and of others' comments only `done` may change
+(`commentOnly({ author })` takes it too). Not access control: a server checks what it receives
+(`authorize` below).
 Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's
 recorded formatting only when no other is there; in a selection, the selected part of each), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
@@ -1441,7 +1446,7 @@ The authority of a shared document (0.x, unstable; ADR-0012; [package README](..
   50 000 000); `log` in the options restores a stored log ending at `version`. A document nested
   deeper than 250 levels is refused (`too-large`). `authorize(clientID,
   steps, doc)` false refuses a client's steps; `doc` is the authority's document they apply to
-  (`onlyCommentSteps(doc, steps)` lets a commenter comment and nothing else, 26.1).
+  (`onlyCommentSteps(doc, steps, { author })` lets a commenter comment and nothing else, 26.1).
 - `authority.receive(message, clientID?)`: a client's `{ version, clientID, steps }`
   (`StepsMessage`, its JSON text or the parsed value) and the client id the app's connection
   authenticated (a message claiming another, or `AUTHORITY`, is refused). `Received`: `{ ok: true, version, broadcast }` (`Broadcast`:

@@ -320,21 +320,60 @@ export const deleteAllComments: Command = (state, dispatch) => {
   return true;
 };
 
-const anchorsOnly = (fragment: Fragment) => {
+/** Whether every node of `fragment` is a comment anchor of one of `ids` (and, when `plain`, has no marks or kept attributes). */
+const anchorsOf = (fragment: Fragment, ids: ReadonlySet<number>, plain: boolean) => {
   let only = true;
   fragment.forEach((node) => {
-    if (!ANCHORS.has(node.type.name)) only = false;
+    if (
+      !ANCHORS.has(node.type.name) ||
+      !ids.has(node.attrs.id as number) ||
+      (plain && (node.marks.length > 0 || node.attrs.attributes != null))
+    )
+      only = false;
   });
   return only;
 };
 
+/** A comment without its `done`: what resolving or reopening leaves alone. */
+const undone = (comment: CommentJSON) => JSON.stringify({ ...comment, done: undefined });
+
+/** Whether a `CommentStep` changes only what `author` may change (see `onlyCommentSteps`). */
+function allowedFor(author: string, { comment, previous }: CommentStep): boolean {
+  if (!previous) return comment?.author === author;
+  if (!comment) return previous.author === author;
+  if (previous.author === author) return comment.author === author;
+  return undone(previous) === undone(comment);
+}
+
+export interface CommentStepsOptions {
+  /**
+   * The user sending the steps: a comment they add or delete must be theirs, and of anyone
+   * else's they may only resolve or reopen. Without it, any comment may change.
+   */
+  author?: string;
+}
+
 /**
  * Whether `steps`, applied to `doc` in order, change only comments: each a `CommentStep` (a
  * comment's content, thread or state) or a `ReplaceStep` inside one textblock that inserts and
- * removes nothing but comment anchors. What a comment-only user may send (`commentOnly()`, and a
- * collab authority's `authorize`). False for a step that does not apply to `doc`.
+ * removes nothing but comment anchors: inserted ones without marks or kept attributes, for a
+ * comment the steps add; removed ones of a comment the steps delete. What a comment-only user may
+ * send (`commentOnly()`, and a collab authority's `authorize`, with `author` there). False for a
+ * step that does not apply to `doc`.
  */
-export function onlyCommentSteps(doc: Node, steps: readonly Step[]): boolean {
+export function onlyCommentSteps(
+  doc: Node,
+  steps: readonly Step[],
+  options: CommentStepsOptions = {},
+): boolean {
+  const added = new Set<number>();
+  const deleted = new Set<number>();
+  for (const step of steps)
+    if (step instanceof CommentStep) {
+      if (options.author !== undefined && !allowedFor(options.author, step)) return false;
+      if (!step.previous && step.comment) added.add(step.id);
+      if (step.previous && !step.comment) deleted.add(step.id);
+    }
   let current = doc;
   for (const step of steps) {
     if (step instanceof ReplaceStep) {
@@ -345,7 +384,8 @@ export function onlyCommentSteps(doc: Node, steps: readonly Step[]): boolean {
       if (slice.openStart || slice.openEnd || !$from.sameParent($to)) return false;
       if (!$from.parent.inlineContent && (slice.size || from < to)) return false;
       const removed = $from.parent.content.cut($from.parentOffset, $to.parentOffset);
-      if (!anchorsOnly(slice.content) || !anchorsOnly(removed)) return false;
+      if (!anchorsOf(slice.content, added, true) || !anchorsOf(removed, deleted, false))
+        return false;
     } else if (!(step instanceof CommentStep)) return false;
     const result = step.apply(current);
     if (!result.doc) return false;
@@ -358,12 +398,14 @@ export function onlyCommentSteps(doc: Node, steps: readonly Step[]): boolean {
  * Comment-only mode: refuses every local transaction that changes more than comments
  * (`onlyCommentSteps`), so typing, paste, drop and commands change nothing, while making,
  * replying to, resolving and deleting comments (and undoing them) work. Received transactions
- * (collab) pass: the others still edit. It keeps a client honest, it is not access control: a
- * server checks the steps it receives itself (`authorize` in `@folijs/collab`).
+ * (collab) pass: the others still edit. With `author`, as `onlyCommentSteps`: give it the
+ * author a server checks with, so the client refuses what the server would. It keeps a client
+ * honest, it is not access control: a server checks the steps it receives itself (`authorize` in
+ * `@folijs/collab`).
  */
-export function commentOnly(): Plugin {
+export function commentOnly(options: CommentStepsOptions = {}): Plugin {
   return new Plugin({
-    filterTransaction: (tr) => isRemote(tr) || onlyCommentSteps(tr.before, tr.steps),
+    filterTransaction: (tr) => isRemote(tr) || onlyCommentSteps(tr.before, tr.steps, options),
   });
 }
 

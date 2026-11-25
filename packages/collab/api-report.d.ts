@@ -202,8 +202,8 @@ export interface AuthorityOptions<P = unknown> {
     limits?: AuthorityLimits;
     /**
      * The app's say: false refuses a client's steps (a read-only user) as `unauthorized`. `doc` is the
-     * authority's document the steps apply to: `onlyCommentSteps(doc, steps)` (core) lets a
-     * comment-only user comment and nothing else.
+     * authority's document the steps apply to: `onlyCommentSteps(doc, steps, { author })` (core)
+     * lets a comment-only user comment and nothing else.
      */
     authorize?: (clientID: ClientID, steps: readonly Step[], doc: Node) => boolean;
     /** The extensions the clients' editors have: their nodes, marks and steps. */
