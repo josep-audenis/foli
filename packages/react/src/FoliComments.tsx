@@ -135,13 +135,20 @@ function plain(c: CommentJSON): boolean {
         Object.keys(p.attrs ?? {}).every((key) => key === "style") &&
         (p.content ?? []).every(
           (n) =>
-            n.type === "text" && (!n.marks?.length || commentMentions({ content: [n] }).length > 0),
+            n.type === "text" &&
+            // A mention's link only: other marks on it would be lost when saved.
+            (!n.marks?.length ||
+              (n.marks.length === 1 && commentMentions({ content: [n] }).length > 0)),
         ),
     )
   );
 }
 
-/** A line of text, `@Name` of each of `people` in it linked as their mention. */
+/**
+ * A line of text, `@Name` of each of `people` in it linked as their mention; of two people
+ * with one name, the first in `people` (shortcut: by name, not by where each was picked; track
+ * pick positions if two people of one name in one comment matter).
+ */
 function lineContent(line: string, people: readonly CommentMention[]): NodeJSON[] {
   // The longest name first: "@Ana Maria" is not "@Ana" and the rest.
   const names = [...people].sort((a, b) => b.name.length - a.name.length);
@@ -149,7 +156,15 @@ function lineContent(line: string, people: readonly CommentMention[]): NodeJSON[
   let text = "";
   for (let i = 0; i < line.length; ) {
     const person =
-      line[i] === "@" ? names.find((p) => p.name && line.startsWith(`@${p.name}`, i)) : undefined;
+      line[i] === "@"
+        ? names.find(
+            (p) =>
+              p.name &&
+              line.startsWith(`@${p.name}`, i) &&
+              // The whole name: "@Anabel" is not "@Ana" and "bel".
+              !/[\p{L}\p{N}]/u.test(line[i + p.name.length + 1] ?? ""),
+          )
+        : undefined;
     if (person) {
       if (text) content.push({ type: "text", text });
       text = "";
@@ -441,7 +456,8 @@ export function FoliComments({
             }}
             mentions={mentions}
             onSave={(text, picked) => {
-              const people = [...commentMentions(c), ...picked];
+              // The latest pick first: it wins over an earlier one of the same name.
+              const people = [...picked].reverse().concat(commentMentions(c));
               if (!run(editComment(c.id, contentLike(c, text, people)))) return false;
               tell(
                 c,
@@ -470,7 +486,8 @@ export function FoliComments({
             onSave={(text, picked) => {
               if (text.trim()) {
                 const before = new Set(commentsNow().map((saved) => saved.id));
-                if (!run(replyToComment(comment.id, contentLike(comment, text, picked))))
+                const people = [...picked].reverse();
+                if (!run(replyToComment(comment.id, contentLike(comment, text, people))))
                   return false;
                 tell(
                   undefined,
@@ -677,23 +694,27 @@ function CommentForm({
   useEffect(() => field.current?.focus(), []);
   // The people for the query: at once from a list, else when the function answers (the last
   // query's answer only).
+  // Read when the query changes: an inline list or function does not search again per render.
+  const source = useRef(mentions);
+  source.current = mentions;
+  const typed = query?.query;
   useEffect(() => {
-    if (!mentions || !query) {
-      setFound([]);
-      return;
-    }
+    const mentions = source.current;
+    // A new query: the last one's people go until this one's answer comes.
+    setFound([]);
+    if (!mentions || typed === undefined) return;
     let current = true;
     const show = (people: readonly CommentMention[]) => {
       if (!current) return;
       setFound(people.slice(0, SUGGESTIONS));
       setActive(0);
     };
-    if (typeof mentions !== "function") show(matching(mentions, query.query));
-    else Promise.resolve(mentions(query.query)).then(show, () => show([]));
+    if (typeof mentions !== "function") show(matching(mentions, typed));
+    else Promise.resolve(mentions(typed)).then(show, () => show([]));
     return () => {
       current = false;
     };
-  }, [mentions, query?.query, query]);
+  }, [typed]);
   const open = !!query && found.length > 0;
   const follow = (element: HTMLTextAreaElement) =>
     setQuery(mentions ? mentionQuery(element.value, element.selectionStart) : null);
@@ -707,7 +728,7 @@ function CommentForm({
     setText(next);
     setQuery(null);
     const at = query.from + written.length;
-    requestAnimationFrame?.(() => {
+    globalThis.requestAnimationFrame?.(() => {
       element.focus();
       element.setSelectionRange(at, at);
     });
@@ -722,7 +743,13 @@ function CommentForm({
       e.preventDefault();
       const step = e.key === "ArrowDown" ? 1 : -1;
       setActive((i) => (i + step + found.length) % found.length);
-    } else if (open && (e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey) {
+    } else if (
+      open &&
+      (e.key === "Enter" || e.key === "Tab") &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey
+    ) {
       e.preventDefault();
       pick(found[active] as CommentMention);
     } else if (e.key === "Escape") {

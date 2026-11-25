@@ -171,7 +171,9 @@ describe("FoliComments in FoliEditor", () => {
     expect((again as HTMLTextAreaElement).value).toBe("Ask @Jo Doe ");
     fireEvent.change(again, { target: { value: "Ask @Jo Doe today" } });
     fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
-    expect(editor.getDocument().comments[0]?.content[0]?.content?.[1]?.marks).toBeTruthy();
+    expect(editor.getDocument().comments[0]?.content[0]?.content?.[1]?.marks).toEqual([
+      { type: "link", attrs: { href: "mailto:jo@example.com" } },
+    ]);
     expect(onMention).toHaveBeenCalledTimes(1);
   });
 
@@ -193,6 +195,30 @@ describe("FoliComments in FoliEditor", () => {
     const reply = editor.getDocument().comments[1];
     expect(reply?.parent).toBe(0);
     expect(onMention.mock.calls).toEqual([[{ comment: reply, people: [ann] }]]);
+  });
+
+  it("links a whole name only; a stale answer does not show", async () => {
+    const ana = { name: "Ana", email: "a@example.com" };
+    let late: (people: (typeof ana)[]) => void = () => {};
+    const find = (query: string) =>
+      query === "a" ? new Promise<(typeof ana)[]>((done) => (late = done)) : [ana];
+    const editor = setup([{ id: 0, author: "Me", content: note("Old") }], false, {
+      mentions: find,
+    });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Me" }));
+    const field = within(pane()).getByRole("textbox", { name: "Comment" });
+    fireEvent.change(field, { target: { value: "@a" } });
+    fireEvent.change(field, { target: { value: "@an" } });
+    fireEvent.mouseDown(await within(pane()).findByRole("option"));
+    // The answer for "@a" comes after: not shown.
+    await act(async () => late([{ name: "Zed", email: "z@example.com" }]));
+    expect(within(pane()).queryByRole("option")).toBeNull();
+    fireEvent.change(field, { target: { value: "@Ana and @Anabel" } });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
+    expect(editor.getDocument().comments[0]?.content[0]?.content?.map((n) => n.text)).toEqual([
+      "@Ana",
+      " and @Anabel",
+    ]);
   });
 
   it("closes the suggestions on Escape, then the form", () => {

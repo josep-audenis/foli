@@ -376,7 +376,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   that must tell people about comments from agents or collab peers reads them with
   `commentMentions`. Word's people part (`people.xml`) is not written, so Word shows a mention
   as a mailto link rather than its contact card. The resolved list is in document order (no
-  date of resolving is kept); deleted comments are not kept anywhere.
+  date of resolving is kept); deleted comments are not kept anywhere. Two people of one name in
+  one comment are told apart by name only: every `@Name` links the latest picked. A Word mention
+  with other formatting than its link is not editable in the pane (replied to, resolved, deleted).
 - Comment-only mode (`commentOnly`, 1.10) is enforced in the client by a transaction filter: an
   app that lets untrusted users save checks their changes on its server (`onlyCommentSteps`).
   Comments stay body-only, so a commenter cannot comment in headers, footers or notes. Without

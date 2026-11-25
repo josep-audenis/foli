@@ -3840,6 +3840,9 @@ thread someone is in, keeping deleted comments.
 - After an agent's review of 27.1–27.2: a thread focused when it left its list is forgotten, so
   switching to the other list does not mark it again. Checked in Chromium (edit.html): `@ch`
   suggests Chloé, Enter picks, the save logs her address from `onMention`.
+- After a review of 27.3: a name links only whole (`@Anabel` is not `@Ana`), the latest pick wins
+  over an earlier person of the same name, a slow answer for an old query never shows, a mention
+  with other marks is not editable (they would be lost), Shift+Enter is a new line.
 
 ### Acceptance
 
