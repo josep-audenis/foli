@@ -110,7 +110,10 @@ keymap binding those names runs first, so they are overridable too.
 
 `FoliToolbar` with tabs (a ribbon) also hears Ctrl+F1 (Ctrl on every platform; macOS may keep
 it for its own keyboard access, so the collapse button is the way there) anywhere on the page: it collapses the ribbon to its tabs, or pins it again (the
-ribbon that has the focus, else the first one mounted). On a collapsed ribbon's tab, Enter,
+ribbon that has the focus, else the first one mounted). Alt pressed and released alone shows its KeyTips (letters for its
+tabs, then for the shown tab's items; Escape steps back), unless `keyTips={false}`: Firefox's
+menu bar does not open on that Alt, and screen readers that use Alt keep their own Alt chords
+(not checked with NVDA or JAWS). On a collapsed ribbon's tab, Enter,
 Space or ArrowDown shows its panel over the document (ArrowDown goes into it), Escape puts it
 away.
 

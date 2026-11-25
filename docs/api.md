@@ -416,6 +416,19 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
   (`.foli-ribbon-collapse`, "Collapse the ribbon" or "Pin the ribbon", `aria-expanded`)
   collapse or pin it. With `collapsed` the app decides: those only call `onCollapsedChange`.
   Without tabs these do nothing.
+- With `overflow: "menu"`, a row too narrow first draws its large buttons small, a group at a
+  time from the end of the row, then puts whole groups under More; a wider row draws them large
+  again (measured again at each width, not while typing).
+- `keyTips` (default true; with tabs): Word's KeyTips. Alt pressed and released alone, with the
+  focus in the ribbon or in the document (else the first ribbon mounted's), shows a letter under
+  each tab (`.foli-keytips`, `.foli-keytip`, `aria-hidden`); a tab's letter shows that tab
+  (over the document when collapsed) with a letter under each of its items; an item's letter
+  presses it (a box takes the focus; an item in the More panel opens it first). Escape steps
+  back; any other key, a press, or the window losing the focus puts them away. A tab's letter is
+  its `keyTip`, else Word's (Home H, Insert N, Layout P, References S, Review R, View W), else
+  the first free letter of its name; an item's is its `keyTip`, else the first free letter of
+  its text (translated), else any free letter or digit. The keys are caught before the
+  document's, so the letter is not typed. `keyTips={false}` leaves Alt to the browser.
 - `contextual: true` on a `ToolbarTab` draws it as a tab of the selection
   (`.foli-ribbon-tab-contextual`, in `--foli-ribbon-contextual`, apart from the tabs before
   it); give it a `visible` too. It is a tab as any other for the keyboard and screen readers.

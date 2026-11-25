@@ -239,6 +239,13 @@ export interface FoliToolbarProps {
     /** Someone collapsed or pinned the ribbon. */
     onCollapsedChange?: ((collapsed: boolean) => void) | undefined;
     /**
+     * With tabs: Word's KeyTips. Alt pressed and released alone (the focus in the ribbon or the
+     * document) shows a letter on each tab; a tab's letter shows that tab with a letter on each
+     * of its items, an item's letter presses it (or focuses its box). Escape steps back; any other
+     * key or a press puts them away. Default true.
+     */
+    keyTips?: boolean | undefined;
+    /**
      * What happens to items that do not fit the toolbar's width: `"wrap"` (the default) puts
      * them on more rows; `"menu"` keeps one row and puts the groups that do not fit, whole, in a
      * panel under a "More" button at its end. The arrow keys go on into the panel (it opens) and
@@ -290,6 +297,8 @@ export interface ToolbarTab {
      * (`.foli-ribbon-tab-contextual`, in the accent color). Usually with `visible`.
      */
     readonly contextual?: boolean | undefined;
+    /** Its KeyTip, a letter or digit (default: Word's for its key, else one from its label). */
+    readonly keyTip?: string | undefined;
 }
 /** What every toolbar item has. */
 interface ToolbarItemBase {
@@ -307,6 +316,8 @@ interface ToolbarItemBase {
      * dialog buttons; a box or an app's control stays as it is.
      */
     readonly size?: "large" | undefined;
+    /** Its KeyTip, a letter or digit (default: one from its label that its tab has free). */
+    readonly keyTip?: string | undefined;
     /**
      * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
      * a menu, whether it has entries; any other kind, always (a box's `pick` is not dry-run).
@@ -540,7 +551,7 @@ export declare const selectionInTable: (state: EditorState) => boolean;
  * `FoliEditor`'s `toolbar`); a tab, a group or an item is left out or added as with any tabs.
  */
 export declare const wordRibbonTabs: readonly ToolbarTab[];
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand: givenClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, collapsed: givenCollapsed, defaultCollapsed, onCollapsedChange, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand: givenClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, collapsed: givenCollapsed, defaultCollapsed, onCollapsedChange, keyTips, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts

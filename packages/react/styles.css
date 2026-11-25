@@ -704,6 +704,32 @@
 .foli-ribbon-panel[hidden] {
   display: none;
 }
+/* KeyTips (Alt): a letter under each tab, then under each item of the tab shown. */
+.foli-keytips {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.foli-keytip {
+  position: absolute;
+  min-width: 16px;
+  padding: 1px 4px;
+  transform: translate(-50%, -60%);
+  border: 1px solid var(--foli-border-color);
+  border-radius: 3px;
+  background: var(--foli-toolbar-color);
+  color: var(--foli-toolbar-background);
+  font:
+    600 11px / 1.2 system-ui,
+    sans-serif;
+  text-align: center;
+}
+@media (forced-colors: active) {
+  .foli-keytip {
+    border-color: CanvasText;
+  }
+}
 /* Collapsed: a tab's panel shown over the document. */
 .foli-ribbon-floating > .foli-ribbon-panel {
   position: absolute;
