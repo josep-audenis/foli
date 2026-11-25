@@ -12,6 +12,7 @@
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
 import { Fragment, Slice } from "../model/index.js";
+import { Mapping } from "../transform/stepmap.js";
 import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
@@ -661,39 +662,115 @@ export const acceptAllChanges = (author?: string): Command =>
 export const rejectAllChanges = (author?: string): Command =>
   command(false, everything, author === undefined ? {} : { author }, true);
 
-/** Selects the next (or previous) change after (before) the selection. */
-function goTo(forward: boolean): Command {
-  return (state, dispatch) => {
-    // Where the review view hides deleted content, only what it shows.
-    const hidden = (trackState(state)?.view ?? "markup") !== "markup";
-    const changes = trackedChanges(state.doc, wordContext(state)?.envelope.section).filter(
-      (c) => !hidden || (c.kind !== "deletion" && c.kind !== "paragraphDeletion"),
-    );
-    const { from, to } = state.selection;
-    // In document order (by start, then end), the first one after (before) the selection.
-    const target = forward
-      ? changes.find((c) => c.from > from || (c.from === from && c.to > to))
-      : [...changes].reverse().find((c) => c.from < from || (c.from === from && c.to < to));
-    if (!target) return false;
-    if (dispatch) {
+/**
+ * Meta of a transaction that went to a change: the view scrolls to the selection with room
+ * around it, as find does, not just into the window's edge.
+ */
+export const revealSelection = "revealSelection";
+
+/** The changes `nextChange` stops at, each with the selection it makes, in that order. */
+function stops(state: EditorState): { change: Change; from: number; to: number }[] {
+  // Where the review view hides deleted content, only what it shows.
+  const hidden = (trackState(state)?.view ?? "markup") !== "markup";
+  return trackedChanges(state.doc, wordContext(state)?.envelope.section)
+    .filter((c) => !hidden || (c.kind !== "deletion" && c.kind !== "paragraphDeletion"))
+    .map((change) => {
       // A paragraph mark: the caret at the end of its paragraph.
       const mark =
-        target.kind === "paragraphInsertion" ||
-        target.kind === "paragraphDeletion" ||
-        target.kind === "sectionFormatting";
-      const head = mark ? target.from : target.to;
-      // A table's, row's or cell's change: the node, which accepting then resolves alone.
-      dispatch(
-        state.tr.setSelection(
-          NODE_KINDS.has(target.kind)
-            ? NodeSelection.create(state.doc, target.from)
-            : TextSelection.create(state.doc, target.from, head),
-        ),
-      );
-    }
+        change.kind === "paragraphInsertion" ||
+        change.kind === "paragraphDeletion" ||
+        change.kind === "sectionFormatting";
+      return { change, from: change.from, to: mark ? change.from : change.to };
+    })
+    .sort((a, b) => a.from - b.from || a.to - b.to);
+}
+
+/**
+ * The stop after (`forward`) or before the selection `from..to`, by the selection each stop makes
+ * (not the change's range: a paragraph mark's caret is at its start, and would be found again);
+ * `at`: one making this very selection counts too. With `wrap`, past the end the first one (the
+ * last one going back).
+ */
+function stopFrom(
+  state: EditorState,
+  from: number,
+  to: number,
+  forward: boolean,
+  wrap: boolean,
+  at = false,
+) {
+  const all = stops(state);
+  const order = (s: { from: number; to: number }) => s.from - from || s.to - to;
+  const found = forward
+    ? all.find((s) => order(s) > 0 || (at && order(s) === 0))
+    : [...all].reverse().find((s) => order(s) < 0 || (at && order(s) === 0));
+  return found ?? (wrap ? (forward ? all[0] : all.at(-1)) : undefined);
+}
+
+/** Selects `stop` in `tr` (of `doc`), marked to be scrolled to. */
+function select(tr: Transaction, stop: { change: Change; from: number; to: number }): Transaction {
+  // A table's, row's or cell's change: the node, which accepting then resolves alone.
+  return tr
+    .setSelection(
+      NODE_KINDS.has(stop.change.kind)
+        ? NodeSelection.create(tr.doc, stop.from)
+        : TextSelection.create(tr.doc, stop.from, stop.to),
+    )
+    .setMeta(revealSelection, true);
+}
+
+/** Selects the next (or previous) change after (before) the selection. */
+function goTo(forward: boolean, wrap: boolean): Command {
+  return (state, dispatch) => {
+    const { from, to } = state.selection;
+    const target = stopFrom(state, from, to, forward, wrap);
+    if (!target) return false;
+    if (dispatch) dispatch(select(state.tr, target));
     return true;
   };
 }
 
-export const nextChange: Command = goTo(true);
-export const previousChange: Command = goTo(false);
+/** Selects the next change after the selection; false after the last one. */
+export const nextChange: Command = goTo(true, false);
+/** Selects the previous change before the selection; false before the first one. */
+export const previousChange: Command = goTo(false, false);
+/** `nextChange`, going on from the first change after the last one (Word's Next). */
+export const nextChangeWrapping: Command = goTo(true, true);
+/** `previousChange`, going on from the last change before the first one. */
+export const previousChangeWrapping: Command = goTo(false, true);
+
+/**
+ * Word's Accept (Reject) button: accepts (rejects) the change at the caret or the changes selected,
+ * and selects the next change, in one step. Where there is none to resolve, goes to the next one.
+ */
+function resolveAndNext(resolveChange: Command): Command {
+  return (state, dispatch) => {
+    let resolved: Transaction | undefined;
+    if (!resolveChange(state, (tr) => (resolved = tr))) return nextChangeWrapping(state, dispatch);
+    if (!dispatch || !resolved) return true;
+    const tr = resolved;
+    const { state: after, transactions } = state.applyTransaction(tr);
+    // Plugins may add steps of their own (a comment whose reference went loses its anchors):
+    // the next change is found after them, and selected in `tr`, before them.
+    const back = new Mapping(
+      transactions
+        .slice(1)
+        .flatMap((t) => t.mapping.maps)
+        .reverse()
+        .map((map) => map.invert()),
+    );
+    // From where the resolved change was: the change right there next.
+    const at = transactions
+      .slice(1)
+      .reduce((pos, t) => t.mapping.map(pos, -1), tr.mapping.map(state.selection.from, -1));
+    const found = stopFrom(after, at, at, true, true, true);
+    const target = found && { ...found, from: back.map(found.from), to: back.map(found.to) };
+    dispatch(target ? select(tr, target) : tr);
+    return true;
+  };
+}
+
+/** Accepts the change at the caret, or the changes selected, and selects the next change. */
+export const acceptChangeAndNext: Command = resolveAndNext(acceptChange);
+/** Rejects the change at the caret, or the changes selected, and selects the next change. */
+export const rejectChangeAndNext: Command = resolveAndNext(rejectChange);

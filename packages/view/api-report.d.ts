@@ -462,6 +462,7 @@ export declare class EditorView {
     private readonly onMatchScroll;
     /** What find shows here, marked; a story's view is told by its page's view. */
     private showFound;
+    /** `below`: room kept under it, in px (a change gone to gets as much as above). */
     private scrollToRange;
     /** Opens story `id` where a page shows it, leaving the focus where it is. */
     private openForReveal;

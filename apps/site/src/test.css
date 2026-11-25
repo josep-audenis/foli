@@ -634,3 +634,7 @@ body.try {
     display: none;
   }
 }
+
+.try-changes {
+  color: var(--ink-2);
+}

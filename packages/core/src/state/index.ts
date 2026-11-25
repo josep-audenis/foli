@@ -216,15 +216,20 @@ export {
 export {
   acceptAllChanges,
   acceptChange,
+  acceptChangeAndNext,
   acceptChangesById,
   type Change,
   type ChangeFilter,
   type ChangeKind,
   nextChange,
+  nextChangeWrapping,
   previousChange,
+  previousChangeWrapping,
   rejectAllChanges,
   rejectChange,
+  rejectChangeAndNext,
   rejectChangesById,
+  revealSelection,
   trackedChanges,
 } from "./review.js";
 export {

@@ -1,4 +1,4 @@
-import type { EditorDocument } from "@folijs/core";
+import { type EditorDocument, type EditorState, trackedChanges } from "@folijs/core";
 import type { DocxPackage, PackageImages } from "@folijs/docx";
 import {
   FoliEditor,
@@ -25,21 +25,34 @@ interface Opened {
   trackChanges: boolean;
 }
 
-/** Word's status bar: page count and word count, read from the rendered pages. */
-function useStatus(host: React.RefObject<HTMLDivElement | null>) {
-  const [status, setStatus] = useState({ pages: 0, words: 0 });
+/** Which tracked change the selection is on (1-based, 0 for none), of how many. */
+function changesAt(state: EditorState) {
+  const changes = trackedChanges(state.doc);
+  const { from, to } = state.selection;
+  const at = changes.findIndex((c) => c.from <= from && to <= Math.max(c.to, c.from));
+  return { change: at + 1, changes: changes.length };
+}
+
+/** Word's status bar: page count and word count, read from the rendered pages; the changes. */
+function useStatus(
+  host: React.RefObject<HTMLDivElement | null>,
+  editorRef: React.RefObject<FoliEditorHandle | null>,
+) {
+  const [status, setStatus] = useState({ pages: 0, words: 0, change: 0, changes: 0 });
   const update = useCallback(() => {
     // After the view has laid out the change; a timeout, not rAF, so a background tab updates too.
     setTimeout(() => {
       const el = host.current;
       if (!el) return;
       const text = el.querySelector(".foli-content")?.textContent ?? "";
+      const editor = editorRef.current?.editor;
       setStatus({
         pages: el.querySelectorAll(".foli-page").length,
         words: text.split(/\s+/).filter(Boolean).length,
+        ...(editor ? changesAt(editor.state) : { change: 0, changes: 0 }),
       });
     });
-  }, [host]);
+  }, [host, editorRef]);
   return [status, update] as const;
 }
 
@@ -56,7 +69,7 @@ function Try() {
   const [saved, setSaved] = useState<{ same: number; total: number; changed: string[] } | null>(
     null,
   );
-  const [status, update] = useStatus(host);
+  const [status, update] = useStatus(host, editorRef);
 
   // An opened file shows only images it contains: one linked from the web stays a box, unfetched.
   const resource = useCallback<NonNullable<FoliEditorProps["resource"]>>(
@@ -109,7 +122,12 @@ function Try() {
     update();
     const timer = setTimeout(update, 500);
     document.fonts?.ready.then(update);
-    return () => clearTimeout(timer);
+    // The change count follows the selection too (Next change, a click), not only edits.
+    const unsubscribe = editorRef.current?.editor.subscribe(update);
+    return () => {
+      clearTimeout(timer);
+      unsubscribe?.();
+    };
   }, [update, opened]);
 
   async function open(event: ChangeEvent<HTMLInputElement>) {
@@ -249,6 +267,13 @@ function Try() {
           {status.pages} {status.pages === 1 ? "page" : "pages"}
         </span>
         <span>{status.words} words</span>
+        {status.changes > 0 && (
+          <span className="try-changes">
+            {status.change
+              ? `Change ${status.change} of ${status.changes}`
+              : `${status.changes} ${status.changes === 1 ? "change" : "changes"}`}
+          </span>
+        )}
         <span className="try-message" role="status">
           {message}
         </span>
