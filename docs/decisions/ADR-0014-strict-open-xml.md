@@ -18,32 +18,39 @@ Strict packages of the fetched corpus (71 distinct; LibreOffice, docx4j, the Ope
 
 **Same in both:** the parts, their names and their structure; every content type; the OPC names
 (`[Content_Types].xml`, the `Relationships` namespace, the core-properties relationship type,
-`dc`/`dcterms`); Microsoft's extensions (`w14`, `w15`, `w16*`, `mc`, `wp14`, their relationship
-types such as `stylesWithEffects`, `diagramDrawing`, `commentsExtended`); half-point sizes
-(`w:sz`), eighths of a point (border `w:sz`), EMU (`wp:extent`, `wp:posOffset`), angles.
+`dc`/`dcterms`); Microsoft's extensions (`w14`, `w15`, `w16*`, `mc`, their relationship types
+such as `stylesWithEffects`, `diagramDrawing`, `commentsExtended`), but for the text of the four
+`wp14` percentages below; half-point sizes (`w:sz`), eighths of a point (border `w:sz`), EMU
+(`wp:extent`, `wp:posOffset`), angles. `schemaLibrary` is written in its Transitional name by
+Word even in a Strict package (the corpus also has its Strict name): read in both, written as
+Word writes it.
+
+**What Word leaves out of a Strict save** (so a twin's import differs there, and nothing is to be
+translated): `w:shapeDefaults` and `w:hdrShapeDefaults` (settings), `w:useFELayout` (the
+glossary's settings), and a `w:charset` it has no IANA name for (Symbol's `02`).
 
 **Namespaces** (`http://purl.oclc.org/ooxml/` + the left column ↔ the right):
 
-| Strict (under `purl.oclc.org/ooxml/`) | Transitional                                                  |
-| ------------------------------------- | ------------------------------------------------------------- |
-| `wordprocessingml/main`               | `schemas.openxmlformats.org/wordprocessingml/2006/main`       |
-| `officeDocument/relationships`        | `…/officeDocument/2006/relationships`                         |
-| `officeDocument/math`                 | `…/officeDocument/2006/math`                                  |
-| `officeDocument/extendedProperties`   | `…/officeDocument/2006/extended-properties`                   |
-| `officeDocument/docPropsVTypes`       | `…/officeDocument/2006/docPropsVTypes`                        |
-| `officeDocument/customXml`            | `…/officeDocument/2006/customXml`                             |
-| `officeDocument/bibliography`         | `…/officeDocument/2006/bibliography`                          |
-| `officeDocument/sharedTypes`          | `…/officeDocument/2006/sharedTypes`                           |
-| `schemaLibrary/main`                  | `schemas.openxmlformats.org/schemaLibrary/2006/main`          |
-| `drawingml/main`                      | `schemas.openxmlformats.org/drawingml/2006/main`              |
-| `drawingml/wordprocessingDrawing`     | `…/drawingml/2006/wordprocessingDrawing`                      |
-| `drawingml/picture`                   | `…/drawingml/2006/picture` (also `a:graphicData@uri`'s value) |
-| `drawingml/chart`                     | `…/drawingml/2006/chart` (also `a:graphicData@uri`)           |
-| `drawingml/diagram`                   | `…/drawingml/2006/diagram` (also `a:graphicData@uri`)         |
-| `drawingml/lockedCanvas`              | `…/drawingml/2006/lockedCanvas` (also `a:graphicData@uri`)    |
-| `drawingml/chartDrawing`              | `…/drawingml/2006/chartDrawing`                               |
-| `drawingml/compatibility`             | `…/drawingml/2006/compatibility`                              |
-| `spreadsheetml/main`                  | `schemas.openxmlformats.org/spreadsheetml/2006/main`          |
+| Strict (under `purl.oclc.org/ooxml/`) | Transitional                                                     |
+| ------------------------------------- | ---------------------------------------------------------------- |
+| `wordprocessingml/main`               | `schemas.openxmlformats.org/wordprocessingml/2006/main`          |
+| `officeDocument/relationships`        | `…/officeDocument/2006/relationships`                            |
+| `officeDocument/math`                 | `…/officeDocument/2006/math`                                     |
+| `officeDocument/extendedProperties`   | `…/officeDocument/2006/extended-properties`                      |
+| `officeDocument/docPropsVTypes`       | `…/officeDocument/2006/docPropsVTypes`                           |
+| `officeDocument/customXml`            | `…/officeDocument/2006/customXml`                                |
+| `officeDocument/bibliography`         | `…/officeDocument/2006/bibliography`                             |
+| `officeDocument/sharedTypes`          | `…/officeDocument/2006/sharedTypes`                              |
+| `schemaLibrary/main`                  | `schemas.openxmlformats.org/schemaLibrary/2006/main` (read only) |
+| `drawingml/main`                      | `schemas.openxmlformats.org/drawingml/2006/main`                 |
+| `drawingml/wordprocessingDrawing`     | `…/drawingml/2006/wordprocessingDrawing`                         |
+| `drawingml/picture`                   | `…/drawingml/2006/picture` (also `a:graphicData@uri`'s value)    |
+| `drawingml/chart`                     | `…/drawingml/2006/chart` (also `a:graphicData@uri`)              |
+| `drawingml/diagram`                   | `…/drawingml/2006/diagram` (also `a:graphicData@uri`)            |
+| `drawingml/lockedCanvas`              | `…/drawingml/2006/lockedCanvas` (also `a:graphicData@uri`)       |
+| `drawingml/chartDrawing`              | `…/drawingml/2006/chartDrawing`                                  |
+| `drawingml/compatibility`             | `…/drawingml/2006/compatibility`                                 |
+| `spreadsheetml/main`                  | `schemas.openxmlformats.org/spreadsheetml/2006/main`             |
 
 **Relationship types:** `purl.oclc.org/ooxml/officeDocument/relationships/<name>` ↔
 `schemas.openxmlformats.org/officeDocument/2006/relationships/<name>`, the same `<name>` but
@@ -51,23 +58,27 @@ types such as `stylesWithEffects`, `diagramDrawing`, `commentsExtended`); half-p
 `metadata/thumbnail` ↔ the package's `schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail`.
 One corpus file mixes a Transitional type into a Strict package: read as it is.
 
-**Values and names** (Strict ↔ Transitional; R read, W written back in Strict's form, K kept
+**Values and names** (Strict ↔ Transitional; R read in Strict's form, W written back in it, K kept
 as read):
 
-| Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Strict                                                                        | Transitional                               |     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------ | --- |
-| `w:document@w:conformance` (and `w:glossaryDocument`)                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `strict`                                                                      | absent                                     | R W |
-| Twips: `w:ind@start,end,left,right,hanging,firstLine`, `w:spacing@before,after,line` (`w:pPr`), `w:spacing@val` (`w:rPr`), `w:tab@pos`, `w:pgSz@w,h`, `w:pgMar@*`, `w:cols@space`, `w:col@w,space`, `w:gridCol@w`, `w:trHeight@val`, `w:framePr@w,h,hSpace,vSpace,x,y`, `w:tblpPr@leftFromText,rightFromText,topFromText,bottomFromText,tblpX,tblpY`, `w:lnNumType@distance`, `w:defaultTabStop@val`, `w:hyphenationZone@val`, `w:drawingGrid*Spacing@val`, `w:drawingGrid*Origin@val`, `w:object@dxaOrig,dyaOrig` | `36pt`, `35.40pt` (any universal measure: `mm`, `cm`, `in`, `pt`, `pc`, `pi`) | `720`, `708`                               | R W |
-| Widths (`w:tblW`, `w:tcW`, `w:tblInd`, `w:tblCellSpacing`, `w:wBefore`, `w:wAfter`, the margins of `w:tblCellMar`/`w:tcMar`), by `w:type`                                                                                                                                                                                                                                                                                                                                                                          | `dxa`: `5.40pt`; `pct`: `50%`                                                 | `108`; `2500` (fiftieths)                  | R W |
-| `w:zoom@w:percent`; `w:w@w:val` (`w:rPr`, text scale)                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `110%`                                                                        | `110`                                      | R W |
-| `w:jc@val`, `w:lvlJc@val`, `w:tab@val`                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `start`, `end`                                                                | `left`, `right`                            | R W |
-| `w:ind@start,end,startChars,endChars`                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `start`, `end`, `startChars`, `endChars`                                      | `left`, `right`, `leftChars`, `rightChars` | R W |
-| `w:start`, `w:end` in `w:tblBorders`, `w:tcBorders`, `w:tblCellMar`, `w:tcMar`                                                                                                                                                                                                                                                                                                                                                                                                                                     | `w:start`, `w:end`                                                            | `w:left`, `w:right`                        | R W |
-| DrawingML percentages: `a:tint`, `a:shade`, `a:alpha`, `a:alphaMod`, `a:alphaOff`, `a:lumMod`, `a:lumOff`, `a:satMod`, `a:satOff`, `a:hueMod`, `a:spcPct` (`@val`); `a:gs@pos`; `a:miter@lim`; `a:alphaModFix@amt`; `a:lum@bright,contrast`; `a:srcRect`, `a:fillRect`, `a:fillToRect`, `a:tileRect` (`@l,t,r,b`); `a:scrgbClr@r,g,b`; `a:rPr`, `a:defRPr` (`@baseline`)                                                                                                                                           | `50%`                                                                         | `50000` (thousandths)                      | R W |
-| `w:tblLook@w:val`, `w:cnfStyle@w:val`                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | absent (the named attributes only)                                            | hex, beside the named ones                 | W   |
-| `w:charset`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `@w:characterSet` (`iso-8859-1`)                                              | `@w:val` (`00`)                            | K   |
-| `mc:Ignorable` of a part's root                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | lists `wne`                                                                   | does not                                   | K   |
-| VML (`v:`, `o:`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | not allowed                                                                   | allowed                                    | —   |
+| Where                                                                                                                                                                                                                                                                                                                                                                    | Strict                                                          | Transitional                               |     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------ | --- |
+| `w:document@w:conformance` (not on `w:glossaryDocument`: Word does not write it there)                                                                                                                                                                                                                                                                                   | `strict`                                                        | absent                                     | R W |
+| Twips Word writes as points: `w:ind@start,end,left,right,hanging,firstLine`, `w:spacing@before,after,line`, `w:tab@pos`, `w:pgSz@w,h`, `w:pgMar@*`, `w:cols@space`, `w:col@w,space`, `w:defaultTabStop@val`, `w:hyphenationZone@val`, `w:drawingGridHorizontalSpacing@val`, `w:drawingGridVerticalSpacing@val`, `w:object@dxaOrig,dyaOrig`                               | `36pt`, `35.40pt`                                               | `720`, `708`                               | R W |
+| Twips Word writes as numbers in Strict too: `w:gridCol@w`, `w:spacing@val` (`w:rPr`), `w:trHeight@val`, `w:framePr@w,h,hSpace,vSpace,x,y`, `w:tblpPr@*FromText,tblpX,tblpY`, `w:lnNumType@distance`, `w:drawingGrid*Origin@val`                                                                                                                                          | a number, or a universal measure from another writer            | a number                                   | R   |
+| Half-points: `w:sz`, `w:szCs`, `w:kern`, `w:position` (`@val`)                                                                                                                                                                                                                                                                                                           | a number, or a universal measure                                | a number                                   | R   |
+| Widths (`w:tblW`, `w:tcW`, `w:tblInd`, `w:tblCellSpacing`, `w:wBefore`, `w:wAfter`, the margins of `w:tblCellMar`/`w:tcMar`), by `w:type`                                                                                                                                                                                                                                | `dxa`: `5.40pt`; `pct`: `50%`                                   | `108`; `2500` (fiftieths)                  | R W |
+| `w:zoom@w:percent`                                                                                                                                                                                                                                                                                                                                                       | `110%`                                                          | `110`                                      | R W |
+| `w:w@w:val` (`w:rPr`, text scale)                                                                                                                                                                                                                                                                                                                                        | `110%`, or a number                                             | `110`                                      | R   |
+| `w:jc@val`, `w:lvlJc@val`, `w:tab@val`                                                                                                                                                                                                                                                                                                                                   | `start`, `end`                                                  | `left`, `right`                            | R W |
+| `w:ind@start,end,startChars,endChars`                                                                                                                                                                                                                                                                                                                                    | `start`, `end`, `startChars`, `endChars`                        | `left`, `right`, `leftChars`, `rightChars` | R W |
+| `w:start`, `w:end` in `w:tblBorders`, `w:tcBorders`, `w:tblCellMar`, `w:tcMar`                                                                                                                                                                                                                                                                                           | `w:start`, `w:end`                                              | `w:left`, `w:right`                        | R W |
+| DrawingML percentages: `a:tint`, `a:shade`, `a:alpha`, `a:alphaMod`, `a:alphaOff`, `a:lumMod`, `a:lumOff`, `a:satMod`, `a:satOff`, `a:hueMod`, `a:spcPct` (`@val`); `a:gs@pos`; `a:miter@lim`; `a:alphaModFix@amt`; `a:lum@bright,contrast`; `a:srcRect`, `a:fillRect`, `a:fillToRect`, `a:tileRect` (`@l,t,r,b`); `a:scrgbClr@r,g,b`; `a:rPr`, `a:defRPr` (`@baseline`) | `50%`                                                           | `50000` (thousandths)                      | R W |
+| The text of `wp14:pctWidth`, `wp14:pctHeight`, `wp14:pctPosHOffset`, `wp14:pctPosVOffset`                                                                                                                                                                                                                                                                                | `0%`                                                            | `0` (thousandths)                          | R W |
+| `w:tblLook@w:val`, `w:cnfStyle@w:val`                                                                                                                                                                                                                                                                                                                                    | absent (the named attributes only)                              | hex or bits, beside the named ones         | R W |
+| `w:charset`                                                                                                                                                                                                                                                                                                                                                              | `@w:characterSet` (`iso-8859-1`)                                | `@w:val` (`00`)                            | K   |
+| `mc:Ignorable` of a part's root                                                                                                                                                                                                                                                                                                                                          | lists `wne`                                                     | does not                                   | K   |
+| VML (`v:`, `o:`)                                                                                                                                                                                                                                                                                                                                                         | not allowed, but 5 parts of the corpus's Strict files hold some | allowed                                    | K   |
 
 Word writes a twips value `n` as `n/20` points, `36pt` when whole, else with two decimals
 (`35.40pt`, `451.30pt`); a percentage as its value with `%`, no zeros after the point (`50%`).
@@ -77,31 +88,37 @@ Word writes a twips value `n` as `n/20` points, `36pt` when whole, else with two
 **Translate the text of a Strict part where it is read and where it is written, and nowhere
 else.** `strict.ts` holds the tables above, once, and two functions over a part's source:
 `toTransitional(source)` and `toStrict(source)`. Each parses the part (`parseXml`) and returns its
-text with only the listed spans replaced (namespace URIs in `xmlns` declarations, the listed
-attribute values and names, the listed element names in both tags), every other character as
-it was. The package (`readPackage`) knows its conformance from the main part's relationship
-type; in a Strict package every part's XML and every relationship part is read through
+text with only the listed spans replaced, every other character as it was: namespace URIs in
+`xmlns` declarations and `a:graphicData@uri`, relationship types, the listed attribute values and
+names, the listed element names in both tags, the text of the listed elements, and the attributes
+one form has and the other lacks (`w:conformance`, `w:tblLook@w:val` and `w:cnfStyle@w:val`,
+removed or added from the named ones). The package (`readPackage`) knows its conformance from its
+own relationships (`/_rels/.rels`, an `officeDocument` of Strict's type); in a Strict package
+`text()` returns, and `xml()` and `relationships()` read, every XML part translated by
 `toTransitional`. From there everything is Transitional: the property readers, the model, the
 opaque and verbatim XML kept in the document, its JSON.
 
 **Export writes the original's conformance.** `exportDocx` with a Strict original passes every
 part it writes (the document, styles, numbering, comments, headers, footers, notes, settings,
-relationships) through `toStrict`; parts it copies are the original's bytes, Strict already.
-Without the original, or with a Transitional one, nothing changes: a document from a Strict
-file saved as JSON and exported on its own is all Transitional, because nothing it kept is in
-Strict names. No schema change.
+relationships) through `toStrict`, in `DocxPackage.write`; parts it copies are the original's
+bytes, Strict already. Export rewrites a part only when its new text differs from `text()`, so
+an unchanged part is copied; `asDocument`'s second pass (it reads the written package again to
+drop macros) goes through the same `text()` and `write`. Without the original, or with a
+Transitional one, nothing changes: a document from a Strict file saved as JSON and exported on its
+own is all Transitional, because nothing it kept is in Strict names. No schema change.
 
-**Round trip.** For what Word writes, `toStrict(toTransitional(x))` is `x` once canonicalized
-(the corpus run's comparison), and `toTransitional(toStrict(y))` is `y`: tested on the nine's
-Strict files and their Transitional twins. Other writers' forms (`0.5in`, `1.27cm`, `36.0pt`)
+**Round trip.** For what Word writes, `toStrict(toTransitional(x))` is `x`, character for
+character, for every XML part of the nine's Strict files: tested, since a part that did not come
+back exact would be rewritten on every export. Other writers' forms (`0.5in`, `1.27cm`, `36.0pt`)
 are read to the nearest twip and written back as Word writes them: the same value, another
-spelling, which the corpus run classes "reformatted". Attributes not in the table keep their
-text both ways; a universal measure in one of them stays as written, which Transitional allows
-too (its measure types accept universal measures).
+spelling, which the corpus run classes "reformatted". An attribute not in the table keeps its text
+both ways; a universal measure in one stays as written, which Transitional allows too (its current
+schema's measure types accept universal measures; its 2006 first edition did not), and Foli's
+readers read as no value.
 
 **Not done:** writing Transitional from a Strict file or the reverse (no option asked for);
-VML in a Strict package (Word does not write it there; Foli writes none on export of a Strict
-original, checked in 28.3); converting `w:charset` (the font table is copied, never written).
+converting VML (kept as read, as Word reads it in the corpus's Strict files) or `w:charset` (the
+font table is copied, never written).
 
 ## Consequences
 

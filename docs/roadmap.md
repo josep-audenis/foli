@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —                         | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1 merged: Strict twins of the nine, ADR-0014                                                                                                                                               |
+| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1 in review (#299): Strict twins of the nine, ADR-0014                                                                                                                                     |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3923,8 +3923,9 @@ agent's review.
   how kept XML is stored so an export without the package is all Transitional.
   (Done: `save-strict.ps1` writes each of the nine twice from one open document, Strict and
   Transitional, authored as the corpus's fictional user; ADR-0014 tables what differs, from
-  those pairs and the corpus's 75 Strict packages: Word writes twips as points (`35.40pt`),
-  DrawingML percentages with `%`, `start`/`end` for left and right. Decided: each Strict part's
+  those pairs and the corpus's 75 Strict packages: Word writes most twips as points (`35.40pt`;
+  grid columns and character spacing stay numbers), DrawingML percentages with `%`,
+  `start`/`end` for left and right. Decided: each Strict part's
   text translated to Transitional where it is read and back where it is written, so the model
   and kept XML are Transitional only.)
 - [ ] 28.2 Strict import: the refusal removed; parts, relationships and kept XML read through

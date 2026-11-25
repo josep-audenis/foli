@@ -1,4 +1,4 @@
-﻿# Saves the synthetic Word corpus (corpus/word/*.docx) as Strict Open XML through Microsoft Word
+# Saves the synthetic Word corpus (corpus/word/*.docx) as Strict Open XML through Microsoft Word
 # (Phase 28, ADR-0014). For each document it writes two files to corpus/word/strict/, from the
 # same open document so they differ only by the format Word wrote:
 #   <name>.strict.docx        wdFormatStrictOpenXMLDocument (24)
@@ -6,10 +6,11 @@
 #
 #   powershell -ExecutionPolicy Bypass -File scripts/corpus/save-strict.ps1
 #
-# Opened read-only with macros disabled. Word records who saved a file (lastModifiedBy): for the
-# run Word's user is the corpus's fictional author, and the user's own name is restored at the
-# end (kept in the same file as build-word-corpus.ps1, so an interrupted run of either is
-# restored by the next). Windows with desktop Word only.
+# Each document is opened from a copy in the temp folder, read-write (a read-only open makes Word
+# record DocSecurity 4 in the Transitional save), macros disabled. Word records who saved a file
+# (lastModifiedBy): for the run Word's user is the corpus's fictional author, and the user's own
+# name is restored at the end (kept in the same file as build-word-corpus.ps1, so an interrupted
+# run of either is restored by the next). Windows with desktop Word only.
 
 $ErrorActionPreference = "Stop"
 # Paths go to Word as [string]: PowerShell 5.1 passes a Join-Path result as a wrapped object,
@@ -40,9 +41,13 @@ try {
   $word.Options.UseLocalUserInfo = $true
   $word.UserName = "Legal Department"
   $word.UserInitials = "LD"
+  $scratch = [string](Join-Path ([System.IO.Path]::GetTempPath()) "foli-save-strict")
+  New-Item -ItemType Directory -Force $scratch | Out-Null
   foreach ($file in @(Get-ChildItem -Path $in -Filter *.docx -File | Sort-Object Name)) {
     $base = [string]$file.BaseName
-    $doc = $word.Documents.Open([string]$file.FullName, $false, $true, $false, "foli-no-password")
+    $copy = [string](Join-Path $scratch $file.Name)
+    Copy-Item $file.FullName $copy -Force
+    $doc = $word.Documents.Open($copy, $false, $false, $false, "foli-no-password")
     try {
       foreach ($pair in @(@("transitional", $FORMAT_DOCX), @("strict", $FORMAT_STRICT))) {
         $path = [string](Join-Path $out "$base.$($pair[0]).docx")
@@ -51,6 +56,7 @@ try {
       }
     } finally {
       $doc.Close(0)
+      Remove-Item $copy -ErrorAction SilentlyContinue
     }
     Write-Output "wrote $base"
   }
