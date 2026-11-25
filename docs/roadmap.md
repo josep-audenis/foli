@@ -3824,7 +3824,7 @@ thread someone is in, keeping deleted comments.
 ### Tasks
 
 - [x] Claim phase, branch `phase-27/comment-history`
-- [ ] 27.1 Highlights: the text of a resolved thread is not shaded (both renderers; a thread is
+- [x] 27.1 Highlights: the text of a resolved thread is not shaded (both renderers; a thread is
   resolved when its first comment is, as Word marks it); the pane removes its focus mark from
   every element that has it, copies included.
 - [ ] 27.2 History: the pane shows open threads beside their text and a "Resolved" tab listing

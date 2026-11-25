@@ -80,6 +80,31 @@ describe("FoliComments in FoliEditor", () => {
     expect(screen.queryByRole("complementary", { name: "Comments" })).toBeNull();
   });
 
+  it("shades a thread's text until it is resolved, replies too", () => {
+    const shaded = () =>
+      (document.querySelector('[data-foli-comments~="0"]') as HTMLElement).style.backgroundColor;
+    const editor = setup([{ id: 0, author: "Ana", content: note("Which world?") }]);
+    expect(shaded()).not.toBe("");
+    fireEvent.click(within(pane()).getByRole("button", { name: "Resolve" }));
+    expect(shaded()).toBe("");
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(shaded()).not.toBe("");
+  });
+
+  it("takes its mark off every copy of the focused thread's text", () => {
+    setup([{ id: 0, author: "Ana", content: note("Which world?") }]);
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ana" });
+    fireEvent.focus(thread);
+    const text = document.querySelector('[data-foli-comments~="0"]') as HTMLElement;
+    expect(text.classList.contains("foli-comment-active")).toBe(true);
+    // As the page layout copies a paragraph split across pages, mark and all.
+    text.parentElement?.append(text.cloneNode(true));
+    fireEvent.blur(thread);
+    expect(document.querySelectorAll(".foli-comment-active")).toHaveLength(0);
+  });
+
   it("edits a comment's text", () => {
     const editor = setup([{ id: 0, author: "Ana", content: note("Old") }]);
     fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Ana" }));

@@ -85,6 +85,7 @@ import {
   isCommentOnly,
   keepTablesApart,
   referencesIn,
+  resolvedCommentIds,
   StoryStep,
   sameSpot,
   setComments,
@@ -1084,6 +1085,11 @@ export class EditorView {
       envelope?.section !== before?.section ||
       envelope?.settings !== before?.settings;
     const storiesChanged = envelope?.stories !== before?.stories;
+    // A thread resolved or reopened: its text's shading goes or comes back.
+    const resolvedChanged =
+      envelope?.comments !== before?.comments &&
+      String([...resolvedCommentIds(envelope?.comments ?? [])]) !==
+        String([...resolvedCommentIds(before?.comments ?? [])]);
     const selectionChanged = !state.selection.eq(this.state.selection);
     // Another document: the story being edited closes.
     const lost = !!this.mount && wordContext(state)?.id !== wordContext(this.state)?.id;
@@ -1091,16 +1097,17 @@ export class EditorView {
     this.state = state;
     // Decorations that changed redraw their blocks (the others are reused).
     const decorated = this.decorate(state);
-    if (docChanged || decorated || (storiesChanged && !this.redrawRegions())) this.render();
+    const redrawn = docChanged || decorated || resolvedChanged;
+    if (redrawn || (storiesChanged && !this.redrawRegions())) this.render();
     // Blocks drawn again hold new text nodes: the hint's ranges are made again on them (and
     // during a composition, when the pages are not placed again).
-    if (this.shownHint && (docChanged || decorated)) this.drawHint();
+    if (this.shownHint && redrawn) this.drawHint();
     if (lost) this.closeStory(true);
     // The open story has its own editor, which hears nothing of this.
     if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
     this.showSelectedNode();
     // Redrawn blocks may have held the DOM selection.
-    this.writeSelection(docChanged || decorated);
+    this.writeSelection(redrawn);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
     if (docChanged || selectionChanged) this.scrollToSelection();
     this.eachPluginView((view) => view.update?.(this, previous));

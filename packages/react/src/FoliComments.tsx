@@ -278,12 +278,15 @@ export function FoliComments({
   useEffect(() => {
     const container = pane.current && pagesAround(pane.current);
     if (!container || focused === null) return;
-    const marked = [
-      ...container.querySelectorAll<HTMLElement>(`[data-foli-comments~="${focused}"]`),
-    ];
-    for (const element of marked) element.classList.add("foli-comment-active");
+    for (const element of container.querySelectorAll<HTMLElement>(
+      `[data-foli-comments~="${focused}"]`,
+    ))
+      element.classList.add("foli-comment-active");
+    // Every element with the mark, not those marked: the page layout copies a paragraph split
+    // across pages, mark included.
     return () => {
-      for (const element of marked) element.classList.remove("foli-comment-active");
+      for (const element of container.querySelectorAll<HTMLElement>(".foli-comment-active"))
+        element.classList.remove("foli-comment-active");
     };
   }, [focused, doc]);
 
