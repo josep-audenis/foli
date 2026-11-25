@@ -108,8 +108,8 @@ the browser cannot: Up and Down beside a rule or across a table cell's edge (`Ar
 Shift+arrows in a table (`Shift-ArrowUp` …: grows a cell selection, `extendCellSelection`). A
 keymap binding those names runs first, so they are overridable too.
 
-`FoliToolbar` with tabs (a ribbon) also hears Ctrl+F1 (Cmd+F1 is not taken: Ctrl on every
-platform) anywhere on the page: it collapses the ribbon to its tabs, or pins it again (the
+`FoliToolbar` with tabs (a ribbon) also hears Ctrl+F1 (Ctrl on every platform; macOS may keep
+it for its own keyboard access, so the collapse button is the way there) anywhere on the page: it collapses the ribbon to its tabs, or pins it again (the
 ribbon that has the focus, else the first one mounted). On a collapsed ribbon's tab, Enter,
 Space or ArrowDown shows its panel over the document (ArrowDown goes into it), Escape puts it
 away.

@@ -177,4 +177,25 @@ describe("wordRibbonTabs", () => {
     rerender(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed={false} />);
     expect(panel().hidden).toBe(false);
   });
+
+  it("puts the panel over the document away when a command runs from it, without onClickCommand", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} defaultCollapsed />);
+    const panel = () => screen.getByRole("tabpanel", { hidden: true });
+    fireEvent.click(screen.getByRole("tab", { name: "Home" }), { detail: 1 });
+    expect(panel().hidden).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Bold" }), { detail: 1 });
+    expect(panel().hidden).toBe(true);
+  });
+
+  it("forgets a panel over the document when the app pins the ribbon", () => {
+    const editor = createEditor({ document: word });
+    const { rerender } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed />);
+    const panel = () => screen.getByRole("tabpanel", { hidden: true });
+    fireEvent.click(screen.getByRole("tab", { name: "Home" }), { detail: 1 });
+    expect(panel().hidden).toBe(false);
+    rerender(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed={false} />);
+    rerender(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed />);
+    expect(panel().hidden).toBe(true);
+  });
 });

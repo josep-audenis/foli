@@ -2015,12 +2015,10 @@ export function FoliToolbar({
 }: FoliToolbarProps) {
   // A collapsed ribbon's panel shown over the document: a command run from it puts it away.
   const [floating, setFloating] = useState(false);
-  const onClickCommand =
-    givenClickCommand &&
-    (() => {
-      setFloating(false);
-      givenClickCommand();
-    });
+  const onClickCommand = () => {
+    setFloating(false);
+    givenClickCommand?.();
+  };
   const tr = translator(messages);
   /** A label that may be one of the toolbar's messages (a built-in item's, a tab's…). */
   const trLabel = (text: string) => tr(text as ToolbarMessage);
@@ -2045,7 +2043,12 @@ export function FoliToolbar({
   const [collapsedState, setCollapsedState] = useState(defaultCollapsed);
   const collapsed = !!tab && (givenCollapsed ?? collapsedState);
   const panelShown = !collapsed || floating;
+  useEffect(() => {
+    if (!collapsed) setFloating(false);
+  }, [collapsed]);
   const setCollapsed = (next: boolean) => {
+    const panelNow = ribbon.current?.querySelector(".foli-ribbon-panel");
+    if (next && panelNow?.contains(document.activeElement)) focusTab();
     if (givenCollapsed === undefined) setCollapsedState(next);
     setFloating(false);
     onCollapsedChange?.(next);
@@ -2208,9 +2211,29 @@ export function FoliToolbar({
     focused < items.length && (focused < firstInMore || moreOpen || !inMore) ? focused : 0;
   /** The focus back to a dialog's button: to More when the button is in the closed panel. */
   const giveBack = (element: HTMLElement | null | undefined) => {
+    if (element?.closest<HTMLElement>(".foli-ribbon-panel")?.hidden) {
+      focusTab();
+      return;
+    }
     const closed = morePanel.current?.hidden && morePanel.current.contains(element ?? null);
     (closed ? moreButton.current : element)?.focus();
   };
+  /**
+   * A dialog closed: applied, the focus goes to the document (`onClickCommand`) and a panel shown
+   * over it goes away (without `onClickCommand`, the focus then goes to its tab); otherwise back
+   * to `restore`, its button.
+   */
+  const closed = (applied: boolean | undefined, restore: HTMLElement | null | undefined) => {
+    if (applied && givenClickCommand) onClickCommand();
+    else if (applied && floating) {
+      setFloating(false);
+      focusTab();
+    } else giveBack(restore);
+  };
+  /** The focus to the selected tab (a ribbon's). */
+  function focusTab() {
+    tabButtons.current[tabs?.findIndex((t) => t.key === tab?.key) ?? -1]?.focus();
+  }
   /** The items as last rendered: where a dialog closed later finds its button. */
   const shown = useRef(items);
   shown.current = items;
@@ -2265,7 +2288,7 @@ export function FoliToolbar({
       }
       // Closing by its button: the focus was in the menu, which goes away.
       setMenu(null);
-      if (event.detail > 0 && onClickCommand) onClickCommand();
+      if (event.detail > 0 && givenClickCommand) givenClickCommand();
       else buttons.current[index]?.focus();
       return;
     }
@@ -3183,12 +3206,11 @@ export function FoliToolbar({
           editor={editor}
           close={(applied) => {
             setAppDialog(null);
-            if (applied && onClickCommand) onClickCommand();
             // Its button as it is now: the items may have changed while it was open.
-            else
-              giveBack(
-                buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
-              );
+            closed(
+              applied,
+              buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
+            );
           }}
         />
       )}
@@ -3200,8 +3222,7 @@ export function FoliToolbar({
           onClose={(done) => {
             const { restore } = pictureDialog;
             setPictureDialog(null);
-            if (done && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(done, restore);
           }}
         />
       )}
@@ -3211,8 +3232,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = setupDialog;
             setSetupDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3223,8 +3243,7 @@ export function FoliToolbar({
           onClose={(inserted) => {
             const { restore } = referenceDialog;
             setReferenceDialog(null);
-            if (inserted && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(inserted, restore);
           }}
         />
       )}
@@ -3234,8 +3253,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = columnDialog;
             setColumnDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3245,8 +3263,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = noteDialog;
             setNoteDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3256,8 +3273,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = controlDialog;
             setControlDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3268,8 +3284,7 @@ export function FoliToolbar({
           onClose={(inserted) => {
             const { restore } = tableDialog;
             setTableDialog(null);
-            if (inserted && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(inserted, restore);
           }}
         />
       )}
