@@ -35,7 +35,7 @@ place that says what is in progress; check it before starting work.
 | 21 Hardening              | ✅ Done                  | —                      | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
-| 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0, `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1 on npm (2026-11-25)                                                                         |
+| 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
 | 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.5 merged (#282, #284); 25.6-25.7 (shrinking, KeyTips)                                                                                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -3626,8 +3626,9 @@ agent; if both change a shared file, whichever lands second merges the other in 
   collab page), limitations.md (the hub's limits, the host leaving, a lost last message) and three
   changesets (core and react minor, collab minor). Released 2026-11-25 as 1.8.0 (#277), with
   `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1; `pnpm bench` passed
-  before it. The fix for the pinned mark divergence (#278) came after and ships in the next
-  release.
+  before it. The fix for the pinned mark divergence (#278, #280) followed as 1.8.1 (#283), with
+  `@folijs/collab` 0.2.1, `@folijs/agent` 0.4.2 and `@folijs/mcp` 0.3.2 (2026-11-25); its two bench
+  runs flagged different engines each time, read as a busy machine (the PR says why).
 
 ## Phase 25 — Word ribbon · M → 1.9.0
 
