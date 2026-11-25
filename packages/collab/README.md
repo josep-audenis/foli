@@ -75,6 +75,9 @@ message) and `unauthorized`. The log keeps `limits.log` steps (default 10 000); 
 behind gets a snapshot. Pass `log` (`authority.log`, stored) and `version` to start again after a
 restart. Locked content controls are not checked again by the authority (their rules depend on
 the command that made an edit): an app whose clients may be hostile checks them in `authorize`.
+`authorize(clientID, steps, doc)` also gets the document the steps apply to: a comment-only user
+is `onlyCommentSteps(doc, steps, { author })` from `@folijs/core`: their own comments, replies,
+deletes and resolving go through, nothing else (with `author`, the name that client edits as).
 
 **Versions.** A version counts steps. `broadcast.version` is the version _before_ the
 broadcast's steps: a client applies it when `broadcast.version === getVersion(editor.state)`, keeps

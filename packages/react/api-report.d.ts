@@ -129,8 +129,19 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * document has comments, `true` always, `false` never.
      */
     comments?: boolean | "auto" | undefined;
-    /** The comments pane edits and deletes only `author`'s comments (`FoliComments`). */
+    /**
+     * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
+     * `commentOnly`'s value.
+     */
     onlyOwnComments?: boolean | undefined;
+    /**
+     * Comment-only mode: the user selects, copies, finds and comments (replies, resolves, deletes),
+     * but cannot change the text. The canvas is read-only, the toolbar keeps only commenting and
+     * review items, and core's `commentOnly({ author })` plugin refuses every other local change
+     * (received collab edits still apply): the user changes only their own comments, and resolves
+     * any. Not access control: the app's server checks what it receives.
+     */
+    commentOnly?: boolean | undefined;
     /** Rendered between the toolbar and the pages, inside the editor's context. */
     children?: ReactNode | undefined;
 }
@@ -183,6 +194,11 @@ export interface FoliToolbarProps {
      * the editor, which code may always change (`FoliEditor` does this for you).
      */
     disabled?: boolean | undefined;
+    /**
+     * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
+     * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
+     */
+    commentOnly?: boolean | undefined;
     /**
      * Called after a click ran a command, to show its result in the document (`FoliEditor`
      * focuses its canvas). Keyboard activation keeps the focus in the toolbar.
@@ -551,7 +567,7 @@ export declare const selectionInTable: (state: EditorState) => boolean;
  * `FoliEditor`'s `toolbar`); a tab, a group or an item is left out or added as with any tabs.
  */
 export declare const wordRibbonTabs: readonly ToolbarTab[];
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand: givenClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, collapsed: givenCollapsed, defaultCollapsed, onCollapsedChange, keyTips, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, commentOnly, onClickCommand: givenClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, collapsed: givenCollapsed, defaultCollapsed, onCollapsedChange, keyTips, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts

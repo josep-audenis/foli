@@ -197,7 +197,8 @@ export function now(): string {
   return new Date().toISOString().replace(/\.\d+Z$/, "Z");
 }
 
-const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
+/** @internal The marks a tracked change is recorded with. */
+export const REVIEW_MARKS: ReadonlySet<string> = new Set(["insertion", "deletion", "formatChange"]);
 
 /** @internal The largest change id on a tree's nodes, or -1. */
 export function maxRevisionIn(doc: Node): number {
