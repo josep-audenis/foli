@@ -36,11 +36,16 @@ describe("wordRibbonTabs", () => {
     ]);
     const groups = wordRibbonTabs.flatMap((tab) => tab.items);
     for (const group of groups) expect(Array.isArray(group)).toBe(false);
-    const all = new Set(groups.flatMap((group) => ("items" in group ? group.items : group)));
-    for (const item of Object.values(toolbarItems)) expect(all.has(item)).toBe(true);
+    // Each group's items and its launcher (large buttons are copies: by key).
+    const keysOf = (g: (typeof groups)[number]) =>
+      "items" in g
+        ? [...g.items, ...(g.launcher ? [g.launcher] : [])].map((i) => i.key)
+        : g.map((i) => i.key);
+    const all = new Set(groups.flatMap(keysOf));
+    for (const item of Object.values(toolbarItems)) expect(all.has(item.key)).toBe(true);
     // An item twice in one tab would share a key.
     for (const tab of wordRibbonTabs) {
-      const keys = tab.items.flatMap((g) => ("items" in g ? g.items : g).map((i) => i.key));
+      const keys = tab.items.flatMap(keysOf);
       expect(new Set(keys).size).toBe(keys.length);
     }
   });
@@ -101,5 +106,75 @@ describe("wordRibbonTabs", () => {
     fireEvent.click(codes, { detail: 1 });
     expect(fieldCodesShown(editor.state)).toBe(true);
     expect(codes.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("draws large buttons named by their text, and a group's launcher after its items", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} defaultTab="references" />);
+    const footnote = screen.getByRole("button", { name: "Footnote" });
+    expect(footnote.classList.contains("foli-toolbar-large")).toBe(true);
+    const group = screen.getByRole("group", { name: "Footnotes" });
+    const launcher = within(group).getByRole("button", { name: "Note options…" });
+    expect(launcher.classList.contains("foli-toolbar-launcher")).toBe(true);
+    expect(launcher.getAttribute("aria-haspopup")).toBe("dialog");
+    // The last of the group for the arrow keys.
+    const buttons = within(group).getAllByRole("button");
+    expect(buttons.at(-1)).toBe(launcher);
+    fireEvent.click(launcher, { detail: 1 });
+    screen.getByRole("dialog", { name: "Note options" });
+  });
+
+  it("collapses to its tabs: a click shows a tab over the document, Escape puts it away", () => {
+    const editor = createEditor({ document: word });
+    const changes: boolean[] = [];
+    render(
+      <FoliToolbar
+        editor={editor}
+        tabs={wordRibbonTabs}
+        onCollapsedChange={(c) => changes.push(c)}
+      />,
+    );
+    const panel = () => screen.getByRole("tabpanel", { hidden: true });
+    const collapse = screen.getByRole("button", { name: "Collapse the ribbon" });
+    expect(collapse.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(collapse);
+    expect(panel().hidden).toBe(true);
+    expect(changes).toEqual([true]);
+    const pin = screen.getByRole("button", { name: "Pin the ribbon" });
+    expect(pin.getAttribute("aria-expanded")).toBe("false");
+
+    const insert = screen.getByRole("tab", { name: "Insert" });
+    fireEvent.click(insert, { detail: 1 });
+    expect(panel().hidden).toBe(false);
+    expect(panel().closest(".foli-ribbon")?.classList.contains("foli-ribbon-floating")).toBe(true);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Page break" }), { key: "Escape" });
+    expect(panel().hidden).toBe(true);
+    expect(document.activeElement).toBe(insert);
+
+    // ArrowDown on a tab shows the panel and goes into it; a press elsewhere puts it away.
+    fireEvent.keyDown(insert, { key: "ArrowDown" });
+    expect(panel().hidden).toBe(false);
+    expect(panel().contains(document.activeElement)).toBe(true);
+    fireEvent.pointerDown(document.body);
+    expect(panel().hidden).toBe(true);
+
+    // Ctrl+F1 pins it again, as a double-click on a tab does.
+    fireEvent.keyDown(document, { key: "F1", ctrlKey: true });
+    expect(panel().hidden).toBe(false);
+    fireEvent.doubleClick(insert);
+    expect(panel().hidden).toBe(true);
+    expect(changes).toEqual([true, false, true]);
+  });
+
+  it("follows the app's `collapsed`", () => {
+    const editor = createEditor({ document: word });
+    const { rerender } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed />);
+    const panel = () => screen.getByRole("tabpanel", { hidden: true });
+    expect(panel().hidden).toBe(true);
+    // A pick only asks: the app keeps it collapsed.
+    fireEvent.click(screen.getByRole("button", { name: "Pin the ribbon" }));
+    expect(panel().hidden).toBe(true);
+    rerender(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed={false} />);
+    expect(panel().hidden).toBe(false);
   });
 });
