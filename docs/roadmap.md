@@ -3724,8 +3724,8 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   Escape steps back; `keyTips={false}`; `keyTip` on a tab or an item. Letters come from the
   translated names, so they follow `messages`.
 - [x] 25.8 The site's try page uses `wordRibbonTabs` (`overflow: "menu"`); the playground
-  shows it at `edit.html?ribbon` (its one-row toolbar stays the default, which the other specs
-  drive). `ribbon.spec.ts` in Chromium, Firefox and WebKit: tabs and axe, the table tabs coming
+  shows it at `edit.html` (by default since 1.9.0's release; `edit.html?toolbar` gives the
+  one-row toolbar the other specs drive). `ribbon.spec.ts` in Chromium, Firefox and WebKit: tabs and axe, the table tabs coming
   and going, collapse and Ctrl+F1, shrinking at 1366, 1024 and 768 px with every item
   reachable, KeyTips; a screenshot of the References tab per engine. Found there: the collapse
   button sat between the tabs and the toolbar for Tab; it now comes after the panel.

@@ -87,7 +87,7 @@ const documentOf = (blocks: Json[], more: Json = {}): Json => ({
 });
 
 async function load(page: Page, document: Json = documentOf(body)) {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), document);
 }

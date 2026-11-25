@@ -11,7 +11,7 @@ const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
 
 async function open(page: Page, name: string): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   const base64 = readFileSync(new URL(name, CORPUS)).toString("base64");
   await page.evaluate((data) => window.foliEdit.loadDocx(data), base64);
@@ -105,7 +105,7 @@ test("pictures copied into another document bring their images (12.11)", async (
   await page.keyboard.press("ControlOrMeta+c");
   // Another document, another page: the source's object URLs are not for it.
   const other = await context.newPage();
-  await other.goto("/edit.html");
+  await other.goto("/edit.html?toolbar");
   await other.waitForFunction(() => "foliEdit" in window);
   await editor(other).click();
   await other.keyboard.press("ControlOrMeta+End");

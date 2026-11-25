@@ -11,7 +11,7 @@ const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
 
 async function open(page: Page, name: string): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   const base64 = readFileSync(new URL(name, CORPUS)).toString("base64");
   await page.evaluate((data) => window.foliEdit.loadDocx(data), base64);

@@ -62,7 +62,7 @@ const DOCUMENT: Json = {
 };
 
 async function load(page: Page) {
-  await page.goto("/edit.html?keys=override");
+  await page.goto("/edit.html?toolbar&keys=override");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), DOCUMENT);
 }

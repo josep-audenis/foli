@@ -54,7 +54,7 @@ const paragraph = (attrs: Json, ...content: Json[]): Json => ({
 const numbered = { numbering: { id: 1, level: 0 } };
 
 async function open(page: Page, blocks: Json[]): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), documentOf(blocks));
   await editor(page).focus();

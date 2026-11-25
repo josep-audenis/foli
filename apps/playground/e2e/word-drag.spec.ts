@@ -19,7 +19,7 @@ async function open(
   tracking = false,
   more: { blocks?: Json[]; controls?: Json } = {},
 ): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate(
     ({ content, tracking, more }) =>

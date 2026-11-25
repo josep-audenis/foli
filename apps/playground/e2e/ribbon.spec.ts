@@ -1,5 +1,5 @@
 /**
- * Word's ribbon (Phase 25): `edit.html?ribbon` shows `wordRibbonTabs` with `overflow="menu"`.
+ * Word's ribbon (Phase 25): `edit.html` shows `wordRibbonTabs` with `overflow="menu"`.
  * Tabs of captioned groups, the table tabs that come with the selection, collapsing, large
  * buttons drawn small before groups go under More, and KeyTips.
  */
@@ -14,7 +14,7 @@ const tab = (page: Page, name: string) => page.getByRole("tab", { name });
 const panel = (page: Page) => page.locator(".foli-ribbon-panel");
 
 async function open(page: Page, docx?: string): Promise<void> {
-  await page.goto("/edit.html?ribbon");
+  await page.goto("/edit.html");
   await page.waitForFunction(() => "foliEdit" in window);
   if (docx) {
     const base64 = readFileSync(new URL(docx, CORPUS)).toString("base64");

@@ -95,7 +95,7 @@ const sample = (): Json =>
   ]);
 
 async function load(page: Page, document: Json = sample()) {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => !!window.foliEdit);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), document);
   await editor(page).click({ position: { x: 200, y: 200 } });

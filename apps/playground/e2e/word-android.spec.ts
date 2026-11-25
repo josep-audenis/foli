@@ -16,7 +16,7 @@ const paragraph = (text: string, attrs?: Json): Json => ({
 });
 
 async function open(page: Page, blocks: Json[]): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate(
     (content) =>

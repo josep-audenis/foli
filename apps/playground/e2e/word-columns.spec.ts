@@ -31,7 +31,7 @@ const documentOf = (blocks: Json[], section: Json = A4): Json => ({
 });
 
 async function load(page: Page, document: Json) {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), document);
 }
@@ -302,7 +302,7 @@ test("the section menu and page setup dialog work from the keyboard and pass axe
 });
 
 test("the newsletter's sections are on Word's pages in the editor", async ({ page }) => {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   const base64 = readFileSync(
     new URL("../../../corpus/word/08-newsletter.docx", import.meta.url),
