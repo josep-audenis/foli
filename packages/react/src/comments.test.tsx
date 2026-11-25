@@ -68,9 +68,15 @@ describe("FoliComments in FoliEditor", () => {
 
     fireEvent.click(within(thread).getByRole("button", { name: "Resolve" }));
     expect(editor.getDocument().comments[0]?.done).toBe(true);
+    // Resolved: out of the margin, in the history.
+    expect(within(pane()).queryByRole("article")).toBeNull();
+    expect(pane().textContent).toContain("No open comments");
+    fireEvent.click(within(pane()).getByRole("button", { name: "Resolved (1)" }));
     expect(within(pane()).getByRole("article", { name: "Comment by Ana, resolved" })).toBeTruthy();
     fireEvent.click(within(pane()).getByRole("button", { name: "Reopen" }));
     expect(editor.getDocument().comments[0]?.done).toBeUndefined();
+    expect(pane().textContent).toContain("No resolved comments");
+    fireEvent.click(within(pane()).getByRole("button", { name: "Open (1)" }));
 
     fireEvent.click(within(pane()).getByRole("button", { name: "Delete reply by Me" }));
     expect(editor.getDocument().comments).toHaveLength(1);
@@ -91,6 +97,16 @@ describe("FoliComments in FoliEditor", () => {
       editor.commands.undo();
     });
     expect(shaded()).not.toBe("");
+  });
+
+  it("unmarks a focused thread's text when resolving takes the thread away", () => {
+    setup([{ id: 0, author: "Ana", content: note("Which world?") }]);
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ana" });
+    fireEvent.focus(thread);
+    expect(document.querySelectorAll(".foli-comment-active").length).toBeGreaterThan(0);
+    // Removed while focused: no blur comes.
+    fireEvent.click(within(thread).getByRole("button", { name: "Resolve" }));
+    expect(document.querySelectorAll(".foli-comment-active")).toHaveLength(0);
   });
 
   it("takes its mark off every copy of the focused thread's text", () => {

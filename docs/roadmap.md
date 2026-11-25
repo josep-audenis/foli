@@ -3827,8 +3827,10 @@ thread someone is in, keeping deleted comments.
 - [x] 27.1 Highlights: the text of a resolved thread is not shaded (both renderers; a thread is
   resolved when its first comment is, as Word marks it); the pane removes its focus mark from
   every element that has it, copies included.
-- [ ] 27.2 History: the pane shows open threads beside their text and a "Resolved" tab listing
-  the resolved ones (newest first), each with Reopen and Delete; focusing one marks its text.
+- [x] 27.2 History: the pane shows open threads beside their text and, once a thread is
+  resolved, an Open / Resolved switch; Resolved lists them in document order, each with Reopen
+  and Delete; focusing one marks its text. A thread resolved, reopened or deleted while focused
+  takes its mark with it (no blur comes for a removed element).
 - [ ] 27.3 Mentions: `commentMentions(comment)` in core; the pane's `mentions` (people, or a
   function that finds them) suggest people after `@` in a comment or reply, a pick writes the
   linked name; `onMention` gets the comment and the people it newly tags when one is saved.

@@ -154,7 +154,11 @@ export function FoliComments({
   const head = useEditorState((state) => state.selection.head, { editor });
   const me = useEditorState((state) => trackState(state)?.author, { editor });
   const own = (c: CommentJSON) => !onlyOwnComments || c.author === me;
-  const threads = threadsOf(editor.state, comments);
+  const all = threadsOf(editor.state, comments);
+  /** Open threads, beside their text; the resolved ones are in their own list (the history). */
+  const threads = all.filter((thread) => !thread.comment.done);
+  const resolved = all.filter((thread) => thread.comment.done);
+  const [showResolved, setShowResolved] = useState(false);
   const pane = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
@@ -196,6 +200,7 @@ export function FoliComments({
     if (fresh && !readOnly && isEmpty(fresh) && plain(fresh)) {
       created.current.add(fresh.id);
       setWriting({ id: fresh.id, reply: false });
+      setShowResolved(false);
     }
   }, [comments, documentId, readOnly]);
 
@@ -203,7 +208,7 @@ export function FoliComments({
   // hidden or without threads: no query of the pages, no layout forced.
   const measure = () => {
     const root = pane.current;
-    if (hidden || !threads.length) return;
+    if (hidden || showResolved || !threads.length) return;
     const container = root && pagesAround(root);
     if (!root || !container) return;
     const paneTop = root.getBoundingClientRect().top;
@@ -219,7 +224,8 @@ export function FoliComments({
     }
     const items = [...root.querySelectorAll<HTMLElement>(":scope > .foli-comment-thread")];
     const next: number[] = [];
-    let bottom = 0;
+    const header = root.querySelector<HTMLElement>(":scope > .foli-comments-header");
+    let bottom = header ? header.offsetHeight + 8 : 0;
     threads.forEach((thread, i) => {
       const anchor = anchors.get(String(thread.comment.id));
       const wanted = anchor ? anchor.getBoundingClientRect().top - paneTop : bottom;
@@ -237,7 +243,7 @@ export function FoliComments({
   const measureRef = useRef(measure);
   measureRef.current = measure;
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured after every change of what it shows.
-  useIsomorphicLayoutEffect(measure, [comments, writing, threads.length, hidden]);
+  useIsomorphicLayoutEffect(measure, [comments, writing, threads.length, hidden, showResolved]);
   // Typing moves the text: measured once a frame, not once a keystroke, and only with threads.
   const frame = useRef(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes move the anchors.
@@ -273,13 +279,18 @@ export function FoliComments({
     focus?.();
   });
 
+  // A thread that left the list it was focused in (resolved, reopened, deleted) took the focus
+  // with it, without a blur: its text is not marked.
+  const marked = (showResolved ? resolved : threads).some((t) => t.comment.id === focused)
+    ? focused
+    : null;
   // The focused thread's text marked in the document (again after the view redraws it).
   // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes mean redrawn text to mark.
   useEffect(() => {
     const container = pane.current && pagesAround(pane.current);
-    if (!container || focused === null) return;
+    if (!container || marked === null) return;
     for (const element of container.querySelectorAll<HTMLElement>(
-      `[data-foli-comments~="${focused}"]`,
+      `[data-foli-comments~="${marked}"]`,
     ))
       element.classList.add("foli-comment-active");
     // Every element with the mark, not those marked: the page layout copies a paragraph split
@@ -288,7 +299,7 @@ export function FoliComments({
       for (const element of container.querySelectorAll<HTMLElement>(".foli-comment-active"))
         element.classList.remove("foli-comment-active");
     };
-  }, [focused, doc]);
+  }, [marked, doc]);
 
   const run = (command: Parameters<Editor["run"]>[0]) => editor.run(command);
   /**
@@ -312,6 +323,85 @@ export function FoliComments({
     };
   };
 
+  /** A thread: beside its text (an open one), or in the list of resolved ones. */
+  const threadView = (thread: Thread, i: number, list: readonly Thread[], beside: boolean) => {
+    const { comment } = thread;
+    const active = head >= thread.pos && head <= thread.end + 1;
+    const after = list[i + 1] ?? list[i - 1];
+    const canReply = !readOnly && editor.can(replyToComment(comment.id, "x"));
+    return (
+      <article
+        key={comment.id}
+        data-thread={comment.id}
+        tabIndex={-1}
+        className="foli-comment-thread"
+        data-active={active || undefined}
+        data-done={comment.done || undefined}
+        style={beside ? { top: tops[i] ?? 0 } : undefined}
+        aria-label={`Comment by ${nameOf(comment)}${comment.done ? ", resolved" : ""}`}
+        onFocus={() => setFocused(comment.id)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(null);
+        }}
+      >
+        {[comment, ...thread.replies].map((c) => (
+          <CommentView
+            key={c.id}
+            comment={c}
+            root={c === comment}
+            readOnly={readOnly}
+            canReply={canReply}
+            canEdit={own(c) && plain(c)}
+            canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
+            editing={writing?.id === c.id && !writing.reply}
+            onEdit={() => setWriting({ id: c.id, reply: false })}
+            onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
+            onResolve={() => {
+              run(resolveComment(comment.id, !comment.done));
+              // It moves to the other list: the next thread of this one has the focus.
+              focusThread(after?.comment.id);
+            }}
+            onDelete={() => {
+              run(deleteComment(c.id));
+              focusThread(c === comment ? after?.comment.id : comment.id);
+            }}
+            onSave={(text) => {
+              if (!run(editComment(c.id, contentLike(c, text)))) return false;
+              created.current.delete(c.id);
+              setWriting(null);
+              focusThread(comment.id);
+              return true;
+            }}
+            onCancel={() => {
+              // A comment made here and left empty goes.
+              const gone = created.current.has(c.id) && isEmpty(c);
+              created.current.delete(c.id);
+              if (gone) run(deleteComment(c.id));
+              setWriting(null);
+              focusThread(gone ? after?.comment.id : comment.id);
+            }}
+          />
+        ))}
+        {writing?.reply && writing.id === comment.id && (
+          <CommentForm
+            label="Reply"
+            initial=""
+            onSave={(text) => {
+              if (text.trim() && !run(replyToComment(comment.id, text))) return false;
+              setWriting(null);
+              focusThread(comment.id, writing.from);
+              return true;
+            }}
+            onCancel={() => {
+              setWriting(null);
+              focusThread(comment.id, writing.from);
+            }}
+          />
+        )}
+      </article>
+    );
+  };
+
   return (
     <aside
       ref={pane}
@@ -319,85 +409,33 @@ export function FoliComments({
       className={`foli-comments${className ? ` ${className}` : ""}`}
       aria-label={label}
       hidden={hidden}
-      style={height ? { minHeight: height } : undefined}
+      style={height && !showResolved ? { minHeight: height } : undefined}
     >
-      {threads.length === 0 && <p className="foli-comments-empty">No comments</p>}
-      {threads.map((thread, i) => {
-        const { comment } = thread;
-        const active = head >= thread.pos && head <= thread.end + 1;
-        const after = threads[i + 1] ?? threads[i - 1];
-        const canReply = !readOnly && editor.can(replyToComment(comment.id, "x"));
-        return (
-          <article
-            key={comment.id}
-            data-thread={comment.id}
-            tabIndex={-1}
-            className="foli-comment-thread"
-            data-active={active || undefined}
-            data-done={comment.done || undefined}
-            style={{ top: tops[i] ?? 0 }}
-            aria-label={`Comment by ${nameOf(comment)}${comment.done ? ", resolved" : ""}`}
-            onFocus={() => setFocused(comment.id)}
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(null);
-            }}
-          >
-            {[comment, ...thread.replies].map((c) => (
-              <CommentView
-                key={c.id}
-                comment={c}
-                root={c === comment}
-                readOnly={readOnly}
-                canReply={canReply}
-                canEdit={own(c) && plain(c)}
-                canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
-                editing={writing?.id === c.id && !writing.reply}
-                onEdit={() => setWriting({ id: c.id, reply: false })}
-                onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
-                onResolve={() => {
-                  run(resolveComment(comment.id, !comment.done));
-                  focusThread(comment.id);
-                }}
-                onDelete={() => {
-                  run(deleteComment(c.id));
-                  focusThread(c === comment ? after?.comment.id : comment.id);
-                }}
-                onSave={(text) => {
-                  if (!run(editComment(c.id, contentLike(c, text)))) return false;
-                  created.current.delete(c.id);
-                  setWriting(null);
-                  focusThread(comment.id);
-                  return true;
-                }}
-                onCancel={() => {
-                  // A comment made here and left empty goes.
-                  const gone = created.current.has(c.id) && isEmpty(c);
-                  created.current.delete(c.id);
-                  if (gone) run(deleteComment(c.id));
-                  setWriting(null);
-                  focusThread(gone ? after?.comment.id : comment.id);
-                }}
-              />
-            ))}
-            {writing?.reply && writing.id === comment.id && (
-              <CommentForm
-                label="Reply"
-                initial=""
-                onSave={(text) => {
-                  if (text.trim() && !run(replyToComment(comment.id, text))) return false;
-                  setWriting(null);
-                  focusThread(comment.id, writing.from);
-                  return true;
-                }}
-                onCancel={() => {
-                  setWriting(null);
-                  focusThread(comment.id, writing.from);
-                }}
-              />
-            )}
-          </article>
-        );
-      })}
+      {(resolved.length > 0 || showResolved) && (
+        <div className="foli-comments-header">
+          <button type="button" aria-pressed={!showResolved} onClick={() => setShowResolved(false)}>
+            Open ({threads.length})
+          </button>
+          <button type="button" aria-pressed={showResolved} onClick={() => setShowResolved(true)}>
+            Resolved ({resolved.length})
+          </button>
+        </div>
+      )}
+      {showResolved ? (
+        <div className="foli-comments-resolved">
+          {resolved.length === 0 && <p className="foli-comments-empty">No resolved comments</p>}
+          {resolved.map((thread, i) => threadView(thread, i, resolved, false))}
+        </div>
+      ) : (
+        <>
+          {threads.length === 0 && (
+            <p className="foli-comments-empty">
+              {resolved.length ? "No open comments" : "No comments"}
+            </p>
+          )}
+          {threads.map((thread, i) => threadView(thread, i, threads, true))}
+        </>
+      )}
     </aside>
   );
 }
