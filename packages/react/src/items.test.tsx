@@ -108,6 +108,32 @@ const NAMES = {
   navigate: 1,
   notes: 1,
   controls: 1,
+  rowAbove: 1,
+  rowBelow: 1,
+  columnLeft: 1,
+  columnRight: 1,
+  deleteRows: 1,
+  deleteColumns: 1,
+  deleteTable: 1,
+  mergeCells: 1,
+  splitCell: 1,
+  columnWidth: 1,
+  headerRow: 1,
+  pageSetup: 1,
+  controlProperties: 1,
+  footnote: 1,
+  endnote: 1,
+  goToNote: 1,
+  noteOptions: 1,
+  tableOfContents: 1,
+  updateFields: 1,
+  pageNumber: 1,
+  date: 1,
+  crossReference: 1,
+  fieldCodes: 1,
+  navigationPane: 1,
+  rotateLeft: 1,
+  rotateRight: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */
@@ -124,7 +150,9 @@ describe("toolbar items", () => {
 
   it("exports every built-in item by name, the default toolbar made of them", () => {
     expect(Object.keys(toolbarItems).sort()).toEqual(Object.keys(NAMES).sort());
-    expect(defaultToolbarItems.flat()).toEqual(Object.values(toolbarItems));
+    // The ribbon's own items (menus' entries as buttons) come after the default toolbar's.
+    const defaults = defaultToolbarItems.flat();
+    expect(Object.values(toolbarItems).slice(0, defaults.length)).toEqual(defaults);
     expect(toolbarItems.alignStart.key).toBe("align-start");
   });
 
@@ -709,8 +737,9 @@ describe("toolbar items", () => {
       "Review",
     ]);
     const all = defaultToolbarTabs.flatMap((tab) => tab.items.flat());
-    expect(new Set(all)).toEqual(new Set(Object.values(toolbarItems)));
-    expect(all).toHaveLength(Object.keys(toolbarItems).length);
+    // The default toolbar's items: the ribbon's own (menus' entries) are `wordRibbonTabs`'.
+    expect(new Set(all)).toEqual(new Set(defaultToolbarItems.flat()));
+    expect(all).toHaveLength(defaultToolbarItems.flat().length);
 
     // No groups is no items, as before there were tabs.
     const empty = render(<FoliEditor initialContent={doc()} toolbar={[]} label="Document" />);

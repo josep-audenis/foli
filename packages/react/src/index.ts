@@ -23,6 +23,7 @@ export {
   defaultToolbarTabs,
   FoliToolbar,
   type FoliToolbarProps,
+  selectionInTable,
   type ToolbarAction,
   type ToolbarButton,
   type ToolbarColor,
@@ -41,5 +42,6 @@ export {
   type ToolbarSelect,
   type ToolbarTab,
   toolbarItems,
+  wordRibbonTabs,
 } from "./FoliToolbar.js";
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";

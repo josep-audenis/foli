@@ -5,6 +5,7 @@ import {
   addComment,
   addRepeatingItem,
   alignAt,
+  CellSelection,
   type Command,
   type ControlJSON,
   canOutdent,
@@ -235,6 +236,11 @@ export interface ToolbarTab {
    * first one shows (no `onTabChange`).
    */
   readonly visible?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+  /**
+   * A tab of the selection, as Word's Table Design: drawn apart from the others
+   * (`.foli-ribbon-tab-contextual`, in the accent color). Usually with `visible`.
+   */
+  readonly contextual?: boolean | undefined;
 }
 
 /** What every toolbar item has. */
@@ -491,6 +497,12 @@ interface Item extends ToolbarItemBase {
   dialog?: ToolbarDialog["dialog"] | undefined;
   render?: ToolbarCustom["render"] | undefined;
   select?: ToolbarSelect["select"] | undefined;
+  /**
+   * A menu's entry as a button of its own (the ribbon's), made from the body's editor: a press
+   * runs it as its menu does (its dialog, its focus). `command` is then only what applies
+   * without the toolbar (no pages, no story to open).
+   */
+  entry?: ((body: Editor) => Action) | undefined;
 }
 
 /** A built-in menu's entry: it may open a dialog or move the focus. */
@@ -1363,6 +1375,147 @@ const GROUPS: Item[][] = [
   ],
 ];
 
+/** A static menu's entry as a button of its own. */
+const fromEntry = (
+  actions: readonly Action[],
+  key: string,
+  item: Omit<Item, "key" | "label" | "command">,
+): Item => {
+  const action = actions.find((a) => a.key === key) as Action;
+  return {
+    key,
+    label: action.label,
+    ...(action.dialog ? { dialog: action.dialog } : { command: action.command }),
+    ...(action.checked ? { pressed: action.checked } : {}),
+    ...item,
+  };
+};
+
+/** A menu's entry made from the body's editor, as a button of its own (see `Item.entry`). */
+const bodyEntry = (
+  actions: (body: Editor) => readonly Action[],
+  entry: string,
+  item: Omit<Item, "entry">,
+): Item => ({
+  ...item,
+  entry: (body) => actions(body).find((a) => a.key === entry) as Action,
+});
+
+/** A quarter turn, in Word's unit (60,000ths of a degree). */
+const QUARTER_TURN = 5_400_000;
+const rotate =
+  (by: number): Command =>
+  (state, dispatch) => {
+    const picture = selectedPicture(state);
+    return (
+      !!picture &&
+      setPictureRotation(picture.pos, Number(picture.node.attrs.rotation ?? 0) + by)(
+        state,
+        dispatch,
+      )
+    );
+  };
+const pictureSelected = (state: EditorState) => selectedPicture(state) !== null;
+const isWord = (state: EditorState) => wordContext(state) !== null;
+// The table entries' cheap checks: a dry run of an insertion would build it after every change.
+const rowsOf = { enabled: inTable };
+const columnsOf = { enabled: canFormatTable };
+
+/**
+ * Built-in items that are not in the default toolbar: menus' entries as buttons of their own,
+ * for the ribbon (`wordRibbonTabs`) and an app's tabs.
+ */
+const RIBBON_ITEMS: readonly Item[] = [
+  fromEntry(TABLE_ACTIONS, "rowAbove", { text: "Insert above", ...rowsOf }),
+  fromEntry(TABLE_ACTIONS, "rowBelow", { text: "Insert below", ...rowsOf }),
+  fromEntry(TABLE_ACTIONS, "columnLeft", { text: "Insert left", ...columnsOf }),
+  fromEntry(TABLE_ACTIONS, "columnRight", { text: "Insert right", ...columnsOf }),
+  fromEntry(TABLE_ACTIONS, "deleteRows", rowsOf),
+  fromEntry(TABLE_ACTIONS, "deleteColumns", columnsOf),
+  fromEntry(TABLE_ACTIONS, "deleteTable", rowsOf),
+  fromEntry(TABLE_ACTIONS, "mergeCells", {
+    enabled: (state) => canFormatTable(state) && state.selection instanceof CellSelection,
+  }),
+  // A dry run returns before building anything: it only finds whether a cell is merged.
+  fromEntry(TABLE_ACTIONS, "splitCell", {
+    enabled: (state) => canFormatTable(state) && splitCell(state),
+  }),
+  fromEntry(TABLE_ACTIONS, "columnWidth", {}),
+  fromEntry(TABLE_ACTIONS, "headerRow", { text: "Header row", ...rowsOf }),
+  fromEntry(SECTION_ACTIONS, "pageSetup", {}),
+  fromEntry(CONTROL_ACTIONS, "controlProperties", { text: "Properties…" }),
+  bodyEntry(noteActions, "footnote", {
+    key: "footnote",
+    label: "Insert footnote",
+    text: "Footnote",
+    command: insertNote("footnote"),
+  }),
+  bodyEntry(noteActions, "endnote", {
+    key: "endnote",
+    label: "Insert endnote",
+    text: "Endnote",
+    command: insertNote("endnote"),
+  }),
+  bodyEntry(noteActions, "goToNote", {
+    key: "goToNote",
+    label: "Go to note or reference",
+    text: "Show notes",
+    command: (state) => noteAtSelection(state) !== null,
+  }),
+  { key: "noteOptions", label: "Note options…", dialog: "noteOptions" },
+  bodyEntry(fieldActions, "tableOfContents", {
+    key: "tableOfContents",
+    label: "Table of contents",
+    enabled: (state) => isWord(state) && insertPageBreak(state),
+    command: insertTableOfContents({ layout: null }),
+  }),
+  bodyEntry(fieldActions, "updateAll", {
+    key: "updateFields",
+    label: "Update all fields",
+    text: "Update fields",
+    enabled: isWord,
+    command: () => true,
+  }),
+  bodyEntry(fieldActions, "pageNumber", {
+    key: "pageNumber",
+    label: "Page number",
+    enabled: (state) => isWord(state) && insertPageBreak(state),
+    command: insertPageNumber({ layout: null }),
+  }),
+  {
+    key: "date",
+    label: "Date",
+    enabled: (state) => isWord(state) && insertPageBreak(state),
+    command: insertDate(),
+  },
+  { key: "crossReference", label: "Cross-reference…", dialog: "crossReference" },
+  {
+    key: "fieldCodes",
+    label: "Show field codes",
+    text: "Field codes",
+    enabled: isWord,
+    pressed: fieldCodesShown,
+    command: toggleFieldCodes,
+  },
+  bodyEntry(navigationActions, "outline", {
+    key: "navigationPane",
+    label: "Navigation pane",
+    command: () => false,
+  }),
+  {
+    key: "rotateLeft",
+    label: "Rotate left 90°",
+    enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
+    command: rotate(-QUARTER_TURN),
+  },
+  {
+    key: "rotateRight",
+    label: "Rotate right 90°",
+    enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
+    command: rotate(QUARTER_TURN),
+  },
+];
+
 /** The names of the built-in items in `toolbarItems`. */
 export type ToolbarItemName =
   | "style"
@@ -1406,7 +1559,33 @@ export type ToolbarItemName =
   | "fields"
   | "navigate"
   | "notes"
-  | "controls";
+  | "controls"
+  | "rowAbove"
+  | "rowBelow"
+  | "columnLeft"
+  | "columnRight"
+  | "deleteRows"
+  | "deleteColumns"
+  | "deleteTable"
+  | "mergeCells"
+  | "splitCell"
+  | "columnWidth"
+  | "headerRow"
+  | "pageSetup"
+  | "controlProperties"
+  | "footnote"
+  | "endnote"
+  | "goToNote"
+  | "noteOptions"
+  | "tableOfContents"
+  | "updateFields"
+  | "pageNumber"
+  | "date"
+  | "crossReference"
+  | "fieldCodes"
+  | "navigationPane"
+  | "rotateLeft"
+  | "rotateRight";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -1419,6 +1598,12 @@ type ToolbarMenuName =
   | "controls";
 type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
 type ToolbarColorName = "textColor" | "highlight" | "cellShading";
+type ToolbarDialogItemName =
+  | "columnWidth"
+  | "pageSetup"
+  | "controlProperties"
+  | "noteOptions"
+  | "crossReference";
 
 /**
  * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
@@ -1426,7 +1611,10 @@ type ToolbarColorName = "textColor" | "highlight" | "cellShading";
  * with another `label` or `icon` keeps what the built-in does.
  */
 export const toolbarItems = Object.fromEntries(
-  GROUPS.flat().map((item) => [item.key.replace(/-(\w)/, (_, c: string) => c.toUpperCase()), item]),
+  [...GROUPS.flat(), ...RIBBON_ITEMS].map((item) => [
+    item.key.replace(/-(\w)/, (_, c: string) => c.toUpperCase()),
+    item,
+  ]),
 ) as unknown as {
   readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName
     ? ToolbarMenu
@@ -1434,7 +1622,9 @@ export const toolbarItems = Object.fromEntries(
       ? ToolbarSelect
       : Name extends ToolbarColorName
         ? ToolbarColorMenu
-        : ToolbarButton;
+        : Name extends ToolbarDialogItemName
+          ? ToolbarDialog
+          : ToolbarButton;
 };
 
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
@@ -1500,6 +1690,131 @@ export const defaultToolbarTabs: readonly (ToolbarTab & {
   ];
 })();
 
+/** Whether the selection is in a table (a cell selection included): Word's Table tabs show then. */
+export const selectionInTable = (state: EditorState): boolean => inTable(state);
+
+/**
+ * Word's ribbon: Home, Insert, Layout, References, Review and View in captioned groups, then the
+ * Table Design and Table Layout tabs while the selection is in a table and Picture Format while
+ * a picture is selected. Every built-in item is in it. For `FoliToolbarProps.tabs` (or
+ * `FoliEditor`'s `toolbar`); a tab, a group or an item is left out or added as with any tabs.
+ */
+export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
+  const t = toolbarItems;
+  const group = (label: string, ...items: ToolbarItem[]): ToolbarGroup => ({ label, items });
+  return [
+    {
+      key: "home",
+      label: "Home",
+      items: [
+        group("Undo", t.undo, t.redo),
+        group(
+          "Font",
+          t.font,
+          t.size,
+          t.bold,
+          t.italic,
+          t.underline,
+          t.strike,
+          t.textColor,
+          t.highlight,
+        ),
+        group(
+          "Paragraph",
+          t.bulletList,
+          t.orderedList,
+          t.outdent,
+          t.indent,
+          t.alignStart,
+          t.alignCenter,
+          t.alignEnd,
+          t.alignJustify,
+          t.lineSpacing,
+        ),
+        group("Styles", t.style),
+        group("Editing", t.navigate),
+      ],
+    },
+    {
+      key: "insert",
+      label: "Insert",
+      items: [
+        group("Pages", t.pageBreak, t.horizontalRule),
+        group("Tables", t.table),
+        group("Illustrations", t.picture),
+        group("Links", t.link, t.crossReference),
+        group("Header & Footer", t.headerFooter, t.pageNumber),
+        group("Text", t.controls, t.controlProperties, t.fields, t.date),
+      ],
+    },
+    {
+      key: "layout",
+      label: "Layout",
+      items: [
+        group("Page Setup", t.section, t.pageSetup),
+        group("Paragraph", t.outdent, t.indent, t.lineSpacing),
+      ],
+    },
+    {
+      key: "references",
+      label: "References",
+      items: [
+        group("Table of Contents", t.tableOfContents, t.updateFields),
+        group("Footnotes", t.footnote, t.endnote, t.goToNote, t.notes, t.noteOptions),
+        group("Captions", t.crossReference),
+      ],
+    },
+    {
+      key: "review",
+      label: "Review",
+      items: [
+        group("Comments", t.newComment),
+        group("Tracking", t.trackChanges, t.reviewView),
+        group(
+          "Changes",
+          t.acceptChange,
+          t.rejectChange,
+          t.acceptAll,
+          t.rejectAll,
+          t.previousChange,
+          t.nextChange,
+        ),
+      ],
+    },
+    {
+      key: "view",
+      label: "View",
+      items: [group("Show", t.navigationPane, t.fieldCodes)],
+    },
+    {
+      key: "tableDesign",
+      label: "Table Design",
+      contextual: true,
+      visible: inTable,
+      items: [group("Table Styles", t.tableStyle, t.headerRow), group("Shading", t.cellShading)],
+    },
+    {
+      key: "tableLayout",
+      label: "Table Layout",
+      contextual: true,
+      visible: inTable,
+      items: [
+        group("Delete", t.deleteRows, t.deleteColumns, t.deleteTable),
+        group("Rows & Columns", t.rowAbove, t.rowBelow, t.columnLeft, t.columnRight),
+        group("Merge", t.mergeCells, t.splitCell),
+        group("Cell Size", t.columnWidth),
+      ],
+    },
+    {
+      key: "pictureFormat",
+      label: "Picture Format",
+      contextual: true,
+      visible: pictureSelected,
+      items: [group("Picture", t.picture), group("Arrange", t.rotateLeft, t.rotateRight)],
+    },
+  ];
+})();
+
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
   href: string;
@@ -1558,11 +1873,14 @@ const statesOf =
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled
         ? item.enabled(state, editor)
-        : typeof item.dialog === "string"
-          ? DIALOG_APPLIES[item.dialog](state)
-          : item.actions
-            ? actionsOf(item, body).length > 0
-            : !item.command || editor.can(item.command),
+        : item.entry
+          ? // A menu's entry: its own dry run, as its menu does (theirs are cheap).
+            item.entry(body).command(state)
+          : typeof item.dialog === "string"
+            ? DIALOG_APPLIES[item.dialog](state)
+            : item.actions
+              ? actionsOf(item, body).length > 0
+              : !item.command || editor.can(item.command),
       value:
         item.colors?.value(state) ??
         item.select?.value(state) ??
@@ -1844,6 +2162,16 @@ export function FoliToolbar({
     if (typeof item.dialog === "function") {
       closeDialogs();
       setAppDialog({ key: item.key });
+      return;
+    }
+    if (item.entry) {
+      const action = item.entry(body);
+      if (action.dialog) {
+        openBuiltIn(action.dialog, buttons.current[index] ?? null);
+        return;
+      }
+      runHere(action.command);
+      if (!action.movesFocus && event.detail > 0) onClickCommand?.();
       return;
     }
     if (item.actions && !actionsOf(item, body).length) return;
@@ -2233,7 +2561,7 @@ export function FoliToolbar({
               type="button"
               role="tab"
               id={`${id}-tab-${n}`}
-              className={`foli-ribbon-tab foli-ribbon-tab-${t.key}`}
+              className={`foli-ribbon-tab foli-ribbon-tab-${t.key}${t.contextual ? " foli-ribbon-tab-contextual" : ""}`}
               aria-selected={t.key === tab.key}
               aria-controls={`${id}-panel`}
               tabIndex={t.key === tab.key ? 0 : -1}

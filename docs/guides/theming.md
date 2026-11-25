@@ -90,6 +90,7 @@ is. So the safer dark theme darkens everything around the pages and keeps the pa
     --foli-toolbar-pressed: #164e63;
     --foli-focus-ring: #67c6dc;
     --foli-error-color: #f97066;
+    --foli-ribbon-contextual: #d6a8f0;
   }
   /* The comments pane draws its threads in the page colors, but this line on the canvas. */
   .acme-editor .foli-comments-empty {

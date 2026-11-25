@@ -224,7 +224,18 @@ The built-in items are exported by name in `toolbarItems` (`ToolbarItemName`: `s
 `indent`, `newComment`, `trackChanges`, `reviewView`, `previousChange`, `nextChange`,
 `acceptChange`, `rejectChange`, `acceptAll`, `rejectAll`, `undo`, `redo`, `table`, `tableStyle`,
 `cellShading`, `picture`, `pageBreak`, `horizontalRule`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
-`controls`), and the default toolbar is `defaultToolbarItems`, groups of them. `items` (or
+`controls`), and the default toolbar is `defaultToolbarItems`, groups of them. Since 1.9 more
+built-ins, menus' entries as buttons of their own for the ribbon, are in `toolbarItems` and not
+in the default toolbar: the Table menu's `rowAbove`, `rowBelow`, `columnLeft`, `columnRight`,
+`deleteRows`, `deleteColumns`, `deleteTable`, `mergeCells`, `splitCell`, `columnWidth` (its
+dialog), `headerRow` (a toggle); `pageSetup`, `controlProperties`, `noteOptions` and
+`crossReference` (their dialogs); `footnote`, `endnote` and `goToNote` (as the Notes menu: the
+caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `date` and
+`fieldCodes` (a toggle), as the Fields menu; `navigationPane` (the outline of
+`FoliNavigation`); `rotateLeft` and `rotateRight` (a selected picture, a quarter turn; not while
+tracking). Those the toolbar runs with the pages or a story (`footnote`, `endnote`, `goToNote`,
+`tableOfContents`, `updateFields`, `pageNumber`, `navigationPane`) do so only from the toolbar,
+a copy included: their `command` is what applies without it. `items` (or
 `FoliEditor`'s `toolbar`) takes groups of items to add, remove, reorder and regroup them; an
 empty group is left out, and New comment shows only with `comments`. An item's `key` is its
 class, `foli-toolbar-<key>` (the alignments' keys are `align-start`, `align-center`, `align-end`,
@@ -369,6 +380,27 @@ An empty `tabs` shows `items`.
   `label` (`.foli-toolbar-group`), its items in `.foli-toolbar-group-items` and the caption under
   them (`.foli-toolbar-group-label`). In `items` and in a tab's `items` alike
   (`ToolbarGroups`).
+
+#### Word ribbon
+
+`wordRibbonTabs` (1.9) is Word's ribbon made of the built-in items, every one of them in it:
+Home (Undo, Font, Paragraph, Styles, Editing), Insert (Pages, Tables, Illustrations, Links,
+Header & Footer, Text), Layout (Page Setup, Paragraph), References (Table of Contents,
+Footnotes, Captions), Review (Comments, Tracking, Changes) and View (Show), each group
+captioned; then the tabs of the selection: Table Design and Table Layout while it is in a table
+(`selectionInTable(state)`), Picture Format while a picture is selected (`selectedPicture` of
+`@folijs/core`). An item is in more than one tab where Word has it so (indents, line spacing,
+cross-reference).
+
+```tsx
+import { FoliEditor, wordRibbonTabs } from "@folijs/react";
+
+<FoliEditor toolbar={wordRibbonTabs} />;
+```
+
+- `contextual: true` on a `ToolbarTab` draws it as a tab of the selection
+  (`.foli-ribbon-tab-contextual`, in `--foli-ribbon-contextual`, apart from the tabs before
+  it); give it a `visible` too. It is a tab as any other for the keyboard and screen readers.
 
 #### Toolbar messages
 
