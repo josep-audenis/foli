@@ -250,7 +250,6 @@ export function resolveComment(id: number, done = true): Command {
 /**
  * The ids of the comments in a resolved thread: one whose first comment is `done` (Word may
  * mark only that one), replies included.
- * @internal
  */
 export function resolvedCommentIds(comments: readonly CommentJSON[]): Set<number> {
   const ids = new Set<number>();

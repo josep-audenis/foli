@@ -47,7 +47,7 @@ export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
-export { isCommentOnly } from "./state/comments.js";
+export { isCommentOnly, resolvedCommentIds } from "./state/comments.js";
 export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryEditStep, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export { withTrackState } from "./state/track.js";
@@ -903,6 +903,7 @@ export declare function baseKeymap(): Plugin;
  */
 import type { Node, NodeJSON } from "../model/index.js";
 import { type Step } from "../transform/steps.js";
+import type { CommentJSON } from "../v3/document.js";
 import { type Command, type EditorState, Plugin } from "./state.js";
 export interface CommentOptions {
     /** Default: the editor's author (`createEditor({ author })`). */
@@ -929,6 +930,11 @@ export declare function replyToComment(parent: number, content: CommentContent, 
 export declare const editComment: (id: number, content: CommentContent) => Command;
 /** Resolves (or reopens) comment `id`'s thread: every comment of it, as Word marks them. */
 export declare function resolveComment(id: number, done?: boolean): Command;
+/**
+ * The ids of the comments in a resolved thread: one whose first comment is `done` (Word may
+ * mark only that one), replies included.
+ */
+export declare function resolvedCommentIds(comments: readonly CommentJSON[]): Set<number>;
 /** Deletes comment `id` with its replies and their anchors. */
 export declare function deleteComment(id: number): Command;
 /** Deletes every comment and its anchors (not the threads anchored in verbatim content). */
