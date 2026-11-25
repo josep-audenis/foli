@@ -1,5 +1,12 @@
 # @folijs/collab
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [cbfe172]
+  - @folijs/core@1.8.1
+
 ## 0.2.0
 
 ### Minor Changes
