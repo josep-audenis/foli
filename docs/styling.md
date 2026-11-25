@@ -17,22 +17,27 @@ Word's styles and direct formatting, written inline on each paragraph and run.
 The defaults live on `:root` (and `:host`, for a shadow root). Set a variable on any ancestor of
 the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it there.
 
-| Variable                    | Default                                                    | Applies to                      |
-| --------------------------- | ---------------------------------------------------------- | ------------------------------- |
-| `--foli-canvas-background`  | `#f3f3f1`                                                  | area around the pages           |
-| `--foli-page-background`    | `#ffffff`                                                  | pages                           |
-| `--foli-page-shadow`        | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                           |
-| `--foli-page-gap`           | `24px`                                                     | space between pages             |
-| `--foli-text-color`         | `#1d1d1b`                                                  | text without a color of its own |
-| `--foli-selection-color`    | `rgb(35 103 220 / 0.22)`                                   | selected text                   |
-| `--foli-border-color`       | `#e2e2df`                                                  | toolbar border and separators   |
-| `--foli-toolbar-background` | `#ffffff`                                                  | toolbar                         |
-| `--foli-toolbar-color`      | `#1d1d1b`                                                  | toolbar text                    |
-| `--foli-toolbar-hover`      | `#f0f0ee`                                                  | hovered button                  |
-| `--foli-toolbar-pressed`    | `#dfe8f8`                                                  | pressed (active) toggle         |
-| `--foli-focus-ring`         | `#2367dc`                                                  | focus outline, pressed border   |
-| `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL        |
-| `--foli-ribbon-contextual`  | `#7a2e9e`                                                  | tabs of the selection (ribbon)  |
+| Variable                           | Default                                                    | Applies to                      |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------- |
+| `--foli-canvas-background`         | `#f3f3f1`                                                  | area around the pages           |
+| `--foli-page-background`           | `#ffffff`                                                  | pages                           |
+| `--foli-page-shadow`               | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                           |
+| `--foli-page-gap`                  | `24px`                                                     | space between pages             |
+| `--foli-text-color`                | `#1d1d1b`                                                  | text without a color of its own |
+| `--foli-selection-color`           | `rgb(35 103 220 / 0.22)`                                   | selected text                   |
+| `--foli-border-color`              | `#e2e2df`                                                  | toolbar border and separators   |
+| `--foli-toolbar-background`        | `#ffffff`                                                  | toolbar                         |
+| `--foli-toolbar-color`             | `#1d1d1b`                                                  | toolbar text                    |
+| `--foli-toolbar-hover`             | `#f0f0ee`                                                  | hovered button                  |
+| `--foli-toolbar-pressed`           | `#dfe8f8`                                                  | pressed (active) toggle         |
+| `--foli-focus-ring`                | `#2367dc`                                                  | focus outline, pressed border   |
+| `--foli-error-color`               | `#b3261e`                                                  | link dialog: invalid URL        |
+| `--foli-ribbon-contextual`         | `#7a2e9e`                                                  | tabs of the selection (ribbon)  |
+| `--foli-dialog-input-height`       | `32px`                                                     | dialog fields and buttons       |
+| `--foli-dialog-radius`             | `4px`                                                      | dialog fields and buttons       |
+| `--foli-dialog-primary-background` | `transparent`                                              | dialog main button (Apply, OK)  |
+| `--foli-dialog-primary-color`      | `var(--foli-toolbar-color)`                                | dialog main button text         |
+| `--foli-dialog-primary-border`     | `var(--foli-border-color)`                                 | dialog main button border       |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change (the
 document's, or CSS over it) re-flows the pages. The document's fonts must be available (loaded web fonts or installed ones); the view

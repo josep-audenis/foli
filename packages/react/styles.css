@@ -18,6 +18,12 @@
   --foli-focus-ring: #2367dc;
   --foli-error-color: #b3261e;
   --foli-ribbon-contextual: #7a2e9e;
+  --foli-dialog-input-height: 32px;
+  --foli-dialog-radius: 4px;
+  /* The main button's defaults match the others; set these to make it stand out. */
+  --foli-dialog-primary-background: transparent;
+  --foli-dialog-primary-color: var(--foli-toolbar-color);
+  --foli-dialog-primary-border: var(--foli-border-color);
 }
 
 .foli-canvas {
@@ -165,6 +171,7 @@
   color: inherit;
   font: inherit;
   text-align: start;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -197,31 +204,6 @@
 
 .foli-table-dialog input {
   flex: 0 0 5em;
-}
-
-.foli-setup-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 0 1 12em;
-}
-
-.foli-setup-field select,
-.foli-setup-field input {
-  flex: none;
-  height: 32px;
-  font: inherit;
-}
-
-.foli-setup-check {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.foli-setup-check input {
-  width: 16px;
-  height: 16px;
 }
 
 /* The color field behind "More colors…": there for the browser's picker to open from, not seen. */
@@ -298,10 +280,10 @@
 .foli-link-dialog input {
   flex: 1 1 16em;
   min-width: 0;
-  height: 32px;
+  height: var(--foli-dialog-input-height);
   padding: 0 8px;
   border: 1px solid var(--foli-border-color);
-  border-radius: 4px;
+  border-radius: var(--foli-dialog-radius);
   font: inherit;
 }
 
@@ -309,15 +291,49 @@
   border-color: var(--foli-error-color);
 }
 
+/* Page setup: label over field. After the dialog's input rule, which they override (its flex
+   basis would be a height in this column). */
+.foli-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 1 12em;
+}
+
+.foli-setup-field select,
+.foli-setup-field input {
+  flex: none;
+  height: var(--foli-dialog-input-height);
+  font: inherit;
+}
+
+.foli-setup-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.foli-setup-check input {
+  width: 16px;
+  height: 16px;
+}
+
 .foli-link-dialog button {
-  height: 32px;
+  height: var(--foli-dialog-input-height);
   padding: 0 12px;
   border: 1px solid var(--foli-border-color);
-  border-radius: 4px;
+  border-radius: var(--foli-dialog-radius);
   background: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+/* A dialog's main button (Apply, Insert, OK). */
+.foli-link-dialog button[type="submit"] {
+  border-color: var(--foli-dialog-primary-border);
+  background: var(--foli-dialog-primary-background);
+  color: var(--foli-dialog-primary-color);
 }
 
 .foli-link-dialog :focus-visible {
@@ -637,18 +653,21 @@
   font-size: 11px;
   opacity: 0.75;
 }
-/* A group's caption with its dialog launcher (`ToolbarGroup.launcher`) in the corner. */
+/* A group's caption with its dialog launcher (`ToolbarGroup.launcher`) in the corner: the caption
+   centered, the launcher in its own column so a wide caption widens the group, never under it. */
 .foli-toolbar-group-foot {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-self: stretch;
   align-items: center;
-  justify-content: center;
   gap: 2px;
-  position: relative;
+}
+.foli-toolbar-group-foot > .foli-toolbar-group-label {
+  grid-column: 2;
 }
 .foli-toolbar-launcher {
-  position: absolute;
-  inset-inline-end: 0;
+  grid-column: 3;
+  justify-self: end;
   min-width: 18px;
   height: 18px;
   padding: 0 3px;
