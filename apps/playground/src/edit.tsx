@@ -22,7 +22,7 @@ import {
   type PackageImages,
   packageImages,
 } from "@folijs/docx";
-import { FoliComments, FoliNavigation, FoliToolbar } from "@folijs/react";
+import { FoliComments, FoliNavigation, FoliToolbar, wordRibbonTabs } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
@@ -116,9 +116,17 @@ const navigation = createRoot(document.getElementById("navigation") as HTMLEleme
  * The formatting toolbar for the current editor (a click puts the focus back in the document)
  * and the comments pane.
  */
+// `?ribbon`: Word's ribbon (25.x) in place of the one-row toolbar the e2e specs drive.
+const ribbon = new URLSearchParams(location.search).has("ribbon");
 const showToolbar = () => {
   toolbar.render(
-    <FoliToolbar editor={editor} comments upload={upload} onClickCommand={() => view.focus()} />,
+    <FoliToolbar
+      editor={editor}
+      comments
+      upload={upload}
+      onClickCommand={() => view.focus()}
+      {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
+    />,
   );
   commentsPane.render(<FoliComments editor={editor} />);
   navigation.render(<FoliNavigation editor={editor} />);
