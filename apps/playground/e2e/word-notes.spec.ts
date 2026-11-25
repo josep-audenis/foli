@@ -76,7 +76,7 @@ const lines = (n: number, from = 0) =>
 const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(" ");
 
 async function load(page: Page, document: Json) {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), document);
 }

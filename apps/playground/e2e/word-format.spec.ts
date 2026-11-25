@@ -18,7 +18,7 @@ const paragraph = (value: string, attrs?: Json): Json => ({
 
 /** Opens the editing page on paragraphs of Word's Normal (with Heading 1 and List Paragraph). */
 async function open(page: Page, blocks: Json[]): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate(
     (content) =>

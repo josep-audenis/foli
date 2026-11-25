@@ -121,8 +121,8 @@ const navigation = createRoot(document.getElementById("navigation") as HTMLEleme
  * The formatting toolbar for the current editor (a click puts the focus back in the document)
  * and the comments pane.
  */
-// `?ribbon`: Word's ribbon (25.x) in place of the one-row toolbar the e2e specs drive.
-const ribbon = new URLSearchParams(location.search).has("ribbon");
+// Word's ribbon (25.x); `?toolbar`: the one-row toolbar most e2e specs drive.
+const ribbon = !new URLSearchParams(location.search).has("toolbar");
 const showToolbar = () => {
   toolbar.render(
     <FoliToolbar

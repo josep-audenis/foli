@@ -50,7 +50,7 @@ interface PageInfo {
 
 /** Loads `blocks` and reads the pages at once, before any resize observer could re-flow them. */
 async function loadAndRead(page: Page, blocks: Json[]): Promise<PageInfo[]> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   return page.evaluate((doc) => {
     window.foliEdit.load(doc as never);

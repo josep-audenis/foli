@@ -286,7 +286,7 @@ const WORDS_OTHERWISE = new Set(["08-newsletter.docx"]);
 for (const name of readdirSync(CORPUS).filter((n) => n.endsWith(".docx")))
   test(`${name}: the editor's print gives the pages exportPdf gives`, async ({ page, context }) => {
     const exported = await exportCorpus(context, name);
-    await page.goto("/edit.html");
+    await page.goto("/edit.html?toolbar");
     await page.waitForFunction(() => "foliEdit" in window);
     await page.evaluate(
       (data) => window.foliEdit.loadDocx(data),

@@ -30,7 +30,7 @@ const text = (value: string): Json => ({ type: "text", text: value });
 const anchor = (type: string, id: number): Json => ({ type, attrs: { id } });
 
 async function open(page: Page, blocks: Json[], comments: Json[] = []): Promise<void> {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), documentOf(blocks, comments));
   await editor(page).focus();

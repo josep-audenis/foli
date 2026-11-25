@@ -37,7 +37,7 @@ const sample = (): Json => ({
 });
 
 async function load(page: Page) {
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => !!window.foliEdit);
   await page.evaluate((doc) => window.foliEdit.load(doc as never), sample());
   await editor(page).click({ position: { x: 200, y: 200 } });
@@ -204,7 +204,7 @@ test("in a header with a tab and in a note with its number, the mark is on the s
       { type: "noteReference", attrs: { story: "footnote:1" }, marks: [reference] },
     ],
   });
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => !!window.foliEdit);
   await page.evaluate((d) => window.foliEdit.load(d as never), doc);
   // "Left" 1..5, the tab 5..6, "cat" 6..9.
@@ -262,7 +262,7 @@ test("in a header's copy: the final view's joined paragraph and deleted text, a 
       },
     },
   };
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => !!window.foliEdit);
   await page.evaluate((d) => window.foliEdit.load(d as never), doc);
   await page.evaluate(() => window.foliEdit.editor.commands.setReviewView("final"));
@@ -330,7 +330,7 @@ test("in a header's table, a cell's paragraph with a deleted mark is not joined 
       },
     },
   };
-  await page.goto("/edit.html");
+  await page.goto("/edit.html?toolbar");
   await page.waitForFunction(() => !!window.foliEdit);
   await page.evaluate((d) => window.foliEdit.load(d as never), doc);
   await page.evaluate(() => window.foliEdit.editor.commands.setReviewView("final"));
