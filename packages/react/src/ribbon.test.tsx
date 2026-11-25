@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createEditor, type FoliDocument, fieldCodesShown, insertTable } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 import { FoliToolbar, selectionInTable, toolbarItems, wordRibbonTabs } from "./index.js";
 
 const word: FoliDocument = {
@@ -231,5 +231,67 @@ describe("wordRibbonTabs", () => {
     fireEvent.keyUp(document.body, { key: "Alt" });
     fireEvent.keyDown(document.body, { key: "n" });
     expect(screen.getByRole("tab", { name: "Home" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  describe('with overflow="menu" in a row too narrow', () => {
+    // jsdom lays nothing out: the row's widths are given, from its large buttons.
+    const widths = (scroll: (large: number) => number) => {
+      const bar = (e: Element) => e.classList.contains("foli-toolbar");
+      const large = (e: Element) => e.querySelectorAll(".foli-toolbar-large").length;
+      const scrollWidth = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth");
+      const clientWidth = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth");
+      Object.defineProperty(Element.prototype, "scrollWidth", {
+        configurable: true,
+        get(this: Element) {
+          return bar(this) ? scroll(large(this)) : 0;
+        },
+      });
+      Object.defineProperty(Element.prototype, "clientWidth", {
+        configurable: true,
+        get(this: Element) {
+          return bar(this) ? 450 : 0;
+        },
+      });
+      onTestFinished(() => {
+        if (scrollWidth) Object.defineProperty(Element.prototype, "scrollWidth", scrollWidth);
+        if (clientWidth) Object.defineProperty(Element.prototype, "clientWidth", clientWidth);
+      });
+    };
+    const big = (key: string, label: string) => ({
+      key,
+      label,
+      icon: "*",
+      size: "large" as const,
+      command: () => true,
+    });
+    const tabs = [
+      {
+        key: "t",
+        label: "T",
+        items: [
+          { label: "One", items: [big("a", "A")] },
+          { label: "Two", items: [big("b", "B"), big("c", "C")] },
+        ],
+      },
+    ];
+
+    it("draws the last groups' large buttons small while that narrows the row", () => {
+      // Each large button drawn small saves 40 px: two of three are enough.
+      widths((large) => 400 + 40 * large);
+      const editor = createEditor({ document: word });
+      const { container } = render(<FoliToolbar editor={editor} tabs={tabs} overflow="menu" />);
+      // The last group (two buttons) small, the first still large.
+      const large = [...container.querySelectorAll(".foli-toolbar-large")].map(
+        (b) => b.getAttribute("aria-label") ?? b.textContent,
+      );
+      expect(large).toEqual(["*A"]);
+    });
+
+    it("keeps them large when drawing them small does not narrow the row", () => {
+      widths(() => 600);
+      const editor = createEditor({ document: word });
+      const { container } = render(<FoliToolbar editor={editor} tabs={tabs} overflow="menu" />);
+      expect(container.querySelectorAll(".foli-toolbar-large")).toHaveLength(3);
+    });
   });
 });

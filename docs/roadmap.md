@@ -3711,8 +3711,10 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   command runs from it, Escape, a press elsewhere or the focus leaves; `collapsed`,
   `defaultCollapsed`, `onCollapsedChange`.
 - [x] 25.6 Groups shrink as the width falls: large buttons become small a group at a time from
-  the end of the row, then `overflow: "menu"` takes whole groups; measured again at each width,
-  nothing measured while typing. Changed from 25.1: a captioned group does not become one
+  the end of the row while that narrows it, then `overflow: "menu"` takes whole groups; measured
+  again at each width, nothing measured while typing. Found in 25.8's e2e: the built-ins have
+  text and no icon, and a large one wraps its text, so drawn small it is wider; the shrinking
+  now keeps a step only when the row got narrower, and the built-ins stay large. Changed from 25.1: a captioned group does not become one
   button opening its items. More already reaches every item that does not fit, and a second
   kind of panel would mean a second way through the items for the keyboard; left for later.
 - [x] 25.7 KeyTips: Alt alone, then a tab's letter (Word's: H, N, P, S, R, W), then an item's;
