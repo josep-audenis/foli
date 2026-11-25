@@ -145,12 +145,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * it the words a model reads (descriptions, refusals); the phase's last four areas to come.
  * Agent raised again in 23.8 (100.2 kB, 104.0 allowed): pictures, headers and footers, review;
  * the phase's code is in, its last tasks are tests and docs.
+ * React and FoliEditor raised in 25.2 (179.9 and 177.9 kB; 187.5 allowed): the Word ribbon
+ * (`wordRibbonTabs`, 26 more built-in items), with room for Phase 25's large buttons, launchers,
+ * collapse, shrinking groups and KeyTips.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 130_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 184_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 184_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 192_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 192_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
