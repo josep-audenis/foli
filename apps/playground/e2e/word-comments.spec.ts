@@ -105,6 +105,9 @@ test("reply, resolve, delete from the keyboard, and undo in the document", async
     // Resolving marks the whole thread, as Word does.
     { author: "Foli user", parent: 0, done: true, text: "This one." },
   ]);
+  // A resolved thread leaves the margin for the Resolved list.
+  await expect(pane(page).getByRole("article")).toHaveCount(0);
+  await pane(page).getByRole("button", { name: "Resolved (1)" }).click();
   await expect(pane(page).getByRole("article")).toHaveAttribute("data-done", "true");
   await pane(page).getByRole("button", { name: "Delete" }).first().click();
   expect(await comments(page)).toEqual([]);

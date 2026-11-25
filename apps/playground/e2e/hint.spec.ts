@@ -96,7 +96,10 @@ test("a far page is scrolled to and marked, then the mark fades and goes; the ca
     return !!rect && rect.top >= 0 && rect.bottom <= innerHeight;
   });
   expect(shown).toBe(true);
-  await expect.poll(() => marks(page, "foli-hint-fading")).toEqual(["Another cat"]);
+  // The fade lasts 400 ms: poll often enough not to step over it.
+  await expect
+    .poll(() => marks(page, "foli-hint-fading"), { intervals: [50] })
+    .toEqual(["Another cat"]);
   await expect.poll(() => marks(page, "foli-hint-fading")).toEqual([]);
   expect(await marks(page)).toEqual([]);
   expect(await selection(page)).toBe(before);
