@@ -1,5 +1,34 @@
 # @folijs/react
 
+## 1.9.0
+
+### Minor Changes
+
+- 220d533: Ribbon: an item's `size: "large"` (Word's large buttons), a group's `launcher` (the dialog
+  launcher in the caption's corner), and a ribbon that collapses to its tabs (`collapsed`,
+  `defaultCollapsed`, `onCollapsedChange`; the button at the end of the tabs, a double-click on
+  a tab, Ctrl+F1), a tab's panel then shown over the document. `wordRibbonTabs` uses them. New
+  toolbar strings: "Collapse the ribbon", "Pin the ribbon".
+- 313e871: Ribbon: KeyTips (Alt, then a tab's letter, then an item's; `keyTips`, and `keyTip` on a tab or
+  an item), and with `overflow: "menu"` large buttons drawn small, a group at a time, before
+  groups go under More.
+- 3eba13f: `wordRibbonTabs`: Word's ribbon (Home, Insert, Layout, References, Review, View) in captioned
+  groups, with Table Design, Table Layout and Picture Format tabs that show with the selection.
+  `ToolbarTab.contextual` draws a tab of the selection apart (`--foli-ribbon-contextual`), and
+  `selectionInTable` is exported. 26 more built-ins in `toolbarItems`, menus' entries as buttons
+  of their own (rows and columns, footnotes, table of contents, field codes, page setup…); the
+  default toolbar is unchanged. New toolbar strings: "Table Design", "Footnote", "Field codes",
+  "Rotate left 90°" and the ribbon's group captions (`toolbarMessages`).
+
+### Patch Changes
+
+- a8db59e: Ribbon: large buttons are drawn small only while that narrows the row (a large button with text
+  and no icon wraps its text and is often the narrower).
+- 84fa700: Ribbon: the collapse button comes after the panel for Tab (tabs, then the toolbar, then the
+  button), drawn at the end of the tabs' row as before.
+- @folijs/core@1.9.0
+  - @folijs/view@1.9.0
+
 ## 1.8.1
 
 ### Patch Changes

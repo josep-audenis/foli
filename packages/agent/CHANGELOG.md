@@ -1,5 +1,11 @@
 # @folijs/agent
 
+## 0.4.3
+
+### Patch Changes
+
+- @folijs/core@1.9.0
+
 ## 0.4.2
 
 ### Patch Changes
