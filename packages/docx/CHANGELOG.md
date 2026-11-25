@@ -1,5 +1,12 @@
 # @folijs/docx
 
+## 1.8.1
+
+### Patch Changes
+
+- Updated dependencies [cbfe172]
+  - @folijs/core@1.8.1
+
 ## 1.8.0
 
 ### Patch Changes

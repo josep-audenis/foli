@@ -1,6 +1,6 @@
 {
   "name": "@folijs/agent",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Agent editing for the Foli document engine: an LLM reads a document as text with a handle per block and edits it with a few coarse operations, every edit a tracked change. No DOM, no Node built-ins.",
   "license": "MIT",
   "repository": {

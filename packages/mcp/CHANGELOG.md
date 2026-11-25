@@ -1,5 +1,14 @@
 # @folijs/mcp
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [cbfe172]
+  - @folijs/core@1.8.1
+  - @folijs/agent@0.4.2
+  - @folijs/docx@1.8.1
+
 ## 0.3.1
 
 ### Patch Changes
