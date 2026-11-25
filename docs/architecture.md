@@ -1377,6 +1377,12 @@ since 1.0.0):
   selection (O(selection)), `aria-disabled` from cheap checks (undo/redo depth, a paragraph in
   the selection, whether it can be outdented), not command dry runs: `editor.can` builds the
   whole transaction, which over a select-all costs O(blocks) per keystroke.
+  With tabs (15.3) it is a ribbon; `wordRibbonTabs` (Phase 25) is Word's, in captioned groups,
+  with contextual tabs (`visible`), large buttons, dialog launchers (the group's last item, so the
+  roving index and the More panel count it), collapsing (a `floating` panel over the document)
+  and KeyTips (capture-phase document listeners, one owner among mounted ribbons). Shrinking
+  with `overflow="menu"` runs in the measuring layout effect: a group's large buttons drawn small
+  while that narrows the row, then the group count that fits; measured again per width.
   One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping; with Alt, Ctrl
   or Meta the keys are the browser's; the last button reached by keyboard keeps the stop);
   disabled buttons stay focusable (`aria-disabled`, not `disabled`). `mousedown` is prevented,

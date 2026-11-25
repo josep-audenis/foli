@@ -36,7 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
-| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.7 merged (#282, #284, #285); 25.8 (site, e2e)                                                                                                                               |
+| 25 Word ribbon            | In review                | `phase-25/word-ribbon` | 25.1-25.8 merged (#282, #284, #285, #287); docs closing; 1.9.0 waits on the owner                                                                                                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3727,9 +3727,13 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   and going, collapse and Ctrl+F1, shrinking at 1366, 1024 and 768 px with every item
   reachable, KeyTips; a screenshot of the References tab per engine. Found there: the collapse
   button sat between the tabs and the toolbar for Tab; it now comes after the panel.
-- [ ] 25.9 Docs and release: api.md, styling.md (the new classes), theming.md, keyboard.md
-  (Ctrl+F1, KeyTips), limitations.md (what Word's ribbon has that this does not); a changeset;
-  1.9.0 published with the owner's approval (1.8.0 went out with Phase 24).
+- [ ] 25.9 Docs and release: api.md, styling.md, theming.md, keyboard.md, limitations.md (the
+  ribbon's gaps), architecture.md, the React README and the extensions guide updated; five
+  changesets for `@folijs/react` (minor). `pnpm bench --engines chromium` (2026-11-25): no
+  regression past a threshold, keystrokes at or under the baseline (the bench page has the
+  one-row toolbar, not the ribbon: the ribbon's own cost while typing is its items' state, the
+  same selector as any toolbar's). Firefox and WebKit not benched. Left: 1.9.0 published with
+  the owner's approval.
 
 ### Acceptance
 
