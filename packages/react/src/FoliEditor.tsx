@@ -19,7 +19,7 @@ import {
   useIsomorphicLayoutEffect,
 } from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
-import { FoliComments } from "./FoliComments.js";
+import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { FoliNavigation } from "./FoliNavigation.js";
 import {
   FoliToolbar,
@@ -107,6 +107,10 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * any. Not access control: the app's server checks what it receives.
    */
   commentOnly?: boolean | undefined;
+  /** People a comment can tag after `@` (`FoliComments`' `mentions`). */
+  mentions?: MentionSource | undefined;
+  /** A comment saved in the pane newly tags people: tell them (`FoliComments`' `onMention`). */
+  onMention?: ((event: MentionEvent) => void) | undefined;
   /** Rendered between the toolbar and the pages, inside the editor's context. */
   children?: ReactNode | undefined;
 }
@@ -140,6 +144,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     comments = "auto",
     onlyOwnComments,
     commentOnly = false,
+    mentions,
+    onMention,
     children,
     ...canvas
   },
@@ -240,6 +246,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
             readOnly={readOnly}
             hidden={comments === "auto" && !hasComments}
             onlyOwnComments={onlyOwnComments ?? commentOnly}
+            mentions={mentions}
+            onMention={onMention}
           />
         )}
       </div>

@@ -20,6 +20,7 @@ import {
   type ParagraphFormat,
   Resolver,
   type RunFormat,
+  resolvedCommentIds,
 } from "@folijs/core/internal";
 import { applyAttrs, type DecorationAttrs } from "../extension.js";
 
@@ -39,6 +40,8 @@ export interface CustomDrawing {
  * parameter of every helper (cells, opaque blocks); fine while drawing stays synchronous.
  */
 let drawing: CustomDrawing | undefined;
+/** The resolved comments of that call's document: their text is not shaded (same shortcut). */
+let resolved: ReadonlySet<number> = new Set();
 
 /**
  * Marks the <br> of an explicit page break (the page flow ends the page after its line).
@@ -793,11 +796,14 @@ export function renderBlocks(
   options: BlockOptions = {},
 ): WordBlock[] {
   const outer = drawing;
+  const outerResolved = resolved;
   drawing = options.custom;
+  resolved = resolvedCommentIds(document.comments ?? []);
   try {
     return renderBlocksNow(document, doc, options);
   } finally {
     drawing = outer;
+    resolved = outerResolved;
   }
 }
 
@@ -1238,7 +1244,7 @@ function renderInline(
     if (link) element.dataset.href = String(link.attrs?.href ?? `#${String(link.attrs?.anchor)}`);
     if (comments.size) {
       element.dataset.foliComments = [...comments].join(" ");
-      if (!run.highlight && !run.shading)
+      if (!run.highlight && !run.shading && [...comments].some((id) => !resolved.has(id)))
         element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
     }
     if (review === "markup" && (inserted || deleted)) {

@@ -24,6 +24,14 @@ import {
   packageImages,
 } from "@folijs/docx";
 import { FoliComments, FoliNavigation, FoliToolbar, wordRibbonTabs } from "@folijs/react";
+
+/** People a comment can tag after @ (an app gives its own directory). */
+const PEOPLE = [
+  { name: "Ana García", email: "ana@example.com" },
+  { name: "Ben Okafor", email: "ben@example.com" },
+  { name: "Chloé Martin", email: "chloe@example.com" },
+];
+
 import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
@@ -134,7 +142,17 @@ const showToolbar = () => {
       {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
     />,
   );
-  commentsPane.render(<FoliComments editor={editor} onlyOwnComments={commenting} />);
+  commentsPane.render(
+    <FoliComments
+      editor={editor}
+      onlyOwnComments={commenting}
+      mentions={PEOPLE}
+      // An app would email them from its server; the playground logs who was tagged.
+      onMention={({ comment, people }) =>
+        console.info(`Comment ${comment.id} tags`, people.map((p) => p.email).join(", "))
+      }
+    />,
+  );
   navigation.render(<FoliNavigation editor={editor} readOnly={commenting} />);
 };
 showToolbar();

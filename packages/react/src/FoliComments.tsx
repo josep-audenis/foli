@@ -1,10 +1,13 @@
 import {
   type CommentJSON,
+  type CommentMention,
   commentAnchors,
+  commentMentions,
   deleteComment,
   type Editor,
   type EditorState,
   editComment,
+  mentionText,
   type NodeJSON,
   replyToComment,
   resolveComment,
@@ -29,7 +32,35 @@ export interface FoliCommentsProps {
    * It hides the buttons, it does not guard the document: commands still change any comment.
    */
   onlyOwnComments?: boolean | undefined;
+  /**
+   * People a comment or reply can tag: typing `@` suggests them (by name or address), a pick
+   * writes `@Name` linked to `mailto:` their address, as Word does. A list, or a function that
+   * finds them for what follows the `@` (your directory; it may return a promise). Anyone may
+   * be tagged, connected or not.
+   */
+  mentions?: MentionSource | undefined;
+  /**
+   * A comment or reply saved here tags people it did not tag before: tell them (send an email,
+   * say). Called once per save with only the newly tagged. Comments made elsewhere (an agent, a
+   * collab peer) do not call it: a server finds their tags with `commentMentions`.
+   */
+  onMention?: ((event: MentionEvent) => void) | undefined;
 }
+
+/** Who can be tagged: a list, or a function that finds them for a query. */
+export type MentionSource =
+  | readonly CommentMention[]
+  | ((query: string) => readonly CommentMention[] | Promise<readonly CommentMention[]>);
+
+export interface MentionEvent {
+  /** The comment or reply as saved. */
+  comment: CommentJSON;
+  /** The people it tags that it did not before. */
+  people: CommentMention[];
+}
+
+/** At most this many suggestions show. */
+const SUGGESTIONS = 8;
 
 /** A comment and its replies, where its range starts in the document. */
 interface Thread {
@@ -102,19 +133,65 @@ function plain(c: CommentJSON): boolean {
       (p) =>
         p.type === "paragraph" &&
         Object.keys(p.attrs ?? {}).every((key) => key === "style") &&
-        (p.content ?? []).every((n) => n.type === "text" && !n.marks?.length),
+        (p.content ?? []).every(
+          (n) =>
+            n.type === "text" &&
+            // A mention's link only: other marks on it would be lost when saved.
+            (!n.marks?.length ||
+              (n.marks.length === 1 && commentMentions({ content: [n] }).length > 0)),
+        ),
     )
   );
 }
 
-/** `text` as `c`'s content: a paragraph per line, in `c`'s paragraph style. */
-function contentLike(c: CommentJSON, text: string): NodeJSON[] {
+/**
+ * A line of text, `@Name` of each of `people` in it linked as their mention; of two people
+ * with one name, the first in `people` (shortcut: by name, not by where each was picked; track
+ * pick positions if two people of one name in one comment matter).
+ */
+function lineContent(line: string, people: readonly CommentMention[]): NodeJSON[] {
+  // The longest name first: "@Ana Maria" is not "@Ana" and the rest.
+  const names = [...people].sort((a, b) => b.name.length - a.name.length);
+  const content: NodeJSON[] = [];
+  let text = "";
+  for (let i = 0; i < line.length; ) {
+    const person =
+      line[i] === "@"
+        ? names.find(
+            (p) =>
+              p.name &&
+              line.startsWith(`@${p.name}`, i) &&
+              // The whole name: "@Anabel" is not "@Ana" and "bel".
+              !/[\p{L}\p{N}]/u.test(line[i + p.name.length + 1] ?? ""),
+          )
+        : undefined;
+    if (person) {
+      if (text) content.push({ type: "text", text });
+      text = "";
+      content.push(mentionText(person));
+      i += person.name.length + 1;
+    } else text += line[i++];
+  }
+  if (text) content.push({ type: "text", text });
+  return content;
+}
+
+/** `text` as `c`'s content: a paragraph per line, in `c`'s paragraph style, `people` tagged. */
+function contentLike(c: CommentJSON, text: string, people: readonly CommentMention[] = []) {
   const style = (c.content[0]?.attrs as { style?: string } | undefined)?.style;
-  return text.split(/\r\n|\r|\n/).map((line) => ({
-    type: "paragraph",
-    ...(style ? { attrs: { style } } : {}),
-    ...(line ? { content: [{ type: "text", text: line }] } : {}),
-  }));
+  return text.split(/\r\n|\r|\n/).map(
+    (line): NodeJSON => ({
+      type: "paragraph",
+      ...(style ? { attrs: { style } } : {}),
+      ...(line ? { content: lineContent(line, people) } : {}),
+    }),
+  );
+}
+
+/** Who `after` tags that `before` did not (by address). */
+function newlyTagged(before: CommentJSON | undefined, after: CommentJSON): CommentMention[] {
+  const old = new Set((before ? commentMentions(before) : []).map((p) => p.email.toLowerCase()));
+  return commentMentions(after).filter((p) => !old.has(p.email.toLowerCase()));
 }
 
 const isEmpty = (c: CommentJSON) => textOf(c).trim() === "";
@@ -144,6 +221,8 @@ export function FoliComments({
   className,
   hidden = false,
   onlyOwnComments = false,
+  mentions,
+  onMention,
 }: FoliCommentsProps) {
   const editor = useEditorOrContext(editorProp, "FoliComments");
   const comments = useEditorState((state) => wordContext(state)?.envelope.comments ?? EMPTY, {
@@ -154,7 +233,11 @@ export function FoliComments({
   const head = useEditorState((state) => state.selection.head, { editor });
   const me = useEditorState((state) => trackState(state)?.author, { editor });
   const own = (c: CommentJSON) => !onlyOwnComments || c.author === me;
-  const threads = threadsOf(editor.state, comments);
+  const all = threadsOf(editor.state, comments);
+  /** Open threads, beside their text; the resolved ones are in their own list (the history). */
+  const threads = all.filter((thread) => !thread.comment.done);
+  const resolved = all.filter((thread) => thread.comment.done);
+  const [showResolved, setShowResolved] = useState(false);
   const pane = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
@@ -196,6 +279,7 @@ export function FoliComments({
     if (fresh && !readOnly && isEmpty(fresh) && plain(fresh)) {
       created.current.add(fresh.id);
       setWriting({ id: fresh.id, reply: false });
+      setShowResolved(false);
     }
   }, [comments, documentId, readOnly]);
 
@@ -203,7 +287,7 @@ export function FoliComments({
   // hidden or without threads: no query of the pages, no layout forced.
   const measure = () => {
     const root = pane.current;
-    if (hidden || !threads.length) return;
+    if (hidden || showResolved || !threads.length) return;
     const container = root && pagesAround(root);
     if (!root || !container) return;
     const paneTop = root.getBoundingClientRect().top;
@@ -219,7 +303,8 @@ export function FoliComments({
     }
     const items = [...root.querySelectorAll<HTMLElement>(":scope > .foli-comment-thread")];
     const next: number[] = [];
-    let bottom = 0;
+    const header = root.querySelector<HTMLElement>(":scope > .foli-comments-header");
+    let bottom = header ? header.offsetHeight + 8 : 0;
     threads.forEach((thread, i) => {
       const anchor = anchors.get(String(thread.comment.id));
       const wanted = anchor ? anchor.getBoundingClientRect().top - paneTop : bottom;
@@ -237,7 +322,7 @@ export function FoliComments({
   const measureRef = useRef(measure);
   measureRef.current = measure;
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured after every change of what it shows.
-  useIsomorphicLayoutEffect(measure, [comments, writing, threads.length, hidden]);
+  useIsomorphicLayoutEffect(measure, [comments, writing, threads.length, hidden, showResolved]);
   // Typing moves the text: measured once a frame, not once a keystroke, and only with threads.
   const frame = useRef(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes move the anchors.
@@ -273,21 +358,39 @@ export function FoliComments({
     focus?.();
   });
 
+  // A thread that left the list it was focused in (resolved, reopened, deleted) took the focus
+  // with it, without a blur: its text is not marked.
+  const marked = (showResolved ? resolved : threads).some((t) => t.comment.id === focused)
+    ? focused
+    : null;
+  // Forgotten, so switching lists does not mark it again.
+  useEffect(() => {
+    if (marked === null && focused !== null) setFocused(null);
+  }, [marked, focused]);
   // The focused thread's text marked in the document (again after the view redraws it).
   // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes mean redrawn text to mark.
   useEffect(() => {
     const container = pane.current && pagesAround(pane.current);
-    if (!container || focused === null) return;
-    const marked = [
-      ...container.querySelectorAll<HTMLElement>(`[data-foli-comments~="${focused}"]`),
-    ];
-    for (const element of marked) element.classList.add("foli-comment-active");
+    if (!container || marked === null) return;
+    for (const element of container.querySelectorAll<HTMLElement>(
+      `[data-foli-comments~="${marked}"]`,
+    ))
+      element.classList.add("foli-comment-active");
+    // Every element with the mark, not those marked: the page layout copies a paragraph split
+    // across pages, mark included.
     return () => {
-      for (const element of marked) element.classList.remove("foli-comment-active");
+      for (const element of container.querySelectorAll<HTMLElement>(".foli-comment-active"))
+        element.classList.remove("foli-comment-active");
     };
-  }, [focused, doc]);
+  }, [marked, doc]);
 
   const run = (command: Parameters<Editor["run"]>[0]) => editor.run(command);
+  const commentsNow = () => wordContext(editor.state)?.envelope.comments ?? EMPTY;
+  /** Tells `onMention` whom `saved` newly tags. */
+  const tell = (before: CommentJSON | undefined, saved: CommentJSON | undefined) => {
+    const people = saved ? newlyTagged(before, saved) : [];
+    if (saved && people.length) onMention?.({ comment: saved, people });
+  };
   /**
    * Focus the thread of `id` (comment `from`'s first button, else the thread's), else the pane,
    * else the document.
@@ -309,6 +412,102 @@ export function FoliComments({
     };
   };
 
+  /** A thread: beside its text (an open one), or in the list of resolved ones. */
+  const threadView = (thread: Thread, i: number, list: readonly Thread[], beside: boolean) => {
+    const { comment } = thread;
+    const active = head >= thread.pos && head <= thread.end + 1;
+    const after = list[i + 1] ?? list[i - 1];
+    const canReply = !readOnly && editor.can(replyToComment(comment.id, "x"));
+    return (
+      <article
+        key={comment.id}
+        data-thread={comment.id}
+        tabIndex={-1}
+        className="foli-comment-thread"
+        data-active={active || undefined}
+        data-done={comment.done || undefined}
+        style={beside ? { top: tops[i] ?? 0 } : undefined}
+        aria-label={`Comment by ${nameOf(comment)}${comment.done ? ", resolved" : ""}`}
+        onFocus={() => setFocused(comment.id)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(null);
+        }}
+      >
+        {[comment, ...thread.replies].map((c) => (
+          <CommentView
+            key={c.id}
+            comment={c}
+            root={c === comment}
+            readOnly={readOnly}
+            canReply={canReply}
+            canEdit={own(c) && plain(c)}
+            canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
+            editing={writing?.id === c.id && !writing.reply}
+            onEdit={() => setWriting({ id: c.id, reply: false })}
+            onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
+            onResolve={() => {
+              run(resolveComment(comment.id, !comment.done));
+              // It moves to the other list: the next thread of this one has the focus.
+              focusThread(after?.comment.id);
+            }}
+            onDelete={() => {
+              run(deleteComment(c.id));
+              focusThread(c === comment ? after?.comment.id : comment.id);
+            }}
+            mentions={mentions}
+            onSave={(text, picked) => {
+              // The latest pick first: it wins over an earlier one of the same name.
+              const people = [...picked].reverse().concat(commentMentions(c));
+              if (!run(editComment(c.id, contentLike(c, text, people)))) return false;
+              tell(
+                c,
+                commentsNow().find((saved) => saved.id === c.id),
+              );
+              created.current.delete(c.id);
+              setWriting(null);
+              focusThread(comment.id);
+              return true;
+            }}
+            onCancel={() => {
+              // A comment made here and left empty goes.
+              const gone = created.current.has(c.id) && isEmpty(c);
+              created.current.delete(c.id);
+              if (gone) run(deleteComment(c.id));
+              setWriting(null);
+              focusThread(gone ? after?.comment.id : comment.id);
+            }}
+          />
+        ))}
+        {writing?.reply && writing.id === comment.id && (
+          <CommentForm
+            label="Reply"
+            initial=""
+            mentions={mentions}
+            onSave={(text, picked) => {
+              if (text.trim()) {
+                const before = new Set(commentsNow().map((saved) => saved.id));
+                const people = [...picked].reverse();
+                if (!run(replyToComment(comment.id, contentLike(comment, text, people))))
+                  return false;
+                tell(
+                  undefined,
+                  commentsNow().find((saved) => !before.has(saved.id)),
+                );
+              }
+              setWriting(null);
+              focusThread(comment.id, writing.from);
+              return true;
+            }}
+            onCancel={() => {
+              setWriting(null);
+              focusThread(comment.id, writing.from);
+            }}
+          />
+        )}
+      </article>
+    );
+  };
+
   return (
     <aside
       ref={pane}
@@ -316,85 +515,33 @@ export function FoliComments({
       className={`foli-comments${className ? ` ${className}` : ""}`}
       aria-label={label}
       hidden={hidden}
-      style={height ? { minHeight: height } : undefined}
+      style={height && !showResolved ? { minHeight: height } : undefined}
     >
-      {threads.length === 0 && <p className="foli-comments-empty">No comments</p>}
-      {threads.map((thread, i) => {
-        const { comment } = thread;
-        const active = head >= thread.pos && head <= thread.end + 1;
-        const after = threads[i + 1] ?? threads[i - 1];
-        const canReply = !readOnly && editor.can(replyToComment(comment.id, "x"));
-        return (
-          <article
-            key={comment.id}
-            data-thread={comment.id}
-            tabIndex={-1}
-            className="foli-comment-thread"
-            data-active={active || undefined}
-            data-done={comment.done || undefined}
-            style={{ top: tops[i] ?? 0 }}
-            aria-label={`Comment by ${nameOf(comment)}${comment.done ? ", resolved" : ""}`}
-            onFocus={() => setFocused(comment.id)}
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(null);
-            }}
-          >
-            {[comment, ...thread.replies].map((c) => (
-              <CommentView
-                key={c.id}
-                comment={c}
-                root={c === comment}
-                readOnly={readOnly}
-                canReply={canReply}
-                canEdit={own(c) && plain(c)}
-                canDelete={!readOnly && own(c) && editor.can(deleteComment(c.id))}
-                editing={writing?.id === c.id && !writing.reply}
-                onEdit={() => setWriting({ id: c.id, reply: false })}
-                onReply={() => setWriting({ id: comment.id, reply: true, from: c.id })}
-                onResolve={() => {
-                  run(resolveComment(comment.id, !comment.done));
-                  focusThread(comment.id);
-                }}
-                onDelete={() => {
-                  run(deleteComment(c.id));
-                  focusThread(c === comment ? after?.comment.id : comment.id);
-                }}
-                onSave={(text) => {
-                  if (!run(editComment(c.id, contentLike(c, text)))) return false;
-                  created.current.delete(c.id);
-                  setWriting(null);
-                  focusThread(comment.id);
-                  return true;
-                }}
-                onCancel={() => {
-                  // A comment made here and left empty goes.
-                  const gone = created.current.has(c.id) && isEmpty(c);
-                  created.current.delete(c.id);
-                  if (gone) run(deleteComment(c.id));
-                  setWriting(null);
-                  focusThread(gone ? after?.comment.id : comment.id);
-                }}
-              />
-            ))}
-            {writing?.reply && writing.id === comment.id && (
-              <CommentForm
-                label="Reply"
-                initial=""
-                onSave={(text) => {
-                  if (text.trim() && !run(replyToComment(comment.id, text))) return false;
-                  setWriting(null);
-                  focusThread(comment.id, writing.from);
-                  return true;
-                }}
-                onCancel={() => {
-                  setWriting(null);
-                  focusThread(comment.id, writing.from);
-                }}
-              />
-            )}
-          </article>
-        );
-      })}
+      {(resolved.length > 0 || showResolved) && (
+        <div className="foli-comments-header">
+          <button type="button" aria-pressed={!showResolved} onClick={() => setShowResolved(false)}>
+            Open ({threads.length})
+          </button>
+          <button type="button" aria-pressed={showResolved} onClick={() => setShowResolved(true)}>
+            Resolved ({resolved.length})
+          </button>
+        </div>
+      )}
+      {showResolved ? (
+        <div className="foli-comments-resolved">
+          {resolved.length === 0 && <p className="foli-comments-empty">No resolved comments</p>}
+          {resolved.map((thread, i) => threadView(thread, i, resolved, false))}
+        </div>
+      ) : (
+        <>
+          {threads.length === 0 && (
+            <p className="foli-comments-empty">
+              {resolved.length ? "No open comments" : "No comments"}
+            </p>
+          )}
+          {threads.map((thread, i) => threadView(thread, i, threads, true))}
+        </>
+      )}
     </aside>
   );
 }
@@ -413,6 +560,7 @@ function CommentView({
   onDelete,
   onSave,
   onCancel,
+  mentions,
 }: {
   comment: CommentJSON;
   root: boolean;
@@ -425,8 +573,9 @@ function CommentView({
   onReply(): void;
   onResolve(): void;
   onDelete(): void;
-  onSave(text: string): boolean;
+  onSave(text: string, picked: readonly CommentMention[]): boolean;
   onCancel(): void;
+  mentions: MentionSource | undefined;
 }) {
   const author = comment.author || "Unknown author";
   const what = root ? "comment" : "reply";
@@ -441,12 +590,24 @@ function CommentView({
           initial={textOf(comment)}
           onSave={onSave}
           onCancel={onCancel}
+          mentions={mentions}
         />
       ) : (
         <div className="foli-comment-text">
           {comment.content.map((p, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs have no identity.
-            <p key={i}>{paragraphText(p)}</p>
+            <p key={i}>
+              {(p.content ?? []).map((n, j) =>
+                commentMentions({ content: [n] }).length ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: runs have no identity.
+                  <span key={j} className="foli-comment-mention">
+                    {n.text}
+                  </span>
+                ) : (
+                  paragraphText({ type: "paragraph", content: [n] })
+                ),
+              )}
+            </p>
           ))}
         </div>
       )}
@@ -491,37 +652,117 @@ function CommentView({
   );
 }
 
+/** The `@query` being typed before the caret (no space in it), or null. */
+function mentionQuery(text: string, caret: number): { from: number; query: string } | null {
+  const match = /(?:^|\s)@([^\s@]*)$/.exec(text.slice(0, caret));
+  return match
+    ? { from: caret - (match[1] as string).length - 1, query: match[1] as string }
+    : null;
+}
+
+/** The people of a list that match `query` (in their name or address). */
+const matching = (people: readonly CommentMention[], query: string) => {
+  const q = query.toLowerCase();
+  return people.filter(
+    (p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
+  );
+};
+
 function CommentForm({
   label,
   initial,
   onSave,
   onCancel,
+  mentions,
 }: {
   label: string;
   initial: string;
   /** False when it could not be saved: the form stays open. */
-  onSave(text: string): boolean;
+  onSave(text: string, picked: readonly CommentMention[]): boolean;
   onCancel(): void;
+  mentions?: MentionSource | undefined;
 }) {
   const id = useId();
   const [text, setText] = useState(initial);
   const [failed, setFailed] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  /** The people picked here: their `@Name` is linked when saved. */
+  const picked = useRef<CommentMention[]>([]);
+  const [query, setQuery] = useState<{ from: number; query: string } | null>(null);
+  const [found, setFound] = useState<readonly CommentMention[]>([]);
+  const [active, setActive] = useState(0);
   useEffect(() => field.current?.focus(), []);
-  const save = () => setFailed(!onSave(text));
+  // The people for the query: at once from a list, else when the function answers (the last
+  // query's answer only).
+  // Read when the query changes: an inline list or function does not search again per render.
+  const source = useRef(mentions);
+  source.current = mentions;
+  const typed = query?.query;
+  useEffect(() => {
+    const mentions = source.current;
+    // A new query: the last one's people go until this one's answer comes.
+    setFound([]);
+    if (!mentions || typed === undefined) return;
+    let current = true;
+    const show = (people: readonly CommentMention[]) => {
+      if (!current) return;
+      setFound(people.slice(0, SUGGESTIONS));
+      setActive(0);
+    };
+    if (typeof mentions !== "function") show(matching(mentions, typed));
+    else Promise.resolve(mentions(typed)).then(show, () => show([]));
+    return () => {
+      current = false;
+    };
+  }, [typed]);
+  const open = !!query && found.length > 0;
+  const follow = (element: HTMLTextAreaElement) =>
+    setQuery(mentions ? mentionQuery(element.value, element.selectionStart) : null);
+  const pick = (person: CommentMention) => {
+    const element = field.current;
+    if (!element || !query) return;
+    const caret = element.selectionStart;
+    const written = `@${person.name} `;
+    const next = text.slice(0, query.from) + written + text.slice(caret);
+    picked.current.push(person);
+    setText(next);
+    setQuery(null);
+    const at = query.from + written.length;
+    globalThis.requestAnimationFrame?.(() => {
+      element.focus();
+      element.setSelectionRange(at, at);
+    });
+  };
+  const save = () => setFailed(!onSave(text, picked.current));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     save();
   };
   const keys = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Escape") {
+    if (open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
-      onCancel();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setActive((i) => (i + step + found.length) % found.length);
+    } else if (
+      open &&
+      (e.key === "Enter" || e.key === "Tab") &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey
+    ) {
+      e.preventDefault();
+      pick(found[active] as CommentMention);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      // The suggestions close first, then the form.
+      if (open) setQuery(null);
+      else onCancel();
     } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       save();
     }
   };
+  const listId = `${id}-people`;
   return (
     <form className="foli-comment-form" onSubmit={submit}>
       <label htmlFor={id}>{label}</label>
@@ -530,11 +771,44 @@ function CommentForm({
         ref={field}
         value={text}
         rows={3}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          follow(e.target);
+        }}
+        // The caret moved (not by the keys the suggestions take, after which it is set).
+        onKeyUp={(e) => {
+          if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key))
+            follow(e.currentTarget);
+        }}
+        onClick={(e) => follow(e.currentTarget)}
         onKeyDown={keys}
+        onBlur={() => setQuery(null)}
+        aria-autocomplete={mentions ? "list" : undefined}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
         aria-invalid={failed || undefined}
         aria-describedby={failed ? `${id}-error` : undefined}
       />
+      {open && (
+        <div id={listId} className="foli-comment-people" role="listbox" aria-label="People">
+          {found.map((person, i) => (
+            <div
+              key={person.email}
+              id={`${listId}-${i}`}
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === active}
+              // Before the field's blur: the pick needs the caret where it was.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(person);
+              }}
+            >
+              <strong>{person.name}</strong> <span>{person.email}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {failed && (
         <p id={`${id}-error`} className="foli-comment-error" role="alert">
           Could not be saved here.

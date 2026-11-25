@@ -22,6 +22,7 @@ import {
   type ListMarker,
   type RunFormat,
   referencesIn,
+  resolvedCommentIds,
   type WordContext,
 } from "@folijs/core/internal";
 import {
@@ -162,6 +163,8 @@ export class WordRenderer {
   #markers: (ListMarker | null)[] = [];
   /** Comment ranges open at the start of each block. */
   #comments: number[][] = [];
+  /** Resolved comments: their text is not shaded (a change of comments renews the renderer). */
+  #resolved: ReadonlySet<number>;
   /** Where a document adds paragraph spacing: the space after the paragraph above, in a cell. */
   #above: number[] = [];
   /** Whether fields show their codes. */
@@ -199,6 +202,7 @@ export class WordRenderer {
     this.#clipboard = clipboard;
     this.#review = review;
     this.#image = image ?? imageSource(context.envelope.resources);
+    this.#resolved = resolvedCommentIds(context.envelope.comments);
   }
 
   get context(): WordContext {
@@ -588,7 +592,7 @@ export class WordRenderer {
     if (comments.size && !this.#clipboard) {
       // The comments whose range holds this text: the comments pane finds and marks it.
       element.dataset.foliComments = [...comments].join(" ");
-      if (!element.style.backgroundColor)
+      if (!element.style.backgroundColor && [...comments].some((id) => !this.#resolved.has(id)))
         element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
     }
     let outer = element;
