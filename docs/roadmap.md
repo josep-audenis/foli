@@ -3729,7 +3729,11 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   button sat between the tabs and the toolbar for Tab; it now comes after the panel.
 - [ ] 25.9 Docs and release: api.md, styling.md, theming.md, keyboard.md, limitations.md (the
   ribbon's gaps), architecture.md, the React README and the extensions guide updated; five
-  changesets for `@folijs/react` (minor). Left: 1.9.0 published with the owner's approval.
+  changesets for `@folijs/react` (minor). `pnpm bench --engines chromium` (2026-11-25): no
+  regression past a threshold, keystrokes at or under the baseline (the bench page has the
+  one-row toolbar, not the ribbon: the ribbon's own cost while typing is its items' state, the
+  same selector as any toolbar's). Firefox and WebKit not benched. Left: 1.9.0 published with
+  the owner's approval.
 
 ### Acceptance
 
