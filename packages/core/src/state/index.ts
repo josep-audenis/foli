@@ -41,9 +41,11 @@ export {
   type CommentContent,
   type CommentOptions,
   commentAnchors,
+  commentOnly,
   deleteAllComments,
   deleteComment,
   editComment,
+  onlyCommentSteps,
   replyToComment,
   resolveComment,
 } from "./comments.js";

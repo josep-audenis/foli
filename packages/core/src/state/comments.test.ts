@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
+import type { Step } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument } from "../v3/document.js";
+import { commentOnly, onlyCommentSteps } from "./comments.js";
 import { createEditor, type Editor } from "./editor.js";
+import { remote } from "./state.js";
 
 const text = (value: string): NodeJSON => ({ type: "text", text: value });
 const p = (...content: NodeJSON[]): NodeJSON => ({
@@ -209,5 +212,92 @@ describe("comments", () => {
     editor.select(3);
     editor.commands.insertText("c");
     expect(comments(editor)).toHaveLength(1);
+  });
+});
+
+describe("comment-only mode", () => {
+  function commenter(blocks: NodeJSON[], comments: CommentJSON[] = []): Editor {
+    const document: FoliDocument = {
+      schemaVersion: 5,
+      section: {},
+      defaults: {},
+      styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+      numbering: { abstracts: [], instances: [] },
+      comments,
+      content: { type: "doc", content: blocks },
+    };
+    return createEditor({ document, author: "Me", plugins: [commentOnly()] });
+  }
+
+  it("comments, replies, resolves, deletes and undoes; the text stays", () => {
+    const editor = commenter([p(text("Hello world"))]);
+    editor.select(7, 12);
+    editor.commands.addComment("Which?");
+    editor.commands.replyToComment(0, "That one");
+    editor.commands.resolveComment(0);
+    expect(comments(editor).map((c) => [c.id, c.done])).toEqual([
+      [0, true],
+      [1, true],
+    ]);
+    editor.commands.deleteComment(1);
+    expect(blocks(editor)).toEqual([p(text("Hello "), start(0), text("world"), end(0), ref(0))]);
+    editor.commands.undo();
+    editor.commands.undo();
+    editor.commands.undo();
+    editor.commands.undo();
+    expect(blocks(editor)).toEqual([p(text("Hello world"))]);
+    expect(comments(editor)).toEqual([]);
+  });
+
+  it("refuses every other change", () => {
+    const editor = commenter([p(text("Hello world"))]);
+    const before = editor.getDocument();
+    editor.select(1, 6);
+    editor.commands.insertText("Bye");
+    editor.commands.toggleMark("bold");
+    editor.commands.splitBlock();
+    editor.commands.deleteSelection();
+    expect(editor.getDocument()).toEqual(before);
+    // The selection still moves: it is no change to the document.
+    editor.select(2, 3);
+    expect(editor.state.selection.from).toBe(2);
+  });
+
+  it("lets received transactions through: the others still edit", () => {
+    const editor = commenter([p(text("ab"))]);
+    editor.dispatch(editor.state.tr.insertText("Z", 1).setMeta(remote, true));
+    expect(blocks(editor)).toEqual([p(text("Zab"))]);
+  });
+
+  it("checks steps against the document they apply to", () => {
+    const editor = createEditor({
+      document: {
+        schemaVersion: 5,
+        section: {},
+        defaults: {},
+        styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+        numbering: { abstracts: [], instances: [] },
+        comments: [],
+        content: { type: "doc", content: [p(text("ab"))] },
+      },
+    });
+    const doc = editor.state.doc;
+    let steps: Step[] = [];
+    editor.subscribe((_, transactions) => {
+      steps = transactions.flatMap((tr) => tr.steps);
+    });
+    editor.select(1, 3);
+    editor.commands.addComment("c");
+    expect(steps.length).toBeGreaterThan(1);
+    expect(onlyCommentSteps(doc, steps)).toBe(true);
+    // The same anchors' removal from the commented document is fine; text with them is not.
+    const commented = editor.state.doc;
+    editor.commands.deleteComment(0);
+    expect(onlyCommentSteps(commented, steps)).toBe(true);
+    editor.select(1, 2);
+    editor.commands.insertText("x");
+    expect(onlyCommentSteps(doc, steps)).toBe(false);
+    // A step that does not apply to the document is refused, not thrown.
+    expect(onlyCommentSteps(commenter([p()]).state.doc, steps)).toBe(false);
   });
 });

@@ -86,8 +86,12 @@ export interface AuthorityOptions<P = unknown> {
   /** The package it was imported from (`DocxImport.package`), kept as it is for export. */
   package?: P;
   limits?: AuthorityLimits;
-  /** The app's say: false refuses a client's steps (a read-only user) as `unauthorized`. */
-  authorize?: (clientID: ClientID, steps: readonly Step[]) => boolean;
+  /**
+   * The app's say: false refuses a client's steps (a read-only user) as `unauthorized`. `doc` is the
+   * authority's document the steps apply to: `onlyCommentSteps(doc, steps)` (core) lets a
+   * comment-only user comment and nothing else.
+   */
+  authorize?: (clientID: ClientID, steps: readonly Step[], doc: Node) => boolean;
   /** The extensions the clients' editors have: their nodes, marks and steps. */
   extensions?: Extension[];
 }
@@ -252,7 +256,8 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
         if (error instanceof FoliDocumentError) return refuse("malformed", error.message);
         throw error;
       }
-      if (options.authorize && !options.authorize(clientID, parsed)) return refuse("unauthorized");
+      if (options.authorize && !options.authorize(clientID, parsed, editor.state.doc))
+        return refuse("unauthorized");
       // Applied as clients apply it (the word plugin checks envelope and story steps), with
       // Word's rules concurrent edits can break and the schema does not hold restored, in one
       // transaction: a step that would break the document changes nothing.

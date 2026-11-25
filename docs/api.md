@@ -671,6 +671,12 @@ opaque block, which stays), `deleteAllComments()` (threads anchored there kept);
 (a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
 reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
 accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
+Comment-only mode (1.10): `commentOnly()` is a plugin that refuses every local transaction
+changing more than comments, so typing, paste, drop and other commands change nothing while
+comments, replies, resolving, deleting and their undo work; received (collab) transactions pass.
+`onlyCommentSteps(doc, steps)` is its check: each step a `CommentStep` or a `ReplaceStep` in
+one textblock that inserts and removes only comment anchors. Not access control: a server checks
+what it receives (`authorize` below).
 Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's
 recorded formatting only when no other is there; in a selection, the selected part of each), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
@@ -1434,7 +1440,8 @@ The authority of a shared document (0.x, unstable; ADR-0012; [package README](..
   default 4 000 000), `steps` (per message, 1000), `log` (steps kept, 10 000), `logSize` (their JSON's characters,
   50 000 000); `log` in the options restores a stored log ending at `version`. A document nested
   deeper than 250 levels is refused (`too-large`). `authorize(clientID,
-  steps)` false refuses a client's steps.
+  steps, doc)` false refuses a client's steps; `doc` is the authority's document they apply to
+  (`onlyCommentSteps(doc, steps)` lets a commenter comment and nothing else, 26.1).
 - `authority.receive(message, clientID?)`: a client's `{ version, clientID, steps }`
   (`StepsMessage`, its JSON text or the parsed value) and the client id the app's connection
   authenticated (a message claiming another, or `AUTHORITY`, is refused). `Received`: `{ ok: true, version, broadcast }` (`Broadcast`:

@@ -8,7 +8,8 @@
  * replies.
  */
 
-import type { Node, NodeJSON } from "../model/index.js";
+import type { Fragment, Node, NodeJSON } from "../model/index.js";
+import { ReplaceStep, type Step } from "../transform/steps.js";
 import type { CommentJSON } from "../v3/document.js";
 import { closeHistory } from "./history.js";
 import { freshId } from "./ids.js";
@@ -22,7 +23,7 @@ import {
   type Transaction,
 } from "./state.js";
 import { now, trackState, untracked } from "./track.js";
-import { setComments, storyBody, wordContext } from "./word.js";
+import { CommentStep, setComments, storyBody, wordContext } from "./word.js";
 
 const ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
 
@@ -318,6 +319,53 @@ export const deleteAllComments: Command = (state, dispatch) => {
   }
   return true;
 };
+
+const anchorsOnly = (fragment: Fragment) => {
+  let only = true;
+  fragment.forEach((node) => {
+    if (!ANCHORS.has(node.type.name)) only = false;
+  });
+  return only;
+};
+
+/**
+ * Whether `steps`, applied to `doc` in order, change only comments: each a `CommentStep` (a
+ * comment's content, thread or state) or a `ReplaceStep` inside one textblock that inserts and
+ * removes nothing but comment anchors. What a comment-only user may send (`commentOnly()`, and a
+ * collab authority's `authorize`). False for a step that does not apply to `doc`.
+ */
+export function onlyCommentSteps(doc: Node, steps: readonly Step[]): boolean {
+  let current = doc;
+  for (const step of steps) {
+    if (step instanceof ReplaceStep) {
+      const { from, to, slice } = step;
+      if (from < 0 || to > current.content.size || from > to) return false;
+      const $from = current.resolve(from);
+      const $to = current.resolve(to);
+      if (slice.openStart || slice.openEnd || !$from.sameParent($to)) return false;
+      if (!$from.parent.inlineContent && (slice.size || from < to)) return false;
+      const removed = $from.parent.content.cut($from.parentOffset, $to.parentOffset);
+      if (!anchorsOnly(slice.content) || !anchorsOnly(removed)) return false;
+    } else if (!(step instanceof CommentStep)) return false;
+    const result = step.apply(current);
+    if (!result.doc) return false;
+    current = result.doc;
+  }
+  return true;
+}
+
+/**
+ * Comment-only mode: refuses every local transaction that changes more than comments
+ * (`onlyCommentSteps`), so typing, paste, drop and commands change nothing, while making,
+ * replying to, resolving and deleting comments (and undoing them) work. Received transactions
+ * (collab) pass: the others still edit. It keeps a client honest, it is not access control: a
+ * server checks the steps it receives itself (`authorize` in `@folijs/collab`).
+ */
+export function commentOnly(): Plugin {
+  return new Plugin({
+    filterTransaction: (tr) => isRemote(tr) || onlyCommentSteps(tr.before, tr.steps),
+  });
+}
 
 const key = new PluginKey("comments");
 

@@ -8,6 +8,7 @@ import {
   getVersion,
   insertTable,
   type NodeJSON,
+  onlyCommentSteps,
   parseDocument,
   receiveTransaction,
   SCHEMA_VERSION,
@@ -86,6 +87,28 @@ describe("the authority (22.8)", () => {
     expect(b.getDocument()).toEqual(document);
     expect(document.content.content?.[0]).toEqual(p("A Hello world B"));
     expect(sendableSteps(a.state)).toBeNull();
+  });
+
+  it("gives `authorize` its document: a commenter comments and edits nothing (26.1)", () => {
+    const authority = createAuthority({
+      document: DOCUMENT,
+      authorize: (clientID, steps, doc) => clientID !== 3 || onlyCommentSteps(doc, steps),
+    });
+    const commenter = client(DOCUMENT, 3);
+    commenter.select(1, 6);
+    commenter.commands.addComment("Why?");
+    const commented = authority.receive(message(commenter));
+    expect(commented.ok).toBe(true);
+    if (!commented.ok) return;
+    apply(commenter, commented.broadcast);
+    expect(authority.snapshot().document.comments).toHaveLength(1);
+    commenter.commands.insertText("x");
+    const before = authority.snapshot();
+    expect(authority.receive(message(commenter))).toMatchObject({
+      ok: false,
+      reason: "unauthorized",
+    });
+    expect(authority.snapshot()).toEqual(before);
   });
 
   it("refuses what it cannot take, changing nothing", () => {
