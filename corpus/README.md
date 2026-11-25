@@ -44,6 +44,18 @@ restored by the next run. The text is English (UK) whatever the generating Word'
 a document still takes the generating machine's Normal template and regional settings (decimal
 symbol): after regenerating, check the files for anything personal before committing them.
 
+## Strict Open XML twins (`word/strict/`)
+
+The nine saved again by Word, from the same open document, as Strict Open XML
+(`<name>.strict.docx`, `wdFormatStrictOpenXMLDocument`) and as Transitional
+(`<name>.transitional.docx`), so the two differ only in the format Word wrote
+([ADR-0014](../docs/decisions/ADR-0014-strict-open-xml.md)). Written by
+
+    powershell -ExecutionPolicy Bypass -File scripts/corpus/save-strict.ps1
+
+(Windows with desktop Word; read-only, macros off). Saved 2026-11-25 by Word 16.0 from the
+committed nine. A Strict file imports to the same document as its twin, and exports Strict.
+
 ## Word's reference data (`reference/word/`)
 
 What Word does with each document, recorded by `scripts/corpus/word-reference.ps1` (Word
