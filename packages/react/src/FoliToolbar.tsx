@@ -193,6 +193,17 @@ export interface FoliToolbarProps {
   /** Someone picked another tab (a click, or the arrow keys). */
   onTabChange?: ((key: string) => void) | undefined;
   /**
+   * With tabs: the ribbon shows its tabs only, as Word's collapsed ribbon. A click on a tab (or
+   * Enter, or ArrowDown) then shows its panel over the document until a command runs, Escape, or
+   * a press or the focus goes elsewhere. A double-click on a tab, Ctrl+F1 and the ribbon's
+   * collapse button toggle it. With it the app decides (change it in `onCollapsedChange`).
+   */
+  collapsed?: boolean | undefined;
+  /** Collapsed at first, while the app does not pass `collapsed` (default false). */
+  defaultCollapsed?: boolean | undefined;
+  /** Someone collapsed or pinned the ribbon. */
+  onCollapsedChange?: ((collapsed: boolean) => void) | undefined;
+  /**
    * What happens to items that do not fit the toolbar's width: `"wrap"` (the default) puts
    * them on more rows; `"menu"` keeps one row and puts the groups that do not fit, whole, in a
    * panel under a "More" button at its end. The arrow keys go on into the panel (it opens) and
@@ -215,6 +226,12 @@ export interface FoliToolbarProps {
 export interface ToolbarGroup {
   readonly label: string;
   readonly items: readonly ToolbarItem[];
+  /**
+   * Word's dialog launcher: an item shown as a small button in the caption's corner
+   * (`.foli-toolbar-launcher`), named by its `label`, after the group's items for the arrow keys.
+   * Usually a `ToolbarDialog` (`{ ...toolbarItems.pageSetup }`).
+   */
+  readonly launcher?: ToolbarItem | undefined;
 }
 
 /** A toolbar's groups, a separator between them: arrays of items, or groups with a caption. */
@@ -253,6 +270,12 @@ interface ToolbarItemBase {
   readonly text?: string | undefined;
   /** Shown instead of the text (a symbol or an SVG): `label` is then the accessible name. */
   readonly icon?: ReactNode | undefined;
+  /**
+   * `"large"`: as Word's large buttons, the group's height, its `icon` (if any) over its text,
+   * which is then the accessible name (`.foli-toolbar-large`). Buttons, menus, color menus and
+   * dialog buttons; a box or an app's control stays as it is.
+   */
+  readonly size?: "large" | undefined;
   /**
    * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
    * a menu, whether it has entries; any other kind, always (a box's `pick` is not dry-run).
@@ -927,6 +950,25 @@ const alignIcon = (bars: readonly [number, number][]) => (
       // biome-ignore lint/suspicious/noArrayIndexKey: a fixed drawing.
       <rect key={i} x={x} y={2.5 + i * 3.5} width={width} height="1.5" fill="currentColor" />
     ))}
+  </svg>
+);
+
+/** The ribbon's collapse button: a chevron up; pinned again: a pin. */
+const COLLAPSE_ICON = (
+  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+    <path d="M2 8l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
+const PIN_ICON = (
+  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+    <path d="M4 1h4M5 1v4L3 7h6L7 5V1M6 7v4" fill="none" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
+/** Word's dialog launcher: a small arrow out of a corner. */
+const LAUNCHER_ICON = (
+  <svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true" focusable="false">
+    <path d="M1 1h4M1 1v4M3 3l6 6M5 9h4V5" fill="none" stroke="currentColor" strokeWidth="1.2" />
   </svg>
 );
 
@@ -1638,6 +1680,8 @@ const itemsOf = (group: ToolbarGroups[number]): readonly ToolbarItem[] =>
   Array.isArray(group) ? group : (group as ToolbarGroup).items;
 const labelOf = (group: ToolbarGroups[number]): string | undefined =>
   Array.isArray(group) ? undefined : (group as ToolbarGroup).label;
+const launcherOf = (group: ToolbarGroups[number]): ToolbarItem | undefined =>
+  Array.isArray(group) ? undefined : (group as ToolbarGroup).launcher;
 
 /**
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
@@ -1702,6 +1746,8 @@ export const selectionInTable = (state: EditorState): boolean => inTable(state);
 export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
   const t = toolbarItems;
   const group = (label: string, ...items: ToolbarItem[]): ToolbarGroup => ({ label, items });
+  // Word's large buttons: copies, so the default toolbar's items stay as they are.
+  const large = (item: ToolbarItem): ToolbarItem => ({ ...item, size: "large" });
   return [
     {
       key: "home",
@@ -1740,8 +1786,8 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       label: "Insert",
       items: [
         group("Pages", t.pageBreak, t.horizontalRule),
-        group("Tables", t.table),
-        group("Illustrations", t.picture),
+        group("Tables", large(t.table)),
+        group("Illustrations", large(t.picture)),
         group("Links", t.link, t.crossReference),
         group("Header & Footer", t.headerFooter, t.pageNumber),
         group("Text", t.controls, t.controlProperties, t.fields, t.date),
@@ -1751,7 +1797,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "layout",
       label: "Layout",
       items: [
-        group("Page Setup", t.section, t.pageSetup),
+        { ...group("Page Setup", t.section), launcher: t.pageSetup },
         group("Paragraph", t.outdent, t.indent, t.lineSpacing),
       ],
     },
@@ -1759,8 +1805,11 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "references",
       label: "References",
       items: [
-        group("Table of Contents", t.tableOfContents, t.updateFields),
-        group("Footnotes", t.footnote, t.endnote, t.goToNote, t.notes, t.noteOptions),
+        group("Table of Contents", large(t.tableOfContents), t.updateFields),
+        {
+          ...group("Footnotes", large(t.footnote), t.endnote, t.goToNote, t.notes),
+          launcher: t.noteOptions,
+        },
         group("Captions", t.crossReference),
       ],
     },
@@ -1768,12 +1817,12 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "review",
       label: "Review",
       items: [
-        group("Comments", t.newComment),
-        group("Tracking", t.trackChanges, t.reviewView),
+        group("Comments", large(t.newComment)),
+        group("Tracking", large(t.trackChanges), t.reviewView),
         group(
           "Changes",
-          t.acceptChange,
-          t.rejectChange,
+          large(t.acceptChange),
+          large(t.rejectChange),
           t.acceptAll,
           t.rejectAll,
           t.previousChange,
@@ -1892,6 +1941,9 @@ const statesOf =
 const actionsOf = (item: Item, body: Editor): readonly Action[] =>
   typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
 
+/** The mounted ribbons, in order: Ctrl+F1 is the focused one's, else the first one's. */
+const ribbons: { holds: (node: Node | null) => boolean }[] = [];
+
 /** The mounted, enabled toolbars of each editor, in order: one of them opens its link dialog. */
 const linkOwners = new WeakMap<Editor, LinkOwner[]>();
 type LinkOwner = {
@@ -1919,7 +1971,11 @@ const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) 
     a.length === b.length &&
     a.every((group, i) => {
       const other = b[i] as ToolbarGroups[number];
-      return labelOf(group) === labelOf(other) && sameItems(itemsOf(group), itemsOf(other));
+      return (
+        labelOf(group) === labelOf(other) &&
+        launcherOf(group) === launcherOf(other) &&
+        sameItems(itemsOf(group), itemsOf(other))
+      );
     }));
 
 /**
@@ -1940,7 +1996,7 @@ const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "Pag
 export function FoliToolbar({
   editor: given,
   disabled = false,
-  onClickCommand,
+  onClickCommand: givenClickCommand,
   label: givenLabel,
   className,
   comments = false,
@@ -1951,9 +2007,18 @@ export function FoliToolbar({
   tab: givenTab,
   defaultTab,
   onTabChange,
+  collapsed: givenCollapsed,
+  defaultCollapsed = false,
+  onCollapsedChange,
   overflow = "wrap",
   messages,
 }: FoliToolbarProps) {
+  // A collapsed ribbon's panel shown over the document: a command run from it puts it away.
+  const [floating, setFloating] = useState(false);
+  const onClickCommand = () => {
+    setFloating(false);
+    givenClickCommand?.();
+  };
   const tr = translator(messages);
   /** A label that may be one of the toolbar's messages (a built-in item's, a tab's…). */
   const trLabel = (text: string) => tr(text as ToolbarMessage);
@@ -1974,6 +2039,20 @@ export function FoliToolbar({
   const [tabKey, setTabKey] = useState(defaultTab ?? null);
   const wanted = givenTab ?? tabKey;
   const tab = tabs?.find((t) => t.key === wanted) ?? tabs?.[0];
+  // A collapsed ribbon: the tabs only, the panel over the document while `floating`.
+  const [collapsedState, setCollapsedState] = useState(defaultCollapsed);
+  const collapsed = !!tab && (givenCollapsed ?? collapsedState);
+  const panelShown = !collapsed || floating;
+  useEffect(() => {
+    if (!collapsed) setFloating(false);
+  }, [collapsed]);
+  const setCollapsed = (next: boolean) => {
+    const panelNow = ribbon.current?.querySelector(".foli-ribbon-panel");
+    if (next && panelNow?.contains(document.activeElement)) focusTab();
+    if (givenCollapsed === undefined) setCollapsedState(next);
+    setFloating(false);
+    onCollapsedChange?.(next);
+  };
   // A pick taken out of `tabs` is forgotten: it is not selected again when the app adds it back
   // (one hidden by its `visible` stays wanted).
   // Only a key seen before: a `defaultTab` that arrives later is still wanted.
@@ -1992,12 +2071,18 @@ export function FoliToolbar({
   const stableGroups = lastGroups.current;
   const { groups, items, selectStates } = useMemo(() => {
     const groups = ((stableGroups ?? GROUPS) as ToolbarGroups)
-      .map((group) => ({
-        label: labelOf(group),
-        items: (itemsOf(group) as readonly Item[]).filter(
+      .map((group) => {
+        const launcher = launcherOf(group) as Item | undefined;
+        const own = (itemsOf(group) as readonly Item[]).filter(
           (item) => comments || item.key !== "newComment",
-        ),
-      }))
+        );
+        // The launcher is the group's last item, for the arrow keys and the More panel.
+        return {
+          label: labelOf(group),
+          launcher: own.length > 0 && launcher ? launcher : null,
+          items: own.length > 0 && launcher ? [...own, launcher] : own,
+        };
+      })
       .filter((group) => group.items.length > 0);
     const items = groups.flatMap((group) => group.items);
     if (development()) {
@@ -2048,7 +2133,7 @@ export function FoliToolbar({
     if (!overflowing) return;
     measured.current = null;
     setFit(null);
-  }, [overflowing, groups]);
+  }, [overflowing, groups, panelShown]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads what this effect measures.
   useIsomorphicLayoutEffect(() => {
     const element = bar.current;
@@ -2126,9 +2211,29 @@ export function FoliToolbar({
     focused < items.length && (focused < firstInMore || moreOpen || !inMore) ? focused : 0;
   /** The focus back to a dialog's button: to More when the button is in the closed panel. */
   const giveBack = (element: HTMLElement | null | undefined) => {
+    if (element?.closest<HTMLElement>(".foli-ribbon-panel")?.hidden) {
+      focusTab();
+      return;
+    }
     const closed = morePanel.current?.hidden && morePanel.current.contains(element ?? null);
     (closed ? moreButton.current : element)?.focus();
   };
+  /**
+   * A dialog closed: applied, the focus goes to the document (`onClickCommand`) and a panel shown
+   * over it goes away (without `onClickCommand`, the focus then goes to its tab); otherwise back
+   * to `restore`, its button.
+   */
+  const closed = (applied: boolean | undefined, restore: HTMLElement | null | undefined) => {
+    if (applied && givenClickCommand) onClickCommand();
+    else if (applied && floating) {
+      setFloating(false);
+      focusTab();
+    } else giveBack(restore);
+  };
+  /** The focus to the selected tab (a ribbon's). */
+  function focusTab() {
+    tabButtons.current[tabs?.findIndex((t) => t.key === tab?.key) ?? -1]?.focus();
+  }
   /** The items as last rendered: where a dialog closed later finds its button. */
   const shown = useRef(items);
   shown.current = items;
@@ -2183,7 +2288,7 @@ export function FoliToolbar({
       }
       // Closing by its button: the focus was in the menu, which goes away.
       setMenu(null);
-      if (event.detail > 0 && onClickCommand) onClickCommand();
+      if (event.detail > 0 && givenClickCommand) givenClickCommand();
       else buttons.current[index]?.focus();
       return;
     }
@@ -2483,7 +2588,10 @@ export function FoliToolbar({
   // Another tab: its items from the first, and nothing of the last tab's left open.
   // A pick: the app's to follow when it passes `tab`. Picking the tab that shows only because
   // the wanted one went (a tab with `visible`) is a pick too.
-  const showTab = (next: ToolbarTab) => {
+  const showTab = (next: ToolbarTab, open = false) => {
+    // Collapsed: a click (Enter, ArrowDown) shows the tab's panel over the document, or puts the
+    // shown one away; the arrow keys between tabs only pick.
+    if (collapsed && open) setFloating(!(floating && next.key === tab?.key));
     if (next.key === tab?.key && (wanted === null || wanted === next.key)) return;
     if (givenTab === undefined) setTabKey(next.key);
     onTabChange?.(next.key);
@@ -2524,60 +2632,145 @@ export function FoliToolbar({
       Home: 0,
       End: count - 1,
     };
+    if (event.key === "ArrowDown") {
+      // Into the panel (Word's): a collapsed ribbon shows it first.
+      event.preventDefault();
+      if (panelShown) buttons.current[active]?.focus();
+      else {
+        focusInto.current = true;
+        setFloating(true);
+      }
+      return;
+    }
     const next = tabs[moves[event.key] ?? -1];
     if (!next) return;
     event.preventDefault();
     showTab(next);
     tabButtons.current[tabs.indexOf(next)]?.focus();
   };
+  // The panel a key opened over the document takes the focus.
+  const focusInto = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the panel shows.
+  useEffect(() => {
+    if (!floating || !focusInto.current) return;
+    focusInto.current = false;
+    buttons.current[active]?.focus();
+  }, [floating]);
+  // The panel over the document goes with a press elsewhere (a dialog of the toolbar's is not
+  // elsewhere: it comes from the panel).
+  useEffect(() => {
+    if (!floating) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (ribbon.current?.contains(target) || target?.closest?.(".foli-link-dialog")) return;
+      setFloating(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [floating]);
+  // Ctrl+F1 collapses or pins the ribbon that has the focus, else the first one mounted.
+  const toggleCollapsed = useRef(() => {});
+  toggleCollapsed.current = () => setCollapsed(!collapsed);
+  const hasRibbon = !!tab;
+  useEffect(() => {
+    if (!hasRibbon) return;
+    const owner = { holds: (node: Node | null) => !!ribbon.current?.contains(node) };
+    ribbons.push(owner);
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "F1" || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey)
+        return;
+      const focused = document.activeElement;
+      if ((ribbons.find((o) => o.holds(focused)) ?? ribbons[0]) !== owner) return;
+      event.preventDefault();
+      toggleCollapsed.current();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      ribbons.splice(ribbons.indexOf(owner), 1);
+    };
+  }, [hasRibbon]);
   // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
   const panel = (bar: ReactNode) =>
     tabs && tab ? (
       // biome-ignore lint/a11y/noStaticElementInteractions: it only notes whether the focus is inside.
       <div
         ref={ribbon}
-        className={className ? `foli-ribbon ${className}` : "foli-ribbon"}
+        className={[
+          "foli-ribbon",
+          collapsed && "foli-ribbon-collapsed",
+          collapsed && floating && "foli-ribbon-floating",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onFocus={() => {
           ribbonFocused.current = true;
         }}
         onBlur={(event) => {
+          const to = event.relatedTarget as Element | null;
           // Not fired when the focused element is removed: the flag then stays.
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          if (!event.currentTarget.contains(to)) {
             ribbonFocused.current = false;
+            // Tabbing out puts the panel over the document away (not into its own dialog).
+            if (to && !to.closest(".foli-link-dialog")) setFloating(false);
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || event.defaultPrevented || !floating) return;
+          event.preventDefault();
+          setFloating(false);
+          tabButtons.current[tabs.findIndex((t) => t.key === tab.key)]?.focus();
         }}
       >
-        <div
-          role="tablist"
-          aria-label={label}
-          className="foli-ribbon-tabs"
-          onKeyDown={onTabKeyDown}
-        >
-          {tabs.map((t, n) => (
-            <button
-              key={t.key}
-              ref={(element) => {
-                tabButtons.current[n] = element;
-              }}
-              type="button"
-              role="tab"
-              id={`${id}-tab-${n}`}
-              className={`foli-ribbon-tab foli-ribbon-tab-${t.key}${t.contextual ? " foli-ribbon-tab-contextual" : ""}`}
-              aria-selected={t.key === tab.key}
-              aria-controls={`${id}-panel`}
-              tabIndex={t.key === tab.key ? 0 : -1}
-              // Keep the focus (and the selection) in the document on click.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => showTab(t)}
-            >
-              {trLabel(t.label)}
-            </button>
-          ))}
+        <div className="foli-ribbon-head">
+          <div
+            role="tablist"
+            aria-label={label}
+            className="foli-ribbon-tabs"
+            onKeyDown={onTabKeyDown}
+          >
+            {tabs.map((t, n) => (
+              <button
+                key={t.key}
+                ref={(element) => {
+                  tabButtons.current[n] = element;
+                }}
+                type="button"
+                role="tab"
+                id={`${id}-tab-${n}`}
+                className={`foli-ribbon-tab foli-ribbon-tab-${t.key}${t.contextual ? " foli-ribbon-tab-contextual" : ""}`}
+                aria-selected={t.key === tab.key}
+                aria-controls={`${id}-panel`}
+                tabIndex={t.key === tab.key ? 0 : -1}
+                // Keep the focus (and the selection) in the document on click.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => showTab(t, true)}
+                onDoubleClick={() => setCollapsed(!collapsed)}
+              >
+                {trLabel(t.label)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="foli-ribbon-collapse"
+            aria-label={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+            title={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+            aria-expanded={panelShown}
+            aria-controls={`${id}-panel`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            {collapsed ? PIN_ICON : COLLAPSE_ICON}
+          </button>
         </div>
         <div
           role="tabpanel"
           id={`${id}-panel`}
           aria-labelledby={`${id}-tab-${tabs.findIndex((t) => t.key === tab.key)}`}
           className="foli-ribbon-panel"
+          hidden={!panelShown}
           // A tab without items has nothing to focus: the panel takes the tab stop.
           tabIndex={items.length ? undefined : 0}
         >
@@ -2695,6 +2888,8 @@ export function FoliToolbar({
               const controls = group.items.map((item) => {
                 const i = index++;
                 const state = states[i];
+                const launcher = item === group.launcher;
+                const large = item.size === "large";
                 // Inserting a picture needs the app's upload; editing a selected one does not.
                 // A menu without entries (or colors) cannot open, whatever its `enabled` says.
                 const off =
@@ -2807,9 +3002,14 @@ export function FoliToolbar({
                       buttons.current[i] = element;
                     }}
                     type="button"
-                    className={`foli-toolbar-button foli-toolbar-${item.key}`}
+                    className={`foli-toolbar-button foli-toolbar-${item.key}${launcher ? " foli-toolbar-launcher" : large ? " foli-toolbar-large" : ""}`}
                     // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                    aria-label={item.icon !== undefined ? trLabel(item.label) : undefined}
+                    // A large button shows its text, which names it.
+                    aria-label={
+                      launcher || (item.icon !== undefined && !large)
+                        ? trLabel(item.label)
+                        : undefined
+                    }
                     title={trLabel(item.label)}
                     aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
                     aria-haspopup={
@@ -2831,9 +3031,24 @@ export function FoliToolbar({
                     }}
                   >
                     {/* A letter for an icon (B for bold) is a message too. */}
-                    {typeof item.icon === "string"
-                      ? trLabel(item.icon)
-                      : (item.icon ?? trLabel(item.text ?? item.label))}
+                    {launcher ? (
+                      LAUNCHER_ICON
+                    ) : large ? (
+                      <>
+                        {item.icon !== undefined && (
+                          <span className="foli-toolbar-large-icon" aria-hidden="true">
+                            {typeof item.icon === "string" ? trLabel(item.icon) : item.icon}
+                          </span>
+                        )}
+                        <span className="foli-toolbar-large-text">
+                          {trLabel(item.text ?? item.label)}
+                        </span>
+                      </>
+                    ) : typeof item.icon === "string" ? (
+                      trLabel(item.icon)
+                    ) : (
+                      (item.icon ?? trLabel(item.text ?? item.label))
+                    )}
                     {item.colors && (
                       <span
                         className="foli-toolbar-swatch"
@@ -2947,6 +3162,21 @@ export function FoliToolbar({
                   {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
                   {group.label === undefined ? (
                     controls
+                  ) : group.launcher ? (
+                    // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
+                    <div
+                      role="group"
+                      aria-label={trLabel(group.label)}
+                      className="foli-toolbar-group"
+                    >
+                      <div className="foli-toolbar-group-items">{controls.slice(0, -1)}</div>
+                      <div className="foli-toolbar-group-foot">
+                        <div className="foli-toolbar-group-label" aria-hidden="true">
+                          {trLabel(group.label)}
+                        </div>
+                        {controls.at(-1)}
+                      </div>
+                    </div>
                   ) : (
                     // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
                     <div
@@ -2976,12 +3206,11 @@ export function FoliToolbar({
           editor={editor}
           close={(applied) => {
             setAppDialog(null);
-            if (applied && onClickCommand) onClickCommand();
             // Its button as it is now: the items may have changed while it was open.
-            else
-              giveBack(
-                buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
-              );
+            closed(
+              applied,
+              buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
+            );
           }}
         />
       )}
@@ -2993,8 +3222,7 @@ export function FoliToolbar({
           onClose={(done) => {
             const { restore } = pictureDialog;
             setPictureDialog(null);
-            if (done && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(done, restore);
           }}
         />
       )}
@@ -3004,8 +3232,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = setupDialog;
             setSetupDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3016,8 +3243,7 @@ export function FoliToolbar({
           onClose={(inserted) => {
             const { restore } = referenceDialog;
             setReferenceDialog(null);
-            if (inserted && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(inserted, restore);
           }}
         />
       )}
@@ -3027,8 +3253,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = columnDialog;
             setColumnDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3038,8 +3263,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = noteDialog;
             setNoteDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3049,8 +3273,7 @@ export function FoliToolbar({
           onClose={(applied) => {
             const { restore } = controlDialog;
             setControlDialog(null);
-            if (applied && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(applied, restore);
           }}
         />
       )}
@@ -3061,8 +3284,7 @@ export function FoliToolbar({
           onClose={(inserted) => {
             const { restore } = tableDialog;
             setTableDialog(null);
-            if (inserted && onClickCommand) onClickCommand();
-            else giveBack(restore);
+            closed(inserted, restore);
           }}
         />
       )}

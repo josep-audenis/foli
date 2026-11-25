@@ -36,7 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0, `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1 on npm (2026-11-25)                                                                         |
-| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.3 (ribbon tabs, contextual tabs) done                                                                                                                                       |
+| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.3 merged (#282); 25.4-25.5 (large buttons, launchers, collapse)                                                                                                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3703,12 +3703,13 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
 - [x] 25.3 Contextual tabs: Table Design and Table Layout while the selection is in a table
   (`selectionInTable` exported), Picture Format while a picture is selected;
   `ToolbarTab.contextual` and `--foli-ribbon-contextual`.
-- [ ] 25.4 Large buttons and launchers: an item's `size: "large"` (icon over label, the
-  group's height); a group's `launcher` opening a toolbar dialog (Page Setup, note options,
-  insert table) or calling the app; keyboard and focus as for other items.
-- [ ] 25.5 Collapse: a double-click on a tab or Ctrl+F1 hides the panel; a click on a tab then
-  shows it over the document until the next command or Escape; a pin keeps it shown;
-  `collapsed` and `onCollapsedChange` for apps that keep it.
+- [x] 25.4 Large buttons and launchers: an item's `size: "large"` (the group's height, its
+  icon over its text, which names it); a group's `launcher`, shown in the caption's corner and
+  the group's last item for the arrow keys (Page setup, Note options in `wordRibbonTabs`).
+- [x] 25.5 Collapse: the button at the end of the tabs, a double-click on a tab or Ctrl+F1;
+  a click (Enter, Space, ArrowDown) on a tab then shows its panel over the document until a
+  command runs from it, Escape, a press elsewhere or the focus leaves; `collapsed`,
+  `defaultCollapsed`, `onCollapsedChange`.
 - [ ] 25.6 Groups shrink step by step as the width falls (25.1's steps), then overflow; one
   `ResizeObserver`, measured once per width, nothing measured while typing (bench: no keystroke
   slower than 1.6.0 with the ribbon shown).

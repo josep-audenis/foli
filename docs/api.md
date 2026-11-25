@@ -398,6 +398,24 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
 <FoliEditor toolbar={wordRibbonTabs} />;
 ```
 
+- `size: "large"` on an item (a button, a menu, a color menu or a dialog button; not a box or
+  an app's control) draws it as Word's large buttons (`.foli-toolbar-large`): the group's
+  height, its `icon` (if it has one, `.foli-toolbar-large-icon`) over its text, which is then
+  its accessible name. `wordRibbonTabs` has copies of Table, Picture, Table of contents,
+  Footnote, New comment, Track changes, Accept and Reject at that size.
+- `launcher` on a `ToolbarGroup`: an item shown as Word's dialog launcher, a small button in the
+  caption's corner (`.foli-toolbar-launcher`, in `.foli-toolbar-group-foot` with the caption),
+  named by its `label`; for the arrow keys and the More panel it is the group's last item.
+  `wordRibbonTabs` has Page setup on Layout's Page Setup and Note options on Footnotes.
+- `collapsed`, `defaultCollapsed` and `onCollapsedChange(collapsed)` on the toolbar: a ribbon
+  that shows its tabs only (`.foli-ribbon-collapsed`; the panel is `hidden`). A click on a tab,
+  or Enter, Space or ArrowDown on it, shows its panel over the document
+  (`.foli-ribbon-floating`; ArrowDown moves the focus into it); a command run from it with a
+  click, Escape, a press outside the ribbon and its dialogs, or the focus leaving it puts it
+  away. A double-click on a tab, Ctrl+F1 and the button at the end of the tabs
+  (`.foli-ribbon-collapse`, "Collapse the ribbon" or "Pin the ribbon", `aria-expanded`)
+  collapse or pin it. With `collapsed` the app decides: those only call `onCollapsedChange`.
+  Without tabs these do nothing.
 - `contextual: true` on a `ToolbarTab` draws it as a tab of the selection
   (`.foli-ribbon-tab-contextual`, in `--foli-ribbon-contextual`, apart from the tabs before
   it); give it a `visible` too. It is a tab as any other for the keyboard and screen readers.

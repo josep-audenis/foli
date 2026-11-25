@@ -637,6 +637,81 @@
   font-size: 11px;
   opacity: 0.75;
 }
+/* A group's caption with its dialog launcher (`ToolbarGroup.launcher`) in the corner. */
+.foli-toolbar-group-foot {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  position: relative;
+}
+.foli-toolbar-launcher {
+  position: absolute;
+  inset-inline-end: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+}
+/* A large button (`size: "large"`): the group's height, its icon over its text. */
+.foli-toolbar-large {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 64px;
+  max-width: 88px;
+  white-space: normal;
+  line-height: 1.15;
+}
+.foli-toolbar-large-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* The ribbon's head: the tabs, and the button that collapses or pins it at the end. */
+.foli-ribbon {
+  position: relative;
+}
+.foli-ribbon-head {
+  display: flex;
+  align-items: flex-end;
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+}
+.foli-ribbon-head > .foli-ribbon-tabs {
+  flex: 1 1 auto;
+}
+.foli-ribbon-collapse {
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-end: 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.foli-ribbon-collapse:hover {
+  background: var(--foli-toolbar-hover);
+}
+.foli-ribbon-collapse:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: -2px;
+}
+.foli-ribbon-panel[hidden] {
+  display: none;
+}
+/* Collapsed: a tab's panel shown over the document. */
+.foli-ribbon-floating > .foli-ribbon-panel {
+  position: absolute;
+  top: 100%;
+  inset-inline: 0;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+}
 
 .foli-toolbar-separator {
   align-self: stretch;
