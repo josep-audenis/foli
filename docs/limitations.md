@@ -183,7 +183,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   drawn small it would be wider and stays large while groups go under More (Word's further
   steps, icon only and a group as one button, are not built). Launchers exist only where Foli
   has a dialog (Page setup, Note options): no Font or Paragraph dialog yet. Picture Format is the
-  picture dialog and a quarter turn. KeyTips are one letter or digit each (36 per tab at most);
+  picture dialog and a quarter turn. KeyTips are one letter or digit each (35 per tab at most: A to Z, 1 to 9);
   they show on Alt released alone with the focus in the ribbon or an editable element, not
   checked with NVDA or JAWS. Ctrl+F1 may be the system's on macOS (the collapse button works
   there).
