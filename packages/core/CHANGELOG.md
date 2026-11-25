@@ -1,5 +1,14 @@
 # @folijs/core
 
+## 1.10.0
+
+### Minor Changes
+
+- bfe5241: `commentMentions(comment)` lists the people a comment tags (`@` text linked to `mailto:`, as
+  Word writes mentions), `mentionText(person)` writes one.
+- 2896964: Comment-only mode: `commentOnly({ author? })`, a plugin that lets a user comment, reply, resolve and delete
+  comments but refuses every other local change, and `onlyCommentSteps(doc, steps, { author? })`, its check.
+
 ## 1.9.0
 
 No changes in this release.

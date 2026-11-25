@@ -37,8 +37,8 @@ place that says what is in progress; check it before starting work.
 | 23 Agent editing parity       | ✅ Done                  | —                          | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration         | ✅ Done                  | —                          | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
 | 25 Word ribbon                | ✅ Done                  | —                          | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
-| 26 Comment-only mode          | In review                | `phase-26/comment-only`    | 26.1-26.3 built; release waits on owner                                                                                                                                                       |
-| 27 Comment history & mentions | In review                | `phase-27/comment-history` | Asked for by the owner on 2026-11-25                                                                                                                                                          |
+| 26 Comment-only mode          | ✅ Done                  | —                          | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
+| 27 Comment history & mentions | ✅ Done                  | —                          | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -123,7 +123,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 23    | Agent editing parity      | Tables, formatting, lists, pictures, headers: the agent edits as a user does      | agent 0.4.0, mcp 0.3.0 | M    |
 | 24    | Collab, easy to integrate | Versions checked, a client loop over any transport, plugins switched in place     | 1.8.0, collab 0.2.0    | M    |
 | 25    | Word ribbon               | Captioned groups, contextual tabs, collapse, shrinking groups, KeyTips            | 1.9.0                  | M    |
-| 26    | Comment-only mode         | Select and comment, never change the text; the collab authority checks it too     | next minor             | S    |
+| 26    | Comment-only mode         | Select and comment, never change the text; the collab authority checks it too     | 1.10.0                 | S    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐

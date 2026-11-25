@@ -1,5 +1,15 @@
 # @folijs/mcp
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [bfe5241]
+- Updated dependencies [2896964]
+  - @folijs/core@1.10.0
+  - @folijs/agent@0.4.4
+  - @folijs/docx@1.10.0
+
 ## 0.3.3
 
 ### Patch Changes
