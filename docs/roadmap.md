@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —      | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —      | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —      | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | Ready                    | —      | Planned 2026-11-25, nothing built: Strict Open XML (71 refused) and `mc:AlternateContent` roots (about 23 of 60)                                                                              |
+| 28 Strict & mc roots          | Ready                    | —      | Planned 2026-11-25, nothing built: Strict Open XML (71 refused) and `mc:AlternateContent` roots (22 of 60)                                                                                    |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3864,24 +3864,34 @@ The two largest refusals of Phase 20's corpus run ([corpus-report.md](corpus-rep
 `word/document.xml` root is not `w:document`. Both are refused by `importPackage` today
 (`packages/docx/src/import/index.ts`). Planned 2026-11-25, nothing built.
 
-**Strict Open XML** is Word's "Strict Open XML Document" (Save As). The parts and their
-structure are Transitional's; what differs: namespaces and relationship types under
-`http://purl.oclc.org/ooxml/…` (WordprocessingML, relationships, DrawingML, math, …; the
-document carries `w:conformance="strict"`), no VML, and value forms Strict alone requires
-(percentages written `50%`, `start`/`end` in place of `left`/`right`, universal measures such
-as `2.5cm` allowed). A Strict file is kept Strict: export writes it back in Strict's
-namespaces and value forms, as Word does when it saves one. No schema change: the conformance
-is the original package's, which `exportDocx` already takes.
+**Strict Open XML** is Word's "Strict Open XML Document" (Save As). The parts, their structure
+and their content types are Transitional's; what differs: namespaces and relationship types
+under `http://purl.oclc.org/ooxml/…` (WordprocessingML, officeDocument relationships, DrawingML,
+math, `docPropsVTypes`, …; the document carries `w:conformance="strict"`), no VML elements, and
+value forms Strict alone requires (percentages written `50%`, `start`/`end` in place of
+`left`/`right`, universal measures such as `2.5cm` allowed). OPC names (the `Relationships`
+namespace, the core-properties relationship type) and Microsoft's extensions (`w14`, `w15`,
+`mc`, `diagramDrawing`) stay as they are. A Strict file is kept Strict: export writes it back
+in Strict's namespaces and value forms, as Word does when it saves one. No schema change when
+`exportDocx` gets the original package (the conformance is the package's). A document saved as
+JSON and exported without its package comes out Transitional, so the XML it keeps verbatim
+must not stay in Strict names there: ADR-0014 decides how kept XML is stored (Transitional
+names, translated back on a Strict export, is the default to beat).
 
-**The roots in the 60 files** are docx4j's tests of how a reader copes with an unusual root,
-each beside a `-word365` twin Word resaved (those import today). By their root element, at a
-first count of `word/document.xml` (28.4 recounts from the run's results):
-`mc:AlternateContent` about 23 (Word takes the branch it understands, `mc:Choice` or
-`mc:Fallback`); the rest an unknown element holding `w:p`, `w:body` or another part's root
-(`w:madeUp` and the like), which is Word's own error recovery, not a format. This phase reads the first kind, as Word
-does; the second stays refused, with a message that names the root. A document whose root was
-resolved is exported with a `w:document` root, as Word's twin is, and the import reports it
-(`dropped`: the branch not taken).
+**The roots in the 60 files** are docx4j's tests of how a reader copes with an unusual root of
+`word/document.xml`; 38 of them sit beside a `-word365` twin Word resaved, and every twin
+imports today. By the root (counted from the run's results, 2026-11-22): `mc:AlternateContent`
+22 (Word takes the branch it understands, `mc:Choice` or `mc:Fallback`); the other 38 an
+unknown element or another part's root (`w:madeUp` 15, `foo`/`w:foo`/`z:foo` 6, `w:sdtContent`
+4, `z:madeUp` 2, `w:footnotes` 2, one each of `madeUp`, `w:p`, `w:tc`, `w:body`, `w:hdr`,
+`w:ftr`, `w:comments`, `w:styles`, `w:endnotes`), which is Word's own error recovery, not a
+format. This phase reads the first kind, as Word does; the second stays refused, with a message
+that names the root. A document whose root was resolved is exported with a `w:document` root,
+as Word's twin is, and the import reports it (`dropped`: the branch not taken). Besides the 60,
+docx4j's `c79-10`…`c79-18` put an `mc:AlternateContent` root in other parts (header, footer,
+notes, comments, styles, numbering, settings): they import today, and two of them
+(`c79-12-footnotes-root`, `c79-13-endnotes-root`) crash on export with "A note reference has no
+note".
 
 Not in this phase: unknown roots (above); writing a Transitional file from a Strict one or the
 reverse (an export option nobody asked for); Strict spreadsheets or presentations; the other
@@ -3890,9 +3900,12 @@ Robustness list below.
 
 **Starts from (1.10.0):** `W_STRICT` in `import/ooxml.ts` and the refusal next to it;
 `isW`/`child` match the Transitional namespace only; `REL` lists Transitional relationship
-types; `pnpm corpus:run` and `corpus/external.json` (the 3 445 files, the 72 Strict and the 60
-roots among them); `build-word-corpus.ps1` saves through Word with `SaveAs2`;
-`word-reference.ps1` records what Word does with a file.
+types (the main part is found by an `officeDocument` suffix, `package.ts`, so it is found in a
+Strict package already); `content.ts` keeps an inline `mc:AlternateContent` whole and opaque;
+`pnpm corpus:run` and `corpus/external.json` (the 3 445 files; the 71 distinct Strict files,
+68 under `strict/` paths, four of them listed twice, and LibreOffice's `tdf116410`,
+`tdf150822` and the Open XML SDK's `AnnotationRef`; the 60 roots); `build-word-corpus.ps1`
+saves through Word with `SaveAs2`; `word-reference.ps1` records what Word does with a file.
 
 ### Tasks
 
@@ -3902,27 +3915,32 @@ agent's review.
 - [ ] Claim phase, branch `phase-28/strict-mc-root`
 - [ ] 28.1 The Strict inventory and fixtures: the nine of `corpus/word/` saved by Word as
   Strict (`SaveAs2` with `wdFormatStrictOpenXMLDocument`, 24) into `corpus/word/strict/` by
-  `build-word-corpus.ps1`; ADR-0014 with a table of every namespace, relationship type,
-  content type and value form that differs, from those pairs and ECMA-376 Part 1 against
-  Part 4, each marked read, written or kept verbatim. ADR-0014 records the design: names
-  translated where the XML is read and written (one map, both directions), modeled values read
-  in both forms and written in the original's, kept XML left as it was read.
+  `build-word-corpus.ps1`; ADR-0014 with a table of every namespace, relationship type and
+  value form that differs (and what does not: content types, OPC, Microsoft's extensions), from
+  those pairs, the 71 and ECMA-376 Part 1 against Part 4, each marked read, written or kept
+  verbatim. ADR-0014 records the design: names translated where the XML is read and written
+  (one map, both directions), modeled values read in both forms and written in the original's,
+  how kept XML is stored so an export without the package is all Transitional.
 - [ ] 28.2 Strict import: the refusal removed; parts, relationships and kept XML read through
   the map; Strict's value forms read by the property readers. Tested: each of the nine's Strict
-  files imports to the same document as its Transitional twin; `pnpm corpus:run` over the 72
-  Strict corpus files, none refused for Strict.
+  files imports to the same document as its Transitional twin; `pnpm corpus:run` over the 71,
+  none refused for Strict.
 - [ ] 28.3 Strict export: a document imported from a Strict package exported Strict (names,
-  relationship types, `w:conformance`, value forms), edited or not. Tested: export without
-  edits compared part by part with the original (the corpus run's comparison) for the nine and
-  the 72; a second import equal to the first; Word opens the nine's exports without a repair
-  and `word-reference.ps1` measures the originals' pages, revisions and comments.
+  relationship types, `w:conformance`, value forms), edited or not; exported without its
+  package, all Transitional. Tested: export without edits compared part by part with the
+  original (the corpus run's comparison) for the nine and the 71; a second import equal to the
+  first; no Strict name in an export without the package; Word opens the nine's exports without
+  a repair and `word-reference.ps1` measures the originals' pages, revisions and comments.
 - [ ] 28.4 `mc:AlternateContent` roots: the branch Word takes chosen at the root of
-  `word/document.xml` and of the parts the 60 test (headers, footers, notes, comments, styles,
-  numbering, settings), by the namespaces Foli reads (inline, `content.ts` keeps an
-  `mc:AlternateContent` whole and opaque; a root cannot be, its content is the document);
-  `dropped` reports the branch not taken; export writes the part's own root. Unknown roots stay
-  refused, the message naming the root. Tested: reduced fixtures written by hand (no docx4j
-  file committed); over those of the 60, each import's text equals its `-word365` twin's.
+  `word/document.xml` (the 22 of the 60) and of the other parts (`c79-10`…`c79-18`), by the
+  namespaces Foli reads (a root cannot stay opaque as inline alternate content does: its
+  content is the part); no branch taken (`rw-24-mc-root-nothing-selected`,
+  `c79-71-empty-branch-taken`) reads as an empty part, as Word's twin shows; `dropped` reports
+  the branch not taken; export writes the part's own root; the footnote and endnote roots
+  export without the crash. Unknown roots stay refused, the message naming the root. Tested:
+  reduced fixtures written by hand (no docx4j file committed); each of the 21 with a twin
+  imports with its twin's text, and `rq-31-branch-txbxcontent` (no twin) with the text of the
+  branch Word's rules take, checked in Word through `word-reference.ps1`.
 - [ ] 28.5 The corpus run again: the whole set; `docs/corpus-report.md` updated (refusals and
   losses before and after, what the newly read files add to the other rows). New losses in the
   Strict files are fixed here if they are this phase's (names or values the map misses);
@@ -3932,13 +3950,15 @@ agent's review.
 
 ### Acceptance
 
-- None of the 72 Strict corpus files is refused for being Strict; each exports Strict, its
-  parts compared as the corpus run compares them, and imports again to the same document.
+- None of the 71 Strict corpus files is refused for being Strict; each exports Strict, its
+  parts compared as the corpus run compares them, and imports again to the same document; an
+  export without the package holds no Strict name.
 - Each of the nine's Strict files imports to the same document as its Transitional twin; Word
   opens their Strict exports without a repair, with the original's pages, revisions and
   comments.
-- The `mc:AlternateContent` roots among the 60 import with their `-word365` twin's text; the
-  unknown roots are refused with a message naming the root.
+- The 22 `mc:AlternateContent` roots of the 60 import, those with a `-word365` twin with its
+  text; `c79-10`…`c79-18` import and export without a crash; the 38 unknown roots are refused
+  with a message naming the root.
 - No file that imported before 28.2 imports or exports differently, but as
   `docs/corpus-report.md` records.
 - `pnpm check` green.
@@ -3984,7 +4004,7 @@ first group and from .docx files the corpus does not cover.
 
 **Robustness** (left by Phase 20's corpus run, [corpus-report.md](corpus-report.md)):
 
-- Strict Open XML (71 files refused) and the `mc:AlternateContent` roots (about 23):
+- Strict Open XML (71 files refused) and the `mc:AlternateContent` roots (22):
   planned as Phase 28.
 - The rest of docx4j's `mc-root/*`: an unknown root (`w:madeUp` and the like), Word's error
   recovery; refused, left out of Phase 28.
