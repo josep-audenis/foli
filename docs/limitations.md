@@ -177,6 +177,16 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   measured again. A tab that comes with the
   selection (`visible`) is not selected for the user, as Word's is not.
   People cannot change the toolbar themselves: an app does it over `items` or `tabs`.
+- The Word ribbon (`wordRibbonTabs`, 1.9) has no File tab or backstage (open, save and print
+  are the app's), no Quick Access Toolbar, and only the tabs Foli has commands for (no Design,
+  Mailings or Draw). Its buttons show text, not Word's icons; a large one wraps its text, so
+  drawn small it would be wider and stays large while groups go under More (Word's further
+  steps, icon only and a group as one button, are not built). Launchers exist only where Foli
+  has a dialog (Page setup, Note options): no Font or Paragraph dialog yet. Picture Format is the
+  picture dialog and a quarter turn. KeyTips are one letter or digit each (36 per tab at most);
+  they show on Alt released alone with the focus in the ribbon or an editable element, not
+  checked with NVDA or JAWS. Ctrl+F1 may be the system's on macOS (the collapse button works
+  there).
 - The toolbar's strings are English unless an app gives `messages`; `FoliNavigation`,
   `FoliComments` and the canvas's own strings cannot be translated yet. One English text is one
   message wherever it is shown.

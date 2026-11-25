@@ -45,7 +45,9 @@ panel (`FoliNavigation`). For your own layout: `useFoliEditor`, `FoliEditorProvi
 of them (`toolbar` on `FoliEditor`, `items` on `FoliToolbar`): the built-in ones by name from
 `toolbarItems`, and your own (`ToolbarItem`: a button running a command, enabled by its dry
 run, a menu, a box, a color menu, a dialog or your own control), or tabs of groups
-(`defaultToolbarTabs`: Home, Insert, Layout, Review). `useCommand("undo")` takes a command's name too.
+(`defaultToolbarTabs`: Home, Insert, Layout, Review), or Word's ribbon whole:
+`<FoliEditor toolbar={wordRibbonTabs} />` (captioned groups, Table and Picture tabs that come with
+the selection, large buttons, dialog launchers, a ribbon that collapses, KeyTips on Alt). `useCommand("undo")` takes a command's name too.
 React 18.2+ and 19; server rendering gives the editor's shell, the document appears on
 hydration.
 

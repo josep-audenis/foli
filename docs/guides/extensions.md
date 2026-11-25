@@ -501,7 +501,8 @@ export function AcmeEditor() {
   ([api.md](../api.md#toolbar-items)).
 - `tabs` (or `FoliEditor`'s `toolbar`) takes tabs of groups in place of groups:
   `[...defaultToolbarTabs, { key: "acme", label: "Acme", items: [[mentionButton, topicMenu]] }]`
-  is Word's Home, Insert, Layout and Review with a tab of the app's
+  is Word's Home, Insert, Layout and Review with a tab of the app's (or start from
+  `wordRibbonTabs`, Word's ribbon in captioned groups)
   ([api.md](../api.md#toolbar-tabs)). `tab` and `onTabChange` let the app say which shows; a
   tab with `visible(state, editor)` comes and goes with the selection; a group may be
   `{ label, items }`, shown with its caption.
