@@ -2196,7 +2196,9 @@ export function FoliToolbar({
     const element = bar.current;
     if (!overflowing || fit !== null || !element) return;
     // Too wide with large buttons left: the last group of them is drawn small first.
-    if (small < largeGroups.length && element.scrollWidth > element.clientWidth + 0.5) {
+    // (More is in the row while measuring, hidden: not counted, the groups may fit without it.)
+    const more = moreButton.current?.getBoundingClientRect().width ?? 0;
+    if (small < largeGroups.length && element.scrollWidth - more > element.clientWidth + 0.5) {
       setSmall(small + 1);
       return;
     }
@@ -2236,22 +2238,31 @@ export function FoliToolbar({
     // Another width: the groups are counted again from what was measured (they stay where
     // they are, with their state and the focus, unless they change sides).
     const observer = new ResizeObserver(() => {
-      // With large buttons, another width measures again from them (some may fit again).
-      if (largeGroupsNow.current && element.clientWidth !== measuredWidth.current) {
-        if (measured.current === null) return;
+      const next = fitNow(element);
+      // With large buttons, measured again only when they may change size: wider with some
+      // drawn small, or narrower with groups to put under More and some still large. Otherwise
+      // (a scrollbar coming) the groups stay where they are, as without large buttons.
+      const width = element.clientWidth;
+      const was = measuredWidth.current;
+      const { large, small: smallNow } = shrinkNow.current;
+      if (
+        measured.current !== null &&
+        was !== null &&
+        ((width > was && smallNow > 0) ||
+          (width < was && smallNow < large && next !== null && next < measured.current.ends.length))
+      ) {
         measured.current = null;
         setSmall(0);
         setFit(null);
         return;
       }
-      const next = fitNow(element);
       if (next !== null) setFit((current) => (current === null ? current : next));
     });
     observer.observe(element);
     return () => observer.disconnect();
   }, [overflowing]);
-  const largeGroupsNow = useRef(false);
-  largeGroupsNow.current = largeGroups.length > 0;
+  const shrinkNow = useRef({ large: 0, small: 0 });
+  shrinkNow.current = { large: largeGroups.length, small };
   const inMore = overflowing && firstInMore < items.length;
   // The panel closes with a press outside it (a click in it keeps the document's focus, so
   // there is no blur to hear), and when nothing is in it any more.
@@ -2776,8 +2787,26 @@ export function FoliToolbar({
       ? keyTipsFor(items.map((i) => ({ tip: i.keyTip, name: trLabel(i.text ?? i.label) })))
       : [];
   /** What the keys see, as rendered last. */
-  const tipsNow = useRef({ tips, tabTips, itemTips, tabs, firstInMore, moreOpen, disabled });
-  tipsNow.current = { tips, tabTips, itemTips, tabs, firstInMore, moreOpen, disabled };
+  const tipsNow = useRef({
+    tips,
+    tabTips,
+    itemTips,
+    tabs,
+    firstInMore,
+    moreOpen,
+    disabled,
+    collapsed,
+  });
+  tipsNow.current = {
+    tips,
+    tabTips,
+    itemTips,
+    tabs,
+    firstInMore,
+    moreOpen,
+    disabled,
+    collapsed,
+  };
   const showTabNow = useRef(showTab);
   showTabNow.current = showTab;
   const useTips = hasRibbon && keyTips;
@@ -2835,7 +2864,9 @@ export function FoliToolbar({
       if (now.tips === "tabs") {
         const t = now.tabs?.[now.tabTips.indexOf(key)];
         if (!t) return;
-        showTabNow.current(t, true);
+        // Its panel shows (over the document when collapsed), also when it already did.
+        showTabNow.current(t);
+        if (now.collapsed) setFloating(true);
         setTips("items");
         return;
       }
@@ -2861,6 +2892,7 @@ export function FoliToolbar({
     document.addEventListener("pointerdown", off, true);
     window.addEventListener("blur", off);
     return () => {
+      setTips(null);
       document.removeEventListener("keydown", onKeyDown, true);
       document.removeEventListener("keyup", onKeyUp, true);
       document.removeEventListener("pointerdown", off, true);

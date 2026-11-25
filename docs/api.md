@@ -420,7 +420,9 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
   time from the end of the row, then puts whole groups under More; a wider row draws them large
   again (measured again at each width, not while typing).
 - `keyTips` (default true; with tabs): Word's KeyTips. Alt pressed and released alone, with the
-  focus in the ribbon or in the document (else the first ribbon mounted's), shows a letter under
+  focus in the ribbon or in the document (an editable element of the page, or none; a
+  read-only document is not editable, so only the ribbon's own focus counts there; the first
+  ribbon mounted's when the focus is not in one), shows a letter under
   each tab (`.foli-keytips`, `.foli-keytip`, `aria-hidden`); a tab's letter shows that tab
   (over the document when collapsed) with a letter under each of its items; an item's letter
   presses it (a box takes the focus; an item in the More panel opens it first). Escape steps
