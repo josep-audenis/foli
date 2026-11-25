@@ -417,8 +417,10 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
   collapse or pin it. With `collapsed` the app decides: those only call `onCollapsedChange`.
   Without tabs these do nothing.
 - With `overflow: "menu"`, a row too narrow first draws its large buttons small, a group at a
-  time from the end of the row, then puts whole groups under More; a wider row draws them large
-  again (measured again at each width, not while typing).
+  time from the end of the row, while that narrows the row, then puts whole groups under More; a
+  wider row draws them large again (measured again at each width, not while typing). A large
+  button with text and no icon is often narrower than its small form (its text wraps), so
+  `wordRibbonTabs`' built-ins stay large and their groups go under More.
 - `keyTips` (default true; with tabs): Word's KeyTips. Alt pressed and released alone, with the
   focus in the ribbon or in the document (an editable element of the page, or none; a
   read-only document is not editable, so only the ribbon's own focus counts there; the first

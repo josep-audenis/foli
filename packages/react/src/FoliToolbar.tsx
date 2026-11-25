@@ -2164,6 +2164,8 @@ export function FoliToolbar({
     [groups],
   );
   const smallGroups = new Set(largeGroups.slice(largeGroups.length - small));
+  /** While measuring: the row's width before the last group drawn small, and whether to stop. */
+  const shrinking = useRef<{ from: number | null; done: boolean }>({ from: null, done: false });
   /** The row's width when it was last measured: another width measures again. */
   const measuredWidth = useRef<number | null>(null);
   const rowGroups = overflowing && fit !== null ? Math.min(fit, groups.length) : groups.length;
@@ -2189,16 +2191,31 @@ export function FoliToolbar({
     if (!overflowing) return;
     measured.current = null;
     setSmall(0);
+    shrinking.current = { from: null, done: false };
     setFit(null);
   }, [overflowing, groups, panelShown]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads what this effect measures.
   useIsomorphicLayoutEffect(() => {
     const element = bar.current;
     if (!overflowing || fit !== null || !element) return;
-    // Too wide with large buttons left: the last group of them is drawn small first.
+    // Too wide with large buttons left: the last group of them is drawn small first, kept so
+    // only if that narrowed the row (a large button with text only is often the narrower: its
+    // text wraps under the icon), else drawn large again and the shrinking stops.
     // (More is in the row while measuring, hidden: not counted, the groups may fit without it.)
     const more = moreButton.current?.getBoundingClientRect().width ?? 0;
-    if (small < largeGroups.length && element.scrollWidth - more > element.clientWidth + 0.5) {
+    const before = shrinking.current.from;
+    shrinking.current.from = null;
+    if (before !== null && element.scrollWidth >= before - 0.5) {
+      shrinking.current.done = true;
+      setSmall(small - 1);
+      return;
+    }
+    if (
+      !shrinking.current.done &&
+      small < largeGroups.length &&
+      element.scrollWidth - more > element.clientWidth + 0.5
+    ) {
+      shrinking.current.from = element.scrollWidth;
       setSmall(small + 1);
       return;
     }
@@ -2249,10 +2266,15 @@ export function FoliToolbar({
         measured.current !== null &&
         was !== null &&
         ((width > was && smallNow > 0) ||
-          (width < was && smallNow < large && next !== null && next < measured.current.ends.length))
+          (width < was &&
+            smallNow < large &&
+            !shrinking.current.done &&
+            next !== null &&
+            next < measured.current.ends.length))
       ) {
         measured.current = null;
         setSmall(0);
+        shrinking.current = { from: null, done: false };
         setFit(null);
         return;
       }
@@ -2995,18 +3017,6 @@ export function FoliToolbar({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="foli-ribbon-collapse"
-            aria-label={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
-            title={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
-            aria-expanded={panelShown}
-            aria-controls={`${id}-panel`}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            {collapsed ? PIN_ICON : COLLAPSE_ICON}
-          </button>
         </div>
         <div
           role="tabpanel"
@@ -3019,6 +3029,19 @@ export function FoliToolbar({
         >
           {bar}
         </div>
+        {/* After the panel: Tab goes from the tabs into the toolbar, then here. */}
+        <button
+          type="button"
+          className="foli-ribbon-collapse"
+          aria-label={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+          title={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+          aria-expanded={panelShown}
+          aria-controls={`${id}-panel`}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? PIN_ICON : COLLAPSE_ICON}
+        </button>
       </div>
     ) : (
       bar

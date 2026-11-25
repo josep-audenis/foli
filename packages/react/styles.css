@@ -670,7 +670,8 @@
   line-height: 1;
 }
 
-/* The ribbon's head: the tabs, and the button that collapses or pins it at the end. */
+/* The ribbon's head: the tabs. The button that collapses or pins it comes after the panel (last
+   for Tab) and is drawn at the end of the tabs' row. */
 .foli-ribbon {
   position: relative;
 }
@@ -682,9 +683,13 @@
 }
 .foli-ribbon-head > .foli-ribbon-tabs {
   flex: 1 1 auto;
+  /* Room for the collapse button, drawn over the end of the tabs' row. */
+  padding-inline-end: calc(28px + 2 * 8px);
 }
 .foli-ribbon-collapse {
-  align-self: center;
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 0;
   width: 28px;
   height: 28px;
   margin-inline-end: 8px;

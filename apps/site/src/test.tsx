@@ -1,6 +1,11 @@
 import type { EditorDocument } from "@folijs/core";
 import type { DocxPackage, PackageImages } from "@folijs/docx";
-import { FoliEditor, type FoliEditorHandle, type FoliEditorProps } from "@folijs/react";
+import {
+  FoliEditor,
+  type FoliEditorHandle,
+  type FoliEditorProps,
+  wordRibbonTabs,
+} from "@folijs/react";
 import "@folijs/react/styles.css";
 import { type ChangeEvent, StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -231,6 +236,8 @@ function Try() {
           resource={resource}
           onChange={update}
           className="try-canvas"
+          toolbar={wordRibbonTabs}
+          toolbarProps={{ overflow: "menu" }}
         />
       ) : (
         <div className="try-loading" role="status">
