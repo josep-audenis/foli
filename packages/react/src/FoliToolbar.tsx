@@ -204,6 +204,13 @@ export interface FoliToolbarProps {
   /** Someone collapsed or pinned the ribbon. */
   onCollapsedChange?: ((collapsed: boolean) => void) | undefined;
   /**
+   * With tabs: Word's KeyTips. Alt pressed and released alone (the focus in the ribbon or the
+   * document) shows a letter on each tab; a tab's letter shows that tab with a letter on each
+   * of its items, an item's letter presses it (or focuses its box). Escape steps back; any other
+   * key or a press puts them away. Default true.
+   */
+  keyTips?: boolean | undefined;
+  /**
    * What happens to items that do not fit the toolbar's width: `"wrap"` (the default) puts
    * them on more rows; `"menu"` keeps one row and puts the groups that do not fit, whole, in a
    * panel under a "More" button at its end. The arrow keys go on into the panel (it opens) and
@@ -258,6 +265,8 @@ export interface ToolbarTab {
    * (`.foli-ribbon-tab-contextual`, in the accent color). Usually with `visible`.
    */
   readonly contextual?: boolean | undefined;
+  /** Its KeyTip, a letter or digit (default: Word's for its key, else one from its label). */
+  readonly keyTip?: string | undefined;
 }
 
 /** What every toolbar item has. */
@@ -276,6 +285,8 @@ interface ToolbarItemBase {
    * dialog buttons; a box or an app's control stays as it is.
    */
   readonly size?: "large" | undefined;
+  /** Its KeyTip, a letter or digit (default: one from its label that its tab has free). */
+  readonly keyTip?: string | undefined;
   /**
    * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
    * a menu, whether it has entries; any other kind, always (a box's `pick` is not dry-run).
@@ -1941,6 +1952,40 @@ const statesOf =
 const actionsOf = (item: Item, body: Editor): readonly Action[] =>
   typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
 
+/** Word's KeyTips for its tabs. */
+const TAB_TIPS: Readonly<Record<string, string>> = {
+  home: "H",
+  insert: "N",
+  layout: "P",
+  references: "S",
+  review: "R",
+  view: "W",
+};
+
+/**
+ * One KeyTip each (a letter or digit; "" for none left): the one asked for, else Word's, else
+ * the first letter of the name that is free, else any free letter, else a digit.
+ */
+function keyTipsFor(entries: readonly { tip?: string | undefined; name: string }[]): string[] {
+  const taken = new Set<string>();
+  const take = (c: string | undefined) => {
+    const tip = c?.toUpperCase();
+    if (!tip || !/^[A-Z0-9]$/.test(tip) || taken.has(tip)) return null;
+    taken.add(tip);
+    return tip;
+  };
+  const tips: (string | null)[] = entries.map((e) => take(e.tip));
+  return tips.map(
+    (tip, i) =>
+      tip ??
+      [...(entries[i]?.name ?? ""), ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"].reduce<string | null>(
+        (found, c) => found ?? take(c),
+        null,
+      ) ??
+      "",
+  );
+}
+
 /** The mounted ribbons, in order: Ctrl+F1 is the focused one's, else the first one's. */
 const ribbons: { holds: (node: Node | null) => boolean }[] = [];
 
@@ -2010,6 +2055,7 @@ export function FoliToolbar({
   collapsed: givenCollapsed,
   defaultCollapsed = false,
   onCollapsedChange,
+  keyTips = true,
   overflow = "wrap",
   messages,
 }: FoliToolbarProps) {
@@ -2110,6 +2156,16 @@ export function FoliToolbar({
   const morePanel = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<number | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Before groups go under More, Word's large buttons become small: this many of the groups that
+  // have one, from the end of the row.
+  const [small, setSmall] = useState(0);
+  const largeGroups = useMemo(
+    () => groups.flatMap((group, g) => (group.items.some((i) => i.size === "large") ? [g] : [])),
+    [groups],
+  );
+  const smallGroups = new Set(largeGroups.slice(largeGroups.length - small));
+  /** The row's width when it was last measured: another width measures again. */
+  const measuredWidth = useRef<number | null>(null);
   const rowGroups = overflowing && fit !== null ? Math.min(fit, groups.length) : groups.length;
   /** The first item in the More panel (the number of items when all are in the row). */
   const firstInMore = groups.slice(0, rowGroups).reduce((n, group) => n + group.items.length, 0);
@@ -2132,12 +2188,21 @@ export function FoliToolbar({
   useIsomorphicLayoutEffect(() => {
     if (!overflowing) return;
     measured.current = null;
+    setSmall(0);
     setFit(null);
   }, [overflowing, groups, panelShown]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads what this effect measures.
   useIsomorphicLayoutEffect(() => {
     const element = bar.current;
     if (!overflowing || fit !== null || !element) return;
+    // Too wide with large buttons left: the last group of them is drawn small first.
+    // (More is in the row while measuring, hidden: not counted, the groups may fit without it.)
+    const more = moreButton.current?.getBoundingClientRect().width ?? 0;
+    if (small < largeGroups.length && element.scrollWidth - more > element.clientWidth + 0.5) {
+      setSmall(small + 1);
+      return;
+    }
+    measuredWidth.current = element.clientWidth;
     // Every group is in the row now: where each ends, from where the row starts.
     const box = element.getBoundingClientRect();
     const style = getComputedStyle(element);
@@ -2165,7 +2230,7 @@ export function FoliToolbar({
       more: (moreButton.current?.getBoundingClientRect().width ?? 0) + 4,
     };
     setFit(fitNow(element));
-  }, [overflowing, fit, groups]);
+  }, [overflowing, fit, groups, small]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads refs only.
   useEffect(() => {
     const element = bar.current;
@@ -2174,11 +2239,30 @@ export function FoliToolbar({
     // they are, with their state and the focus, unless they change sides).
     const observer = new ResizeObserver(() => {
       const next = fitNow(element);
+      // With large buttons, measured again only when they may change size: wider with some
+      // drawn small, or narrower with groups to put under More and some still large. Otherwise
+      // (a scrollbar coming) the groups stay where they are, as without large buttons.
+      const width = element.clientWidth;
+      const was = measuredWidth.current;
+      const { large, small: smallNow } = shrinkNow.current;
+      if (
+        measured.current !== null &&
+        was !== null &&
+        ((width > was && smallNow > 0) ||
+          (width < was && smallNow < large && next !== null && next < measured.current.ends.length))
+      ) {
+        measured.current = null;
+        setSmall(0);
+        setFit(null);
+        return;
+      }
       if (next !== null) setFit((current) => (current === null ? current : next));
     });
     observer.observe(element);
     return () => observer.disconnect();
   }, [overflowing]);
+  const shrinkNow = useRef({ large: 0, small: 0 });
+  shrinkNow.current = { large: largeGroups.length, small };
   const inMore = overflowing && firstInMore < items.length;
   // The panel closes with a press outside it (a click in it keeps the document's focus, so
   // there is no blur to hear), and when nothing is in it any more.
@@ -2672,10 +2756,12 @@ export function FoliToolbar({
   const toggleCollapsed = useRef(() => {});
   toggleCollapsed.current = () => setCollapsed(!collapsed);
   const hasRibbon = !!tab;
+  const ribbonOwner = useRef<(typeof ribbons)[number] | null>(null);
   useEffect(() => {
     if (!hasRibbon) return;
     const owner = { holds: (node: Node | null) => !!ribbon.current?.contains(node) };
     ribbons.push(owner);
+    ribbonOwner.current = owner;
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "F1" || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey)
         return;
@@ -2690,6 +2776,154 @@ export function FoliToolbar({
       ribbons.splice(ribbons.indexOf(owner), 1);
     };
   }, [hasRibbon]);
+  // KeyTips: none, the tabs', or the shown tab's items'.
+  const [tips, setTips] = useState<null | "tabs" | "items">(null);
+  const tabTips =
+    tips && tabs
+      ? keyTipsFor(tabs.map((t) => ({ tip: t.keyTip ?? TAB_TIPS[t.key], name: trLabel(t.label) })))
+      : [];
+  const itemTips =
+    tips === "items"
+      ? keyTipsFor(items.map((i) => ({ tip: i.keyTip, name: trLabel(i.text ?? i.label) })))
+      : [];
+  /** What the keys see, as rendered last. */
+  const tipsNow = useRef({
+    tips,
+    tabTips,
+    itemTips,
+    tabs,
+    firstInMore,
+    moreOpen,
+    disabled,
+    collapsed,
+  });
+  tipsNow.current = {
+    tips,
+    tabTips,
+    itemTips,
+    tabs,
+    firstInMore,
+    moreOpen,
+    disabled,
+    collapsed,
+  };
+  const showTabNow = useRef(showTab);
+  showTabNow.current = showTab;
+  const useTips = hasRibbon && keyTips;
+  useEffect(() => {
+    if (!useTips) return;
+    // Alt pressed and released with nothing between: armed by its keydown.
+    let armed = false;
+    const mine = () => {
+      const focused = document.activeElement;
+      // The ribbon that has the focus, else (the focus in a document) the first one mounted.
+      const editable =
+        focused === document.body || (focused instanceof HTMLElement && focused.isContentEditable);
+      const owner = ribbons.find((o) => o.holds(focused)) ?? (editable ? ribbons[0] : undefined);
+      return owner !== undefined && owner === ribbonOwner.current;
+    };
+    const press = (index: number) => {
+      const { firstInMore: inMoreFrom, moreOpen: open } = tipsNow.current;
+      const press = () => {
+        const element = buttons.current[index];
+        if (!element) return;
+        element.focus();
+        if (!(element instanceof HTMLSelectElement)) element.click();
+      };
+      if (index >= inMoreFrom && !open) {
+        setMoreOpen(true);
+        setTimeout(press);
+      } else press();
+    };
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      const now = tipsNow.current;
+      if (!now.tips) {
+        armed =
+          event.key === "Alt" &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey &&
+          !now.disabled;
+        return;
+      }
+      armed = false;
+      const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
+      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+      if (key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setTips(now.tips === "items" ? "tabs" : null);
+        return;
+      }
+      if (!plain || !/^[A-Z0-9]$/.test(key)) {
+        setTips(null);
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (now.tips === "tabs") {
+        const t = now.tabs?.[now.tabTips.indexOf(key)];
+        if (!t) return;
+        // Its panel shows (over the document when collapsed), also when it already did.
+        showTabNow.current(t);
+        if (now.collapsed) setFloating(true);
+        setTips("items");
+        return;
+      }
+      const index = now.itemTips.indexOf(key);
+      if (index < 0) return;
+      setTips(null);
+      press(index);
+    };
+    const onKeyUp = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Alt" || !armed) return;
+      armed = false;
+      if (!mine()) return;
+      // Firefox would open its menu bar on this Alt.
+      event.preventDefault();
+      setTips((current) => (current ? null : "tabs"));
+    };
+    const off = () => {
+      armed = false;
+      if (tipsNow.current.tips) setTips(null);
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keyup", onKeyUp, true);
+    document.addEventListener("pointerdown", off, true);
+    window.addEventListener("blur", off);
+    return () => {
+      setTips(null);
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("keyup", onKeyUp, true);
+      document.removeEventListener("pointerdown", off, true);
+      window.removeEventListener("blur", off);
+    };
+  }, [useTips]);
+  useEffect(() => {
+    if (disabled) setTips(null);
+  }, [disabled]);
+  // The letters over the tabs and items they press (positions read after layout).
+  const [badges, setBadges] = useState<{ tip: string; x: number; y: number }[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placed again whenever they show.
+  useIsomorphicLayoutEffect(() => {
+    const root = ribbon.current;
+    if (!tips || !root) {
+      setBadges((current) => (current.length ? [] : current));
+      return;
+    }
+    const box = root.getBoundingClientRect();
+    const place = (element: HTMLElement | null | undefined, tip: string) => {
+      const rect = element?.getBoundingClientRect();
+      // Not shown (in a closed More panel): no letter to see.
+      if (!rect || !tip || (rect.width === 0 && rect.height === 0)) return [];
+      return [{ tip, x: rect.left - box.left + rect.width / 2, y: rect.bottom - box.top }];
+    };
+    setBadges(
+      tips === "tabs"
+        ? tabTips.flatMap((tip, n) => place(tabButtons.current[n], tip))
+        : itemTips.flatMap((tip, i) => place(buttons.current[i], tip)),
+    );
+  }, [tips, tab?.key, floating, items, fit, small]);
   // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
   const panel = (bar: ReactNode) =>
     tabs && tab ? (
@@ -2723,6 +2957,15 @@ export function FoliToolbar({
           tabButtons.current[tabs.findIndex((t) => t.key === tab.key)]?.focus();
         }}
       >
+        {badges.length > 0 && (
+          <div className="foli-keytips" aria-hidden="true">
+            {badges.map((b) => (
+              <span key={b.tip} className="foli-keytip" style={{ left: b.x, top: b.y }}>
+                {b.tip}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="foli-ribbon-head">
           <div
             role="tablist"
@@ -2889,7 +3132,7 @@ export function FoliToolbar({
                 const i = index++;
                 const state = states[i];
                 const launcher = item === group.launcher;
-                const large = item.size === "large";
+                const large = item.size === "large" && !smallGroups.has(g);
                 // Inserting a picture needs the app's upload; editing a selected one does not.
                 // A menu without entries (or colors) cannot open, whatever its `enabled` says.
                 const off =

@@ -198,4 +198,38 @@ describe("wordRibbonTabs", () => {
     rerender(<FoliToolbar editor={editor} tabs={wordRibbonTabs} collapsed />);
     expect(panel().hidden).toBe(true);
   });
+
+  it("shows KeyTips on Alt: a tab's letter shows it, an item's letter presses it", () => {
+    const editor = createEditor({ document: word });
+    const { container } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    const tips = () => [...container.querySelectorAll(".foli-keytip")].map((b) => b.textContent);
+    const alt = () => {
+      fireEvent.keyDown(document.body, { key: "Alt", altKey: true });
+      fireEvent.keyUp(document.body, { key: "Alt" });
+    };
+    // jsdom lays nothing out: the letters are placed from zero-sized boxes, so read the state
+    // through the keys instead of the badges.
+    alt();
+    fireEvent.keyDown(document.body, { key: "n" });
+    expect(screen.getByRole("tab", { name: "Insert" }).getAttribute("aria-selected")).toBe("true");
+    // Page break is Insert's first item: P is its first letter, free in this tab.
+    const before = JSON.stringify(editor.getDocument()).split('"pageBreak"').length;
+    fireEvent.keyDown(document.body, { key: "p" });
+    expect(JSON.stringify(editor.getDocument()).split('"pageBreak"').length).toBe(before + 1);
+    // The letters are gone after the press; Escape with none shown does nothing.
+    expect(tips()).toEqual([]);
+    alt();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    fireEvent.keyDown(document.body, { key: "h" });
+    expect(screen.getByRole("tab", { name: "Insert" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("leaves Alt alone with keyTips={false}", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} keyTips={false} />);
+    fireEvent.keyDown(document.body, { key: "Alt", altKey: true });
+    fireEvent.keyUp(document.body, { key: "Alt" });
+    fireEvent.keyDown(document.body, { key: "n" });
+    expect(screen.getByRole("tab", { name: "Home" }).getAttribute("aria-selected")).toBe("true");
+  });
 });

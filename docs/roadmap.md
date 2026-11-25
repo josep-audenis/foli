@@ -36,7 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0, `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1 on npm (2026-11-25)                                                                         |
-| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.3 merged (#282); 25.4-25.5 (large buttons, launchers, collapse)                                                                                                             |
+| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.5 merged (#282, #284); 25.6-25.7 (shrinking, KeyTips)                                                                                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3710,11 +3710,14 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
   a click (Enter, Space, ArrowDown) on a tab then shows its panel over the document until a
   command runs from it, Escape, a press elsewhere or the focus leaves; `collapsed`,
   `defaultCollapsed`, `onCollapsedChange`.
-- [ ] 25.6 Groups shrink step by step as the width falls (25.1's steps), then overflow; one
-  `ResizeObserver`, measured once per width, nothing measured while typing (bench: no keystroke
-  slower than 1.6.0 with the ribbon shown).
-- [ ] 25.7 KeyTips: the tabs' letters (Word's where free: H, N, P, S, R, W), then the shown
-  tab's items' letters; Escape steps back; letters in `messages`; off with `keyTips={false}`.
+- [x] 25.6 Groups shrink as the width falls: large buttons become small a group at a time from
+  the end of the row, then `overflow: "menu"` takes whole groups; measured again at each width,
+  nothing measured while typing. Changed from 25.1: a captioned group does not become one
+  button opening its items. More already reaches every item that does not fit, and a second
+  kind of panel would mean a second way through the items for the keyboard; left for later.
+- [x] 25.7 KeyTips: Alt alone, then a tab's letter (Word's: H, N, P, S, R, W), then an item's;
+  Escape steps back; `keyTips={false}`; `keyTip` on a tab or an item. Letters come from the
+  translated names, so they follow `messages`.
 - [ ] 25.8 The playground and the site's demo show `wordRibbonTabs`; e2e specs in Chromium,
   Firefox and WebKit (tabs, a contextual tab coming and going, collapse, shrinking at three
   widths, KeyTips); screenshots against a baseline.
