@@ -18,7 +18,7 @@ import {
 import { readSettings, trackRevisionsOf } from "../settings.js";
 import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext, Moves, preservedIn } from "./content.js";
-import { child, isW, REL, W_STRICT } from "./ooxml.js";
+import { child, isW, REL } from "./ooxml.js";
 import { comments, numbering, styles, theme } from "./parts.js";
 import { section } from "./properties.js";
 import { type ImportReport, Recorder } from "./report.js";
@@ -60,8 +60,6 @@ export async function importDocx(
 export function importPackage(pkg: DocxPackage): DocxImport {
   const report = new Recorder();
   const main = pkg.xml(pkg.mainDocument);
-  if (main.root.ns === W_STRICT)
-    throw new DocxError("Strict Open XML documents are not supported yet");
   if (!isW(main.root, "document"))
     throw new DocxError(`${pkg.mainDocument}: not a WordprocessingML document`);
   const body = child(main.root, "body");

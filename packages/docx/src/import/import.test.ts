@@ -458,7 +458,7 @@ describe("importing WordprocessingML", () => {
           root: '<w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"><w:body/></w:document>',
         }),
       ),
-    ).rejects.toThrow(/Strict Open XML/);
+    ).rejects.toThrow(/not a WordprocessingML document/);
     await expect(
       importDocx(await docx("", { root: `<w:other xmlns:w="${W_NS}"/>` })),
     ).rejects.toThrow(/not a WordprocessingML document/);
