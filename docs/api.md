@@ -703,7 +703,12 @@ recorded formatting only when no other is there; in a selection, the selected pa
 `previousChange()` (select the change after or before the selection); the same as commands
 (`acceptChange`, `rejectChange`, `acceptAllChanges(author?)`, `rejectAllChanges(author?)`,
 `nextChange`, `previousChange`; `acceptChangesById(ids)` and `rejectChangesById(ids)`, 1.7: the changes
-with these `Change.id`s and only those, with a move's other end). `trackedChanges(doc)` lists the changes (`Change`: `kind`,
+with these `Change.id`s and only those, with a move's other end). Word's Review buttons, as
+commands (the toolbar's, next release): `acceptChangeAndNext` / `rejectChangeAndNext` resolve
+as `acceptChange` / `rejectChange` and select the next change in the same undo step (with none
+at the caret, they go to the next one); `nextChangeWrapping` / `previousChangeWrapping` go on
+from the first (last) change past the end. A transaction going to a change has the
+`revealSelection` meta: the view scrolls to it with room around it. `trackedChanges(doc)` lists the changes (`Change`: `kind`,
 `id`, `author`, `date`, `from`, `to`, `move`) in document order: runs with one change mark,
 paragraph marks inserted or deleted (their closing token), paragraphs' recorded formatting,
 tables', rows' and cells' (`tableFormatting`, 1.7; at a caret only when no other is there).

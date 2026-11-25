@@ -54,6 +54,7 @@ import {
   type ResourceJSON,
   type ReviewView,
   redo,
+  revealSelection,
   type SectionJSON,
   Selection,
   Slice,
@@ -864,6 +865,9 @@ export class EditorView {
     this.unsubscribe = editor.subscribe((state, transactions) => {
       this.mapHint(state, transactions);
       this.update(state);
+      // Gone to a change: with room around it, as find shows a match.
+      if (transactions.some((tr) => tr.getMeta(revealSelection)))
+        this.scrollToRange(state.selection.from, state.selection.to, REVEAL_ABOVE);
       this.drawPeers();
     });
     for (const extension of extensions) {
@@ -2343,7 +2347,8 @@ export class EditorView {
     this.drawMatches();
   }
 
-  private scrollToRange(from: number, to: number): void {
+  /** `below`: room kept under it, in px (a change gone to gets as much as above). */
+  private scrollToRange(from: number, to: number, below = 48): void {
     let rect = this.rangesOf(from, to)[0]?.getClientRects?.()[0];
     if (!rect) {
       // A place, not a stretch of text: what holds it.
@@ -2352,7 +2357,7 @@ export class EditorView {
     }
     // With room around it: a panel may float over the top of the window.
     if (rect)
-      scrollRectIntoView(this.host, { top: rect.top - REVEAL_ABOVE, bottom: rect.bottom + 48 });
+      scrollRectIntoView(this.host, { top: rect.top - REVEAL_ABOVE, bottom: rect.bottom + below });
   }
 
   /** Opens story `id` where a page shows it, leaving the focus where it is. */

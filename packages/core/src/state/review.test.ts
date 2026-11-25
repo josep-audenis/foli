@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
-import { trackedChanges } from "./review.js";
+import {
+  acceptChangeAndNext,
+  nextChangeWrapping,
+  previousChangeWrapping,
+  rejectChangeAndNext,
+  revealSelection,
+  trackedChanges,
+} from "./review.js";
 
 const STYLES: StyleJSON[] = [
   { id: "Normal", type: "paragraph", name: "Normal", isDefault: true, next: "Normal" },
@@ -185,6 +192,70 @@ describe("accepting and rejecting changes", () => {
     expect(editor.commands.nextChange()).toBe(true);
     expect([editor.state.selection.from, editor.state.selection.to]).toEqual([2, 3]);
     expect(editor.commands.nextChange()).toBe(false);
+  });
+
+  it("goes past an inserted paragraph mark to the change after it, and back", () => {
+    // "ab" ends with an inserted mark (caret at 3), then "X" is inserted in the next paragraph.
+    const editor = editorOf(
+      p({ revision: { insertion: by(3) } }, text("ab")),
+      p({}, text("X", [ins(4)]), text("c")),
+    );
+    editor.select(1);
+    const sel = () => [editor.state.selection.from, editor.state.selection.to];
+    expect(editor.commands.nextChange()).toBe(true);
+    expect(sel()).toEqual([3, 3]);
+    expect(editor.commands.nextChange()).toBe(true);
+    expect(sel()).toEqual([5, 6]);
+    expect(editor.commands.nextChange()).toBe(false);
+    expect(editor.commands.previousChange()).toBe(true);
+    expect(sel()).toEqual([3, 3]);
+    expect(editor.commands.previousChange()).toBe(false);
+  });
+
+  it("wraps around with the wrapping commands, and marks the step to be revealed", () => {
+    const editor = redline();
+    const revealed: boolean[] = [];
+    editor.subscribe((_state, trs) =>
+      revealed.push(trs.some((tr) => !!tr.getMeta(revealSelection))),
+    );
+    const sel = () => [editor.state.selection.from, editor.state.selection.to];
+    editor.select(5);
+    expect(editor.run(nextChangeWrapping)).toBe(true);
+    expect(sel()).toEqual([2, 3]);
+    expect(editor.run(previousChangeWrapping)).toBe(true);
+    expect(sel()).toEqual([4, 5]);
+    expect(revealed).toEqual([false, true, true]);
+    editor.commands.acceptAllChanges();
+    expect(editor.run(nextChangeWrapping)).toBe(false);
+  });
+
+  it("accepts or rejects and goes on to the next change, in one undo step", () => {
+    const editor = redline();
+    const sel = () => [editor.state.selection.from, editor.state.selection.to];
+    // Nothing at the caret: it goes to the first change.
+    editor.select(1);
+    expect(editor.run(acceptChangeAndNext)).toBe(true);
+    expect(sel()).toEqual([2, 3]);
+    expect(trackedChanges(editor.state.doc)).toHaveLength(2);
+    expect(editor.run(acceptChangeAndNext)).toBe(true);
+    expect(blocks(editor)).toEqual([p({}, text("aXb"), text("Y", [del(2, "B")]), text("c"))]);
+    expect(sel()).toEqual([4, 5]);
+    editor.commands.undo();
+    expect(trackedChanges(editor.state.doc)).toHaveLength(2);
+    expect(sel()).toEqual([2, 3]);
+    editor.run(acceptChangeAndNext);
+    // The last one: resolved, and nothing left to go to.
+    expect(editor.run(rejectChangeAndNext)).toBe(true);
+    expect(blocks(editor)).toEqual([p({}, text("aXbYc"))]);
+    expect(editor.run(rejectChangeAndNext)).toBe(false);
+  });
+
+  it("goes on to a change right where a rejected insertion was", () => {
+    const editor = editorOf(p({}, text("a"), text("X", [ins(1)]), text("Y", [del(2)]), text("b")));
+    editor.select(2, 3);
+    editor.run(rejectChangeAndNext);
+    expect(blocks(editor)).toEqual([p({}, text("a"), text("Y", [del(2)]), text("b"))]);
+    expect([editor.state.selection.from, editor.state.selection.to]).toEqual([2, 3]);
   });
 
   it("accepts only the selected part of a change", () => {
