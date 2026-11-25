@@ -5,6 +5,7 @@ import {
   addComment,
   addRepeatingItem,
   alignAt,
+  CellSelection,
   type Command,
   type ControlJSON,
   canOutdent,
@@ -1433,32 +1434,32 @@ const RIBBON_ITEMS: readonly Item[] = [
   fromEntry(TABLE_ACTIONS, "deleteColumns", columnsOf),
   fromEntry(TABLE_ACTIONS, "deleteTable", rowsOf),
   fromEntry(TABLE_ACTIONS, "mergeCells", {
-    enabled: (state) => canFormatTable(state) && !state.selection.empty,
+    enabled: (state) => canFormatTable(state) && state.selection instanceof CellSelection,
   }),
-  fromEntry(TABLE_ACTIONS, "splitCell", columnsOf),
+  // A dry run returns before building anything: it only finds whether a cell is merged.
+  fromEntry(TABLE_ACTIONS, "splitCell", {
+    enabled: (state) => canFormatTable(state) && splitCell(state),
+  }),
   fromEntry(TABLE_ACTIONS, "columnWidth", {}),
-  fromEntry(TABLE_ACTIONS, "headerRow", { text: "Header row", ...columnsOf }),
+  fromEntry(TABLE_ACTIONS, "headerRow", { text: "Header row", ...rowsOf }),
   fromEntry(SECTION_ACTIONS, "pageSetup", {}),
   fromEntry(CONTROL_ACTIONS, "controlProperties", { text: "Properties…" }),
   bodyEntry(noteActions, "footnote", {
     key: "footnote",
     label: "Insert footnote",
     text: "Footnote",
-    enabled: isWord,
     command: insertNote("footnote"),
   }),
   bodyEntry(noteActions, "endnote", {
     key: "endnote",
     label: "Insert endnote",
     text: "Endnote",
-    enabled: isWord,
     command: insertNote("endnote"),
   }),
   bodyEntry(noteActions, "goToNote", {
     key: "goToNote",
     label: "Go to note or reference",
     text: "Show notes",
-    enabled: isWord,
     command: (state) => noteAtSelection(state) !== null,
   }),
   { key: "noteOptions", label: "Note options…", dialog: "noteOptions" },
@@ -1499,7 +1500,6 @@ const RIBBON_ITEMS: readonly Item[] = [
   bodyEntry(navigationActions, "outline", {
     key: "navigationPane",
     label: "Navigation pane",
-    enabled: isWord,
     command: () => false,
   }),
   {
@@ -1873,11 +1873,14 @@ const statesOf =
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled
         ? item.enabled(state, editor)
-        : typeof item.dialog === "string"
-          ? DIALOG_APPLIES[item.dialog](state)
-          : item.actions
-            ? actionsOf(item, body).length > 0
-            : !item.command || editor.can(item.command),
+        : item.entry
+          ? // A menu's entry: its own dry run, as its menu does (theirs are cheap).
+            item.entry(body).command(state)
+          : typeof item.dialog === "string"
+            ? DIALOG_APPLIES[item.dialog](state)
+            : item.actions
+              ? actionsOf(item, body).length > 0
+              : !item.command || editor.can(item.command),
       value:
         item.colors?.value(state) ??
         item.select?.value(state) ??

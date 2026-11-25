@@ -68,6 +68,25 @@ describe("wordRibbonTabs", () => {
     expect(table()?.content).toHaveLength(2);
     fireEvent.click(within(panel).getByRole("button", { name: "Insert below" }), { detail: 1 });
     expect(table()?.content).toHaveLength(3);
+    // At a caret nothing is merged, and only a cell selection merges.
+    const off = (name: string) =>
+      within(panel).getByRole("button", { name }).getAttribute("aria-disabled");
+    expect(off("Merge cells")).toBe("true");
+    expect(off("Split cell")).toBe("true");
+    expect(off("Delete rows")).toBeNull();
+  });
+
+  it("enables an entry's button as its menu would: no note where none can go", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} defaultTab="references" />);
+    const state = (name: string) =>
+      screen.getByRole("button", { name }).getAttribute("aria-disabled");
+    expect(state("Footnote")).toBeNull();
+    // No note at the caret, nor a note open: nothing to go to.
+    expect(state("Show notes")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: "View" }), { detail: 1 });
+    // No navigation pane mounted (`FoliNavigation`): nothing opens it.
+    expect(state("Navigation pane")).toBe("true");
   });
 
   it("runs a menu's entry from its own button: a footnote, the field codes", () => {
