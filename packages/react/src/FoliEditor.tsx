@@ -1,4 +1,5 @@
 import {
+  commentOnly as commentOnlyPlugin,
   type DocumentTarget,
   type Editor,
   type EditorDocument,
@@ -10,7 +11,7 @@ import {
   type Transaction,
 } from "@folijs/core";
 import { documentJSON, wordContext } from "@folijs/core/internal";
-import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
+import { forwardRef, type ReactNode, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   FoliEditorProvider,
   useEditorState,
@@ -93,8 +94,19 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * document has comments, `true` always, `false` never.
    */
   comments?: boolean | "auto" | undefined;
-  /** The comments pane edits and deletes only `author`'s comments (`FoliComments`). */
+  /**
+   * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
+   * `commentOnly`'s value.
+   */
   onlyOwnComments?: boolean | undefined;
+  /**
+   * Comment-only mode: the user selects, copies, finds and comments (replies, resolves, deletes),
+   * but cannot change the text. The canvas is read-only, the toolbar keeps only commenting and
+   * review items, and core's `commentOnly({ author })` plugin refuses every other local change
+   * (received collab edits still apply): the user changes only their own comments, and resolves
+   * any. Not access control: the app's server checks what it receives.
+   */
+  commentOnly?: boolean | undefined;
   /** Rendered between the toolbar and the pages, inside the editor's context. */
   children?: ReactNode | undefined;
 }
@@ -127,14 +139,23 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     toolbarProps,
     comments = "auto",
     onlyOwnComments,
+    commentOnly = false,
     children,
     ...canvas
   },
   ref,
 ) {
+  // One filter per author (read once, as the editor's): the client refuses what a server checking
+  // `onlyCommentSteps(doc, steps, { author })` would.
+  const [filter] = useState(() => commentOnlyPlugin(author !== undefined ? { author } : {}));
+  // A new list only when the mode or the app's plugins change (plugins are applied in place).
+  const allPlugins = useMemo(
+    () => (commentOnly ? [...(plugins ?? []), filter] : plugins),
+    [commentOnly, plugins, filter],
+  );
   const editor = useFoliEditor({
     initialContent,
-    plugins,
+    plugins: allPlugins,
     extensions,
     author,
     trackChanges,
@@ -183,6 +204,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     [editor],
   );
 
+  const readOnly = canvas.readOnly === true;
   // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
   const first = typeof toolbar === "object" ? toolbar[0] : undefined;
   const tabbed = first !== undefined && !Array.isArray(first) && "key" in first;
@@ -192,7 +214,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         <FoliToolbar
           {...toolbarProps}
           editor={editor}
-          disabled={canvas.readOnly}
+          disabled={readOnly}
+          commentOnly={commentOnly}
           comments={comments !== false}
           upload={canvas.upload}
           // Groups are arrays of items, tabs are objects; an empty array is no items (as in 1.0).
@@ -203,15 +226,20 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       )}
       {children}
       <div className="foli-editor-body">
-        <FoliNavigation editor={editor} readOnly={canvas.readOnly} />
-        <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
+        <FoliNavigation editor={editor} readOnly={readOnly || commentOnly} />
+        <FoliCanvas
+          ref={canvasRef}
+          editor={editor}
+          {...canvas}
+          readOnly={readOnly || commentOnly}
+        />
         {/* "auto": mounted while hidden, so a comment made from the toolbar opens for writing. */}
         {comments !== false && (
           <FoliComments
             editor={editor}
-            readOnly={canvas.readOnly}
+            readOnly={readOnly}
             hidden={comments === "auto" && !hasComments}
-            onlyOwnComments={onlyOwnComments}
+            onlyOwnComments={onlyOwnComments ?? commentOnly}
           />
         )}
       </div>

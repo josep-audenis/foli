@@ -40,10 +40,13 @@ export {
   addComment,
   type CommentContent,
   type CommentOptions,
+  type CommentStepsOptions,
   commentAnchors,
+  commentOnly,
   deleteAllComments,
   deleteComment,
   editComment,
+  onlyCommentSteps,
   replyToComment,
   resolveComment,
 } from "./comments.js";

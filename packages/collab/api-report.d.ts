@@ -132,7 +132,7 @@ export declare function createHub(authority: Authority): Hub;
  * apply, then gives what to broadcast. No transport and no storage: the app moves the messages
  * and persists what `snapshot` and the log give. Runs wherever `@folijs/core` runs.
  */
-import { type EditorDocument, type Extension, type FoliDocument, Step, type StepJSON } from "@folijs/core";
+import { type EditorDocument, type Extension, type FoliDocument, type Node, Step, type StepJSON } from "@folijs/core";
 /**
  * The client id of the steps the authority adds itself: Word's rules that concurrent edits can
  * break and the schema does not hold (two tables inserted at one place by two people meet; a
@@ -200,8 +200,12 @@ export interface AuthorityOptions<P = unknown> {
     /** The package it was imported from (`DocxImport.package`), kept as it is for export. */
     package?: P;
     limits?: AuthorityLimits;
-    /** The app's say: false refuses a client's steps (a read-only user) as `unauthorized`. */
-    authorize?: (clientID: ClientID, steps: readonly Step[]) => boolean;
+    /**
+     * The app's say: false refuses a client's steps (a read-only user) as `unauthorized`. `doc` is the
+     * authority's document the steps apply to: `onlyCommentSteps(doc, steps, { author })` (core)
+     * lets a comment-only user comment and nothing else.
+     */
+    authorize?: (clientID: ClientID, steps: readonly Step[], doc: Node) => boolean;
     /** The extensions the clients' editors have: their nodes, marks and steps. */
     extensions?: Extension[];
 }

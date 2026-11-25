@@ -149,6 +149,11 @@ export interface FoliToolbarProps {
    */
   disabled?: boolean | undefined;
   /**
+   * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
+   * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
+   */
+  commentOnly?: boolean | undefined;
+  /**
    * Called after a click ran a command, to show its result in the document (`FoliEditor`
    * focuses its canvas). Keyboard activation keeps the focus in the toolbar.
    */
@@ -1922,25 +1927,41 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   columnWidth: canFormatTable,
 };
 
+/** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
+const COMMENT_ONLY_ITEMS: ReadonlySet<string> = new Set([
+  "newComment",
+  "undo",
+  "redo",
+  "reviewView",
+  "previousChange",
+  "nextChange",
+  "navigate",
+  "navigationPane",
+  "fieldCodes",
+]);
+
 /**
  * Runs after every transaction: the built-ins' checks are O(selection), no transactions built;
  * an app's item without `enabled` gets a dry run of its command.
  */
 const statesOf =
-  (items: readonly Item[], body: Editor) =>
+  (items: readonly Item[], body: Editor, commentOnly: boolean) =>
   (state: EditorState, editor: Editor): ItemState[] =>
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
-      enabled: item.enabled
-        ? item.enabled(state, editor)
-        : item.entry
-          ? // A menu's entry: its own dry run, as its menu does (theirs are cheap).
-            item.entry(body).command(state)
-          : typeof item.dialog === "string"
-            ? DIALOG_APPLIES[item.dialog](state)
-            : item.actions
-              ? actionsOf(item, body).length > 0
-              : !item.command || editor.can(item.command),
+      enabled:
+        commentOnly && !COMMENT_ONLY_ITEMS.has(item.key)
+          ? false
+          : item.enabled
+            ? item.enabled(state, editor)
+            : item.entry
+              ? // A menu's entry: its own dry run, as its menu does (theirs are cheap).
+                item.entry(body).command(state)
+              : typeof item.dialog === "string"
+                ? DIALOG_APPLIES[item.dialog](state)
+                : item.actions
+                  ? actionsOf(item, body).length > 0
+                  : !item.command || editor.can(item.command),
       value:
         item.colors?.value(state) ??
         item.select?.value(state) ??
@@ -2041,6 +2062,7 @@ const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "Pag
 export function FoliToolbar({
   editor: given,
   disabled = false,
+  commentOnly = false,
   onClickCommand: givenClickCommand,
   label: givenLabel,
   className,
@@ -2137,8 +2159,8 @@ export function FoliToolbar({
       if (twice !== undefined)
         console.warn(`FoliToolbar: two items have the key "${twice}"; each needs its own`);
     }
-    return { groups, items, selectStates: statesOf(items, body) };
-  }, [stableGroups, comments, body]);
+    return { groups, items, selectStates: statesOf(items, body, commentOnly) };
+  }, [stableGroups, comments, body, commentOnly]);
   const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   // The Font box lists the machine's fonts once read: at once when already allowed.
   // The server renders none (hydration matches); the client re-renders when they come.

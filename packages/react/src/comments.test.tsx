@@ -248,3 +248,67 @@ describe("FoliComments in FoliEditor", () => {
     expect(within(pane()).getByRole("button", { name: "Delete comment by Ana" })).toBeTruthy();
   });
 });
+
+describe("FoliEditor commentOnly (26.2)", () => {
+  afterEach(cleanup);
+
+  function commenter(comments: FoliDocument["comments"] = [], onlyOwnComments?: boolean) {
+    const ref = createRef<FoliEditorHandle>();
+    render(
+      <FoliEditor
+        ref={ref}
+        initialContent={document3(comments)}
+        author="Me"
+        commentOnly
+        onlyOwnComments={onlyOwnComments}
+      />,
+    );
+    return (ref.current as FoliEditorHandle).editor;
+  }
+  const text = (editor: ReturnType<typeof commenter>) => editor.state.doc.textContent;
+
+  it("comments and replies; the text and the formatting stay", () => {
+    const editor = commenter([{ id: 0, author: "Ana", content: note("Which world?") }]);
+    expect(document.querySelector('[contenteditable="true"]')).toBeNull();
+    // Formatting is off; commenting and review navigation stay.
+    expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-disabled")).toBe("true");
+    act(() => editor.select(1, 6));
+    fireEvent.click(screen.getByRole("button", { name: "New comment" }));
+    const field = within(pane()).getByRole("textbox", { name: "Comment" });
+    fireEvent.change(field, { target: { value: "Greeting?" } });
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true });
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ana" });
+    fireEvent.click(within(thread).getByRole("button", { name: "Reply" }));
+    fireEvent.change(within(thread).getByRole("textbox", { name: "Reply" }), {
+      target: { value: "This one" },
+    });
+    fireEvent.click(within(thread).getByRole("button", { name: "Save" }));
+    expect(editor.getDocument().comments.map((c) => [c.author, c.parent])).toEqual([
+      ["Ana", undefined],
+      ["Me", undefined],
+      ["Me", 0],
+    ]);
+    // Undo takes the reply back, redo brings it again.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(editor.getDocument().comments).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+    expect(editor.getDocument().comments).toHaveLength(3);
+    // Only the user's own comments are edited and deleted (onlyOwnComments by default).
+    expect(within(pane()).queryByRole("button", { name: "Delete comment by Ana" })).toBeNull();
+    expect(within(pane()).getByRole("button", { name: "Delete reply by Me" })).toBeTruthy();
+    // Commands that change the text are refused.
+    const content = editor.getDocument().content;
+    act(() => {
+      editor.select(1, 3);
+      editor.commands.insertText("Bye");
+      editor.commands.toggleMark("bold");
+    });
+    expect(text(editor)).toBe("Hello world");
+    expect(editor.getDocument().content).toEqual(content);
+  });
+
+  it("onlyOwnComments can still be turned off", () => {
+    commenter([{ id: 0, author: "Ana", content: note("Which world?") }], false);
+    expect(within(pane()).getByRole("button", { name: "Delete comment by Ana" })).toBeTruthy();
+  });
+});

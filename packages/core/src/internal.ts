@@ -3,6 +3,7 @@
 // helpers). No promise: any release may change it. The packages are installed at the same
 // version (exact peer dependencies), so they always run with the core they were built with.
 
+export { isCommentOnly } from "./state/comments.js";
 export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export {
   CommentStep,

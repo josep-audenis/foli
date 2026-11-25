@@ -48,6 +48,11 @@ run, a menu, a box, a color menu, a dialog or your own control), or tabs of grou
 (`defaultToolbarTabs`: Home, Insert, Layout, Review), or Word's ribbon whole:
 `<FoliEditor toolbar={wordRibbonTabs} />` (captioned groups, Table and Picture tabs that come with
 the selection, large buttons, dialog launchers, a ribbon that collapses, KeyTips on Alt). `useCommand("undo")` takes a command's name too.
+
+Roles: `readOnly` reads (select, copy, find); `commentOnly` comments and changes nothing else (a
+read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin refusing
+every other change). Neither is access control: your server checks who may save, and with
+`@folijs/collab` its `authorize` refuses a commenter's other steps (`onlyCommentSteps(doc, steps, { author })`).
 React 18.2+ and 19; server rendering gives the editor's shell, the document appears on
 hydration.
 

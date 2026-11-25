@@ -8,7 +8,8 @@
  * replies.
  */
 
-import type { Node, NodeJSON } from "../model/index.js";
+import type { Fragment, Node, NodeJSON } from "../model/index.js";
+import { ReplaceStep, type Step } from "../transform/steps.js";
 import type { CommentJSON } from "../v3/document.js";
 import { closeHistory } from "./history.js";
 import { freshId } from "./ids.js";
@@ -21,8 +22,8 @@ import {
   PluginKey,
   type Transaction,
 } from "./state.js";
-import { now, trackState, untracked } from "./track.js";
-import { setComments, storyBody, wordContext } from "./word.js";
+import { now, REVIEW_MARKS, trackState, untracked } from "./track.js";
+import { CommentStep, setComments, storyBody, wordContext } from "./word.js";
 
 const ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
 
@@ -318,6 +319,121 @@ export const deleteAllComments: Command = (state, dispatch) => {
   }
   return true;
 };
+
+/**
+ * Whether every node of `fragment` is a comment anchor of one of `ids`; `inserted` ones carry no
+ * tracked change (a forged insertion would take the comment with it when rejected). Their other
+ * marks and kept attributes stay allowed: undoing the deletion of an imported comment puts them
+ * back.
+ */
+const anchorsOf = (fragment: Fragment, ids: ReadonlyMap<number, unknown>, inserted: boolean) => {
+  let only = true;
+  fragment.forEach((node) => {
+    if (
+      !ANCHORS.has(node.type.name) ||
+      !ids.has(node.attrs.id as number) ||
+      (inserted && node.marks.some((mark) => REVIEW_MARKS.has(mark.type.name)))
+    )
+      only = false;
+  });
+  return only;
+};
+
+/** A comment without its `done`: what resolving or reopening leaves alone. */
+const undone = (comment: CommentJSON) => JSON.stringify({ ...comment, done: undefined });
+
+/**
+ * Whether a `CommentStep` changes only what `author` may change (see `onlyCommentSteps`): their
+ * own comments, the replies of a thread of theirs the steps add or delete with it, and `done`.
+ */
+function allowedFor(
+  author: string,
+  { comment, previous }: CommentStep,
+  added: ReadonlyMap<number, CommentJSON>,
+  deleted: ReadonlyMap<number, CommentJSON>,
+): boolean {
+  const ownThread = (c: CommentJSON, with_: ReadonlyMap<number, CommentJSON>) =>
+    c.author === author || (c.parent !== undefined && with_.get(c.parent)?.author === author);
+  if (!previous) return comment !== null && ownThread(comment, added);
+  if (!comment) return ownThread(previous, deleted);
+  if (previous.author === author) return comment.author === author;
+  return undone(previous) === undone(comment);
+}
+
+export interface CommentStepsOptions {
+  /**
+   * The user sending the steps: a comment they add or delete must be theirs (or a reply in a
+   * thread of theirs added or deleted with it), and of anyone else's they may only resolve or
+   * reopen. Without it, any comment may change.
+   */
+  author?: string;
+}
+
+/**
+ * Whether `steps`, applied to `doc` in order, change only comments: each a `CommentStep` (a
+ * comment's content, thread or state) or a `ReplaceStep` inside one textblock that inserts and
+ * removes nothing but comment anchors: inserted ones without a tracked change, for a comment the
+ * steps add; removed ones of a comment the steps delete. What a comment-only user may
+ * send (`commentOnly()`, and a collab authority's `authorize`, with `author` there). False for a
+ * step that does not apply to `doc`.
+ */
+export function onlyCommentSteps(
+  doc: Node,
+  steps: readonly Step[],
+  options: CommentStepsOptions = {},
+): boolean {
+  const added = new Map<number, CommentJSON>();
+  const deleted = new Map<number, CommentJSON>();
+  for (const step of steps)
+    if (step instanceof CommentStep) {
+      if (!step.previous && step.comment) added.set(step.id, step.comment);
+      if (step.previous && !step.comment) deleted.set(step.id, step.previous);
+    }
+  const { author } = options;
+  for (const step of steps)
+    if (step instanceof CommentStep && author !== undefined)
+      if (!allowedFor(author, step, added, deleted)) return false;
+  let current = doc;
+  for (const step of steps) {
+    if (step instanceof ReplaceStep) {
+      const { from, to, slice } = step;
+      if (from < 0 || to > current.content.size || from > to) return false;
+      const $from = current.resolve(from);
+      const $to = current.resolve(to);
+      if (slice.openStart || slice.openEnd || !$from.sameParent($to)) return false;
+      if (!$from.parent.inlineContent && (slice.size || from < to)) return false;
+      const removed = $from.parent.content.cut($from.parentOffset, $to.parentOffset);
+      if (!anchorsOf(slice.content, added, true) || !anchorsOf(removed, deleted, false))
+        return false;
+    } else if (!(step instanceof CommentStep)) return false;
+    const result = step.apply(current);
+    if (!result.doc) return false;
+    current = result.doc;
+  }
+  return true;
+}
+
+const commentOnlyKey = new PluginKey("commentOnly");
+
+/** Whether `state` is in comment-only mode (`commentOnly()` among its plugins). */
+export const isCommentOnly = (state: EditorState): boolean =>
+  state.plugins.some((plugin) => plugin.spec.key === commentOnlyKey);
+
+/**
+ * Comment-only mode: refuses every local transaction that changes more than comments
+ * (`onlyCommentSteps`), so typing, paste, drop and commands change nothing, while making,
+ * replying to, resolving and deleting comments (and undoing them) work. Received transactions
+ * (collab) pass: the others still edit. With `author`, as `onlyCommentSteps`: give it the
+ * author a server checks with, so the client refuses what the server would. It keeps a client
+ * honest, it is not access control: a server checks the steps it receives itself (`authorize` in
+ * `@folijs/collab`).
+ */
+export function commentOnly(options: CommentStepsOptions = {}): Plugin {
+  return new Plugin({
+    key: commentOnlyKey,
+    filterTransaction: (tr) => isRemote(tr) || onlyCommentSteps(tr.before, tr.steps, options),
+  });
+}
 
 const key = new PluginKey("comments");
 

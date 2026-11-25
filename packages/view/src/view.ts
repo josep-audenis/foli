@@ -82,6 +82,7 @@ import {
   deleteSelectionKeepingTables,
   fitPaste,
   fitPastedV2,
+  isCommentOnly,
   keepTablesApart,
   referencesIn,
   StoryStep,
@@ -3663,11 +3664,15 @@ export class EditorView {
   /**
    * Every change from user input goes through here. Read-only mode drops document changes and
    * newly stored marks (Mod+B on a caret); selection changes, and clearing stored marks, still
-   * apply. Code can always change the document through the editor.
+   * apply. In comment-only mode (core's `commentOnly()`) document changes go to the editor, whose
+   * filter keeps only comment changes (undo and redo of them). Code can always change the
+   * document through the editor.
    */
   private dispatch(tr: Transaction): boolean {
     const marksAdded = tr.storedMarks !== null && tr.storedMarks !== this.state.storedMarks;
-    if ((!this.editable || this.mount) && (tr.docChanged || marksAdded)) return false;
+    const commenting = !this.editable && !this.mount && !marksAdded && isCommentOnly(this.state);
+    if ((!this.editable || this.mount) && (tr.docChanged || marksAdded) && !commenting)
+      return false;
     this.editor.dispatch(tr);
     return true;
   }
