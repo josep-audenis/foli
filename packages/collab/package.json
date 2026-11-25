@@ -1,6 +1,6 @@
 {
   "name": "@folijs/collab",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "The authority for real-time editing of a Foli document by several people: orders every step, validates it by applying it, gives what to broadcast, to catch up and to store. No transport, no storage, no DOM, no Node built-ins.",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,28 @@
 # @folijs/react
 
+## 1.10.0
+
+### Minor Changes
+
+- bfe5241: Comments pane: resolved threads leave the margin for an Open / Resolved switch (the comment
+  history, with Reopen and Delete). `mentions` suggests people after `@` in a comment or reply and
+  links the pick to `mailto:` their address; `onMention({ comment, people })` tells the app whom a
+  saved comment newly tags. `FoliEditor` passes both. A focused thread's text no longer stays
+  outlined after it is resolved, deleted or split across pages.
+- 11039d8: `FoliEditor`'s `commentOnly`: the user selects, copies, finds and comments, and changes nothing
+  else (a read-only canvas, core's `commentOnly()` plugin, the comments pane writing, only the
+  user's own comments editable by default). `FoliToolbar`'s `commentOnly` keeps only the comment
+  and review items.
+
+### Patch Changes
+
+- Updated dependencies [bfe5241]
+- Updated dependencies [bfe5241]
+- Updated dependencies [2896964]
+- Updated dependencies [0ca6129]
+  - @folijs/core@1.10.0
+  - @folijs/view@1.10.0
+
 ## 1.9.0
 
 ### Minor Changes

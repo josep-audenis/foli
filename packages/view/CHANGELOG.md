@@ -1,5 +1,19 @@
 # @folijs/view
 
+## 1.10.0
+
+### Minor Changes
+
+- 0ca6129: A read-only view lets comment changes through to the editor while core's `commentOnly()` is in
+  its plugins, so undo and redo of comments work from the keyboard in comment-only mode.
+
+### Patch Changes
+
+- bfe5241: The text of a resolved comment thread is no longer shaded; resolving or reopening redraws it.
+- Updated dependencies [bfe5241]
+- Updated dependencies [2896964]
+  - @folijs/core@1.10.0
+
 ## 1.9.0
 
 ### Patch Changes

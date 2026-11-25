@@ -1,5 +1,18 @@
 # @folijs/collab
 
+## 0.3.0
+
+### Minor Changes
+
+- 2896964: `authorize(clientID, steps, doc)` gets the authority's document, so a server can let a
+  comment-only user's comments through and refuse the rest with `onlyCommentSteps(doc, steps)`.
+
+### Patch Changes
+
+- Updated dependencies [bfe5241]
+- Updated dependencies [2896964]
+  - @folijs/core@1.10.0
+
 ## 0.2.2
 
 ### Patch Changes
