@@ -37,7 +37,7 @@ place that says what is in progress; check it before starting work.
 | 23 Agent editing parity   | ✅ Done                  | —                       | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                       | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
 | 25 Word ribbon            | In review                | `phase-25/word-ribbon`  | 25.1-25.8 merged (#282, #284, #285, #287); docs closing; 1.9.0 waits on the owner                                                                                                             |
-| 26 Comment-only mode      | In review                | `phase-26/comment-only` | 26.1-26.3 built; release waits on owner                                                                                                                                                      |
+| 26 Comment-only mode      | In review                | `phase-26/comment-only` | 26.1-26.3 built; release waits on owner                                                                                                                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
