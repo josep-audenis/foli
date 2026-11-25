@@ -1,10 +1,13 @@
 import {
   type CommentJSON,
+  type CommentMention,
   commentAnchors,
+  commentMentions,
   deleteComment,
   type Editor,
   type EditorState,
   editComment,
+  mentionText,
   type NodeJSON,
   replyToComment,
   resolveComment,
@@ -29,7 +32,35 @@ export interface FoliCommentsProps {
    * It hides the buttons, it does not guard the document: commands still change any comment.
    */
   onlyOwnComments?: boolean | undefined;
+  /**
+   * People a comment or reply can tag: typing `@` suggests them (by name or address), a pick
+   * writes `@Name` linked to `mailto:` their address, as Word does. A list, or a function that
+   * finds them for what follows the `@` (your directory; it may return a promise). Anyone may
+   * be tagged, connected or not.
+   */
+  mentions?: MentionSource | undefined;
+  /**
+   * A comment or reply saved here tags people it did not tag before: tell them (send an email,
+   * say). Called once per save with only the newly tagged. Comments made elsewhere (an agent, a
+   * collab peer) do not call it: a server finds their tags with `commentMentions`.
+   */
+  onMention?: ((event: MentionEvent) => void) | undefined;
 }
+
+/** Who can be tagged: a list, or a function that finds them for a query. */
+export type MentionSource =
+  | readonly CommentMention[]
+  | ((query: string) => readonly CommentMention[] | Promise<readonly CommentMention[]>);
+
+export interface MentionEvent {
+  /** The comment or reply as saved. */
+  comment: CommentJSON;
+  /** The people it tags that it did not before. */
+  people: CommentMention[];
+}
+
+/** At most this many suggestions show. */
+const SUGGESTIONS = 8;
 
 /** A comment and its replies, where its range starts in the document. */
 interface Thread {
@@ -102,19 +133,50 @@ function plain(c: CommentJSON): boolean {
       (p) =>
         p.type === "paragraph" &&
         Object.keys(p.attrs ?? {}).every((key) => key === "style") &&
-        (p.content ?? []).every((n) => n.type === "text" && !n.marks?.length),
+        (p.content ?? []).every(
+          (n) =>
+            n.type === "text" && (!n.marks?.length || commentMentions({ content: [n] }).length > 0),
+        ),
     )
   );
 }
 
-/** `text` as `c`'s content: a paragraph per line, in `c`'s paragraph style. */
-function contentLike(c: CommentJSON, text: string): NodeJSON[] {
+/** A line of text, `@Name` of each of `people` in it linked as their mention. */
+function lineContent(line: string, people: readonly CommentMention[]): NodeJSON[] {
+  // The longest name first: "@Ana Maria" is not "@Ana" and the rest.
+  const names = [...people].sort((a, b) => b.name.length - a.name.length);
+  const content: NodeJSON[] = [];
+  let text = "";
+  for (let i = 0; i < line.length; ) {
+    const person =
+      line[i] === "@" ? names.find((p) => p.name && line.startsWith(`@${p.name}`, i)) : undefined;
+    if (person) {
+      if (text) content.push({ type: "text", text });
+      text = "";
+      content.push(mentionText(person));
+      i += person.name.length + 1;
+    } else text += line[i++];
+  }
+  if (text) content.push({ type: "text", text });
+  return content;
+}
+
+/** `text` as `c`'s content: a paragraph per line, in `c`'s paragraph style, `people` tagged. */
+function contentLike(c: CommentJSON, text: string, people: readonly CommentMention[] = []) {
   const style = (c.content[0]?.attrs as { style?: string } | undefined)?.style;
-  return text.split(/\r\n|\r|\n/).map((line) => ({
-    type: "paragraph",
-    ...(style ? { attrs: { style } } : {}),
-    ...(line ? { content: [{ type: "text", text: line }] } : {}),
-  }));
+  return text.split(/\r\n|\r|\n/).map(
+    (line): NodeJSON => ({
+      type: "paragraph",
+      ...(style ? { attrs: { style } } : {}),
+      ...(line ? { content: lineContent(line, people) } : {}),
+    }),
+  );
+}
+
+/** Who `after` tags that `before` did not (by address). */
+function newlyTagged(before: CommentJSON | undefined, after: CommentJSON): CommentMention[] {
+  const old = new Set((before ? commentMentions(before) : []).map((p) => p.email.toLowerCase()));
+  return commentMentions(after).filter((p) => !old.has(p.email.toLowerCase()));
 }
 
 const isEmpty = (c: CommentJSON) => textOf(c).trim() === "";
@@ -144,6 +206,8 @@ export function FoliComments({
   className,
   hidden = false,
   onlyOwnComments = false,
+  mentions,
+  onMention,
 }: FoliCommentsProps) {
   const editor = useEditorOrContext(editorProp, "FoliComments");
   const comments = useEditorState((state) => wordContext(state)?.envelope.comments ?? EMPTY, {
@@ -284,6 +348,10 @@ export function FoliComments({
   const marked = (showResolved ? resolved : threads).some((t) => t.comment.id === focused)
     ? focused
     : null;
+  // Forgotten, so switching lists does not mark it again.
+  useEffect(() => {
+    if (marked === null && focused !== null) setFocused(null);
+  }, [marked, focused]);
   // The focused thread's text marked in the document (again after the view redraws it).
   // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes mean redrawn text to mark.
   useEffect(() => {
@@ -302,6 +370,12 @@ export function FoliComments({
   }, [marked, doc]);
 
   const run = (command: Parameters<Editor["run"]>[0]) => editor.run(command);
+  const commentsNow = () => wordContext(editor.state)?.envelope.comments ?? EMPTY;
+  /** Tells `onMention` whom `saved` newly tags. */
+  const tell = (before: CommentJSON | undefined, saved: CommentJSON | undefined) => {
+    const people = saved ? newlyTagged(before, saved) : [];
+    if (saved && people.length) onMention?.({ comment: saved, people });
+  };
   /**
    * Focus the thread of `id` (comment `from`'s first button, else the thread's), else the pane,
    * else the document.
@@ -365,8 +439,14 @@ export function FoliComments({
               run(deleteComment(c.id));
               focusThread(c === comment ? after?.comment.id : comment.id);
             }}
-            onSave={(text) => {
-              if (!run(editComment(c.id, contentLike(c, text)))) return false;
+            mentions={mentions}
+            onSave={(text, picked) => {
+              const people = [...commentMentions(c), ...picked];
+              if (!run(editComment(c.id, contentLike(c, text, people)))) return false;
+              tell(
+                c,
+                commentsNow().find((saved) => saved.id === c.id),
+              );
               created.current.delete(c.id);
               setWriting(null);
               focusThread(comment.id);
@@ -386,8 +466,17 @@ export function FoliComments({
           <CommentForm
             label="Reply"
             initial=""
-            onSave={(text) => {
-              if (text.trim() && !run(replyToComment(comment.id, text))) return false;
+            mentions={mentions}
+            onSave={(text, picked) => {
+              if (text.trim()) {
+                const before = new Set(commentsNow().map((saved) => saved.id));
+                if (!run(replyToComment(comment.id, contentLike(comment, text, picked))))
+                  return false;
+                tell(
+                  undefined,
+                  commentsNow().find((saved) => !before.has(saved.id)),
+                );
+              }
               setWriting(null);
               focusThread(comment.id, writing.from);
               return true;
@@ -454,6 +543,7 @@ function CommentView({
   onDelete,
   onSave,
   onCancel,
+  mentions,
 }: {
   comment: CommentJSON;
   root: boolean;
@@ -466,8 +556,9 @@ function CommentView({
   onReply(): void;
   onResolve(): void;
   onDelete(): void;
-  onSave(text: string): boolean;
+  onSave(text: string, picked: readonly CommentMention[]): boolean;
   onCancel(): void;
+  mentions: MentionSource | undefined;
 }) {
   const author = comment.author || "Unknown author";
   const what = root ? "comment" : "reply";
@@ -482,12 +573,24 @@ function CommentView({
           initial={textOf(comment)}
           onSave={onSave}
           onCancel={onCancel}
+          mentions={mentions}
         />
       ) : (
         <div className="foli-comment-text">
           {comment.content.map((p, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs have no identity.
-            <p key={i}>{paragraphText(p)}</p>
+            <p key={i}>
+              {(p.content ?? []).map((n, j) =>
+                commentMentions({ content: [n] }).length ? (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: runs have no identity.
+                  <span key={j} className="foli-comment-mention">
+                    {n.text}
+                  </span>
+                ) : (
+                  paragraphText({ type: "paragraph", content: [n] })
+                ),
+              )}
+            </p>
           ))}
         </div>
       )}
@@ -532,37 +635,107 @@ function CommentView({
   );
 }
 
+/** The `@query` being typed before the caret (no space in it), or null. */
+function mentionQuery(text: string, caret: number): { from: number; query: string } | null {
+  const match = /(?:^|\s)@([^\s@]*)$/.exec(text.slice(0, caret));
+  return match
+    ? { from: caret - (match[1] as string).length - 1, query: match[1] as string }
+    : null;
+}
+
+/** The people of a list that match `query` (in their name or address). */
+const matching = (people: readonly CommentMention[], query: string) => {
+  const q = query.toLowerCase();
+  return people.filter(
+    (p) => p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
+  );
+};
+
 function CommentForm({
   label,
   initial,
   onSave,
   onCancel,
+  mentions,
 }: {
   label: string;
   initial: string;
   /** False when it could not be saved: the form stays open. */
-  onSave(text: string): boolean;
+  onSave(text: string, picked: readonly CommentMention[]): boolean;
   onCancel(): void;
+  mentions?: MentionSource | undefined;
 }) {
   const id = useId();
   const [text, setText] = useState(initial);
   const [failed, setFailed] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  /** The people picked here: their `@Name` is linked when saved. */
+  const picked = useRef<CommentMention[]>([]);
+  const [query, setQuery] = useState<{ from: number; query: string } | null>(null);
+  const [found, setFound] = useState<readonly CommentMention[]>([]);
+  const [active, setActive] = useState(0);
   useEffect(() => field.current?.focus(), []);
-  const save = () => setFailed(!onSave(text));
+  // The people for the query: at once from a list, else when the function answers (the last
+  // query's answer only).
+  useEffect(() => {
+    if (!mentions || !query) {
+      setFound([]);
+      return;
+    }
+    let current = true;
+    const show = (people: readonly CommentMention[]) => {
+      if (!current) return;
+      setFound(people.slice(0, SUGGESTIONS));
+      setActive(0);
+    };
+    if (typeof mentions !== "function") show(matching(mentions, query.query));
+    else Promise.resolve(mentions(query.query)).then(show, () => show([]));
+    return () => {
+      current = false;
+    };
+  }, [mentions, query?.query, query]);
+  const open = !!query && found.length > 0;
+  const follow = (element: HTMLTextAreaElement) =>
+    setQuery(mentions ? mentionQuery(element.value, element.selectionStart) : null);
+  const pick = (person: CommentMention) => {
+    const element = field.current;
+    if (!element || !query) return;
+    const caret = element.selectionStart;
+    const written = `@${person.name} `;
+    const next = text.slice(0, query.from) + written + text.slice(caret);
+    picked.current.push(person);
+    setText(next);
+    setQuery(null);
+    const at = query.from + written.length;
+    requestAnimationFrame?.(() => {
+      element.focus();
+      element.setSelectionRange(at, at);
+    });
+  };
+  const save = () => setFailed(!onSave(text, picked.current));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     save();
   };
   const keys = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Escape") {
+    if (open && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
-      onCancel();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setActive((i) => (i + step + found.length) % found.length);
+    } else if (open && (e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      pick(found[active] as CommentMention);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      // The suggestions close first, then the form.
+      if (open) setQuery(null);
+      else onCancel();
     } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       save();
     }
   };
+  const listId = `${id}-people`;
   return (
     <form className="foli-comment-form" onSubmit={submit}>
       <label htmlFor={id}>{label}</label>
@@ -571,11 +744,44 @@ function CommentForm({
         ref={field}
         value={text}
         rows={3}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          follow(e.target);
+        }}
+        // The caret moved (not by the keys the suggestions take, after which it is set).
+        onKeyUp={(e) => {
+          if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key))
+            follow(e.currentTarget);
+        }}
+        onClick={(e) => follow(e.currentTarget)}
         onKeyDown={keys}
+        onBlur={() => setQuery(null)}
+        aria-autocomplete={mentions ? "list" : undefined}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
         aria-invalid={failed || undefined}
         aria-describedby={failed ? `${id}-error` : undefined}
       />
+      {open && (
+        <div id={listId} className="foli-comment-people" role="listbox" aria-label="People">
+          {found.map((person, i) => (
+            <div
+              key={person.email}
+              id={`${listId}-${i}`}
+              role="option"
+              tabIndex={-1}
+              aria-selected={i === active}
+              // Before the field's blur: the pick needs the caret where it was.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(person);
+              }}
+            >
+              <strong>{person.name}</strong> <span>{person.email}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {failed && (
         <p id={`${id}-error`} className="foli-comment-error" role="alert">
           Could not be saved here.

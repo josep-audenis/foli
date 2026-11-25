@@ -3,7 +3,13 @@ import type { NodeJSON } from "../model/index.js";
 import { Fragment, type Mark, type MarkType, type NodeType, Slice } from "../model/index.js";
 import { ReplaceStep, type Step } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument } from "../v3/document.js";
-import { commentOnly, onlyCommentSteps, resolvedCommentIds } from "./comments.js";
+import {
+  commentMentions,
+  commentOnly,
+  mentionText,
+  onlyCommentSteps,
+  resolvedCommentIds,
+} from "./comments.js";
 import { createEditor, type Editor } from "./editor.js";
 import { remote } from "./state.js";
 import { CommentStep } from "./word.js";
@@ -389,5 +395,34 @@ describe("resolvedCommentIds", () => {
     // Word may mark only the thread's first comment done.
     const comments = [c(0, { done: true }), c(1, { parent: 0 }), c(2), c(3, { parent: 2 })];
     expect([...resolvedCommentIds(comments)]).toEqual([0, 1]);
+  });
+});
+
+describe("commentMentions", () => {
+  it("finds each person a comment tags once, from @ text linked to mailto:", () => {
+    const ana = { name: "Ana", email: "ana@example.com" };
+    const content: NodeJSON[] = [
+      {
+        type: "paragraph",
+        content: [
+          mentionText(ana),
+          { type: "text", text: " and " },
+          // Not a mention: no @, or not an address.
+          { type: "text", text: "Bo", marks: [{ type: "link", attrs: { href: "mailto:b@x" } }] },
+          { type: "text", text: "@Web", marks: [{ type: "link", attrs: { href: "https://x" } }] },
+          {
+            type: "text",
+            text: "@Ana",
+            marks: [{ type: "link", attrs: { href: "MAILTO:Ana@example.com" } }],
+          },
+          {
+            type: "text",
+            text: "@Odd",
+            marks: [{ type: "link", attrs: { href: "mailto:o%zz@x" } }],
+          },
+        ],
+      },
+    ];
+    expect(commentMentions({ content })).toEqual([ana, { name: "Odd", email: "o%zz@x" }]);
   });
 });

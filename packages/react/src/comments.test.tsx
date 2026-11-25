@@ -2,8 +2,13 @@
 import type { FoliDocument } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it } from "vitest";
-import { FoliEditor, type FoliEditorHandle } from "./index.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  FoliEditor,
+  type FoliEditorHandle,
+  type FoliEditorProps,
+  type MentionEvent,
+} from "./index.js";
 
 const anchor = (type: string, id: number) => ({ type, attrs: { id } });
 const document3 = (comments: FoliDocument["comments"]): FoliDocument => ({
@@ -31,7 +36,11 @@ const document3 = (comments: FoliDocument["comments"]): FoliDocument => ({
 });
 const note = (text: string) => [{ type: "paragraph", content: [{ type: "text", text }] }];
 
-function setup(comments: FoliDocument["comments"], onlyOwnComments?: boolean) {
+function setup(
+  comments: FoliDocument["comments"],
+  onlyOwnComments?: boolean,
+  props: Partial<FoliEditorProps> = {},
+) {
   const ref = createRef<FoliEditorHandle>();
   render(
     <FoliEditor
@@ -39,6 +48,7 @@ function setup(comments: FoliDocument["comments"], onlyOwnComments?: boolean) {
       initialContent={document3(comments)}
       author="Me"
       onlyOwnComments={onlyOwnComments}
+      {...props}
     />,
   );
   return (ref.current as FoliEditorHandle).editor;
@@ -107,6 +117,9 @@ describe("FoliComments in FoliEditor", () => {
     // Removed while focused: no blur comes.
     fireEvent.click(within(thread).getByRole("button", { name: "Resolve" }));
     expect(document.querySelectorAll(".foli-comment-active")).toHaveLength(0);
+    // Not marked again by showing the list it went to.
+    fireEvent.click(within(pane()).getByRole("button", { name: "Resolved (1)" }));
+    expect(document.querySelectorAll(".foli-comment-active")).toHaveLength(0);
   });
 
   it("takes its mark off every copy of the focused thread's text", () => {
@@ -119,6 +132,82 @@ describe("FoliComments in FoliEditor", () => {
     text.parentElement?.append(text.cloneNode(true));
     fireEvent.blur(thread);
     expect(document.querySelectorAll(".foli-comment-active")).toHaveLength(0);
+  });
+
+  it("tags people after @: suggests, picks, and tells onMention whom a save newly tags", () => {
+    const jo = { name: "Jo Doe", email: "jo@example.com" };
+    const people = [jo, { name: "Ann Lee", email: "ann@example.com" }];
+    const onMention = vi.fn<(event: MentionEvent) => void>();
+    const editor = setup([{ id: 0, author: "Me", content: note("Old") }], false, {
+      mentions: people,
+      onMention,
+    });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Me" }));
+    const field = within(pane()).getByRole("textbox", { name: "Comment" });
+    fireEvent.change(field, { target: { value: "Ask @jo" } });
+    const list = within(pane()).getByRole("listbox", { name: "People" });
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Jo Doe jo@example.com"]);
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect((field as HTMLTextAreaElement).value).toBe("Ask @Jo Doe ");
+    expect(within(pane()).queryByRole("listbox")).toBeNull();
+    fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
+    const saved = editor.getDocument().comments[0];
+    expect(saved?.content[0]?.content?.[1]).toEqual({
+      type: "text",
+      text: "@Jo Doe",
+      marks: [{ type: "link", attrs: { href: "mailto:jo@example.com" } }],
+    });
+    expect(onMention).toHaveBeenCalledTimes(1);
+    expect(onMention.mock.calls[0]?.[0]).toEqual({ comment: saved, people: [jo] });
+    expect(pane().querySelector(".foli-comment-mention")?.textContent).toBe("@Jo Doe");
+
+    // Edited again: the tag stays, and nobody new is tagged.
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Me" }));
+    const again = within(pane()).getByRole("textbox", { name: "Comment" });
+    expect((again as HTMLTextAreaElement).value).toBe("Ask @Jo Doe ");
+    fireEvent.change(again, { target: { value: "Ask @Jo Doe today" } });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
+    expect(editor.getDocument().comments[0]?.content[0]?.content?.[1]?.marks).toBeTruthy();
+    expect(onMention).toHaveBeenCalledTimes(1);
+  });
+
+  it("tags in a reply, with people a function finds", async () => {
+    const ann = { name: "Ann Lee", email: "ann@example.com" };
+    const onMention = vi.fn<(event: MentionEvent) => void>();
+    const find = vi.fn(async (query: string) => (query === "an" ? [ann] : []));
+    const editor = setup([{ id: 0, author: "Ana", content: note("Hm") }], false, {
+      mentions: find,
+      onMention,
+    });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Reply" }));
+    const field = within(pane()).getByRole("textbox", { name: "Reply" });
+    fireEvent.change(field, { target: { value: "@an" } });
+    const option = await within(pane()).findByRole("option");
+    expect(find).toHaveBeenLastCalledWith("an");
+    fireEvent.mouseDown(option);
+    fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
+    const reply = editor.getDocument().comments[1];
+    expect(reply?.parent).toBe(0);
+    expect(onMention.mock.calls).toEqual([[{ comment: reply, people: [ann] }]]);
+  });
+
+  it("closes the suggestions on Escape, then the form", () => {
+    setup([{ id: 0, author: "Me", content: note("Old") }], false, {
+      mentions: [{ name: "Jo", email: "jo@example.com" }],
+    });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Me" }));
+    const field = within(pane()).getByRole("textbox", { name: "Comment" });
+    fireEvent.change(field, { target: { value: "@" } });
+    expect(within(pane()).getByRole("listbox")).toBeTruthy();
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(within(pane()).queryByRole("listbox")).toBeNull();
+    expect(within(pane()).getByRole("textbox", { name: "Comment" })).toBe(field);
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(within(pane()).queryByRole("textbox")).toBeNull();
   });
 
   it("edits a comment's text", () => {

@@ -38,7 +38,7 @@ place that says what is in progress; check it before starting work.
 | 24 Collab integration         | ✅ Done                  | —                          | Merged in #270–#276; 1.8.0 and `@folijs/collab` 0.2.0 on npm (2026-11-25), then 1.8.1 and collab 0.2.1 with the mark fix (#278)                                                               |
 | 25 Word ribbon                | ✅ Done                  | —                          | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | In review                | `phase-26/comment-only`    | 26.1-26.3 built; release waits on owner                                                                                                                                                       |
-| 27 Comment history & mentions | In progress              | `phase-27/comment-history` | Asked for by the owner on 2026-11-25                                                                                                                                                          |
+| 27 Comment history & mentions | In review                | `phase-27/comment-history` | Asked for by the owner on 2026-11-25                                                                                                                                                          |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3831,12 +3831,15 @@ thread someone is in, keeping deleted comments.
   resolved, an Open / Resolved switch; Resolved lists them in document order, each with Reopen
   and Delete; focusing one marks its text. A thread resolved, reopened or deleted while focused
   takes its mark with it (no blur comes for a removed element).
-- [ ] 27.3 Mentions: `commentMentions(comment)` in core; the pane's `mentions` (people, or a
+- [x] 27.3 Mentions: `commentMentions(comment)` in core; the pane's `mentions` (people, or a
   function that finds them) suggest people after `@` in a comment or reply, a pick writes the
   linked name; `onMention` gets the comment and the people it newly tags when one is saved.
   `FoliEditor` passes both. A mention survives export and import.
-- [ ] 27.4 Docs (api.md, React README, limitations), changesets, the playground with a list of
+- [x] 27.4 Docs (api.md, React README, limitations), changesets, the playground with a list of
   people.
+- After an agent's review of 27.1–27.2: a thread focused when it left its list is forgotten, so
+  switching to the other list does not mark it again. Checked in Chromium (edit.html): `@ch`
+  suggests Chloé, Enter picks, the save logs her address from `onMention`.
 
 ### Acceptance
 

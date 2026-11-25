@@ -46,6 +46,49 @@ function contentOf(content: CommentContent): NodeJSON[] {
     );
 }
 
+/** A person a comment tags: `@` and their name, linked to `mailto:` their address, as Word does. */
+export interface CommentMention {
+  name: string;
+  email: string;
+}
+
+/** The text of a mention of `person` in a comment, a text node of its content. */
+export const mentionText = (person: CommentMention): NodeJSON => ({
+  type: "text",
+  text: `@${person.name}`,
+  marks: [{ type: "link", attrs: { href: `mailto:${person.email}` } }],
+});
+
+/** A URI component decoded; as written when it is not well-formed (a stray `%`). */
+function decoded(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * The people comment `comment` tags (`@` and a name linked to a `mailto:` address, as Word and
+ * the comments pane write them), once each, in the order they come. A server tells them from
+ * the comments it receives, whoever made them.
+ */
+export function commentMentions(comment: Pick<CommentJSON, "content">): CommentMention[] {
+  const found = new Map<string, CommentMention>();
+  const visit = (node: NodeJSON) => {
+    const href = node.marks?.find((m) => m.type === "link")?.attrs?.href;
+    if (node.type === "text" && node.text?.startsWith("@") && typeof href === "string") {
+      const match = /^mailto:([^?]+)/i.exec(href);
+      const email = match ? decoded(match[1] as string) : "";
+      if (email && !found.has(email.toLowerCase()))
+        found.set(email.toLowerCase(), { name: node.text.slice(1), email });
+    }
+    node.content?.forEach(visit);
+  };
+  comment.content.forEach(visit);
+  return [...found.values()];
+}
+
 /** Word's limit on a comment's initials. */
 const INITIALS = 9;
 const initialsOf = (options: CommentOptions) =>

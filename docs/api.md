@@ -90,7 +90,10 @@ selection and scrolls it into view).
 ### `<FoliComments>`
 
 The comments pane: the document's threads beside the pages, each level with its text and moved
-down below the one before when they would overlap; resolved threads dimmed. Reply (on every
+down below the one before when they would overlap. Resolved threads leave the margin (their
+text unshaded) for the Open / Resolved switch at the top of the pane, which lists them in
+document order with Reopen and Delete: the comment history (deleted comments are gone, undo
+brings them back). Reply (on every
 comment of a thread; a reply to a reply goes at the end of the thread, as in Word), Edit (comments
 of plain text, a line per paragraph), Resolve/Reopen, Delete; a new empty comment (the toolbar's
 New comment) opens for writing (Ctrl/Cmd+Enter saves, Escape cancels; one left empty is
@@ -98,7 +101,13 @@ deleted). Focusing a thread outlines its text; a caret in commented text marks i
 printed. Props: `editor` (default: the nearest provider's), `readOnly` (no actions), `label`
 (default "Comments"), `className`, `hidden` (not shown, still following the editor),
 `onlyOwnComments` (Edit and Delete only on the comments whose author is the editor's `author`,
-by name; it hides buttons, the commands still change any comment). Edit keeps
+by name; it hides buttons, the commands still change any comment), `mentions` (people a comment
+can tag, `{ name, email }[]` or a function from the text after `@` to them, sync or a promise:
+typing `@` suggests them, a pick writes `@Name` linked to `mailto:` the address, as Word does;
+anyone in the list, connected or not), `onMention` (`({ comment, people })` after a save here
+that tags people the comment did not tag before: send them an email from your server; comments
+made elsewhere, by an agent or a collab peer, do not call it, find their tags with
+`commentMentions`). `FoliEditor` passes `mentions` and `onMention` through. Edit keeps
 the comment's paragraph style (Word's CommentText); a comment with other formatting is not
 editable here. `FoliToolbar`'s `comments` prop shows New comment (only with a pane). Render it beside the pages (`FoliEditor` does, in
 `.foli-editor-body`): it finds the commented text (`data-foli-comments` in the view) in the
@@ -673,6 +682,9 @@ opaque block, which stays), `deleteAllComments()` (threads anchored there kept);
 (a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
 reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
 accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
+`commentMentions(comment)` lists the people a comment tags (`{ name, email }`, once each: `@`
+text linked to `mailto:`), and `mentionText(person)` is that text node, for content written in
+code.
 Comment-only mode (1.10): `commentOnly()` is a plugin that refuses every local transaction
 changing more than comments, so typing, paste, drop and other commands change nothing while
 comments, replies, resolving, deleting and their undo work; received (collab) transactions pass.

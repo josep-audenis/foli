@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { createDocument, createEditor } from "@folijs/core";
+import { commentMentions, createDocument, createEditor, mentionText } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx } from "./index.js";
 import { docx } from "./testing/package.js";
@@ -38,6 +38,22 @@ describe("comments made in the editor", () => {
     const again = await importDocx(await exportDocx(editor.getDocument()));
     expect(view(again.document.comments)).toEqual(view(editor.getDocument().comments));
     expect(again.document.content).toEqual(editor.getDocument().content);
+  });
+
+  it("keep their mentions: @ and the name, linked to mailto: the address", async () => {
+    const editor = createEditor({
+      document: createDocument({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Commented text" }] }],
+      }),
+    });
+    editor.select(1, 4);
+    const person = { name: "Jo Doe", email: "jo@example.com" };
+    editor.commands.addComment([
+      { type: "paragraph", content: [{ type: "text", text: "Ask " }, mentionText(person)] },
+    ]);
+    const again = await importDocx(await exportDocx(editor.getDocument()));
+    expect(again.document.comments.map(commentMentions)).toEqual([[person]]);
   });
 
   it("come back from a corpus package that has comments already", async () => {

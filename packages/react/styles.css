@@ -873,6 +873,34 @@
   font: inherit;
 }
 
+/* People to tag, under the field where `@` is typed. */
+.foli-comment-people {
+  margin-top: 2px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: var(--foli-page-background);
+  box-shadow: var(--foli-page-shadow);
+}
+
+.foli-comment-people [role="option"] {
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.foli-comment-people [role="option"] span {
+  opacity: 0.7;
+}
+
+.foli-comment-people [aria-selected="true"] {
+  background: color-mix(in srgb, var(--foli-focus-ring) 15%, transparent);
+}
+
+/* A tagged person in a comment. */
+.foli-comment-mention {
+  color: inherit;
+  font-weight: 600;
+}
+
 .foli-comments :focus-visible {
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: 1px;

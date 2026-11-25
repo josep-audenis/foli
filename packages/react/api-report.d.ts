@@ -37,7 +37,7 @@ export interface FoliCanvasHandle {
 export declare const FoliCanvas: import("react").ForwardRefExoticComponent<FoliCanvasProps & import("react").RefAttributes<FoliCanvasHandle>>;
 
 // FoliComments.d.ts
-import { type Editor } from "@folijs/core";
+import { type CommentJSON, type CommentMention, type Editor } from "@folijs/core";
 export interface FoliCommentsProps {
     /** Default: the editor of the nearest `FoliEditorProvider`. */
     editor?: Editor | undefined;
@@ -53,6 +53,27 @@ export interface FoliCommentsProps {
      * It hides the buttons, it does not guard the document: commands still change any comment.
      */
     onlyOwnComments?: boolean | undefined;
+    /**
+     * People a comment or reply can tag: typing `@` suggests them (by name or address), a pick
+     * writes `@Name` linked to `mailto:` their address, as Word does. A list, or a function that
+     * finds them for what follows the `@` (your directory; it may return a promise). Anyone may
+     * be tagged, connected or not.
+     */
+    mentions?: MentionSource | undefined;
+    /**
+     * A comment or reply saved here tags people it did not tag before: tell them (send an email,
+     * say). Called once per save with only the newly tagged. Comments made elsewhere (an agent, a
+     * collab peer) do not call it: a server finds their tags with `commentMentions`.
+     */
+    onMention?: ((event: MentionEvent) => void) | undefined;
+}
+/** Who can be tagged: a list, or a function that finds them for a query. */
+export type MentionSource = readonly CommentMention[] | ((query: string) => readonly CommentMention[] | Promise<readonly CommentMention[]>);
+export interface MentionEvent {
+    /** The comment or reply as saved. */
+    comment: CommentJSON;
+    /** The people it tags that it did not before. */
+    people: CommentMention[];
 }
 /**
  * The comments pane: the document's comment threads beside the pages, each next to its text,
@@ -62,12 +83,13 @@ export interface FoliCommentsProps {
  * writing, and goes when cancelled empty. Render it beside the pages (`FoliEditor` does): it
  * finds the comments' text in the nearest ancestor holding them.
  */
-export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, onlyOwnComments, }: FoliCommentsProps): import("react").JSX.Element;
+export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, onlyOwnComments, mentions, onMention, }: FoliCommentsProps): import("react").JSX.Element;
 
 // FoliEditor.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FoliDocument, type Plugin, type ReviewView, type Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
+import { type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
@@ -142,6 +164,10 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * any. Not access control: the app's server checks what it receives.
      */
     commentOnly?: boolean | undefined;
+    /** People a comment can tag after `@` (`FoliComments`' `mentions`). */
+    mentions?: MentionSource | undefined;
+    /** A comment saved in the pane newly tags people: tell them (`FoliComments`' `onMention`). */
+    onMention?: ((event: MentionEvent) => void) | undefined;
     /** Rendered between the toolbar and the pages, inside the editor's context. */
     children?: ReactNode | undefined;
 }
@@ -655,7 +681,7 @@ export declare function useCommand<K extends keyof FoliCommands>(name: K, ...arg
 // index.d.ts
 export { type CommandState, FoliEditorProvider, type UseCommandOptions, type UseEditorStateOptions, type UseFoliEditorOptions, useCommand, useCurrentEditor, useEditorState, useFoliEditor, } from "./editor.js";
 export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
-export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
+export { FoliComments, type FoliCommentsProps, type MentionEvent, type MentionSource, } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, selectionInTable, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, wordRibbonTabs, } from "./FoliToolbar.js";
