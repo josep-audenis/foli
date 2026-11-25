@@ -1,5 +1,11 @@
 # @folijs/docx
 
+## 1.9.0
+
+### Patch Changes
+
+- @folijs/core@1.9.0
+
 ## 1.8.1
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @folijs/mcp
 
+## 0.3.3
+
+### Patch Changes
+
+- @folijs/core@1.9.0
+  - @folijs/docx@1.9.0
+  - @folijs/agent@0.4.3
+
 ## 0.3.2
 
 ### Patch Changes

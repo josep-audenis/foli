@@ -1,5 +1,11 @@
 # @folijs/collab
 
+## 0.2.2
+
+### Patch Changes
+
+- @folijs/core@1.9.0
+
 ## 0.2.1
 
 ### Patch Changes
