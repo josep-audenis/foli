@@ -272,7 +272,6 @@ describe("FoliEditor commentOnly (26.2)", () => {
     expect(document.querySelector('[contenteditable="true"]')).toBeNull();
     // Formatting is off; commenting and review navigation stay.
     expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-disabled")).toBe("true");
-    expect(screen.getByRole("button", { name: "Undo" }).getAttribute("aria-disabled")).toBe("true");
     act(() => editor.select(1, 6));
     fireEvent.click(screen.getByRole("button", { name: "New comment" }));
     const field = within(pane()).getByRole("textbox", { name: "Comment" });
@@ -289,6 +288,11 @@ describe("FoliEditor commentOnly (26.2)", () => {
       ["Me", undefined],
       ["Me", 0],
     ]);
+    // Undo takes the reply back, redo brings it again.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(editor.getDocument().comments).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+    expect(editor.getDocument().comments).toHaveLength(3);
     // Only the user's own comments are edited and deleted (onlyOwnComments by default).
     expect(within(pane()).queryByRole("button", { name: "Delete comment by Ana" })).toBeNull();
     expect(within(pane()).getByRole("button", { name: "Delete reply by Me" })).toBeTruthy();

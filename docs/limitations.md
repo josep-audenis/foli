@@ -376,8 +376,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   app that lets untrusted users save checks their changes on its server (`onlyCommentSteps`).
   Comments stay body-only, so a commenter cannot comment in headers, footers or notes. Without
   `author`, the check lets any comment change through (the pane only hides Edit and Delete on
-  others'); with it, a commenter cannot delete their own comment once others replied to it, and
-  cannot undo deleting a comment whose anchors Word wrote with attributes Foli keeps.
+  others'); `FoliEditor` passes its `author`. A commenter cannot delete someone else's reply in
+  their thread on its own (only with the thread). Inserted anchors may carry formatting marks
+  and kept attributes (an imported comment's, back on undo), never a tracked change.
 - Revisions carry no initials (Word has none); comments do.
 - Since 1.6, undo takes back a style, list definition, resource or control's properties added with
   an edit, with the edit (before, they stayed; not checked against what Word does). The tracking switch is the

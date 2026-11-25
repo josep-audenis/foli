@@ -3780,7 +3780,10 @@ control (the app's server decides who may save; the filter keeps an honest clien
   `commentOnly()` plugin added, the toolbar's items off but "New comment", review navigation and
   the View tab (`FoliToolbar`'s `commentOnly`), the comments pane writing, `onlyOwnComments` on
   unless given. Tested: typing, paste, drop and shortcuts change nothing; a comment and a reply
-  are made and undone.
+  are made and undone. After a second review: undo and redo kept (toolbar, and the keyboard:
+  a read-only view passes comment changes while `commentOnly()` is in the plugins), `FoliEditor`
+  passes its `author`, the owner of a thread deletes it with others' replies, and inserted
+  anchors may carry formatting (an imported comment back on undo) but never a tracked change.
 - [x] 26.3 Docs (api.md, the React and collab READMEs, limitations), changesets; the playground
   at `edit.html?comment-only` (checked in Chromium: Delete and typing change nothing, a comment
   is made and deleted). Left: released with the next minor, with the owner's approval.

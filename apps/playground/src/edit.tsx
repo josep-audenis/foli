@@ -101,7 +101,7 @@ const OVERRIDABLE = [
 // `?comment-only`: comment-only mode (26.x) put together by hand, as `FoliEditor`'s `commentOnly` does.
 const commenting = new URLSearchParams(location.search).has("comment-only");
 const plugins = [
-  ...(commenting ? [commentOnly()] : []),
+  ...(commenting ? [commentOnly({ author: "Foli user" })] : []),
   ...(new URLSearchParams(location.search).get("keys") === "override"
     ? [
         new Plugin({

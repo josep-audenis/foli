@@ -677,10 +677,13 @@ Comment-only mode (1.10): `commentOnly()` is a plugin that refuses every local t
 changing more than comments, so typing, paste, drop and other commands change nothing while
 comments, replies, resolving, deleting and their undo work; received (collab) transactions pass.
 `onlyCommentSteps(doc, steps, { author? })` is its check: each step a `CommentStep` or a
-`ReplaceStep` in one textblock that inserts and removes only comment anchors (inserted ones plain,
-for a comment the steps add; removed ones of a comment they delete). With `author`, a comment
-added or deleted must be that author's, and of others' comments only `done` may change
-(`commentOnly({ author })` takes it too). Not access control: a server checks what it receives
+`ReplaceStep` in one textblock that inserts and removes only comment anchors (inserted ones
+without a tracked change, for a comment the steps add; removed ones of a comment they delete).
+With `author`, a comment added or deleted must be that author's (or a reply in a thread of
+theirs added or deleted with it), and of others' comments only `done` may change
+(`commentOnly({ author })` takes it too, `FoliEditor` passes its `author`). A read-only
+`EditorView` lets comment changes through to the editor while `commentOnly()` is in the plugins
+(undo and redo from the keyboard). Not access control: a server checks what it receives
 (`authorize` below).
 Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's

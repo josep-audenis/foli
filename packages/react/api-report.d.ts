@@ -137,8 +137,9 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
     /**
      * Comment-only mode: the user selects, copies, finds and comments (replies, resolves, deletes),
      * but cannot change the text. The canvas is read-only, the toolbar keeps only commenting and
-     * review items, and core's `commentOnly()` plugin refuses every other local change (received
-     * collab edits still apply). Not access control: the app's server checks what it receives.
+     * review items, and core's `commentOnly({ author })` plugin refuses every other local change
+     * (received collab edits still apply): the user changes only their own comments, and resolves
+     * any. Not access control: the app's server checks what it receives.
      */
     commentOnly?: boolean | undefined;
     /** Rendered between the toolbar and the pages, inside the editor's context. */
@@ -194,8 +195,8 @@ export interface FoliToolbarProps {
      */
     disabled?: boolean | undefined;
     /**
-     * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", the review
-     * view and change navigation, Navigate, the navigation pane and field codes.
+     * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
+     * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
      */
     commentOnly?: boolean | undefined;
     /**

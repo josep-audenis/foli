@@ -47,6 +47,7 @@ export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
+export { isCommentOnly } from "./state/comments.js";
 export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryEditStep, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export { withTrackState } from "./state/track.js";
@@ -902,7 +903,7 @@ export declare function baseKeymap(): Plugin;
  */
 import type { Node, NodeJSON } from "../model/index.js";
 import { type Step } from "../transform/steps.js";
-import { type Command, Plugin } from "./state.js";
+import { type Command, type EditorState, Plugin } from "./state.js";
 export interface CommentOptions {
     /** Default: the editor's author (`createEditor({ author })`). */
     author?: string;
@@ -934,20 +935,23 @@ export declare function deleteComment(id: number): Command;
 export declare const deleteAllComments: Command;
 export interface CommentStepsOptions {
     /**
-     * The user sending the steps: a comment they add or delete must be theirs, and of anyone
-     * else's they may only resolve or reopen. Without it, any comment may change.
+     * The user sending the steps: a comment they add or delete must be theirs (or a reply in a
+     * thread of theirs added or deleted with it), and of anyone else's they may only resolve or
+     * reopen. Without it, any comment may change.
      */
     author?: string;
 }
 /**
  * Whether `steps`, applied to `doc` in order, change only comments: each a `CommentStep` (a
  * comment's content, thread or state) or a `ReplaceStep` inside one textblock that inserts and
- * removes nothing but comment anchors: inserted ones without marks or kept attributes, for a
- * comment the steps add; removed ones of a comment the steps delete. What a comment-only user may
+ * removes nothing but comment anchors: inserted ones without a tracked change, for a comment the
+ * steps add; removed ones of a comment the steps delete. What a comment-only user may
  * send (`commentOnly()`, and a collab authority's `authorize`, with `author` there). False for a
  * step that does not apply to `doc`.
  */
 export declare function onlyCommentSteps(doc: Node, steps: readonly Step[], options?: CommentStepsOptions): boolean;
+/** Whether `state` is in comment-only mode (`commentOnly()` among its plugins). */
+export declare const isCommentOnly: (state: EditorState) => boolean;
 /**
  * Comment-only mode: refuses every local transaction that changes more than comments
  * (`onlyCommentSteps`), so typing, paste, drop and commands change nothing, while making,

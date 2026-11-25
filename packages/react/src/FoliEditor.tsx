@@ -11,7 +11,7 @@ import {
   type Transaction,
 } from "@folijs/core";
 import { documentJSON, wordContext } from "@folijs/core/internal";
-import { forwardRef, type ReactNode, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, type ReactNode, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   FoliEditorProvider,
   useEditorState,
@@ -102,8 +102,9 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   /**
    * Comment-only mode: the user selects, copies, finds and comments (replies, resolves, deletes),
    * but cannot change the text. The canvas is read-only, the toolbar keeps only commenting and
-   * review items, and core's `commentOnly()` plugin refuses every other local change (received
-   * collab edits still apply). Not access control: the app's server checks what it receives.
+   * review items, and core's `commentOnly({ author })` plugin refuses every other local change
+   * (received collab edits still apply): the user changes only their own comments, and resolves
+   * any. Not access control: the app's server checks what it receives.
    */
   commentOnly?: boolean | undefined;
   /** Rendered between the toolbar and the pages, inside the editor's context. */
@@ -119,9 +120,6 @@ export interface FoliEditorHandle extends FoliCanvasHandle {
    */
   hint(target: DocumentTarget | { bookmark: string }, options?: { ms?: number }): boolean;
 }
-
-/** One plugin for every comment-only editor: the same item keeps `plugins` equal across renders. */
-const COMMENT_ONLY = commentOnlyPlugin();
 
 /**
  * An editable document on real pages with a toolbar: creates its editor, provides it to
@@ -147,10 +145,13 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   },
   ref,
 ) {
+  // One filter per author (read once, as the editor's): the client refuses what a server checking
+  // `onlyCommentSteps(doc, steps, { author })` would.
+  const [filter] = useState(() => commentOnlyPlugin(author !== undefined ? { author } : {}));
   // A new list only when the mode or the app's plugins change (plugins are applied in place).
   const allPlugins = useMemo(
-    () => (commentOnly ? [...(plugins ?? []), COMMENT_ONLY] : plugins),
-    [commentOnly, plugins],
+    () => (commentOnly ? [...(plugins ?? []), filter] : plugins),
+    [commentOnly, plugins, filter],
   );
   const editor = useFoliEditor({
     initialContent,
