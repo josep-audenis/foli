@@ -2995,18 +2995,6 @@ export function FoliToolbar({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="foli-ribbon-collapse"
-            aria-label={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
-            title={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
-            aria-expanded={panelShown}
-            aria-controls={`${id}-panel`}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            {collapsed ? PIN_ICON : COLLAPSE_ICON}
-          </button>
         </div>
         <div
           role="tabpanel"
@@ -3019,6 +3007,19 @@ export function FoliToolbar({
         >
           {bar}
         </div>
+        {/* After the panel: Tab goes from the tabs into the toolbar, then here. */}
+        <button
+          type="button"
+          className="foli-ribbon-collapse"
+          aria-label={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+          title={collapsed ? tr("Pin the ribbon") : tr("Collapse the ribbon")}
+          aria-expanded={panelShown}
+          aria-controls={`${id}-panel`}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? PIN_ICON : COLLAPSE_ICON}
+        </button>
       </div>
     ) : (
       bar

@@ -682,9 +682,13 @@
 }
 .foli-ribbon-head > .foli-ribbon-tabs {
   flex: 1 1 auto;
+  /* Room for the collapse button, drawn over the end of the tabs' row. */
+  padding-inline-end: 44px;
 }
 .foli-ribbon-collapse {
-  align-self: center;
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 0;
   width: 28px;
   height: 28px;
   margin-inline-end: 8px;

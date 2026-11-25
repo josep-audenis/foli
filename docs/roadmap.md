@@ -36,7 +36,7 @@ place that says what is in progress; check it before starting work.
 | 22 Collaboration          | ✅ Done                  | —                      | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
 | 23 Agent editing parity   | ✅ Done                  | —                      | Merged in #253–#268; 1.7.0 (schema 8), `@folijs/agent` 0.4.0 and `@folijs/mcp` 0.3.0 on npm (2026-11-24)                                                                                      |
 | 24 Collab integration     | ✅ Done                  | —                      | Merged in #270–#276; 1.8.0, `@folijs/collab` 0.2.0, `@folijs/agent` 0.4.1 and `@folijs/mcp` 0.3.1 on npm (2026-11-25)                                                                         |
-| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.5 merged (#282, #284); 25.6-25.7 (shrinking, KeyTips)                                                                                                                       |
+| 25 Word ribbon            | In progress              | `phase-25/word-ribbon` | Building: 25.1-25.7 merged (#282, #284, #285); 25.8 (site, e2e)                                                                                                                               |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3718,9 +3718,12 @@ Microsoft artwork or branding beyond the tabs' ordinary words).
 - [x] 25.7 KeyTips: Alt alone, then a tab's letter (Word's: H, N, P, S, R, W), then an item's;
   Escape steps back; `keyTips={false}`; `keyTip` on a tab or an item. Letters come from the
   translated names, so they follow `messages`.
-- [ ] 25.8 The playground and the site's demo show `wordRibbonTabs`; e2e specs in Chromium,
-  Firefox and WebKit (tabs, a contextual tab coming and going, collapse, shrinking at three
-  widths, KeyTips); screenshots against a baseline.
+- [x] 25.8 The site's try page uses `wordRibbonTabs` (`overflow: "menu"`); the playground
+  shows it at `edit.html?ribbon` (its one-row toolbar stays the default, which the other specs
+  drive). `ribbon.spec.ts` in Chromium, Firefox and WebKit: tabs and axe, the table tabs coming
+  and going, collapse and Ctrl+F1, shrinking at 1366, 1024 and 768 px with every item
+  reachable, KeyTips; a screenshot of the References tab per engine. Found there: the collapse
+  button sat between the tabs and the toolbar for Tab; it now comes after the panel.
 - [ ] 25.9 Docs and release: api.md, styling.md (the new classes), theming.md, keyboard.md
   (Ctrl+F1, KeyTips), limitations.md (what Word's ribbon has that this does not); a changeset;
   1.9.0 published with the owner's approval (1.8.0 went out with Phase 24).
