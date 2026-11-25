@@ -122,3 +122,24 @@ jobs:
           git push --no-verify "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --tags
         env:
           GH_TOKEN: ${{ github.token }}
+
+      # A GitHub Release per pushed tag with no release yet, its notes the version's CHANGELOG
+      # section. Core (the fixed group's lead) is marked Latest. Re-runs skip existing releases.
+      - name: Create GitHub Releases
+        if: ${{ !cancelled() }}
+        run: |
+          for manifest in packages/*/package.json; do
+            dir=$(dirname "$manifest")
+            name=$(node -p "require('./$manifest').name")
+            version=$(node -p "require('./$manifest').version")
+            tag="$name@$version"
+            git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null || continue
+            gh release view "$tag" >/dev/null 2>&1 && continue
+            notes=$(awk -v v="## $version" '$0==v{f=1;next} f&&/^## /{exit} f' "$dir/CHANGELOG.md")
+            printf '%s\n\n---\n`npm install %s@%s` · [npm](https://www.npmjs.com/package/%s/v/%s)\n' \
+              "$notes" "$name" "$version" "$name" "$version" > "$RUNNER_TEMP/notes.md"
+            latest=false; [ "$name" = "@folijs/core" ] && latest=true
+            gh release create "$tag" --verify-tag --title "$tag" --notes-file "$RUNNER_TEMP/notes.md" --latest=$latest
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
