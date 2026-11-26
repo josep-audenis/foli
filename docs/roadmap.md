@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.8 merged (#309–#316); 29.9 in review: mini toolbar                                                                                                                                    |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.9 merged (#309–#317); 29.10 in review: style gallery                                                                                                                                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4165,9 +4165,12 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   `FoliToolbar` of `miniToolbarItems`), `FoliEditor`'s `miniToolbar`, the playground's (the try
   page's comes with 29.11). Faded by CSS until hovered: axe checks it at full opacity. e2e in
   three engines.
-- [ ] 29.10 Style gallery: Home's Styles group as Word's gallery, each style drawn with its
+- [x] 29.10 Style gallery: Home's Styles group as Word's gallery, each style drawn with its
   resolved formatting, a row in the ribbon and the whole list from its arrow; the dropdown stays
-  for the one-row toolbar.
+  for the one-row toolbar. Built: `toolbarItems.styleGallery`
+  (a custom item: a listbox, Quick Styles first, looks kept by resolver), in Home's Styles group;
+  Home's Font and Paragraph groups in two rows (`ToolbarGroup.wrapBefore`) so the gallery fits at
+  1440 px. Word's built-in headings not yet in the document show in the default look.
 - [ ] 29.11 Try page and playground: light chrome as Word's by default (white ribbon, grey
   canvas, pages with shadows), a light/dark/system switch, the status bar of 29.7, the context
   menu and mini toolbar on; the footer's version read from the package. e2e in Chromium, Firefox

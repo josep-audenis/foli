@@ -143,6 +143,7 @@ const NAMES = {
   underlineStyle: 1,
   formatPainter: 1,
   formattingMarks: 1,
+  styleGallery: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */

@@ -1100,3 +1100,87 @@
     transition: none;
   }
 }
+
+/* Word's Styles gallery (the ribbon's `styleGallery`): a row of tiles, all of them when open. */
+.foli-style-gallery {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 60px;
+}
+.foli-style-gallery-list {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 2px;
+  /* Three tiles in the row, as Word's at this width. */
+  width: 264px;
+  height: 60px;
+  overflow: hidden;
+  padding: 2px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px 0 0 4px;
+  background: var(--foli-page-background);
+}
+.foli-style-gallery-list:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+.foli-style-gallery-open .foli-style-gallery-list {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  height: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+}
+.foli-style-gallery-item {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 54px;
+  overflow: hidden;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--foli-text-color);
+}
+.foli-style-gallery-item:hover {
+  background: var(--foli-toolbar-hover);
+}
+.foli-style-gallery-item[aria-selected="true"] {
+  border-color: var(--foli-focus-ring);
+  background: var(--foli-toolbar-pressed);
+}
+.foli-style-gallery-active {
+  outline: 1px dashed var(--foli-focus-ring);
+  outline-offset: -2px;
+}
+.foli-style-gallery-more {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  border: 1px solid var(--foli-border-color);
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  user-select: none;
+}
+/* A two-row group (`ToolbarGroup.wrapBefore`): its rows one over the other. */
+.foli-toolbar-group-rows {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.foli-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
