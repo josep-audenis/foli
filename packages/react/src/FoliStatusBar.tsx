@@ -99,9 +99,19 @@ export function FoliStatusBar({
         setFrame((n) => n + 1);
       });
     });
+    // The first layout (and fonts loading later) come without a change: read again then.
+    let wait = 0;
+    let tries = 0;
+    const first = () => {
+      if (editor.storyView?.fieldLayout || tries++ > 120) setFrame((n) => n + 1);
+      else wait = requestAnimationFrame(first);
+    };
+    wait = requestAnimationFrame(first);
+    void document.fonts?.ready.then(() => setFrame((n) => n + 1));
     return () => {
       unsubscribe();
       if (frame) cancelAnimationFrame(frame);
+      cancelAnimationFrame(wait);
     };
   }, [editor]);
   const head = useEditorState(headOf, { editor });

@@ -16,8 +16,16 @@ body.try {
   --try-page-shadow:
     0 0 0 1px rgb(29 29 27 / 0.05), 0 1px 2px rgb(29 29 27 / 0.06),
     0 12px 28px -12px rgb(29 29 27 / 0.22), 0 36px 72px -36px rgb(29 29 27 / 0.28);
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  /* The editor's tokens for all its parts: the ribbon, the status bar, the menus. */
+  --foli-toolbar-background: var(--paper);
+  --foli-toolbar-color: var(--ink);
+  --foli-border-color: var(--rule);
+  --foli-toolbar-hover: var(--desk);
+  --foli-toolbar-pressed: var(--accent-wash);
+  --foli-focus-ring: var(--accent);
+  /* Title bar, ribbon, the desk (taking the rest), status bar, footer. */
+  display: flex;
+  flex-direction: column;
   height: 100%;
   background: var(--desk);
   font-family: var(--font-text);
@@ -365,6 +373,7 @@ body.try {
 
 /* The desk under the pages. */
 .try-app .foli-editor-body {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   background:
@@ -391,12 +400,11 @@ body.try {
   }
 }
 
-/* Pages sit side by side as far as the window allows. */
+/* Pages one under the other on the grey desk, as Word's Print Layout. */
 .try-app .foli-content {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: var(--foli-page-gap);
 }
 
@@ -637,4 +645,34 @@ body.try {
 
 .try-changes {
   color: var(--ink-2);
+}
+
+/* The theme switch in the title bar. */
+.try-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+.try-theme select {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.try-theme select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The editor: the ribbon, the desk (taking the rest) and the status bar. */
+.try-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
