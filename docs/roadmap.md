@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.6 merged (#309–#314); 29.7 in review: status bar                                                                                                                                      |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.7 merged (#309–#315); 29.8 in review: right-click menu                                                                                                                                |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4150,10 +4150,15 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   Word's steps, slider, fit width and whole page) and `FoliEditor`'s `statusBar`; the playground
   shows it. Not built: the document's language (Foli does not keep `w:lang`; After 1.0) and
   lines in the count (the view has no line count to give).
-- [ ] 29.8 Right-click menu, `FoliContextMenu`: cut, copy, paste (what the browser allows),
+- [x] 29.8 Right-click menu, `FoliContextMenu`: cut, copy, paste (what the browser allows),
   font and paragraph items, link, new comment; in a table the row, column, merge and delete
   items; on a tracked change accept and reject; on a misspelled word the browser's menu stays
-  (Shift+F10 and the menu key open ours). Built from toolbar items, extensible the same way.
+  (Shift+F10 and the menu key open ours). Built from toolbar items, extensible the same way. Built: `FoliContextMenu` with
+  `defaultContextMenuItems` (its own entries, not toolbar items: they run on the editor, not in a
+  toolbar), `FoliEditor`'s `contextMenu`, the playground's. Changed: the browser's menu stays on
+  Shift+right-click, not on a misspelled word (the page cannot tell where the browser saw one);
+  no font or paragraph entries (no such dialogs yet). e2e in three engines with axe; the menu
+  key and Shift+F10 tested only through the event in jsdom.
 - [ ] 29.9 Mini toolbar: font, size, grow and shrink, bold, italic, underline, color, highlight,
   styles, new comment, beside a pointer selection; `miniToolbar` off by default, on in the try
   page and playground.

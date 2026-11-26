@@ -17,6 +17,14 @@ export {
   type MentionSource,
 } from "./FoliComments.js";
 export {
+  type ContextMenuItem,
+  type ContextMenuMessages,
+  contextMenuMessages,
+  defaultContextMenuItems,
+  FoliContextMenu,
+  type FoliContextMenuProps,
+} from "./FoliContextMenu.js";
+export {
   type FoliChange,
   FoliEditor,
   type FoliEditorHandle,

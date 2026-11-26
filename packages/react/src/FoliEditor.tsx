@@ -20,6 +20,7 @@ import {
 } from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComments.js";
+import { FoliContextMenu, type FoliContextMenuProps } from "./FoliContextMenu.js";
 import { FoliNavigation } from "./FoliNavigation.js";
 import { FoliStatusBar, type FoliStatusBarProps } from "./FoliStatusBar.js";
 import {
@@ -102,6 +103,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
   /**
+   * Word's right-click menu on the document (`FoliContextMenu`, 1.11); Shift+right-click keeps
+   * the browser's (spelling suggestions). Also the menu key and Shift+F10. Default false.
+   */
+  contextMenu?: boolean | Pick<FoliContextMenuProps, "items" | "messages"> | undefined;
+  /**
    * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
    * `commentOnly`'s value.
    */
@@ -155,6 +161,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     onMention,
     children,
     statusBar = false,
+    contextMenu = false,
     ...canvas
   },
   ref,
@@ -225,6 +232,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   const zoomed = canvas.zoom === undefined && statusBar !== false;
   const zoom = zoomed ? ownZoom : (canvas.zoom ?? 1);
   const onZoomChange = zoomed ? setOwnZoom : canvas.onZoomChange;
+  // Where the right-click menu is open, if it is.
+  const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
   const first = typeof toolbar === "object" ? toolbar[0] : undefined;
   const tabbed = first !== undefined && !Array.isArray(first) && "key" in first;
@@ -245,7 +254,27 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         />
       )}
       {children}
-      <div className="foli-editor-body">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the document's own menu event, from the keyboard too (the menu key, Shift+F10). */}
+      <div
+        className="foli-editor-body"
+        onContextMenu={(event) => {
+          const target = event.target as Element;
+          if (!contextMenu || event.shiftKey || !target.closest?.(".foli-content")) return;
+          event.preventDefault();
+          // From the keyboard (the menu key, Shift+F10): at the caret.
+          let { clientX: x, clientY: y } = event;
+          if (!x && !y) {
+            const selection = target.ownerDocument.getSelection();
+            const box = selection?.rangeCount
+              ? selection.getRangeAt(0).getBoundingClientRect()
+              : null;
+            x = box?.left ?? 0;
+            y = box ? box.bottom : 0;
+          }
+          // After the selection a quick press made has reached the editor (`selectionchange`).
+          setTimeout(() => setMenuAt({ x, y }));
+        }}
+      >
         <FoliNavigation editor={editor} readOnly={readOnly || commentOnly} />
         <FoliCanvas
           ref={canvasRef}
@@ -267,6 +296,15 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           />
         )}
       </div>
+      {menuAt && (
+        <FoliContextMenu
+          {...(contextMenu === true || contextMenu === false ? {} : contextMenu)}
+          editor={editor}
+          at={menuAt}
+          onClose={() => setMenuAt(null)}
+          onFocusDocument={() => canvasRef.current?.focus()}
+        />
+      )}
       {statusBar !== false && (
         <FoliStatusBar
           {...(statusBar === true ? {} : statusBar)}

@@ -1066,3 +1066,17 @@
   margin-inline-start: auto;
   border-color: var(--foli-border-color);
 }
+/* A line between groups of a menu's entries (the right-click menu's). */
+.foli-menu-separator {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--foli-border-color);
+}
+.foli-context-menu {
+  z-index: 20;
+  min-width: 12rem;
+}
+.foli-context-menu > [role="none"] {
+  display: flex;
+  flex-direction: column;
+}
