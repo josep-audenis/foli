@@ -40,6 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
+| 29 Word look & commands       | Ready                    | —                         | Planned 2026-11-26, nothing built: icons, zoom, status bar, context menu, mini toolbar, Home commands                                                                                         |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4000,6 +4001,125 @@ agent's review.
   `docs/corpus-report.md` records.
 - `pnpm check` green.
 
+## Phase 29 — Word look and everyday commands · L → next minor
+
+The editor works like Word but does not yet look like it. Asked for by the owner on 2026-11-26,
+after comparing the try page with Umo Editor, MROffice and Word: the ribbon draws letters where
+Word draws icons ("B I U S A H", "Picture…"), the try page is dark-only, right-click opens the
+browser's menu, selecting text shows nothing, there is no zoom, and the status bar has only
+pages, words and changes. Most items come from the After 1.0 backlog ("Word commands", "A
+status bar…, zoom…, format painter, showing ¶ marks"). Planned 2026-11-26, nothing built.
+
+The work is in `@folijs/react` (toolbar, new components), `@folijs/view` (zoom, ¶ marks, the
+selection's screen box) and `@folijs/core` (commands). No schema change: every command writes
+formatting the model already has. It can run beside Phase 28 (`@folijs/docx`) and touches no
+root tooling. Everything new is opt-in or added to `wordRibbonTabs`; `defaultToolbarTabs` and a
+toolbar built from `items` stay as in 1.10 (1.x semver).
+
+Not in this phase: the ruler, the Paragraph and Font dialogs, the Layout tab's quick menus
+(Margins, Orientation, Size, Columns), a Design tab (watermark, page color and borders), shapes,
+text boxes, equations and symbols to insert, a File tab, view modes (read, web layout, outline),
+and a floating picture toolbar (Picture Format has its commands). They stay under After 1.0
+("Word look, next"). No Microsoft icons or artwork: Foli draws its own.
+
+**Starts from (1.10.0), checked 2026-11-26:**
+
+- `ToolbarItem` has `icon?: ReactNode` (`FoliToolbar.tsx:286`), but the built-ins use a
+  character or none: `"A"`, `"H"`, `"•"`, `"№"`, `"⇤"`, `"⇥"` (`FoliToolbar.tsx:1146–1238`),
+  marks as letters (`mark(key, label, icon)`, line 1003). 25.6 kept the built-ins large because
+  they have text and no icon.
+- Core has `verticalAlign` (superscript, subscript; `v3/resolve.ts:50`), `setFontSize`,
+  `setFontFamily`, `setWordTextColor`, `setWordHighlight`, `setParagraphStyle`: no command for
+  either script, clearing formatting, changing case, growing or shrinking the font, or copying
+  formatting.
+- The view measures through a scaled ancestor (`view.ts:1767`, "Layout px per px on screen";
+  `view.ts:5244`) and re-flows on zoom (architecture.md), but has no zoom of its own, and
+  `contextmenu` is listened to only for the picture resize menu (`view.ts:4058`).
+- The try page's status bar counts words and pages from the rendered pages' DOM
+  (`apps/site/src/test.tsx:36`); `FoliEditor` has none. Its footer still says "ahead of npm
+  0.5.0".
+- Theming documents a dark theme by CSS (docs/guides/theming.md, "Dark"); the try page is dark
+  and has no switch.
+- Styles are a dropdown (`Paragraph style`) on Home.
+
+**Decisions to take in 29.1** (recorded in api.md; an ADR if one reaches past `@folijs/react`):
+
+- Icons: drawn by Foli as inline SVG in `@folijs/react` (no icon font, no request), on a 20 px
+  grid with `currentColor`, or a permissively licensed set (Lucide, ISC) copied with an entry in
+  `THIRD_PARTY_NOTICES.md`. Proposed: Lucide's paths for what it has, Foli's own for the rest
+  (tracked change, field, content control, footnote), no runtime dependency.
+- Zoom: CSS `zoom` on the pages' container or `transform: scale` with the measured factor.
+  Proposed: the view's own `zoom` option (10–500%), layout unchanged (pages are not re-flowed,
+  only drawn larger), the caret, hit-testing and the selection's box going through the factor
+  the view already reads.
+- Word count: from the document (core), not from the DOM, counting as Word does (words,
+  characters with and without spaces, paragraphs; lines and pages from layout), body only by
+  default, notes and text boxes on request.
+- Mini toolbar: Word shows it faded beside a selection made with the pointer, not the keyboard.
+  Proposed: the same, opt-in (`miniToolbar`), its items an ordinary item list.
+- Keys Word uses that Foli already gives to something else (keyboard.md): Ctrl+Shift+8 is the
+  bulleted list (keyboard.md:69), Shift+F3 the previous result of navigation (keyboard.md:102),
+  Ctrl+Shift+V a paste as plain text (keyboard.md:134, `view.ts:4441`). Proposed: Word's keys
+  win only in a new opt-in `wordKeymap()` plugin, on in the try page (¶ marks on Ctrl+Shift+8, change case on Shift+F3, paste format
+  on Ctrl+Shift+V, the bulleted list and plain paste reachable from the ribbon and the context
+  menu); the default keymap keeps today's keys and gives the new commands none of these.
+
+### Tasks
+
+- [ ] 29.1 The decisions above settled, the key clashes included (keyboard.md updated).
+- [ ] 29.2 Icons: every built-in item of `toolbarItems` gets an SVG icon; small buttons show the
+  icon only (the label as tooltip and accessible name), large ones the icon over the text; the
+  shrinking of 25.6 gets its icon-only step back. Ribbon screenshots updated.
+- [ ] 29.3 Home commands in core, with Word's keys (keyboard.md) and built-in items in Home:
+  superscript (Ctrl+Shift+=), subscript (Ctrl+=), clear formatting (Ctrl+Space keeps the
+  paragraph style; Clear All in the styles group resets it too), change case (Shift+F3 cycles;
+  a menu for Sentence case, lowercase, UPPERCASE, Capitalize Each Word, tOGGLE cASE), grow and
+  shrink font (Ctrl+Shift+> and <, Word's size steps), underline styles in a split button.
+  Tracked while tracking, as other formatting is.
+- [ ] 29.4 Format painter: a click copies the formatting at the caret (run and paragraph), the
+  next selection gets it; a double-click keeps it until Escape; Ctrl+Shift+C / Ctrl+Shift+V.
+  One undo step per paste.
+- [ ] 29.5 Show ¶ marks (Ctrl+Shift+8): paragraph marks, spaces as dots, tabs as arrows, line
+  and page breaks, drawn by the view, not part of the text (copy, find, export and the
+  accessibility tree unchanged). A View option and a Home item.
+- [ ] 29.6 Zoom in the view: `zoom` option and `setZoom`, Ctrl+wheel and Ctrl+plus/minus/0
+  when the app allows, fit page width and whole page; caret, selection, drag, picture handles,
+  comments' anchors and headers stay where they are drawn at 50%, 100% and 200%.
+- [ ] 29.7 `FoliStatusBar`: page X of Y at the caret, the word count (a click opens Word's
+  count dialog), track changes on or off, the document's language, a zoom slider with its
+  percentage and fit buttons; every part optional, all strings in `messages`. The count from
+  29.1 in core.
+- [ ] 29.8 Right-click menu, `FoliContextMenu`: cut, copy, paste (what the browser allows),
+  font and paragraph items, link, new comment; in a table the row, column, merge and delete
+  items; on a tracked change accept and reject; on a misspelled word the browser's menu stays
+  (Shift+F10 and the menu key open ours). Built from toolbar items, extensible the same way.
+- [ ] 29.9 Mini toolbar: font, size, grow and shrink, bold, italic, underline, color, highlight,
+  styles, new comment, beside a pointer selection; `miniToolbar` off by default, on in the try
+  page and playground.
+- [ ] 29.10 Style gallery: Home's Styles group as Word's gallery, each style drawn with its
+  resolved formatting, a row in the ribbon and the whole list from its arrow; the dropdown stays
+  for the one-row toolbar.
+- [ ] 29.11 Try page and playground: light chrome as Word's by default (white ribbon, grey
+  canvas, pages with shadows), a light/dark/system switch, the status bar of 29.7, the context
+  menu and mini toolbar on; the footer's version read from the package. e2e in Chromium, Firefox
+  and WebKit for 29.2–29.10, axe, screenshots of Home light and dark.
+- [ ] 29.12 Docs and release: api.md, keyboard.md, theming.md, styling.md, limitations.md,
+  architecture.md, the React README; changesets; bench (zoom and ¶ marks must not slow typing
+  past 1.10); published with the owner's approval.
+
+### Acceptance
+
+- `<FoliEditor toolbar={wordRibbonTabs} statusBar contextMenu miniToolbar />` gives a ribbon
+  with icons, a status bar with zoom, a right-click menu and a mini toolbar.
+- Superscript, subscript, clear formatting, change case, grow and shrink font and format painter
+  work by click and by Word's keys, round-trip through `.docx` and undo in one step each.
+- At 50%, 100% and 200% zoom, typing, clicking, selecting and dragging land where the pointer
+  is in Chromium, Firefox and WebKit.
+- Show ¶ marks changes nothing that is copied, found, exported or read by a screen reader.
+- Existing toolbars (`items`, `tabs`, `defaultToolbarTabs`) behave as in 1.10: current toolbar
+  tests pass unchanged; axe finds no new violation.
+- `pnpm check` green; the bench shows no keystroke slower than 1.10.
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -4009,6 +4129,13 @@ first group and from .docx files the corpus does not cover.
 
 **From the audit of 2026-11-22** (not in Phase 21; candidates for the next phases):
 
+- Word look, next (after Phase 29, from the comparison of 2026-11-26): a ruler; the Layout
+  tab's Margins, Orientation, Size and Columns menus; a Design tab (watermark, page color and
+  borders); symbols, text boxes, shapes and equations to insert; a table grid picker and
+  Table Properties; picture wrap options; a File tab with print preview and export; read,
+  web-layout and outline views; spelling squiggles and a language; UI translations.
+- (Phase 29 takes superscript, subscript, clear formatting, change case, the status bar, zoom,
+  format painter and ¶ marks from the two items below.)
 - Word commands: superscript and subscript (the `verticalAlign` mark exists), clear formatting,
   change case; Word's keys for them and for alignment, font size, headings, track changes and a
   new comment ([keyboard.md](keyboard.md)); Ctrl+P through `view.print()` so fields update.
