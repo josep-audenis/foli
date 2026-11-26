@@ -74,7 +74,7 @@ export class FormattingMarks {
   }
 }
 
-/** The glyph for each character a mark is drawn for. */
+/** @internal The glyph for each character a mark is drawn for. */
 export const MARK_TEXT: Readonly<Record<string, string>> = {
   " ": "·",
   " ": "°",
