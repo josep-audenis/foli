@@ -24,6 +24,7 @@ the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it 
 | `--foli-page-shadow`               | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                           |
 | `--foli-page-gap`                  | `24px`                                                     | space between pages             |
 | `--foli-text-color`                | `#1d1d1b`                                                  | text without a color of its own |
+| `--foli-formatting-marks`          | `#4a6fa5`                                                  | formatting marks (Show/Hide ¶)  |
 | `--foli-selection-color`           | `rgb(35 103 220 / 0.22)`                                   | selected text                   |
 | `--foli-border-color`              | `#e2e2df`                                                  | toolbar border and separators   |
 | `--foli-toolbar-background`        | `#ffffff`                                                  | toolbar                         |

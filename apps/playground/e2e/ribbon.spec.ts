@@ -233,3 +233,20 @@ test("paints the formatting copied with Format painter onto a pointer selection"
   expect(weight).toBe("700");
   await editor(page).press("Control+z");
 });
+
+test("shows formatting marks over the text, the document's text unchanged", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await open(page);
+  const before = await editor(page).innerText();
+  const button = page.getByRole("button", { name: "Show formatting marks" });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  const layer = page.locator(".foli-formatting-marks");
+  await expect(layer).toHaveAttribute("aria-hidden", "true");
+  await expect.poll(() => layer.evaluate((l) => l.textContent?.includes("¶") ?? false)).toBe(true);
+  expect(await layer.evaluate((l) => (l.textContent?.match(/·/g) ?? []).length)).toBeGreaterThan(5);
+  // Typing draws them again; the document's text is as it was.
+  expect(await editor(page).innerText()).toBe(before);
+  await button.click();
+  await expect(layer).toHaveCount(0);
+});

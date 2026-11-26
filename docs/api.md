@@ -757,6 +757,15 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
   highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
   null removes the highlight and a plain fill (patterned shading stays).
+- Formatting marks (1.11, built in): `toggleFormattingMarks` and `formattingMarksShown(state)`,
+  Word's Show/Hide ¶, a setting of the editor (a story asks its body's), neither a change nor an
+  undo step. While on, the view draws a mark over each space (·), non-breaking space (°), tab
+  (→), line break (↵), page and column break and paragraph end (¶) of the pages near the
+  screen, in `.foli-formatting-marks`: a layer of its own over the page (`aria-hidden`, no
+  pointer events, colored by `--foli-formatting-marks`), so copying, find, export and screen
+  readers meet the text as it is. Drawn again after each change, scroll and resize. The ribbon
+  has `toolbarItems.formattingMarks` in Home's Paragraph group and View's Show group;
+  `wordKeymap()` gives it Ctrl+Shift+8.
 - Format painter (1.11, built in): `copyFormat(armed?)` copies the run formatting where the
   selection starts and its paragraph's properties; `armed` `"once"` gives them to the next
   selection made with the pointer (the view runs `pasteFormat` on mouseup and draws

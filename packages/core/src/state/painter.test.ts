@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { createEditor } from "./editor.js";
-import { copyFormat, formatPainterState, pasteFormat, stopFormatPainter } from "./wordformat.js";
+import {
+  copyFormat,
+  formatPainterState,
+  formattingMarksShown,
+  pasteFormat,
+  stopFormatPainter,
+  toggleFormattingMarks,
+} from "./wordformat.js";
 import { wordKeymap } from "./wordkeys.js";
 
 const text = (value: string, marks?: MarkJSON[]): NodeJSON =>
@@ -133,5 +140,21 @@ describe("wordKeymap", () => {
     const editor = editorOf([p({}, text("ab"))], true);
     editor.select(1, 3);
     expect(editor.handleKey("Mod-Shift-v")).toBe(false);
+  });
+});
+
+describe("formatting marks", () => {
+  it("are a setting toggled without touching the document or its history", () => {
+    const editor = editorOf([p({}, text("a b"))], true);
+    const doc = editor.state.doc;
+    expect(formattingMarksShown(editor.state)).toBe(false);
+    expect(editor.run(toggleFormattingMarks)).toBe(true);
+    expect(formattingMarksShown(editor.state)).toBe(true);
+    expect(editor.state.doc).toBe(doc);
+    expect(editor.commands.undo()).toBe(false);
+    // Ctrl+Shift+8 with wordKeymap(), not the bulleted list.
+    expect(editor.handleKey("Mod-Shift-8")).toBe(true);
+    expect(formattingMarksShown(editor.state)).toBe(false);
+    expect(blocks(editor)[0]?.attrs).toBeUndefined();
   });
 });

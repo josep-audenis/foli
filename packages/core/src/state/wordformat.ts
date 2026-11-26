@@ -28,6 +28,7 @@ import { marksAt, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import {
   isMarker,
+  storyBody,
   type WordContext,
   type WordEnvelope,
   withEnvelope,
@@ -1540,5 +1541,37 @@ export const pasteFormat: Command = (state, dispatch) => {
   if (value.armed === "once") tr.setMeta(painterKey, { ...value, armed: null });
   if (!tr.docChanged && !value.armed) return false;
   dispatch?.(tr);
+  return true;
+};
+
+// ---------- formatting marks ----------
+
+const marksKey = new PluginKey<boolean>("formattingMarks");
+
+/** @internal Whether formatting marks show (built in; a story asks its body's). */
+export function formattingMarksPlugin(): Plugin<boolean> {
+  return new Plugin<boolean>({
+    key: marksKey,
+    state: {
+      init: () => false,
+      apply: (tr, value) => (tr.getMeta(marksKey) as boolean | undefined) ?? value,
+    },
+  });
+}
+
+/** Whether the view shows formatting marks: Word's Show/Hide ¶ (the body's setting, in a story). */
+export const formattingMarksShown = (state: EditorState): boolean =>
+  marksKey.getState(storyBody(state)?.state ?? state) === true;
+
+/**
+ * Word's Show/Hide ¶ (Ctrl+Shift+8 with `wordKeymap()`): the view draws paragraph marks, spaces,
+ * tabs and breaks over the text, or stops. Nothing of them is in the document.
+ */
+export const toggleFormattingMarks: Command = (state, dispatch) => {
+  const body = storyBody(state);
+  if (body) return dispatch ? body.run(toggleFormattingMarks) : body.can(toggleFormattingMarks);
+  const shown = marksKey.getState(state);
+  if (shown === undefined) return false;
+  dispatch?.(state.tr.setMeta(marksKey, !shown));
   return true;
 };

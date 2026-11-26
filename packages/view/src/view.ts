@@ -27,6 +27,7 @@ import {
   fieldCodesShown,
   fieldsIn,
   formatPainterState,
+  formattingMarksShown,
   goToCellVertically,
   insertControlText,
   insertHardBreak,
@@ -163,6 +164,7 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
+import { FormattingMarks, MARK_TEXT, type MarkGlyph } from "./word/marks.js";
 import { HintMarks, MATCH_STYLES, MatchMarks, rangesInCopy, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
@@ -739,6 +741,10 @@ export class EditorView {
   private readonly peerMarks: PeerMarks;
   private peerFrame = 0;
   private peersShown = false;
+  /** Word's Show/Hide ¶ (29.5): the marks drawn over the text, while shown. */
+  private readonly formattingMarks: FormattingMarks;
+  private marksShown = false;
+  private marksFrame = 0;
   private readonly hintMarks: HintMarks;
   /** The hint shown, as positions of the body (18.1). */
   private shownHint: {
@@ -775,6 +781,7 @@ export class EditorView {
     this.state = editor.state;
     this.matchMarks = new MatchMarks(host.ownerDocument);
     this.peerMarks = new PeerMarks(host.ownerDocument);
+    this.formattingMarks = new FormattingMarks(host.ownerDocument);
     this.hintMarks = new HintMarks(host.ownerDocument);
     this.paged = options.paged !== false;
     this.noteMark = options.noteMark;
@@ -959,6 +966,7 @@ export class EditorView {
     this.unsubscribe();
     this.peerMarks.clear();
     if (this.peersShown) this.showPeers(false);
+    this.showMarks(false);
     if (this.peerFrame) this.host.ownerDocument.defaultView?.cancelAnimationFrame(this.peerFrame);
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
@@ -1066,6 +1074,7 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
+    this.showMarks(formattingMarksShown(state));
     // The format painter armed: Word's brush cursor over the text (`.foli-format-painter`).
     this.host.classList.toggle("foli-format-painter", formatPainterState(state).armed !== null);
     // A resize is of the picture at its position when it started: the document changed, over.
@@ -2286,6 +2295,119 @@ export class EditorView {
       drawings.push({ name, color, ranges, caret: shown ? caret : null });
     }
     this.peerMarks.draw(drawings);
+  }
+
+  /** Formatting marks on or off: drawn after each change, scroll and resize while on. */
+  private showMarks(on: boolean): void {
+    const doc = this.host.ownerDocument;
+    const win = doc.defaultView;
+    if (on !== this.marksShown) {
+      this.marksShown = on;
+      const listen = on ? "addEventListener" : "removeEventListener";
+      doc[listen]("scroll", this.onMarksMove, SCROLL_OPTIONS);
+      win?.[listen]("resize", this.onMarksMove);
+      if (!on) {
+        if (this.marksFrame) win?.cancelAnimationFrame(this.marksFrame);
+        this.marksFrame = 0;
+        this.formattingMarks.clear();
+        return;
+      }
+    }
+    // After this change's layout, which an earlier frame request runs first.
+    if (on) this.onMarksMove();
+  }
+
+  private readonly onMarksMove = (): void => {
+    const win = this.host.ownerDocument.defaultView;
+    if (this.marksFrame || !win) return;
+    this.marksFrame = win.requestAnimationFrame(() => {
+      this.marksFrame = 0;
+      if (!this.destroyed && this.marksShown) this.drawMarks();
+    });
+  };
+
+  /** The marks of the paragraphs on pages near the screen: where each space, tab, break and end is. */
+  private drawMarks(): void {
+    const near = this.paged ? this.pagesNearView() : null;
+    const glyphs: MarkGlyph[] = [];
+    const rectOf = (from: number, to: number, last = false) => {
+      const ranges = this.rangesOf(from, to);
+      const range = last ? ranges.at(-1) : ranges[0];
+      const rects = range ? [...range.getClientRects()].filter((r) => r.height > 0) : [];
+      return last ? rects.at(-1) : rects[0];
+    };
+    try {
+      this.state.doc.descendants((node, pos) => {
+        if (!node.isTextblock) return true;
+        if (!this.blockNear(pos, near)) return false;
+        node.forEach((child, offset) => {
+          const at = pos + 1 + offset;
+          if (child.isText) {
+            const text = child.text ?? "";
+            for (let i = 0; i < text.length; i++) {
+              const mark = MARK_TEXT[text[i] as string];
+              const rect = mark && rectOf(at + i, at + i + 1);
+              if (mark && rect)
+                glyphs.push({
+                  text: mark,
+                  x: rect.left + rect.width / 2,
+                  top: rect.top,
+                  height: rect.height,
+                  align: "center",
+                });
+            }
+            return;
+          }
+          const name = child.type.name;
+          const mark =
+            name === "hardBreak"
+              ? "↵"
+              : name === "pageBreak"
+                ? "···· Page Break ····"
+                : name === "columnBreak"
+                  ? "···· Column Break ····"
+                  : null;
+          const rect = mark && (rectOf(at, at + 1) ?? rectOf(pos + 1, at, true));
+          if (mark && rect)
+            glyphs.push({
+              text: mark,
+              x: rect.width ? rect.left : rect.right,
+              top: rect.top,
+              height: rect.height,
+              align: "start",
+            });
+        });
+        // The paragraph mark after its last line (an empty paragraph: where its line starts).
+        const end = pos + node.nodeSize - 1;
+        const last = end > pos + 1 ? rectOf(pos + 1, end, true) : undefined;
+        if (last)
+          glyphs.push({
+            text: "¶",
+            x: last.right + 1,
+            top: last.top,
+            height: last.height,
+            align: "start",
+          });
+        else {
+          const dom = this.blocks[this.blockFrom(pos)]?.dom;
+          if (dom instanceof HTMLElement) {
+            const box = dom.getBoundingClientRect();
+            const style = getComputedStyle(dom);
+            const line = Number.parseFloat(style.fontSize) * 1.2 || 16;
+            const left =
+              box.left +
+              (Number.parseFloat(style.paddingLeft) || 0) +
+              (Number.parseFloat(style.textIndent) || 0);
+            const top = box.top + (Number.parseFloat(style.paddingTop) || 0);
+            glyphs.push({ text: "¶", x: left, top, height: line, align: "start" });
+          }
+        }
+        return false;
+      });
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+    }
+    this.formattingMarks.draw(glyphs, this.host.getBoundingClientRect());
   }
 
   /** Whether the block at `pos` is on a page in `near` (always, unpaged). */

@@ -334,6 +334,10 @@ export declare class EditorView {
     private readonly peerMarks;
     private peerFrame;
     private peersShown;
+    /** Word's Show/Hide ¶ (29.5): the marks drawn over the text, while shown. */
+    private readonly formattingMarks;
+    private marksShown;
+    private marksFrame;
     private readonly hintMarks;
     /** The hint shown, as positions of the body (18.1). */
     private shownHint;
@@ -451,6 +455,11 @@ export declare class EditorView {
     private drawMatches;
     /** Other people's selections marked and carets with their names (22.9); nothing in the document. */
     private drawPeers;
+    /** Formatting marks on or off: drawn after each change, scroll and resize while on. */
+    private showMarks;
+    private readonly onMarksMove;
+    /** The marks of the paragraphs on pages near the screen: where each space, tab, break and end is. */
+    private drawMarks;
     /** Whether the block at `pos` is on a page in `near` (always, unpaged). */
     private blockNear;
     /** Where the caret at `pos` is drawn, in viewport coordinates; null where none shows. */
@@ -903,6 +912,17 @@ export {};
 
 // word/edit.d.ts
 export {};
+
+// word/marks.d.ts
+/**
+ * Word's Show/Hide ¶ (29.5): paragraph marks, spaces, tabs and breaks drawn over the text, in a
+ * layer of their own outside the document (`aria-hidden`, no pointer events), so copying,
+ * finding, exporting and screen readers meet the text as it is. Drawn for the pages near the
+ * screen, again after each change, scroll or resize.
+ * shortcut: the body only; a header, footer or note open on its page shows none.
+ */
+/** The glyph for each character a mark is drawn for. */
+export declare const MARK_TEXT: Readonly<Record<string, string>>;
 
 // word/matches.d.ts
 export {};
