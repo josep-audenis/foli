@@ -39,6 +39,21 @@ describe("FoliMiniToolbar", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it("stays while the pointer is on a menu it opened; goes on a scroll", () => {
+    const editor = createEditor({ document: doc });
+    editor.select(1, 4);
+    const onClose = vi.fn();
+    render(<FoliMiniToolbar editor={editor} at={{ x: 50, y: 80 }} onClose={onClose} />);
+    const bar = screen.getByRole("toolbar", { name: "Mini toolbar" });
+    // jsdom has no layout: every box is at 0, so any point away from it is far.
+    fireEvent.mouseMove(bar, { clientX: 500, clientY: 500 });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.mouseMove(document.body, { clientX: 500, clientY: 500 });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    fireEvent.scroll(document);
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
   it("has Word's entries, drawn with icons", () => {
     expect(miniToolbarItems.map((item) => item.key)).toEqual([
       "font",

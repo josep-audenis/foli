@@ -1,5 +1,6 @@
 import type { Editor } from "@folijs/core";
 import { useEffect, useRef } from "react";
+import { useActiveEditor, useIsomorphicLayoutEffect } from "./editor.js";
 import { FoliToolbar, type ToolbarItem, toolbarItems } from "./FoliToolbar.js";
 import { toolbarIcons } from "./icons.js";
 import type { ToolbarMessages } from "./messages.js";
@@ -62,6 +63,7 @@ export function FoliMiniToolbar({
   onClickCommand,
 }: FoliMiniToolbarProps) {
   const box = useRef<HTMLDivElement>(null);
+  const active = useActiveEditor(editor);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
@@ -71,25 +73,34 @@ export function FoliMiniToolbar({
       if (!box.current?.contains(event.target as Node)) close.current();
     };
     const onMove = (event: MouseEvent) => {
+      // On it or on a menu it opened (a color menu hangs below it).
+      if (box.current?.contains(event.target as Node)) return;
       const rect = box.current?.getBoundingClientRect();
       if (!rect || event.buttons) return;
       const dx = Math.max(rect.left - event.clientX, 0, event.clientX - rect.right);
       const dy = Math.max(rect.top - event.clientY, 0, event.clientY - rect.bottom);
       if (Math.hypot(dx, dy) > AWAY) close.current();
     };
-    const unsubscribe = editor.subscribe((state) => {
+    // The selection is the open header's, footer's or note's when one is open.
+    const unsubscribe = active.subscribe((state) => {
       if (state.selection.empty) close.current();
     });
+    // Scrolling takes the selection away from where it shows, as in Word.
+    const onScroll = (event: Event) => {
+      if (!box.current?.contains(event.target as Node)) close.current();
+    };
     doc.addEventListener("keydown", onKey, true);
     doc.addEventListener("mousemove", onMove);
+    doc.addEventListener("scroll", onScroll, true);
     return () => {
       unsubscribe();
       doc.removeEventListener("keydown", onKey, true);
       doc.removeEventListener("mousemove", onMove);
+      doc.removeEventListener("scroll", onScroll, true);
     };
-  }, [editor]);
-  // Above the selection, kept inside the window.
-  useEffect(() => {
+  }, [active]);
+  // Above the selection, kept inside the window, before it is first painted.
+  useIsomorphicLayoutEffect(() => {
     const element = box.current;
     if (!element) return;
     const { width, height } = element.getBoundingClientRect();

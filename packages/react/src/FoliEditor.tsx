@@ -270,14 +270,16 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       <div
         className="foli-editor-body"
         onMouseUp={(event) => {
-          const target = event.target as Element;
           if (!miniToolbar || readOnly || event.button !== 0) return;
-          if (!target.closest?.(".foli-content")) return;
-          const doc = target.ownerDocument;
-          // After the selection the press made has reached the editor (`selectionchange`).
+          const body = event.currentTarget;
+          // After the selection the press made has reached the editor (`selectionchange`); from
+          // the browser's selection, which a header, footer or note opened by the press has too.
           setTimeout(() => {
-            const selection = doc.getSelection();
-            if (activeEditor.state.selection.empty || !selection?.rangeCount) return;
+            const selection = body.ownerDocument.getSelection();
+            const anchor = selection?.anchorNode;
+            const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+            if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+            if (!element?.closest(".foli-content") || !body.contains(element)) return;
             const rect = selection.getRangeAt(0).getClientRects?.()[0];
             if (rect) setMiniAt({ x: rect.left, y: rect.top });
           });
