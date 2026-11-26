@@ -21,10 +21,11 @@ import type {
   StyleJSON,
 } from "../v3/document.js";
 import type { RunFormat } from "../v3/resolve.js";
+import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { attempt } from "./attempt.js";
 import { idsOf } from "./ids.js";
 import { marksAt, TextSelection } from "./selection.js";
-import type { Command, EditorState, Transaction } from "./state.js";
+import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import {
   isMarker,
   type WordContext,
@@ -1411,3 +1412,133 @@ export function setUnderline(style: string | null): Command {
 export function underlineAt(state: EditorState): string | null {
   return runValueAt(state, (run) => run.underline ?? "none");
 }
+
+// ---------- format painter ----------
+
+/** What the format painter copied: run property marks and paragraph properties. */
+interface CopiedFormat {
+  run: readonly Mark[];
+  paragraph: Attrs;
+}
+
+/** The format painter's state: what it copied, and whether the next selection gets it. */
+interface PainterState {
+  format: CopiedFormat | null;
+  /** `once`: the next selection gets the format (Word's click); `sticky`: until stopped. */
+  armed: "once" | "sticky" | null;
+}
+
+const painterKey = new PluginKey<PainterState>("formatPainter");
+const RUN_MARKS = new Set<string>(RUN_PROPERTY_MARKS);
+
+/** @internal The format painter's state field (built in). */
+export function formatPainterPlugin(): Plugin<PainterState> {
+  return new Plugin<PainterState>({
+    key: painterKey,
+    state: {
+      init: () => ({ format: null, armed: null }),
+      apply: (tr, value) => (tr.getMeta(painterKey) as PainterState | undefined) ?? value,
+    },
+    keymap: {
+      // Escape puts an armed painter away (and goes on to whatever else it does otherwise).
+      Escape: (state, dispatch) => stopFormatPainter(state, dispatch),
+    },
+  });
+}
+
+/** Whether the format painter has a format, and whether the next selection gets it. */
+export function formatPainterState(state: EditorState): {
+  copied: boolean;
+  armed: "once" | "sticky" | null;
+} {
+  const value = painterKey.getState(state);
+  return { copied: Boolean(value?.format), armed: value?.armed ?? null };
+}
+
+/**
+ * Word's Format Painter, and Ctrl+Shift+C: copies the formatting where the selection starts (its
+ * run's formatting and its paragraph's properties). `armed`: the next selection made with the
+ * pointer gets it once (a click on Format Painter), or each one until `stopFormatPainter` (a
+ * double-click); null only copies it (Ctrl+Shift+C).
+ */
+export function copyFormat(armed: "once" | "sticky" | null = null): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state) || !painterKey.getState(state)) return false;
+    const { $from, empty } = state.selection;
+    let marks: readonly Mark[] = state.storedMarks ?? marksAt($from);
+    if (!empty) {
+      let first: readonly Mark[] | null = null;
+      state.doc.nodesBetween(state.selection.from, state.selection.to, (node) => {
+        if (first === null && node.isText) first = node.marks;
+        return first === null;
+      });
+      if (first) marks = first;
+    }
+    const paragraph: Attrs = Object.fromEntries(
+      // Not `ext`, the source's own `w:pPr` (its section, revision ids, unknown children).
+      PARAGRAPH_PROPERTY_KEYS.flatMap((k) =>
+        $from.parent.type.name === "paragraph" && k !== "ext"
+          ? [[k, $from.parent.attrs[k] ?? null]]
+          : [],
+      ),
+    );
+    const format = { run: marks.filter((m) => RUN_MARKS.has(m.type.name)), paragraph };
+    dispatch?.(state.tr.setMeta(painterKey, { format, armed }));
+    return true;
+  };
+}
+
+/** Puts an armed format painter away; false when none is armed. */
+export const stopFormatPainter: Command = (state, dispatch) => {
+  const value = painterKey.getState(state);
+  if (!value?.armed) return false;
+  dispatch?.(state.tr.setMeta(painterKey, { ...value, armed: null }));
+  return true;
+};
+
+/**
+ * Gives the selection (or the word at a caret) the copied formatting: Ctrl+Shift+V, and what the
+ * view runs after a pointer selection while the painter is armed. The run formatting replaces the
+ * text's own; paragraphs the selection covers whole get the paragraph properties too, as Word's
+ * painter gives them to a selection that holds the paragraph mark. One undo step; tracked while
+ * tracking. False when nothing was copied.
+ */
+export const pasteFormat: Command = (state, dispatch) => {
+  const value = painterKey.getState(state);
+  const format = value?.format;
+  if (!format || !wordContext(state)) return false;
+  const { selection } = state;
+  const word = selection.empty ? wordAt(state) : null;
+  const target = word ? TextSelection.create(state.doc, word.from, word.to) : selection;
+  // A click on no word still puts a once-armed painter away, as in Word.
+  if (target.empty) {
+    if (value.armed !== "once") return false;
+    dispatch?.(state.tr.setMeta(painterKey, { ...value, armed: null }));
+    return true;
+  }
+  const at = state.apply(state.tr.setSelection(target));
+  const tr = state.tr;
+  const types = RUN_PROPERTY_MARKS.flatMap((n) => state.schema.marks[n] ?? []);
+  for (const type of types)
+    for (const { node, pos } of runsIn(at, type)) {
+      const from = Math.max(target.from, pos);
+      const to = Math.min(target.to, pos + node.nodeSize);
+      const existing = type.isInSet(node.marks);
+      const mark = format.run.find((m) => m.type === type);
+      // Unchanged runs stay untouched: no empty undo step, no tracked change of nothing.
+      if (mark ? existing?.eq(mark) : !existing) continue;
+      if (existing) tr.removeMark(from, to, type);
+      if (mark) tr.addMark(from, to, mark);
+    }
+  // Paragraph properties only to a selection the user made (a click paints the word alone).
+  for (const { node, pos } of word ? [] : paragraphsIn(at)) {
+    const whole = target.from <= pos + 1 && target.to >= pos + node.nodeSize - 1;
+    if (!whole) continue;
+    const attrs = { ...node.attrs, ...format.paragraph };
+    if (json(attrs) !== json(node.attrs)) tr.setNodeMarkup(pos, node.type, attrs);
+  }
+  if (value.armed === "once") tr.setMeta(painterKey, { ...value, armed: null });
+  if (!tr.docChanged && !value.armed) return false;
+  dispatch?.(tr);
+  return true;
+};

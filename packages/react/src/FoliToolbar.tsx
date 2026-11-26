@@ -17,6 +17,7 @@ import {
   controlAt,
   controlProperties,
   convertNotes,
+  copyFormat,
   crossReferenceTargets,
   deleteColumns,
   deleteRows,
@@ -29,6 +30,7 @@ import {
   fieldsIn,
   fontFamilyAt,
   fontSizeAt,
+  formatPainterState,
   insertColumn,
   insertColumnBreak,
   insertControl,
@@ -99,6 +101,7 @@ import {
   setUnderline,
   splitCell,
   stepFontSize,
+  stopFormatPainter,
   type TextCase,
   tableStyleAt,
   tableStyles,
@@ -554,6 +557,8 @@ interface Item extends ToolbarItemBase {
    * without the toolbar (no pages, no story to open).
    */
   entry?: ((body: Editor) => Action) | undefined;
+  /** What a double-click runs instead (the format painter's: on until Escape). */
+  double?: Command | undefined;
 }
 
 /** A built-in menu's entry: it may open a dialog or move the focus. */
@@ -1598,6 +1603,19 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
     command: rotate(QUARTER_TURN),
   },
+  {
+    key: "formatPainter",
+    label: "Format painter",
+    pressed: (state) => formatPainterState(state).armed !== null,
+    enabled: hasTextblock,
+    // A click copies for the next selection; a second click puts it away; a double-click keeps
+    // it on until Escape.
+    command: (state, dispatch) =>
+      formatPainterState(state).armed
+        ? stopFormatPainter(state, dispatch)
+        : copyFormat("once")(state, dispatch),
+    double: copyFormat("sticky"),
+  },
   // Word's Font group (29.3).
   {
     key: "superscript",
@@ -1745,7 +1763,8 @@ export type ToolbarItemName =
   | "shrinkFont"
   | "clearFormatting"
   | "changeCase"
-  | "underlineStyle";
+  | "underlineStyle"
+  | "formatPainter";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -1871,6 +1890,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     ...["undo", "redo", "bold", "italic", "underline", "strike", "textColor", "highlight"],
     ...["superscript", "subscript", "growFont", "shrinkFont", "clearFormatting", "changeCase"],
     "underlineStyle",
+    "formatPainter",
     ...["align-start", "align-center", "align-end", "align-justify"],
     ...["bulletList", "orderedList", "outdent", "indent"],
   ]);
@@ -1911,6 +1931,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       label: "Home",
       items: [
         group("Undo", t.undo, t.redo),
+        group("Clipboard", t.formatPainter),
         group(
           "Font",
           t.font,
@@ -2579,7 +2600,7 @@ export function FoliToolbar({
       return;
     }
     if (!item.command) return;
-    runHere(item.command);
+    runHere(item.double && event.detail === 2 ? item.double : item.command);
     // `detail` counts pointer clicks; Enter and Space on a button give 0.
     if (event.detail > 0) onClickCommand?.();
   };
