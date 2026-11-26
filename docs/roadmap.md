@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.10 merged (#309–#318); 29.11 in review: try page                                                                                                                                      |
+| 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4186,6 +4186,11 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
 - [ ] 29.12 Docs and release: api.md, keyboard.md, theming.md, styling.md, limitations.md,
   architecture.md, the React README; changesets; bench (zoom and ¶ marks must not slow typing
   past 1.10); published with the owner's approval.
+  Done so far: api.md, keyboard.md, styling.md, theming.md, limitations.md ("Word's look and
+  everyday commands"), architecture.md, the React README and changesets with each task.
+  `pnpm bench --engines chromium` (2026-11-26): no regression past a threshold (typing paint p95
+  at 100 sections +38% of a ±50% allowance; first layout 21% faster). Firefox and WebKit not
+  benched. The release waits for the owner.
 
 ### Acceptance
 

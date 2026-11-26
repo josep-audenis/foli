@@ -694,6 +694,40 @@ Details in the [package README](../packages/docx/README.md).
   In a shadow root, `@folijs/react`'s toolbar and navigation pane do not give the focus back
   where they took it from (they read the document's `activeElement`, the shadow host there).
 
+## Word's look and everyday commands (Phase 29)
+
+- Change Case writes the new text as a deletion and an insertion while tracking (as Word does);
+  text of tracked deletions is left as it is. Title and sentence case look at each paragraph on
+  its own.
+- Ctrl+= and Ctrl+Shift+= (subscript, superscript) are taken from the browser's zoom while the
+  document has the focus: Ctrl+minus still zooms the browser out. On a layout without = or the
+  period and comma where a US keyboard has them, the keys are those places, not the characters.
+- `wordKeymap()` is opt-in: without it Shift+F3 is find's previous result, Ctrl+Shift+8 the
+  bulleted list and Ctrl+Shift+V the plain-text paste.
+- The format painter is per story: formatting copied in the body is not painted in a header,
+  footer or note, and the reverse. A click paints the word under it (no paragraph formatting);
+  paragraph properties go to paragraphs a selection covers whole.
+- Formatting marks are drawn over the text in a layer of their own (fixed, clipped to the
+  editor): when the whole window scrolls, they can paint over an app's sticky toolbar that has no
+  `z-index` of its own. Page and column breaks show as labels, not Word's dotted line.
+- Zoom is CSS `zoom`: a picture's resize handles and a header or footer edited at a zoom other
+  than 100% are not checked by hand yet. A device sending page-mode wheel deltas barely zooms.
+- The status bar has no document language (Foli does not keep `w:lang`) and no line count;
+  `countWords` counts no text boxes (they are opaque). A large selection is counted again at
+  each move.
+- The right-click menu has no Font or Paragraph entries (no such dialogs yet), and its Paste
+  goes through the Clipboard API, which the browser may refuse or ask about first; a browser
+  that ignores a synthetic paste event's data pastes nothing (not seen; not checked in WebKit).
+  Shift+right-click keeps the browser's menu (its spelling suggestions); the page cannot tell
+  where the browser saw a misspelling. In read-only and comment-only documents an app's own
+  entries are hidden with the editing ones.
+- The mini toolbar is for the pointer, as Word's: the keyboard does not reach it (the ribbon
+  has the same commands). It shows after a drag that ends in the editor's body, not outside it.
+- The Styles gallery draws Word's built-in headings the document does not have yet in the
+  default look until one is used. Word's Quick Styles and their order come from `w:qFormat` and
+  `w:uiPriority` as the file has them.
+- The ribbon's icons are Lucide's, not Word's.
+
 ## Docs and tooling
 
 - The docs site's search matches headings and API names, not body text. The API pages show

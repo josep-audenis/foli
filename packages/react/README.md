@@ -47,7 +47,11 @@ of them (`toolbar` on `FoliEditor`, `items` on `FoliToolbar`): the built-in ones
 run, a menu, a box, a color menu, a dialog or your own control), or tabs of groups
 (`defaultToolbarTabs`: Home, Insert, Layout, Review), or Word's ribbon whole:
 `<FoliEditor toolbar={wordRibbonTabs} />` (captioned groups, Table and Picture tabs that come with
-the selection, large buttons, dialog launchers, a ribbon that collapses, KeyTips on Alt). `useCommand("undo")` takes a command's name too.
+the selection, large buttons, dialog launchers, a ribbon that collapses, KeyTips on Alt, icons
+and a Styles gallery). `useCommand("undo")` takes a command's name too. Word's status bar (page,
+words, tracking, zoom), right-click menu and mini toolbar: `statusBar`, `contextMenu` and
+`miniToolbar` on `FoliEditor`, or `FoliStatusBar`, `FoliContextMenu` and `FoliMiniToolbar` in
+your own layout.
 
 Roles: `readOnly` reads (select, copy, find); `commentOnly` comments and changes nothing else (a
 read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin refusing
