@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { createEditor } from "./editor.js";
+import { CellSelection } from "./tables.js";
 import {
   changeCase,
   clearFormatting,
@@ -174,6 +175,38 @@ describe("changeCase", () => {
     sentences.select(1, 15);
     sentences.run(changeCase("sentence"));
     expect(textOf(sentences)).toBe(["Hello.", "World"].join("\n"));
+  });
+
+  it("changes only the selected cells of a cell selection", () => {
+    const cell = (value: string): NodeJSON => ({
+      type: "tableCell",
+      content: [p({}, text(value))],
+    });
+    const row = (...cells: NodeJSON[]): NodeJSON => ({ type: "tableRow", content: cells });
+    const editor = editorOf([
+      { type: "table", content: [row(cell("ab"), cell("cd")), row(cell("ef"), cell("gh"))] },
+      p({}),
+    ]);
+    const cellAt = (value: string) => {
+      let found = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === "tableCell" && node.textContent === value) found = pos;
+      });
+      return found;
+    };
+    // The first column: "cd" lies between its cells in the document, and stays.
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(editor.state.doc, cellAt("ab"), cellAt("ef")),
+      ),
+    );
+    expect(editor.run(changeCase("upper"))).toBe(true);
+    const texts: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.isText) texts.push(node.text ?? "");
+    });
+    expect(texts).toEqual(["AB", "cd", "EF", "gh"]);
+    expect(editor.state.selection).toBeInstanceOf(CellSelection);
   });
 
   it("keeps each run's formatting when a case changes a run's length (ß)", () => {
