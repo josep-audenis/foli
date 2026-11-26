@@ -1406,6 +1406,24 @@ since 1.0.0):
   Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) while the focus is in the document or its panels. Each
   menu and dialog is keyboard-usable and axe-clean in three engines.
 
+### Word's look (Phase 29)
+
+- `@folijs/core`: `countWords` (kept by document for the whole body), Word's Font group commands
+  (`toggleVerticalAlign`, `stepFontSize`, `clearFormatting`, `changeCase`, `setUnderline`), the
+  format painter and formatting marks as built-in plugins' state (`copyFormat`, `pasteFormat`,
+  `toggleFormattingMarks`: settings, not changes), and `wordKeymap()` for Word's meaning of keys
+  the base keymap gives to something else.
+- `@folijs/view`: the format painter's paste on a pointer selection; formatting marks drawn
+  over the text in `.foli-formatting-marks` (a fixed layer outside the document, redrawn after
+  each render, scroll and resize, for the pages near the screen); zoom as CSS `zoom` on the view's
+  element (layout not flowed again; client rects divided by the scale the view measures, as for a
+  zoomed ancestor; printed at 100%); `keyName` naming =, period and comma by their place.
+- `@folijs/react`: `toolbarIcons` (Lucide's shapes as data) drawn by `wordRibbonTabs`,
+  `size: "medium"` and `ToolbarGroup.wrapBefore`; `FoliStatusBar` (pages from
+  `storyView.fieldLayout`, read again a frame after each change); `FoliContextMenu` and
+  `FoliMiniToolbar` (a second `FoliToolbar`); the Styles gallery as a custom item; all opt-in
+  through `FoliEditor` (`statusBar`, `contextMenu`, `miniToolbar`).
+
 ## Styling
 
 Plain CSS with custom properties (`--foli-*`) declared on `:root` and `:host` (page, canvas

@@ -72,6 +72,16 @@ colors, and the focus ring against the toolbar and the canvas (WCAG asks 4.5:1 f
 for the focus indicator). `--foli-page-gap` and the shadow change only the look; the pages keep
 their size.
 
+## The ribbon's parts
+
+The status bar, the right-click menu, the mini toolbar and the Styles gallery (1.11) take the
+toolbar's tokens (`--foli-toolbar-background`, `--foli-toolbar-color`, `--foli-border-color`,
+`--foli-toolbar-hover`, `--foli-toolbar-pressed`, `--foli-focus-ring`): set them where the editor
+is (around `FoliEditor`), not only on `.foli-toolbar`, and they follow. The gallery's tiles keep
+`--foli-page-background` and `--foli-text-color`, as the page does: they show text as it will
+look. Formatting marks are drawn in `--foli-formatting-marks`, read from the page's root
+(`:root`), not from around the editor: their layer is on `document.body`.
+
 ## Dark
 
 Pages are paper. A Word document's colors are chosen for a white page: headings in a theme
