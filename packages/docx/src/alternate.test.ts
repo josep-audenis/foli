@@ -23,8 +23,8 @@ const texts = (node: { content?: readonly NodeJSON[] }): string[] =>
       ? [(n.content ?? []).map((c) => (c.type === "text" ? c.text : "")).join("")]
       : texts(n),
   );
-const read = async (rootXml: string, parts?: Record<string, string>, rels?: string) => {
-  const result = await importDocx(await docx("", { root: rootXml, parts, rels }));
+const read = async (rootXml: string) => {
+  const result = await importDocx(await docx("", { root: rootXml }));
   return { ...result, texts: texts(result.document.content).filter(Boolean) };
 };
 
