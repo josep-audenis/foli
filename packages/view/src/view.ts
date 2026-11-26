@@ -2735,10 +2735,11 @@ export class EditorView {
         const { node } = this.domFromPos(Math.min(pos, this.state.doc.content.size));
         const element =
           node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
-        const page = this.facts[this.pages.indexOf(element?.closest(".foli-page") as HTMLElement)];
+        const index = this.pages.indexOf(element?.closest(".foli-page") as HTMLElement);
+        const page = this.facts[index];
         if (!page) return null;
         const format = this.sections()[page.section]?.pageNumbers?.format;
-        return { number: page.number, sectionPages: page.sectionPages, format };
+        return { number: page.number, index: index + 1, sectionPages: page.sectionPages, format };
       },
     };
   }

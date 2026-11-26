@@ -973,3 +973,96 @@
     background: none;
   }
 }
+
+/* Word's status bar (FoliStatusBar): page, words, tracking on the left; zoom on the right. */
+.foli-status-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-top: 1px solid var(--foli-border-color);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font-size: 12px;
+}
+.foli-status-bar button {
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.foli-status-bar button:hover {
+  background: var(--foli-toolbar-hover);
+}
+.foli-status-bar button:focus-visible,
+.foli-status-bar input:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+.foli-status-page {
+  padding: 0 6px;
+}
+.foli-status-spacer {
+  flex: 1 1 auto;
+}
+.foli-status-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.foli-status-zoom input[type="range"] {
+  width: 100px;
+}
+.foli-status-percent {
+  min-width: 3.5em;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.foli-status-dialog {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 8px;
+  z-index: 10;
+  min-width: 16rem;
+  padding: 12px 16px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 6px;
+  background: var(--foli-toolbar-background);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.16);
+}
+.foli-status-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.foli-status-dialog table {
+  width: 100%;
+  margin-bottom: 8px;
+  border-collapse: collapse;
+}
+.foli-status-dialog caption {
+  text-align: start;
+  font-weight: 600;
+}
+.foli-status-dialog th {
+  text-align: start;
+  font-weight: normal;
+}
+.foli-status-dialog td {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.foli-status-dialog label {
+  display: block;
+  margin-bottom: 8px;
+}
+.foli-status-dialog > button {
+  display: block;
+  margin-inline-start: auto;
+  border-color: var(--foli-border-color);
+}

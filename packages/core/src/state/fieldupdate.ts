@@ -300,6 +300,8 @@ function formatted(
 export interface FieldPage {
   /** The displayed number (`w:pgNumType` restarts count). */
   number: number;
+  /** The page's place among all of them, from 1 (1.11; a view made before has none). */
+  index?: number | undefined;
   /** How many pages its section has. */
   sectionPages: number;
   /** The section's number format (`upperRoman`…). */

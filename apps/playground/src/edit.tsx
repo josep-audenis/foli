@@ -23,7 +23,13 @@ import {
   type PackageImages,
   packageImages,
 } from "@folijs/docx";
-import { FoliComments, FoliNavigation, FoliToolbar, wordRibbonTabs } from "@folijs/react";
+import {
+  FoliComments,
+  FoliNavigation,
+  FoliStatusBar,
+  FoliToolbar,
+  wordRibbonTabs,
+} from "@folijs/react";
 
 /** People a comment can tag after @ (an app gives its own directory). */
 const PEOPLE = [
@@ -121,12 +127,27 @@ const plugins = [
     : []),
 ];
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user", plugins });
-// Ctrl+wheel zooms the pages (29.6), as the status bar's slider will.
-const onZoom = (zoom: number) => view.setOptions({ zoom });
+// The zoom (29.6): Ctrl+wheel and the status bar's controls (29.7) set it.
+let zoom = 1;
+const onZoom = (next: number) => {
+  zoom = next;
+  view.setOptions({ zoom });
+  showStatus();
+};
 let view = new EditorView(host, editor, { upload, editable: !commenting, onZoom });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
+const status = createRoot(document.getElementById("status") as HTMLElement);
+const showStatus = () =>
+  status.render(
+    <FoliStatusBar
+      editor={editor}
+      zoom={zoom}
+      onZoomChange={onZoom}
+      fitZoom={(kind) => view.fitZoom(kind)}
+    />,
+  );
 /**
  * The formatting toolbar for the current editor (a click puts the focus back in the document)
  * and the comments pane.
@@ -156,6 +177,7 @@ const showToolbar = () => {
     />,
   );
   navigation.render(<FoliNavigation editor={editor} readOnly={commenting} />);
+  showStatus();
 };
 showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */

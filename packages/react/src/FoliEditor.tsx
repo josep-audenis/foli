@@ -21,6 +21,7 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { FoliNavigation } from "./FoliNavigation.js";
+import { FoliStatusBar, type FoliStatusBarProps } from "./FoliStatusBar.js";
 import {
   FoliToolbar,
   type FoliToolbarProps,
@@ -95,6 +96,12 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   comments?: boolean | "auto" | undefined;
   /**
+   * Word's status bar under the pages (`FoliStatusBar`, 1.11): the page, the word count,
+   * tracking and the zoom. With it, the zoom is the editor's own (Ctrl+wheel included) unless
+   * `zoom` is given. Default false.
+   */
+  statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
+  /**
    * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
    * `commentOnly`'s value.
    */
@@ -147,6 +154,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     mentions,
     onMention,
     children,
+    statusBar = false,
     ...canvas
   },
   ref,
@@ -212,6 +220,11 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   );
 
   const readOnly = canvas.readOnly === true;
+  // The status bar's zoom, unless the app gives one.
+  const [ownZoom, setOwnZoom] = useState(1);
+  const zoomed = canvas.zoom === undefined && statusBar !== false;
+  const zoom = zoomed ? ownZoom : (canvas.zoom ?? 1);
+  const onZoomChange = zoomed ? setOwnZoom : canvas.onZoomChange;
   // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
   const first = typeof toolbar === "object" ? toolbar[0] : undefined;
   const tabbed = first !== undefined && !Array.isArray(first) && "key" in first;
@@ -238,6 +251,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           ref={canvasRef}
           editor={editor}
           {...canvas}
+          zoom={zoom}
+          onZoomChange={onZoomChange}
           readOnly={readOnly || commentOnly}
         />
         {/* "auto": mounted while hidden, so a comment made from the toolbar opens for writing. */}
@@ -252,6 +267,15 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           />
         )}
       </div>
+      {statusBar !== false && (
+        <FoliStatusBar
+          {...(statusBar === true ? {} : statusBar)}
+          editor={editor}
+          zoom={zoom}
+          onZoomChange={onZoomChange}
+          fitZoom={(kind) => canvasRef.current?.fitZoom(kind) ?? zoom}
+        />
+      )}
     </FoliEditorProvider>
   );
 });

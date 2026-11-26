@@ -24,6 +24,12 @@ export {
 } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export {
+  FoliStatusBar,
+  type FoliStatusBarProps,
+  type StatusBarMessages,
+  statusBarMessages,
+} from "./FoliStatusBar.js";
+export {
   defaultToolbarItems,
   defaultToolbarTabs,
   FoliToolbar,
