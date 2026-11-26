@@ -78,9 +78,18 @@ from `commentsExtended`), sections, headers, footers, footnotes, endnotes and se
   them or they show nothing: spelling marks (`w:proofErr`), rendered page breaks
   (`w:lastRenderedPageBreak`), editing session ids on runs (`w:rsid*`) and runs with no content:
   counted in `report.dropped`. Import time is linear in the file (crafted files included).
+- **Strict Open XML** (Word's "Strict Open XML Document") is read and written back Strict: its
+  XML parts are translated to Transitional names and values as they are read and back as they
+  are written ([ADR-0014](../../docs/decisions/ADR-0014-strict-open-xml.md)), so the model and
+  the XML kept verbatim are Transitional; `DocxPackage.conformance` says which a package is.
+  Exported without its package (from JSON), a Strict document comes out Transitional.
+- **A root inside markup compatibility** (`mc:AlternateContent` as a part's root) is read as Word
+  reads it: the first `mc:Choice` it understands, else `mc:Fallback`; the documents in the main
+  part's branch joined. What is left out is in `report.dropped`; an unchanged part is exported as
+  it was.
 - **Failures** are `DocxError` (or `ZipError` from the package): a file that is not a
-  WordprocessingML document, Strict Open XML (refused until a real file needs it), or an element
-  past the model's absolute limits (over 16 MiB kept verbatim).
+  WordprocessingML document (the message names its root), or an element past the model's
+  absolute limits (over 16 MiB kept verbatim).
 - **Not kept exactly**, to be equal under export's canonical comparison: run boundaries
   (adjacent runs with the same properties become one text), `w:cr` (read as a line break),
   `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
