@@ -2955,7 +2955,8 @@ export declare function clearFormatting(options?: {
 export type TextCase = "sentence" | "lower" | "upper" | "title" | "toggle" | "cycle";
 /**
  * Word's Change Case: the selected text (or the word at the caret) in another case, its
- * formatting kept; tracked as a deletion and an insertion while tracking, as in Word. Text of
+ * formatting kept; tracked as a deletion and an insertion while tracking, as in Word. Each
+ * paragraph is cased on its own (sentence case starts one where the paragraph starts); text of
  * tracked deletions is left as it is.
  */
 export declare function changeCase(kind: TextCase): Command;
