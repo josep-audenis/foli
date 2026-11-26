@@ -129,6 +129,8 @@ export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
         onKeyDown={onKeyDown}
       >
         {shown.map((look, i) => (
+          // biome-ignore lint/a11y/useFocusableInteractive: options of an aria-activedescendant listbox: the listbox has the focus.
+          // biome-ignore lint/a11y/useKeyWithClickEvents: the listbox's keys pick them (Enter, Space).
           <div
             key={look.id}
             id={`${id}-${i}`}
