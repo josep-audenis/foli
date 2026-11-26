@@ -152,12 +152,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * and value forms, both ways), with room for 28.4's markup-compatibility roots.
  * Docx raised again in 28.4 (66.3 kB, 68.0 allowed): `mc:AlternateContent` roots read as Word
  * reads them (`alternate.ts`: the branch taken, documents joined, wrappers unwrapped).
+ * Core, React and FoliEditor raised in 29.3 (95.4, 189.3 and 187.2 kB; 99.0 and 200.0 allowed):
+ * Word's icons (29.2) and Font group commands, with room for Phase 29's format painter,
+ * formatting marks, word count, status bar, context menu, mini toolbar and style gallery.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 101_376 },
   { name: "@folijs/view", entry: dist("view"), budget: 130_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 192_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 192_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 204_800 },
+  { name: "FoliEditor only", entry: appEntry, budget: 204_800 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 69_632 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
