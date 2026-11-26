@@ -52,6 +52,13 @@ then recorded as such):
 The renderer pass lays out every imported file with `renderDocument` in Chromium: pages, time,
 page errors, and pages whose content overflows the sheet.
 
+Strict Open XML files and files whose root is `mc:AlternateContent` go through the same checks
+(Phase 28): the comparison reads a Strict export's parts as the package reads them, translated
+to Transitional, so a Strict file is compared in the names its import used. Their own checks
+beside the run: `corpus/word/strict/` (the nine saved by Word both ways,
+`scripts/corpus/save-strict.ps1`) in `packages/docx/src/strict.test.ts`, and hand-made roots in
+`packages/docx/src/alternate.test.ts`.
+
 ## Word on a sample
 
 On Windows with Word: `node scripts/corpus/word-sample.mjs export <run>.jsonl <dir>` copies a

@@ -1,0 +1,11 @@
+---
+"@folijs/docx": minor
+---
+
+Strict Open XML documents (Word's "Strict Open XML Document") are read and written back Strict:
+each XML part is translated to Transitional names and values as it is read and back as it is
+written, so the model and the XML kept verbatim stay Transitional (`DocxPackage.conformance`
+says which a package is). A Strict document saved as JSON and exported without its package comes
+out Transitional. A part whose root is `mc:AlternateContent` is read as Word reads it: the branch
+it understands, the documents in that branch joined; what is left out is in `report.dropped`.
+Other unknown roots are still refused, and the message now names the root.
