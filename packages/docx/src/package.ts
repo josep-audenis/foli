@@ -259,7 +259,7 @@ export class DocxPackage {
     const added = strict
       ? add.map((part) => {
           const contentType =
-            part.contentType ?? (/.xml$/i.test(part.name) ? "application/xml" : "");
+            part.contentType ?? (/\.xml$/i.test(part.name) ? "application/xml" : "");
           return isXml({ name: part.name, contentType, data: part.data })
             ? { ...part, data: strictBytes(part.data, part.name) }
             : part;
@@ -462,7 +462,9 @@ function strictBytes(data: Uint8Array, name: string): Uint8Array {
 
 /** A part that holds XML: typed so, or a relationships part. */
 function isXml(part: DocxPart): boolean {
-  return /[+/]xml$/.test(part.contentType) || /.(rels|vml)$/i.test(part.name);
+  // A picture's type (`image/svg+xml`) is not a part's XML: its bytes are copied, never parsed.
+  if (part.contentType.startsWith("image/")) return false;
+  return /[+/]xml$/.test(part.contentType) || /\.(rels|vml)$/i.test(part.name);
 }
 
 function xml(source: string, name: string, options: ParseXmlOptions): XmlDocument {

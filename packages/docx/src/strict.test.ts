@@ -9,6 +9,14 @@ const stems = readdirSync(TWINS)
   .filter((n) => n.endsWith(".strict.docx"))
   .map((n) => n.slice(0, -".strict.docx".length));
 const TRANSITIONAL_W = "schemas.openxmlformats.org/wordprocessingml/2006/main";
+const TRANSITIONAL_NAMES =
+  /schemas\.openxmlformats\.org\/(officeDocument\/2006|drawingml\/2006|wordprocessingml\/2006)/;
+/** What two saves of a document by Word differ in: root declarations, save and paragraph ids. */
+const withoutSaveIds = (xml: string) =>
+  // From the root start tag on: Word's two saves declare different namespaces there.
+  xml
+    .replace(/^[\s\S]*?<[^?!][^>]*>/, "")
+    .replace(/ (w:rsid\w*|w14:paraId|w14:textId|w14:val|w15:val)="[^"]*"/g, "");
 const bytes = (name: string) => new Uint8Array(readFileSync(new URL(name, TWINS)));
 
 /** What two saves of one document by Word differ in anyway: revision-save and paragraph ids. */
@@ -128,6 +136,13 @@ describe("Strict Open XML (ADR-0014)", () => {
         // A part the Transitional export leaves as it was, the Strict export leaves too.
         if (raw(twin, part.name) === raw(transitional.package, part.name))
           expect(written, part.name).toBe(raw(strict.package, part.name));
+        else {
+          // A part it rewrites: no Transitional name left, and read back it is the twin's.
+          expect(written, part.name).not.toMatch(TRANSITIONAL_NAMES);
+          expect(withoutSaveIds(toTransitional(written)), part.name).toBe(
+            withoutSaveIds(raw(twin, part.name)),
+          );
+        }
       }
       expect(raw(out, out.mainDocument)).toMatch(/w:conformance="strict"/);
       const again = await importDocx(await exportDocx(strict.document, strict.package));
@@ -152,7 +167,11 @@ describe("Strict Open XML (ADR-0014)", () => {
       const json = JSON.parse(
         JSON.stringify((await importDocx(bytes(`${stem}.strict.docx`))).document),
       );
-      const written = await exportDocx(json).catch(() => undefined);
+      const written = await exportDocx(json).catch((error: Error) => {
+        // Only a document that needs its package may fail here.
+        expect(error.message).toMatch(/refers to a part of its original package/);
+        return undefined;
+      });
       if (!written) continue;
       alone++;
       const out = await readPackage(written);
@@ -164,5 +183,18 @@ describe("Strict Open XML (ADR-0014)", () => {
           );
     }
     expect(alone).toBeGreaterThan(0);
+  });
+
+  it("copies a picture's bytes into a Strict package, an SVG with a DOCTYPE too", async () => {
+    const pkg = await readPackage(bytes(`${stems[0]}.strict.docx`));
+    const svg = new TextEncoder().encode(
+      '<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x"><svg xmlns="http://www.w3.org/2000/svg"/>',
+    );
+    const written = await readPackage(
+      await pkg.write(new Map(), [
+        { name: "/word/media/new.svg", contentType: "image/svg+xml", data: svg },
+      ]),
+    );
+    expect(written.part("/word/media/new.svg")?.data).toEqual(svg);
   });
 });
