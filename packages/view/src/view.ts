@@ -4514,6 +4514,8 @@ export class EditorView {
     event.preventDefault();
     // A notch of a mouse wheel is about 100 px; a pinch comes as many small deltas: 10% a
     // hundred px, from what was asked last (several events come before the app sets it).
+    // shortcut: page-mode deltas (deltaMode 2) are read as px, and an app that ignores the zoom
+    // asked lets the next ask run ahead of what shows; handle them if a device or app needs it.
     const px = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
     this.wheelDelta += px;
     const notches = Math.trunc(this.wheelDelta / 100);
@@ -4536,9 +4538,9 @@ export class EditorView {
     const host = this.host.getBoundingClientRect();
     // The height from where the editor starts to the bottom of what can show it (its clipping
     // ancestors and the window), not its own bottom, which moves with the zoom.
-    const { bottom } = this.visibleBox(false);
+    const box = this.visibleBox(false);
     const across = ((host.width - 32) / shown.width) * this.zoom;
-    const down = ((bottom - Math.max(host.top, 0) - 32) / shown.height) * this.zoom;
+    const down = ((box.bottom - Math.max(host.top, box.top) - 32) / shown.height) * this.zoom;
     return zoomIn(kind === "width" ? across : Math.min(across, down));
   }
 
