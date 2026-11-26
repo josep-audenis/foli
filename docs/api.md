@@ -105,7 +105,7 @@ Home and End move, Enter picks, Escape and Tab close (Escape back to the documen
 `editor`, `at` (`{ x, y }` in viewport px), `items` (`ContextMenuItem[]` or a function of
 `defaultContextMenuItems`: `{ key, label, run(editor), enabled?(state), separator? }`), `messages`
 (by the English label, `contextMenuMessages`), `onClose`, `onFocusDocument`, `readOnly` (only Copy)
-and `commentOnly` (Copy and New comment); `FoliEditor` passes its own and gives the menu the
+and `commentOnly` (Copy and New comment; an app's own entries are hidden then too); `FoliEditor` passes its own and gives the menu the
 editor of the header, footer or note open on its page. `FoliEditor`'s
 `contextMenu` opens it on the document's `contextmenu` event (the pointer's, or the menu key's
 and Shift+F10's, at the caret); Shift+right-click keeps the browser's menu, with its spelling
