@@ -54,6 +54,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `toolbar`         | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`        | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs` or `wordRibbonTabs`). |
 | `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                                       |
 | `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
+| `statusBar`       | `boolean \| FoliStatusBarProps`                                                                          | `false`       | Word's status bar under the pages (1.11, `FoliStatusBar`); the zoom is then the editor's own unless `zoom` is given.                                                 |
 | `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
 | `readOnly`        | `boolean`                                                                                                | `false`       | Read, select, copy; no editing. Disables the toolbar.                                                                                                                |
 | `commentOnly`     | `boolean`                                                                                                | `false`       | Select, copy, find and comment; no other change. Read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin. 1.10.                       |
@@ -90,6 +91,20 @@ The pages alone, for your own layout. Props: `editor` (default: the nearest
 document, shows the editor's selection and scrolls it into view; `fitZoom("width" | "page")` is
 the zoom that fits a page's width, or the whole page, in the part of the screen the canvas has).
 `FoliEditorHandle` has both.
+
+### `<FoliStatusBar>`
+
+Word's status bar (1.11): `Page X of Y` at the caret (from the view's pages,
+`editor.storyView.fieldLayout`: `pageAt(pos).index`, new in 1.11), the word count (`N words`, or
+`N of M words` with a selection; a click opens Word's count: pages, words, characters with and
+without spaces, paragraphs, notes on request), `Track changes: on/off` (a click switches), and,
+with `onZoomChange`, the zoom: Fit page width and Whole page (with `fitZoom`), minus and plus
+through Word's steps (10, 25, 50, 75, 100, 125, 150, 200, 300, 400, 500%), a slider and the
+percentage. Props: `editor`, `page`, `words`, `trackChanges` (each part shown by default),
+`zoom`, `onZoomChange`, `fitZoom` (`FoliCanvasHandle.fitZoom`), `messages` (by the English
+text, `statusBarMessages`), `className`. `FoliEditor`'s `statusBar` puts it under the pages.
+It is a `role="group"` named "Status bar", not a live region: the count is not announced at
+each keystroke. Lines and the document's language are not shown (Foli does not keep `w:lang`).
 
 ### `<FoliComments>`
 
@@ -743,6 +758,9 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   the document has, or `Heading1`–`Heading9`, `ListParagraph`). `setBlockType("heading",
   { level })` uses the document's "heading N" style, `setBlockType("paragraph")` the default
   style.
+- Counting: `countWords(state, { from?, to?, notes? })` is Word's Word Count without what only
+  the pages know: `{ words, characters, charactersWithSpaces, paragraphs }` of the body (a range
+  of it, or with its footnotes and endnotes); deleted text is not counted, field codes neither.
 - Text: `setFontFamily(name | null)`, `fontFamilyAt(state)`, `setFontSize(points | null)`,
   `fontSizeAt(state)` (the size applies to complex scripts too, as Word's size box does).
   Word's Font group (1.11): `toggleVerticalAlign("superscript" | "subscript")` and

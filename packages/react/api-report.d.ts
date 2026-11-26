@@ -99,6 +99,7 @@ import { type DocumentTarget, type Editor, type EditorDocument, type Extension, 
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { type MentionEvent, type MentionSource } from "./FoliComments.js";
+import { type FoliStatusBarProps } from "./FoliStatusBar.js";
 import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
@@ -161,6 +162,12 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      */
     comments?: boolean | "auto" | undefined;
     /**
+     * Word's status bar under the pages (`FoliStatusBar`, 1.11): the page, the word count,
+     * tracking and the zoom. With it, the zoom is the editor's own (Ctrl+wheel included) unless
+     * `zoom` is given. Default false.
+     */
+    statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
+    /**
      * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
      * `commentOnly`'s value.
      */
@@ -215,6 +222,35 @@ export interface FoliNavigationProps {
  * elsewhere on the page Ctrl+F stays the browser's. The toolbar's Navigate menu opens them too.
  */
 export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigationProps): import("react").JSX.Element;
+
+// FoliStatusBar.d.ts
+import { type Editor } from "@folijs/core";
+/** Every string the status bar shows, in English; each is its own key in `messages`. */
+export declare const statusBarMessages: readonly ["Status bar", "Page {page} of {pages}", "{words} words", "{count} of {words} words", "Word count", "Statistics", "Pages", "Words", "Characters (no spaces)", "Characters (with spaces)", "Paragraphs", "Include footnotes and endnotes", "Close", "Track changes: on", "Track changes: off", "Zoom", "Zoom out", "Zoom in", "Fit page width", "Whole page"];
+/** Translations of the status bar's strings, by their English text (`statusBarMessages`). */
+export type StatusBarMessages = Partial<Readonly<Record<(typeof statusBarMessages)[number], string>>>;
+export interface FoliStatusBarProps {
+    /** Default: the editor of the nearest `FoliEditorProvider`. */
+    editor?: Editor | undefined;
+    /** Which parts show (each true by default): the page, the word count, tracking, the zoom. */
+    page?: boolean | undefined;
+    words?: boolean | undefined;
+    trackChanges?: boolean | undefined;
+    /** The zoom the pages are drawn at (1 is 100%); with `onZoomChange`, the zoom controls show. */
+    zoom?: number | undefined;
+    onZoomChange?: ((zoom: number) => void) | undefined;
+    /** The zoom that fits a page's width or the whole page (`FoliCanvasHandle.fitZoom`). */
+    fitZoom?: ((kind: "width" | "page") => number) | undefined;
+    messages?: StatusBarMessages | undefined;
+    className?: string | undefined;
+}
+/**
+ * Word's status bar: the page the caret is on and how many there are, the word count (of the
+ * selection too; a click opens Word's count), whether changes are tracked (a click switches),
+ * and the zoom (minus, slider, plus, fit width, whole page). Pages come from the view of the
+ * editor (`editor.storyView`): without one that part is empty.
+ */
+export declare function FoliStatusBar({ editor: given, page, words, trackChanges, zoom, onZoomChange, fitZoom, messages, className, }: FoliStatusBarProps): import("react").JSX.Element;
 
 // FoliToolbar.d.ts
 import { type Command, type Editor, type EditorState } from "@folijs/core";
@@ -704,6 +740,7 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps, type MentionEvent, type MentionSource, } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
+export { FoliStatusBar, type FoliStatusBarProps, type StatusBarMessages, statusBarMessages, } from "./FoliStatusBar.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, selectionInTable, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, wordRibbonTabs, } from "./FoliToolbar.js";
 export { toolbarIcons } from "./icons.js";
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";

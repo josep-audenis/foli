@@ -14,6 +14,7 @@
       #editor { flex: 1 1 auto; min-width: 0; }
       #comments { display: flex; }
       #navigation { display: contents; }
+      #status { position: sticky; bottom: 0; z-index: 2; }
     </style>
   </head>
   <body>
@@ -27,6 +28,7 @@
       <main id="editor" aria-label="Document"></main>
       <div id="comments"></div>
     </div>
+    <div id="status"></div>
     <script type="module" src="/src/edit.tsx"></script>
   </body>
 </html>

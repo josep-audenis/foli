@@ -71,6 +71,7 @@ export {
   setControlProperties,
   setControlValue,
 } from "./controls.js";
+export { type CountOptions, countWords, type WordCount } from "./count.js";
 export {
   type BuiltInCommands,
   createEditor,

@@ -96,6 +96,7 @@ export {
   type ControlRange,
   type ControlValue,
   type ControlValueInput,
+  type CountOptions,
   type CrossReference,
   type CrossReferenceTargets,
   canOutdent,
@@ -117,6 +118,7 @@ export {
   controlValues,
   convertNotes,
   copyFormat,
+  countWords,
   createEditor,
   crossReferenceTargets,
   type DeleteUnit,
@@ -351,6 +353,7 @@ export {
   updateFields,
   type VerticalAlign,
   verticalAlignAt,
+  type WordCount,
   wordKeymap,
   wrapInList,
 } from "./state/index.js";
