@@ -4,7 +4,7 @@
  * was not asked to replace copied from the original file byte for byte.
  */
 
-import { isStrictPackage, toTransitional } from "./strict.js";
+import { isStrictPackage, transitionalOf } from "./strict.js";
 import {
   type ParseXmlOptions,
   parseXml,
@@ -194,21 +194,21 @@ export class DocxPackage {
     if (this.conformance !== "strict" || !isXml(part)) return text(part.data, part.name);
     let translated = this.#texts.get(key(part.name));
     if (translated === undefined) {
-      const source = text(part.data, part.name);
-      try {
-        translated = toTransitional(source, this.#options);
-      } catch (error) {
-        throw new DocxError(`${part.name}: ${(error as Error).message}`, { cause: error });
-      }
+      // Parsed once within maxNodes, counted then; the translated text's parse is not counted again.
+      translated = transitionalOf(this.#parse(text(part.data, part.name), part.name));
       this.#texts.set(key(part.name), translated);
     }
     return translated;
   }
 
-  #parse(source: string, name: string): XmlDocument {
+  #parse(source: string, name: string, counted = true): XmlDocument {
     try {
-      const doc = xml(source, name, { ...this.#options, maxNodes: this.#nodes });
-      this.#nodes -= doc.nodes;
+      const doc = xml(
+        source,
+        name,
+        counted ? { ...this.#options, maxNodes: this.#nodes } : this.#options,
+      );
+      if (counted) this.#nodes -= doc.nodes;
       return doc;
     } catch (error) {
       if (!((error as Error).cause instanceof XmlLimitError)) throw error;
@@ -226,7 +226,8 @@ export class DocxPackage {
     if (!part) throw new DocxError(`No part ${name}`);
     let doc = this.#xml.get(key(part.name));
     if (!doc) {
-      doc = this.#parse(this.text(part.name), part.name);
+      const translated = this.conformance === "strict" && isXml(part);
+      doc = this.#parse(this.text(part.name), part.name, !translated);
       this.#xml.set(key(part.name), doc);
     }
     return doc;
@@ -436,7 +437,7 @@ function text(data: Uint8Array, name: string): string {
 
 /** A part that holds XML: typed so, or a relationships part. */
 function isXml(part: DocxPart): boolean {
-  return /[+/]xml$/.test(part.contentType) || part.name.toLowerCase().endsWith(".rels");
+  return /[+/]xml$/.test(part.contentType) || /.(rels|vml)$/i.test(part.name);
 }
 
 function xml(source: string, name: string, options: ParseXmlOptions): XmlDocument {

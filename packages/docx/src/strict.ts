@@ -11,6 +11,7 @@ import {
   type ParseXmlOptions,
   parseXml,
   type XmlAttribute,
+  type XmlDocument,
   type XmlElement,
   type XmlText,
 } from "./xml.js";
@@ -83,6 +84,12 @@ const TWIPS: Record<string, readonly string[]> = {
   drawingGridHorizontalOrigin: ["val"],
   drawingGridVerticalOrigin: ["val"],
   object: ["dxaOrig", "dyaOrig"],
+  fitText: ["val"],
+  marLeft: ["val"],
+  marRight: ["val"],
+  marTop: ["val"],
+  marBottom: ["val"],
+  legacy: ["legacySpace", "legacyIndent"],
 };
 /** Twips Word writes as numbers in Strict too: read in either form, written as numbers. */
 const TWIPS_AS_NUMBERS = new Set([
@@ -96,6 +103,13 @@ const TWIPS_AS_NUMBERS = new Set([
   "lnNumType@distance",
   "drawingGridHorizontalOrigin@val",
   "drawingGridVerticalOrigin@val",
+  "fitText@val",
+  "marLeft@val",
+  "marRight@val",
+  "marTop@val",
+  "marBottom@val",
+  "legacy@legacySpace",
+  "legacy@legacyIndent",
 ]);
 /** `wp14` percentages written as element text (thousandths in Transitional). */
 const WP14 = "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing";
@@ -106,6 +120,9 @@ const HALF_POINTS: Record<string, readonly string[]> = {
   szCs: ["val"],
   kern: ["val"],
   position: ["val"],
+  hps: ["val"],
+  hpsRaise: ["val"],
+  hpsBaseText: ["val"],
 };
 /** CT_TblWidth elements: `w:w` by `w:type` (`pct` in fiftieths of a percent, else twips). */
 const WIDTHS = new Set(["tblW", "tcW", "tblInd", "tblCellSpacing", "wBefore", "wAfter"]);
@@ -236,7 +253,8 @@ function renameElement(edits: Edit[], element: XmlElement, local: string): void 
     end: element.start + 1 + element.name.length,
     text: name,
   });
-  if (element.closeStart !== element.openEnd) {
+  // An empty-element tag ends where its start tag does; `<x></x>` has an end tag to rename too.
+  if (element.end !== element.openEnd) {
     const at = element.closeStart + 2;
     edits.push({ start: at, end: at + element.name.length, text: name });
   }
@@ -255,6 +273,7 @@ function applied(source: string, edits: Edit[]): string {
   let out = "";
   let at = 0;
   for (const edit of edits) {
+    if (edit.start < at) throw new Error("Overlapping edits in a Strict translation");
     out += source.slice(at, edit.start) + edit.text;
     at = edit.end;
   }
@@ -280,7 +299,14 @@ const isNamespaceDeclaration = (a: XmlAttribute) => a.name === "xmlns" || a.pref
  * @internal
  */
 export function toTransitional(source: string, options: ParseXmlOptions = {}): string {
-  const { root } = parseXml(source, options);
+  return transitionalOf(parseXml(source, options));
+}
+
+/**
+ * {@link toTransitional} of a part already parsed.
+ * @internal
+ */
+export function transitionalOf({ source, root }: XmlDocument): string {
   const edits: Edit[] = [];
   for (const [el, parent] of elementsOf(root)) {
     const w = el.ns === W_S || el.ns === W_T;
@@ -393,7 +419,7 @@ export function toStrict(source: string, options: ParseXmlOptions = {}): string 
             attribute,
             type === "pct" ? `${trimmed(Number(value) / 50, 2)}%` : twipsAsPoints(Number(value)),
           );
-        } else if (el.local === "zoom" && local === "percent" && NUMBER.test(value)) {
+        } else if (PERCENT[el.local]?.includes(local) && NUMBER.test(value)) {
           setValue(edits, attribute, `${value}%`);
         } else if (ALIGNED.has(el.local) && local === "val" && SIDES_BACK[value]) {
           setValue(edits, attribute, SIDES_BACK[value] as string);
@@ -452,8 +478,11 @@ function onlyText(el: XmlElement): XmlText | undefined {
  * writes, first, as Word writes it in Transitional.
  */
 function withValue(el: XmlElement): Edit[] {
-  const first = el.attributes.find((x) => !isNamespaceDeclaration(x));
-  if (!first) return [];
+  // After the namespace declarations, so a prefix declared on the element is in scope.
+  const declarations = el.attributes.filter(isNamespaceDeclaration);
+  const at = declarations.length
+    ? (declarations[declarations.length - 1] as XmlAttribute).end
+    : el.start + 1 + el.name.length;
   const flag = (name: string) => {
     const v = el.attributes.find((x) => x.local === name)?.value;
     return v === "1" || v === "true" || v === "on";
@@ -465,8 +494,8 @@ function withValue(el: XmlElement): Edit[] {
           .toUpperCase()
           .padStart(4, "0")
       : CNF_NAMES.map((name) => (flag(name) ? "1" : "0")).join("");
-  const prefix = first.prefix ? `${first.prefix}:` : "";
-  return [{ start: first.start, end: first.start, text: `${prefix}val="${value}" ` }];
+  const prefix = el.prefix ? `${el.prefix}:` : "";
+  return [{ start: at, end: at, text: ` ${prefix}val="${value}"` }];
 }
 
 function sibling(parent: XmlElement, local: string): boolean {
@@ -479,6 +508,12 @@ function sibling(parent: XmlElement, local: string): boolean {
  */
 function expanded(el: XmlElement, attribute: XmlAttribute, source: string): Edit[] {
   const edits: Edit[] = [];
+  const valid =
+    el.local === "tblLook"
+      ? /^[0-9A-Fa-f]{1,4}$/.test(attribute.value)
+      : /^[01]{12}$/.test(attribute.value);
+  // A value Foli cannot read is kept: removing it would lose what it says.
+  if (!valid) return edits;
   remove(edits, source, attribute);
   const named = new Set(el.attributes.map((x) => x.local));
   const prefix = attribute.prefix ? `${attribute.prefix}:` : "";
