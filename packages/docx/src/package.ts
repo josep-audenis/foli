@@ -4,6 +4,7 @@
  * was not asked to replace copied from the original file byte for byte.
  */
 
+import { mayHaveAlternateRoot, resolveAlternateRoot } from "./alternate.js";
 import { isStrictPackage, toStrict, transitionalOf } from "./strict.js";
 import {
   type ParseXmlOptions,
@@ -112,8 +113,9 @@ export class DocxPackage {
   readonly #byName = new Map<string, DocxPart>();
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
-  /** A Strict package's XML parts in Transitional, translated once. */
+  /** XML parts read otherwise than their bytes say (Strict, an `mc:AlternateContent` root), once. */
   readonly #texts = new Map<string, string>();
+  readonly #alternates = new Map<string, readonly string[]>();
   readonly #defaults: ReadonlyMap<string, string>;
   readonly #overridden: ReadonlySet<string>;
   readonly #contentTypesText: string;
@@ -191,14 +193,47 @@ export class DocxPackage {
     if (!part) throw new DocxError(`No part ${name}`);
     // shortcut: the encoding and byte order mark are not reported; export (8.5) needs them to
     // re-encode a part it rewrites that was not BOM-less UTF-8 (Word writes only that).
-    if (this.conformance !== "strict" || !isXml(part)) return text(part.data, part.name);
-    let translated = this.#texts.get(key(part.name));
-    if (translated === undefined) {
-      // Parsed once within maxNodes, counted then; the translated text's parse is not counted again.
-      translated = transitionalOf(this.#parse(text(part.data, part.name), part.name));
-      this.#texts.set(key(part.name), translated);
+    if (!isXml(part)) return text(part.data, part.name);
+    const known = this.#texts.get(key(part.name));
+    if (known !== undefined) return known;
+    const source = text(part.data, part.name);
+    const strict = this.conformance === "strict";
+    const alternate = mayHaveAlternateRoot(source);
+    if (!strict && !alternate) return source;
+    // Parsed once within maxNodes, counted then; the parses of the text made from it are not.
+    let doc = this.#parse(source, part.name);
+    let result = strict ? transitionalOf(doc) : source;
+    if (alternate) {
+      if (strict) doc = this.#parse(result, part.name, false);
+      const main = this.mainDocument as string | undefined;
+      const isMain = main !== undefined && key(main) === key(part.name);
+      const dropped: string[] = [];
+      let resolvedAny = false;
+      // A branch whose root is mc:AlternateContent again is read again (a few levels at most).
+      for (let depth = 0; depth < 4; depth++) {
+        const resolved = resolveAlternateRoot(doc, isMain);
+        if (!resolved) break;
+        resolvedAny = true;
+        dropped.push(...resolved.dropped);
+        if (resolved.text === result || !mayHaveAlternateRoot(resolved.text)) {
+          result = resolved.text;
+          break;
+        }
+        result = resolved.text;
+        doc = this.#parse(result, part.name, false);
+      }
+      if (resolvedAny) this.#alternates.set(part.name, dropped);
     }
-    return translated;
+    this.#texts.set(key(part.name), result);
+    return result;
+  }
+
+  /**
+   * The parts whose `mc:AlternateContent` root was read as Word reads it, with what that left out.
+   * @internal
+   */
+  alternateRoots(): ReadonlyMap<string, readonly string[]> {
+    return this.#alternates;
   }
 
   #parse(source: string, name: string, counted = true): XmlDocument {
@@ -226,8 +261,8 @@ export class DocxPackage {
     if (!part) throw new DocxError(`No part ${name}`);
     let doc = this.#xml.get(key(part.name));
     if (!doc) {
-      const translated = this.conformance === "strict" && isXml(part);
-      doc = this.#parse(this.text(part.name), part.name, !translated);
+      const source = this.text(part.name);
+      doc = this.#parse(source, part.name, !this.#texts.has(key(part.name)));
       this.#xml.set(key(part.name), doc);
     }
     return doc;
