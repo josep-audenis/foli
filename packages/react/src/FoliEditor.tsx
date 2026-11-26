@@ -22,6 +22,7 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { FoliContextMenu, type FoliContextMenuProps } from "./FoliContextMenu.js";
+import { FoliMiniToolbar, type FoliMiniToolbarProps } from "./FoliMiniToolbar.js";
 import { FoliNavigation } from "./FoliNavigation.js";
 import { FoliStatusBar, type FoliStatusBarProps } from "./FoliStatusBar.js";
 import {
@@ -109,6 +110,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   contextMenu?: boolean | Pick<FoliContextMenuProps, "items" | "messages"> | undefined;
   /**
+   * Word's mini toolbar above a selection made with the pointer (`FoliMiniToolbar`, 1.11).
+   * Default false.
+   */
+  miniToolbar?: boolean | Pick<FoliMiniToolbarProps, "items" | "messages"> | undefined;
+  /**
    * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
    * `commentOnly`'s value.
    */
@@ -163,6 +169,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     children,
     statusBar = false,
     contextMenu = false,
+    miniToolbar = false,
     ...canvas
   },
   ref,
@@ -235,6 +242,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   const onZoomChange = zoomed ? setOwnZoom : canvas.onZoomChange;
   // The open header's, footer's or note's editor, else the body's: what the menu acts on.
   const activeEditor = useActiveEditor(editor);
+  // Where the mini toolbar shows, if it does.
+  const [miniAt, setMiniAt] = useState<{ x: number; y: number } | null>(null);
   // Where the right-click menu is open, if it is.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
@@ -260,6 +269,21 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the document's own menu event, from the keyboard too (the menu key, Shift+F10). */}
       <div
         className="foli-editor-body"
+        onMouseUp={(event) => {
+          if (!miniToolbar || readOnly || event.button !== 0) return;
+          const body = event.currentTarget;
+          // After the selection the press made has reached the editor (`selectionchange`); from
+          // the browser's selection, which a header, footer or note opened by the press has too.
+          setTimeout(() => {
+            const selection = body.ownerDocument.getSelection();
+            const anchor = selection?.anchorNode;
+            const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+            if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+            if (!element?.closest(".foli-content") || !body.contains(element)) return;
+            const rect = selection.getRangeAt(0).getClientRects?.()[0];
+            if (rect) setMiniAt({ x: rect.left, y: rect.top });
+          });
+        }}
         onContextMenu={(event) => {
           const target = event.target as Element;
           // Shift+right-click keeps the browser's menu; Shift+F10 (a key, no button) opens ours.
@@ -307,6 +331,16 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           />
         )}
       </div>
+      {miniAt && (
+        <FoliMiniToolbar
+          {...(miniToolbar === true || miniToolbar === false ? {} : miniToolbar)}
+          editor={editor}
+          at={miniAt}
+          commentOnly={commentOnly}
+          onClose={() => setMiniAt(null)}
+          onClickCommand={() => canvasRef.current?.focus()}
+        />
+      )}
       {menuAt && (
         <FoliContextMenu
           {...(contextMenu === true || contextMenu === false ? {} : contextMenu)}

@@ -30,6 +30,11 @@ export {
   type FoliEditorHandle,
   type FoliEditorProps,
 } from "./FoliEditor.js";
+export {
+  FoliMiniToolbar,
+  type FoliMiniToolbarProps,
+  miniToolbarItems,
+} from "./FoliMiniToolbar.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export {
   FoliStatusBar,

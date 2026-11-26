@@ -26,6 +26,7 @@ import {
 import {
   FoliComments,
   FoliContextMenu,
+  FoliMiniToolbar,
   FoliNavigation,
   FoliStatusBar,
   FoliToolbar,
@@ -140,6 +141,26 @@ const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
 const status = createRoot(document.getElementById("status") as HTMLElement);
+// Word's mini toolbar (29.9) above a selection made with the pointer.
+const mini = createRoot(document.getElementById("mini") as HTMLElement);
+host.addEventListener("mouseup", (event) => {
+  if (event.button !== 0) return;
+  setTimeout(() => {
+    const rect = getSelection()?.rangeCount
+      ? getSelection()?.getRangeAt(0).getClientRects()[0]
+      : null;
+    if (editor.state.selection.empty || !rect) return;
+    mini.render(
+      <FoliMiniToolbar
+        key={event.timeStamp}
+        editor={editor}
+        at={{ x: rect.left, y: rect.top }}
+        onClose={() => mini.render(null)}
+        onClickCommand={() => view.focus()}
+      />,
+    );
+  });
+});
 // Word's right-click menu (29.8); Shift+right-click keeps the browser's.
 const menu = createRoot(document.getElementById("menu") as HTMLElement);
 host.addEventListener("contextmenu", (event) => {

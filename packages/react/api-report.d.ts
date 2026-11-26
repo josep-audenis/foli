@@ -154,6 +154,7 @@ import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { type FoliContextMenuProps } from "./FoliContextMenu.js";
+import { type FoliMiniToolbarProps } from "./FoliMiniToolbar.js";
 import { type FoliStatusBarProps } from "./FoliStatusBar.js";
 import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
 /**
@@ -228,6 +229,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      */
     contextMenu?: boolean | Pick<FoliContextMenuProps, "items" | "messages"> | undefined;
     /**
+     * Word's mini toolbar above a selection made with the pointer (`FoliMiniToolbar`, 1.11).
+     * Default false.
+     */
+    miniToolbar?: boolean | Pick<FoliMiniToolbarProps, "items" | "messages"> | undefined;
+    /**
      * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
      * `commentOnly`'s value.
      */
@@ -266,6 +272,39 @@ export interface FoliEditorHandle extends FoliCanvasHandle {
  * through `onChange`, a parent reaches it through a `ref`.
  */
 export declare const FoliEditor: import("react").ForwardRefExoticComponent<FoliEditorProps & import("react").RefAttributes<FoliEditorHandle>>;
+
+// FoliMiniToolbar.d.ts
+import type { Editor } from "@folijs/core";
+import { type ToolbarItem } from "./FoliToolbar.js";
+import type { ToolbarMessages } from "./messages.js";
+/**
+ * Word's mini toolbar: font, size, grow and shrink, bold, italic, underline, text color,
+ * highlight, styles and New comment. Change it with `FoliMiniToolbar`'s `items`.
+ */
+export declare const miniToolbarItems: readonly ToolbarItem[];
+export interface FoliMiniToolbarProps {
+    editor: Editor;
+    /** Where the selection starts on the screen (viewport px): it shows above it. */
+    at: {
+        x: number;
+        y: number;
+    };
+    items?: readonly ToolbarItem[] | undefined;
+    messages?: ToolbarMessages | undefined;
+    /** Only comments change: its formatting is off (as the toolbar's). */
+    commentOnly?: boolean | undefined;
+    /** It goes: a key is typed, Escape, or the pointer moves far from it. */
+    onClose: () => void;
+    /** After a pick with the pointer: the document takes the focus back. */
+    onClickCommand?: (() => void) | undefined;
+}
+/**
+ * Word's mini toolbar beside a selection made with the pointer (`.foli-mini-toolbar`): faded
+ * until the pointer comes near (`:hover`), gone when a key is pressed, the pointer moves far
+ * away or the selection is gone. A `FoliToolbar` of its own (one row of `items`); it does not
+ * take the focus, as Word's: the keyboard has the ribbon.
+ */
+export declare function FoliMiniToolbar({ editor, at, items, messages, commentOnly, onClose, onClickCommand, }: FoliMiniToolbarProps): import("react").JSX.Element;
 
 // FoliNavigation.d.ts
 import { type Editor } from "@folijs/core";
@@ -800,6 +839,7 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps, type MentionEvent, type MentionSource, } from "./FoliComments.js";
 export { type ContextMenuItem, type ContextMenuMessages, contextMenuMessages, defaultContextMenuItems, FoliContextMenu, type FoliContextMenuProps, } from "./FoliContextMenu.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
+export { FoliMiniToolbar, type FoliMiniToolbarProps, miniToolbarItems, } from "./FoliMiniToolbar.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { FoliStatusBar, type FoliStatusBarProps, type StatusBarMessages, statusBarMessages, } from "./FoliStatusBar.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, selectionInTable, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, wordRibbonTabs, } from "./FoliToolbar.js";
