@@ -7,9 +7,7 @@ const p = (...content: NodeJSON[]): NodeJSON => ({ type: "paragraph", content })
 const text = (value: string, deletion = false): NodeJSON => ({
   type: "text",
   text: value,
-  ...(deletion
-    ? { marks: [{ type: "deletion", attrs: { id: 1, author: "A", date: null } }] }
-    : {}),
+  ...(deletion ? { marks: [{ type: "deletion", attrs: { id: 1, author: "A", date: null } }] } : {}),
 });
 
 const editorOf = (blocks: NodeJSON[], stories = {}) =>
