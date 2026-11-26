@@ -241,42 +241,42 @@ export class DocxPackage {
    * come last.
    */
   async write(
-    replacing: ReadonlyMap<string, Uint8Array> = new Map(),
-    adding: readonly NewPart[] = [],
+    replace: ReadonlyMap<string, Uint8Array> = new Map(),
+    add: readonly NewPart[] = [],
     /** Parts left out of the file, their `Override`s with them; `main`: the main part's new type. */
     change: { drop?: readonly string[]; main?: string } = {},
   ): Promise<Uint8Array<ArrayBuffer>> {
     // What a Strict package read in Transitional goes back in Strict's names and values (ADR-0014).
     const strict = this.conformance === "strict";
-    const replace: ReadonlyMap<string, Uint8Array> = strict
+    const replaced: ReadonlyMap<string, Uint8Array> = strict
       ? new Map(
-          [...replacing].map(([name, data]) => {
+          [...replace].map(([name, data]) => {
             const part = this.part(name);
             return [name, part && isXml(part) ? strictBytes(data, name) : data];
           }),
         )
-      : replacing;
-    const add = strict
-      ? adding.map((part) => {
+      : replace;
+    const added = strict
+      ? add.map((part) => {
           const contentType =
             part.contentType ?? (/.xml$/i.test(part.name) ? "application/xml" : "");
           return isXml({ name: part.name, contentType, data: part.data })
             ? { ...part, data: strictBytes(part.data, part.name) }
             : part;
         })
-      : adding;
+      : add;
     const dropped = new Set((change.drop ?? []).map(key));
     const pending = new Map<string, Uint8Array>();
-    for (const [name, data] of replace) {
+    for (const [name, data] of replaced) {
       const part = this.part(name);
       if (!part) throw new DocxError(`No part ${name} to replace`);
       pending.set(key(part.name), data);
     }
     const overrides: string[] = [];
-    for (const part of add) {
+    for (const part of added) {
       if (!part.name.startsWith("/") || part.name.endsWith("/"))
         throw new DocxError(`Not a part name: ${part.name}`);
-      if (this.part(part.name) || add.filter((p) => key(p.name) === key(part.name)).length > 1) {
+      if (this.part(part.name) || added.filter((p) => key(p.name) === key(part.name)).length > 1) {
         throw new DocxError(`Part ${part.name} already exists`);
       }
       // An Override already there (a stale one, for a part the zip lacks) is not repeated.
@@ -328,7 +328,7 @@ export class DocxPackage {
       const data = pending.get(key(partName(entry.name)));
       entries.push(data ? await deflateEntry(entry.name, data, entry) : entry);
     }
-    for (const part of add) entries.push(await deflateEntry(part.name.slice(1), part.data));
+    for (const part of added) entries.push(await deflateEntry(part.name.slice(1), part.data));
     return writeZip(entries);
   }
 }
