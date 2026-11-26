@@ -25,6 +25,7 @@ import {
 } from "@folijs/docx";
 import {
   FoliComments,
+  FoliContextMenu,
   FoliNavigation,
   FoliStatusBar,
   FoliToolbar,
@@ -139,6 +140,24 @@ const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
 const status = createRoot(document.getElementById("status") as HTMLElement);
+// Word's right-click menu (29.8); Shift+right-click keeps the browser's.
+const menu = createRoot(document.getElementById("menu") as HTMLElement);
+host.addEventListener("contextmenu", (event) => {
+  if (event.shiftKey) return;
+  event.preventDefault();
+  // After the selection a quick press made has reached the editor (`selectionchange`).
+  setTimeout(() =>
+    menu.render(
+      <FoliContextMenu
+        key={event.timeStamp}
+        editor={editor}
+        at={{ x: event.clientX, y: event.clientY }}
+        onClose={() => menu.render(null)}
+        onFocusDocument={() => view.focus()}
+      />,
+    ),
+  );
+});
 const showStatus = () =>
   status.render(
     <FoliStatusBar

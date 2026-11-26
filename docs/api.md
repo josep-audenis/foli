@@ -55,6 +55,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                                       |
 | `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
 | `statusBar`       | `boolean \| FoliStatusBarProps`                                                                          | `false`       | Word's status bar under the pages (1.11, `FoliStatusBar`); the zoom is then the editor's own unless `zoom` is given.                                                 |
+| `contextMenu`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's right-click menu on the document (1.11, `FoliContextMenu`); Shift+right-click keeps the browser's.                                                            |
 | `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
 | `readOnly`        | `boolean`                                                                                                | `false`       | Read, select, copy; no editing. Disables the toolbar.                                                                                                                |
 | `commentOnly`     | `boolean`                                                                                                | `false`       | Select, copy, find and comment; no other change. Read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin. 1.10.                       |
@@ -91,6 +92,24 @@ The pages alone, for your own layout. Props: `editor` (default: the nearest
 document, shows the editor's selection and scrolls it into view; `fitZoom("width" | "page")` is
 the zoom that fits a page's width, or the whole page, in the part of the screen the canvas has).
 `FoliEditorHandle` has both.
+
+### `<FoliContextMenu>`
+
+Word's right-click menu (1.11), a WAI-ARIA menu at a point (`.foli-menu.foli-context-menu`):
+Cut and Copy (with a selection: the browser's `execCommand` on the document), Paste (through
+the Clipboard API, which the browser may ask about first; then pasted as the keyboard's paste
+is), Link… (the toolbar's link dialog), New comment; in a table Insert row above or below,
+Insert column left or right, Delete rows, columns or the table, Merge cells, Split cell; on a
+tracked change Accept change and Reject change. Only entries that apply now are shown. Arrows,
+Home and End move, Enter picks, Escape and Tab close (Escape back to the document). Props:
+`editor`, `at` (`{ x, y }` in viewport px), `items` (`ContextMenuItem[]` or a function of
+`defaultContextMenuItems`: `{ key, label, run(editor), enabled?(state), separator? }`), `messages`
+(by the English label, `contextMenuMessages`), `onClose`, `onFocusDocument`, `readOnly` (only Copy)
+and `commentOnly` (Copy and New comment; an app's own entries are hidden then too); `FoliEditor` passes its own and gives the menu the
+editor of the header, footer or note open on its page. `FoliEditor`'s
+`contextMenu` opens it on the document's `contextmenu` event (the pointer's, or the menu key's
+and Shift+F10's, at the caret); Shift+right-click keeps the browser's menu, with its spelling
+suggestions. Word's Font… and Paragraph… entries wait for those dialogs.
 
 ### `<FoliStatusBar>`
 

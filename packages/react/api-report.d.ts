@@ -94,11 +94,66 @@ export interface MentionEvent {
  */
 export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, onlyOwnComments, mentions, onMention, }: FoliCommentsProps): import("react").JSX.Element;
 
+// FoliContextMenu.d.ts
+import { type Editor, type EditorState } from "@folijs/core";
+/** One entry of the right-click menu. */
+export interface ContextMenuItem {
+    /** Unique in the menu; also its class, `foli-context-<key>`. */
+    readonly key: string;
+    /** What it shows (and its name), in English: `messages` translates it. */
+    readonly label: string;
+    /** What a press does, on the body's editor. */
+    readonly run: (editor: Editor) => void;
+    /** Whether it can be used now (default: always). Runs when the menu opens. */
+    readonly enabled?: ((state: EditorState) => boolean) | undefined;
+    /** A line before it, as between Word's groups of entries. */
+    readonly separator?: boolean | undefined;
+}
+/** Every string of the built-in entries, in English; each is its own key in `messages`. */
+export declare const contextMenuMessages: readonly ["Document menu", "Cut", "Copy", "Paste", "Link…", "New comment", "Insert row above", "Insert row below", "Insert column left", "Insert column right", "Delete rows", "Delete columns", "Delete table", "Merge cells", "Split cell", "Accept change", "Reject change"];
+/** Translations of the menu's strings (`contextMenuMessages`, or an app's own labels). */
+export type ContextMenuMessages = Partial<Readonly<Record<string, string>>>;
+/**
+ * Word's right-click entries that Foli has: the clipboard, a link and a comment; in a table its
+ * rows, columns and cells; on a tracked change Accept and Reject. Pass a function to
+ * `FoliContextMenu`'s `items` to add, drop or reorder them.
+ */
+export declare const defaultContextMenuItems: readonly ContextMenuItem[];
+export interface FoliContextMenuProps {
+    editor: Editor;
+    /** Where it opens, in viewport px (the pointer, or the caret for the keyboard). */
+    at: {
+        x: number;
+        y: number;
+    };
+    /**
+     * Its entries: the built-in ones (default), or a function of them. Only entries that apply
+     * now are shown (a table's out of a table, Accept off a change).
+     */
+    items?: readonly ContextMenuItem[] | ((defaults: readonly ContextMenuItem[]) => readonly ContextMenuItem[]) | undefined;
+    messages?: ContextMenuMessages | undefined;
+    /** It closes: a pick (after it ran), Escape, Tab, or the focus leaving it. */
+    onClose: () => void;
+    /** Gives the document the focus back (before the clipboard entries run, and on Escape). */
+    onFocusDocument?: (() => void) | undefined;
+    /** Nothing changes the document: only Copy is offered. */
+    readOnly?: boolean | undefined;
+    /** Only comments change: Copy and New comment are offered. */
+    commentOnly?: boolean | undefined;
+}
+/**
+ * Word's right-click menu for the document: a WAI-ARIA menu at the pointer (`.foli-menu`, as the
+ * toolbar's), the arrow keys, Home and End to move, Enter to pick, Escape to close. Entries that
+ * do not apply now are left out, Word's way.
+ */
+export declare function FoliContextMenu({ editor, at, items, messages, onClose, onFocusDocument, readOnly, commentOnly, }: FoliContextMenuProps): import("react").JSX.Element | null;
+
 // FoliEditor.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FoliDocument, type Plugin, type ReviewView, type Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { type MentionEvent, type MentionSource } from "./FoliComments.js";
+import { type FoliContextMenuProps } from "./FoliContextMenu.js";
 import { type FoliStatusBarProps } from "./FoliStatusBar.js";
 import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
 /**
@@ -167,6 +222,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * `zoom` is given. Default false.
      */
     statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
+    /**
+     * Word's right-click menu on the document (`FoliContextMenu`, 1.11); Shift+right-click keeps
+     * the browser's (spelling suggestions). Also the menu key and Shift+F10. Default false.
+     */
+    contextMenu?: boolean | Pick<FoliContextMenuProps, "items" | "messages"> | undefined;
     /**
      * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
      * `commentOnly`'s value.
@@ -738,6 +798,7 @@ export declare const toolbarIcons: Readonly<Record<string, ReactElement>>;
 export { type CommandState, FoliEditorProvider, type UseCommandOptions, type UseEditorStateOptions, type UseFoliEditorOptions, useCommand, useCurrentEditor, useEditorState, useFoliEditor, } from "./editor.js";
 export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 export { FoliComments, type FoliCommentsProps, type MentionEvent, type MentionSource, } from "./FoliComments.js";
+export { type ContextMenuItem, type ContextMenuMessages, contextMenuMessages, defaultContextMenuItems, FoliContextMenu, type FoliContextMenuProps, } from "./FoliContextMenu.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { FoliStatusBar, type FoliStatusBarProps, type StatusBarMessages, statusBarMessages, } from "./FoliStatusBar.js";
