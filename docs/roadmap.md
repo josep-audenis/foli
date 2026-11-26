@@ -41,16 +41,16 @@ place that says what is in progress; check it before starting work.
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
-| 30 Font & Paragraph dialogs   | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 30 Font & Paragraph dialogs   | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 31 Ruler                      | Blocked by 30            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 32 Page decoration            | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 33 Text boxes & layout        | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 32 Page decoration            | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 35 Insert extras              | Ready                    | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
+| 35 Insert extras              | Blocked by 29            | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 37 File tab & views           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 38 Proofing & AutoFormat      | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
-| 39 App shell                  | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 38 Proofing & AutoFormat      | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 39 App shell                  | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 40 Charts & SmartArt          | Blocked by 34            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 41 Extension gallery          | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 
@@ -4031,7 +4031,8 @@ toolbar built from `items` stay as in 1.10 (1.x semver).
 Not in this phase: the ruler, the Paragraph and Font dialogs, the Layout tab's quick menus
 (Margins, Orientation, Size, Columns), a Design tab (watermark, page color and borders), shapes,
 text boxes, equations and symbols to insert, a File tab, view modes (read, web layout, outline),
-and a floating picture toolbar (Picture Format has its commands). They are planned as Phases 30 to 41. No Microsoft icons or artwork: Foli draws its own.
+and a floating picture toolbar (Picture Format has its commands). They are planned as Phases
+30 to 41. No Microsoft icons or artwork: Foli draws its own.
 
 **Starts from (1.10.0), checked 2026-11-26:**
 
@@ -4222,22 +4223,23 @@ The rest of the comparison with Umo Editor, MROffice and Word (2026-11-26), writ
 phases on the owner's request (2026-11-26): what Word has that people use every day and Foli
 does not. Each phase follows "Working on a phase" (claim, plan the PRs, build, close) and the
 task-by-task PR and review. The order is the value seen from a user's chair; the dependencies
-are said per phase. Nothing here is started. Sizes as in Principles.
+are said per phase. Nothing here is started. Sizes as in Principles. "Depends on 29": it
+builds on Phase 29's ribbon, status bar, menus or zoom, merged and waiting for their release.
 
-| Phase | Name                               | Size | Depends on   |
-| ----- | ---------------------------------- | ---- | ------------ |
-| 30    | Font, Paragraph and Layout dialogs | M    | —            |
-| 31    | Ruler                              | M    | 30           |
-| 32    | Page decoration (Design tab)       | M    | —            |
-| 33    | Text boxes and picture layout      | L    | —            |
-| 34    | Shapes                             | L    | 33           |
-| 35    | Insert extras                      | M    | — (35.6: 34) |
-| 36    | Tables as Word's                   | M    | —            |
-| 37    | File tab, export and views         | L    | —            |
-| 38    | Proofing, language, AutoFormat     | M    | —            |
-| 39    | App shell: languages, help, saving | M    | —            |
-| 40    | Charts and SmartArt shown          | L    | 34           |
-| 41    | Extension gallery                  | S    | —            |
+| Phase | Name                               | Size | Depends on    |
+| ----- | ---------------------------------- | ---- | ------------- |
+| 30    | Font, Paragraph and Layout dialogs | M    | 29            |
+| 31    | Ruler                              | M    | 30            |
+| 32    | Page decoration (Design tab)       | M    | 29            |
+| 33    | Text boxes and picture layout      | L    | 29            |
+| 34    | Shapes                             | L    | 33            |
+| 35    | Insert extras                      | L    | 29 (35.6: 34) |
+| 36    | Tables as Word's                   | M    | —             |
+| 37    | File tab, export and views         | L    | 29            |
+| 38    | Proofing, language, AutoFormat     | M    | 29            |
+| 39    | App shell: languages, help, saving | M    | 29            |
+| 40    | Charts and SmartArt shown          | L    | 34            |
+| 41    | Extension gallery                  | S    | —             |
 
 ## Phase 30 — Font, Paragraph and Layout dialogs · M → next minor
 
@@ -4245,7 +4247,7 @@ Word's Font and Paragraph dialogs, its Layout tab's quick menus and lengths in i
 left the Font and Paragraph groups without dialog launchers and the right-click menu without
 Font… and Paragraph…; the Layout tab has one Section menu and the Page setup dialog.
 
-**Starts from (1.11), checked 2026-11-26:** the model has every property these dialogs set:
+**Starts from (`main` after Phase 29, 1.11 once released), checked 2026-11-26:** the model has every property these dialogs set:
 paragraph `justification`, `indent`, `spacing` (line rules auto, exact, at least), `keepNext`,
 `keepLines`, `widowControl`, `pageBreakBefore`, `contextualSpacing`, `outlineLevel`, `tabs`,
 `borders`, `shading` (`v3/schema.ts` `paragraphProperties`); run marks for every Font effect
@@ -4325,6 +4327,7 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   dialog does, undoes in one step, and the handle stays under the pointer at any zoom.
 - Every handle is reachable and changeable by keyboard; axe clean.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 32 — Page decoration (Design tab) · M → next minor
 
 Word's Design tab where Foli has something to put in it: page color, page borders, watermarks,
@@ -4363,6 +4366,7 @@ XML.
 - Corpus files with page color, page borders, watermarks and line numbers show them and save
   them back as Word reads them; the parts not edited stay byte-identical.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 33 — Text boxes and picture layout · L → next minor
 
 Text boxes drawn and edited, and Word's Layout Options for pictures.
@@ -4398,6 +4402,7 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
 - The corpus's text boxes show their text, are edited and saved back; Word opens the result
   without repair. Every wrap kind lays text out as Word does on the corpus's samples (measured).
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 34 — Shapes · L → next minor
 
 Word's basic shapes drawn, inserted, moved, resized and formatted.
@@ -4411,8 +4416,8 @@ paths; text in shapes through Phase 33's stories.
 
 ### Tasks
 
-- [ ] 34.1 Decisions; schema for a shape (geometry, fill, outline, effects kept), import and
-  export.
+- [ ] 34.1 Decisions; schema for a shape (geometry, fill, outline, effects kept), schema bump
+  with migration, import and export.
 - [ ] 34.2 SVG drawing of preset and custom geometries, fill (solid, gradient), outline (color,
   width, dash, arrows), rotation, flip; on read-only pages and `exportPdf`.
 - [ ] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions.
@@ -4426,12 +4431,14 @@ paths; text in shapes through Phase 33's stories.
 - The corpus's shapes show as Word draws them (a visual compare within the tolerance) and are
   written back unchanged unless edited; new shapes open in Word.
 
-## Phase 35 — Insert extras · M → next minor
+- `pnpm check` green; axe finds no new violation.
+## Phase 35 — Insert extras · L → next minor
 
 What Word's Insert tab has and Foli does not, short of shapes and charts.
 
 **Starts from:** `insertBookmark` and the bookmarks dialog (navigation); `SEQ` and `REF` fields
-updated (11.8); equations (`m:oMath`) kept opaque; no symbol picker; date fields with pictures.
+updated (11.8); `insertDate` and date pictures (`fieldupdate.ts`), what 35.2 builds on;
+equations (`m:oMath`) kept opaque; no symbol picker.
 
 ### Tasks
 
@@ -4443,9 +4450,13 @@ updated (11.8); equations (`m:oMath`) kept opaque; no symbol picker; date fields
 - [ ] 35.3 Caption: Insert Caption (label, numbering, position above or below) as Word writes it
   (`SEQ` field in a Caption-style paragraph); Table of Figures from References.
 - [ ] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on
-  pages, read-only pages and `exportPdf`; the text of an equation for find and screen readers.
+  pages, read-only pages and `exportPdf` (the PDF is printed by a browser, so MathML prints as
+  shown; checked here); the text of an equation for find and screen readers. Own converter, or
+  a dependency with its license checked; no editor engine.
 - [ ] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
-  OMML; Insert ▸ Equation with Word's common ones.
+  OMML (an equation node in the model: schema bump with migration); Insert ▸ Equation with
+  Word's common ones. Own parser and writer, or a dependency with its license checked; no
+  editor engine.
 - [ ] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34
   for its shapes; a text-only cover before).
 - [ ] 35.7 e2e; docs; changesets.
@@ -4455,6 +4466,7 @@ updated (11.8); equations (`m:oMath`) kept opaque; no symbol picker; date fields
 - Corpus equations show and round-trip unchanged; a new equation opens in Word as an equation.
 - Symbols, captions and dates insert what Word inserts.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 36 — Tables as Word's · M → next minor
 
 Word's table tools: the grid picker, the styles gallery with its options, Table Properties,
@@ -4481,8 +4493,10 @@ column widths by dragging a border or the dialog; Table Design and Table Layout 
 ### Acceptance
 
 - Each command does to the `.docx` what Word's does (checked on the corpus) and undoes in one
-  step; the styles gallery shows the document's table styles as Word draws them.
+  step; the styles gallery's previews match Word's within a visual-compare tolerance set in
+  36.2.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 37 — File tab, export and views · L → next minor
 
 Word's File tab (backstage) and View tab's views, and export to the formats Umo Editor offers.
@@ -4519,15 +4533,16 @@ what each format cannot hold listed); views as a view option (`layout: "print" |
 - Exports keep what each format can hold (listed per format) and say what they dropped.
 - Each view edits the same document with undo intact; switching back keeps the caret.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 38 — Proofing, language and AutoFormat · M → next minor
 
 Spelling where the browser can, the document's languages, and Word's AutoFormat As You Type.
 
-**Starts from:** `w:lang` not kept (After 1.0: "`w:lang` given to the DOM"); the editing host
+**Starts from:** `w:lang` not modeled (kept verbatim only in content controls; After 1.0: "`w:lang` given to the DOM"); the editing host
 leaves the browser's spellcheck on; Word's autocorrect is the browser's; lists by Ctrl+Shift+7
 and 8 only.
 
-**Decisions to take in 38.1:** `lang` as a run mark (schema bump) with the styles' and defaults'
+**Decisions to take in 38.1:** `lang` as a run mark (schema bump with migration) with the styles' and defaults'
 language resolved; `lang` written on the DOM per run so the browser spell-checks and hyphenates
 in the right language; what Foli's own AutoFormat does and what stays the browser's.
 
@@ -4553,6 +4568,7 @@ in the right language; what Foli's own AutoFormat does and what stays the browse
   follow them in the browsers that do it.
 - Each AutoFormat rule fires as Word's and one Ctrl+Z puts the typed text back.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 39 — App shell: languages, help, saving · M → next minor
 
 What makes Foli an app and not only an editor: its own interface in other languages, a keyboard
@@ -4580,6 +4596,7 @@ try page saves by download only.
 - Each shipped language covers every string; switching it changes every component at once.
 - A closed and reopened try page has the document as it was.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 40 — Charts and SmartArt shown · L → next minor
 
 Charts and SmartArt drawn where they are, read-only, and kept as they are.
@@ -4590,7 +4607,8 @@ Charts and SmartArt drawn where they are, read-only, and kept as they are.
 ### Tasks
 
 - [ ] 40.1 Decisions (which chart kinds: column, bar, line, pie, area, scatter first; drawn as
-  SVG from the cached values; the rest as a placeholder with the chart's title).
+  SVG from the cached values by Foli's own code, or a charting dependency with its license and
+  size checked; the rest as a placeholder with the chart's title).
 - [ ] 40.2 Charts drawn on pages, read-only pages and `exportPdf`, sized as their anchor;
   alt text read.
 - [ ] 40.3 SmartArt drawn from its cached `dsp:` drawing through Phase 34's shapes.
@@ -4602,6 +4620,7 @@ Charts and SmartArt drawn where they are, read-only, and kept as they are.
 - The corpus's charts and SmartArt show close to Word's (a visual compare within a tolerance
   set in 40.1) and are written back byte-identical.
 
+- `pnpm check` green; axe finds no new violation.
 ## Phase 41 — Extension gallery · S → no release (examples and docs)
 
 Umo Editor's extras that are not Word's, as examples of Foli's extension API rather than built
@@ -4619,6 +4638,7 @@ in: a QR code, a Mermaid diagram, an ECharts chart, a signature box, a video lin
 
 - Each example runs on the site, saves to `.docx` with a fallback Word shows, and passes axe.
 
+- `pnpm check` green; axe finds no new violation.
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
