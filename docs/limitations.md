@@ -568,9 +568,10 @@ Details in the [package README](../packages/docx/README.md).
   `w:moveFrom` nested the other way round. In Word, of a sample of 150, the 143 Word measured
   measure the same in the export but one: a literal soft hyphen (U+00AD) or non-breaking hyphen
   (U+2011) in `w:t` comes back as `w:softHyphen` / `w:noBreakHyphen`.
-- Strict Open XML documents are read (Phase 28, ADR-0014: translated to Transitional names and
-  values as they are read), but not yet written: `exportDocx` with a Strict original throws a
-  `DocxError` until 28.3. Refused: a document a document whose root is inside markup compatibility (`mc:AlternateContent`,
+- Strict Open XML documents are read and written back Strict (Phase 28, ADR-0014: translated to
+  Transitional names and values as they are read, and back as they are written). A Strict
+  document saved as JSON and exported without its package comes out Transitional. Refused: a
+  document a document whose root is inside markup compatibility (`mc:AlternateContent`,
   60 files, all docx4j tests). Encrypted zip entries, ZIP64 and compression methods other than
   stored and deflate are refused too. A package whose zip entries name one part twice
   (`word/document.xml` and `word/%64ocument.xml`) is refused; a name that is no valid part name

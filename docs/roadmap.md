@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —                         | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1 merged (#299); 28.2 in review: Strict files read                                                                                                                                         |
+| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1–28.2 merged (#299, #303); 28.3 in review: Strict written back                                                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3937,12 +3937,20 @@ agent's review.
   Strict files imports as its twin (save ids aside), and `toStrict` gives back every XML part of
   them character for character. The 71: all imported, none refused; export refuses a Strict
   original until 28.3, so the run counts 71 export failures for now.)
-- [ ] 28.3 Strict export: a document imported from a Strict package exported Strict (names,
+- [x] 28.3 Strict export: a document imported from a Strict package exported Strict (names,
   relationship types, `w:conformance`, value forms), edited or not; exported without its
   package, all Transitional. Tested: export without edits compared part by part with the
   original (the corpus run's comparison) for the nine and the 71; a second import equal to the
   first; no Strict name in an export without the package; Word opens the nine's exports without
   a repair and `word-reference.ps1` measures the originals' pages, revisions and comments.
+  (Done: `DocxPackage.write` passes every XML part it writes through `toStrict` when the package
+  is Strict; a part export leaves unchanged is copied. Tested on the nine: every written part in
+  Strict names, `w:conformance` on the main part, a part the Transitional twin's export copies
+  copied too, a second import equal to the first, an edited one Strict, and the JSON export of
+  each that needs no package all Transitional. The 71: all import and export; the run's
+  comparison finds one file (`Strict01`) with a picture's duplicate ids renumbered, as Foli does
+  for Transitional files too. Word (16.0) opened the nine's exports, unedited and with a word
+  added to every paragraph, without a repair: pages, comments and revisions as the originals'.)
 - [ ] 28.4 `mc:AlternateContent` roots: the branch Word takes chosen at the root of
   `word/document.xml` (the 22 of the 60) and of the other parts (`c79-10`…`c79-18`), by the
   namespaces Foli reads (a root cannot stay opaque as inline alternate content does: its

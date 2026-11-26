@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { importDocx, readPackage } from "./index.js";
+import { exportDocx, importDocx, readPackage } from "./index.js";
 import { toStrict, toTransitional } from "./strict.js";
 import { docx } from "./testing/package.js";
 
@@ -8,6 +8,15 @@ const TWINS = new URL("../../../corpus/word/strict/", import.meta.url);
 const stems = readdirSync(TWINS)
   .filter((n) => n.endsWith(".strict.docx"))
   .map((n) => n.slice(0, -".strict.docx".length));
+const TRANSITIONAL_W = "schemas.openxmlformats.org/wordprocessingml/2006/main";
+const TRANSITIONAL_NAMES =
+  /schemas\.openxmlformats\.org\/(officeDocument\/2006|drawingml\/2006|wordprocessingml\/2006)/;
+/** What two saves of a document by Word differ in: root declarations, save and paragraph ids. */
+const withoutSaveIds = (xml: string) =>
+  // From the root start tag on: Word's two saves declare different namespaces there.
+  xml
+    .replace(/^[\s\S]*?<[^?!][^>]*>/, "")
+    .replace(/ (w:rsid\w*|w14:paraId|w14:textId|w14:val|w15:val)="[^"]*"/g, "");
 const bytes = (name: string) => new Uint8Array(readFileSync(new URL(name, TWINS)));
 
 /** What two saves of one document by Word differ in anyway: revision-save and paragraph ids. */
@@ -111,8 +120,81 @@ describe("Strict Open XML (ADR-0014)", () => {
     expect(pkg.conformance).toBe("transitional");
   });
 
-  it("refuses to write a Strict package until it writes Strict back", async () => {
+  for (const stem of stems) {
+    it(`${stem}: exports Strict, copying what its Transitional twin's export copies`, async () => {
+      const strict = await importDocx(bytes(`${stem}.strict.docx`));
+      const transitional = await importDocx(bytes(`${stem}.transitional.docx`));
+      const out = await readPackage(await exportDocx(strict.document, strict.package));
+      const twin = await readPackage(await exportDocx(transitional.document, transitional.package));
+      expect(out.conformance).toBe("strict");
+      const raw = (pkg: typeof out, name: string) =>
+        new TextDecoder().decode(pkg.part(name)?.data ?? new Uint8Array());
+      for (const part of out.parts) {
+        if (!/xml$/.test(part.contentType) && !part.name.endsWith(".rels")) continue;
+        const written = raw(out, part.name);
+        expect(written, part.name).not.toContain(TRANSITIONAL_W);
+        // A part the Transitional export leaves as it was, the Strict export leaves too.
+        if (raw(twin, part.name) === raw(transitional.package, part.name))
+          expect(written, part.name).toBe(raw(strict.package, part.name));
+        else {
+          // A part it rewrites: no Transitional name left, and read back it is the twin's.
+          expect(written, part.name).not.toMatch(TRANSITIONAL_NAMES);
+          expect(withoutSaveIds(toTransitional(written)), part.name).toBe(
+            withoutSaveIds(raw(twin, part.name)),
+          );
+        }
+      }
+      expect(raw(out, out.mainDocument)).toMatch(/w:conformance="strict"/);
+      const again = await importDocx(await exportDocx(strict.document, strict.package));
+      expect(comparable(again.document)).toEqual(comparable(strict.document));
+    });
+  }
+
+  it("exports an edited Strict document Strict, and without its package Transitional", async () => {
+    const { document, package: pkg } = await importDocx(bytes(`${stems[0]}.strict.docx`));
+    const edited = structuredClone(document);
+    const paragraph = (edited.content.content ?? []).find((n) => n.type === "paragraph");
+    const run = (paragraph?.content ?? []).find((n) => n.type === "text");
+    if (!run) throw new Error("no text");
+    run.text = `${run.text} edited`;
+    const out = await exportDocx(edited, pkg);
+    const again = await importDocx(out);
+    expect(again.package.conformance).toBe("strict");
+    expect(JSON.stringify(again.document)).toContain(" edited");
+    // Saved as JSON and exported on its own (the documents that need no part of their package).
+    let alone = 0;
+    for (const stem of stems) {
+      const json = JSON.parse(
+        JSON.stringify((await importDocx(bytes(`${stem}.strict.docx`))).document),
+      );
+      const written = await exportDocx(json).catch((error: Error) => {
+        // Only a document that needs its package may fail here.
+        expect(error.message).toMatch(/refers to a part of its original package/);
+        return undefined;
+      });
+      if (!written) continue;
+      alone++;
+      const out = await readPackage(written);
+      expect(out.conformance).toBe("transitional");
+      for (const part of out.parts)
+        if (/xml$/.test(part.contentType) || part.name.endsWith(".rels"))
+          expect(new TextDecoder().decode(part.data), `${stem} ${part.name}`).not.toContain(
+            "purl.oclc.org/ooxml",
+          );
+    }
+    expect(alone).toBeGreaterThan(0);
+  });
+
+  it("copies a picture's bytes into a Strict package, an SVG with a DOCTYPE too", async () => {
     const pkg = await readPackage(bytes(`${stems[0]}.strict.docx`));
-    await expect(pkg.write()).rejects.toThrow(/Strict Open XML/);
+    const svg = new TextEncoder().encode(
+      '<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x"><svg xmlns="http://www.w3.org/2000/svg"/>',
+    );
+    const written = await readPackage(
+      await pkg.write(new Map(), [
+        { name: "/word/media/new.svg", contentType: "image/svg+xml", data: svg },
+      ]),
+    );
+    expect(written.part("/word/media/new.svg")?.data).toEqual(svg);
   });
 });
