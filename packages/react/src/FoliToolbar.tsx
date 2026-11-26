@@ -130,6 +130,7 @@ import {
   useEditorState,
   useIsomorphicLayoutEffect,
 } from "./editor.js";
+import { toolbarIcons } from "./icons.js";
 import { loadLocalFonts, localFontFamilies, subscribeLocalFonts } from "./localFonts.js";
 import {
   MessagesContext,
@@ -287,9 +288,11 @@ interface ToolbarItemBase {
   /**
    * `"large"`: as Word's large buttons, the group's height, its `icon` (if any) over its text,
    * which is then the accessible name (`.foli-toolbar-large`). Buttons, menus, color menus and
-   * dialog buttons; a box or an app's control stays as it is.
+   * dialog buttons; a box or an app's control stays as it is. `"medium"`: as Word's small buttons
+   * with a label, its `icon` beside its text, which names it (`.foli-toolbar-medium`). Both are
+   * drawn small (the icon alone, else the text) when the row is too narrow.
    */
-  readonly size?: "large" | undefined;
+  readonly size?: "large" | "medium" | undefined;
   /** Its KeyTip, a letter or digit (default: one from its label that its tab has free). */
   readonly keyTip?: string | undefined;
   /**
@@ -1762,6 +1765,37 @@ export const selectionInTable = (state: EditorState): boolean => inTable(state);
  */
 export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
   const t = toolbarItems;
+  // Word's ribbon draws icons: alone for formatting, Undo and Redo; beside the text for the
+  // rest; over it for the large ones. Boxes keep theirs.
+  const iconOnly = new Set([
+    ...["undo", "redo", "bold", "italic", "underline", "strike", "textColor", "highlight"],
+    ...["align-start", "align-center", "align-end", "align-justify"],
+    ...["bulletList", "orderedList", "outdent", "indent"],
+  ]);
+  const drawn = new Map<ToolbarItem, ToolbarItem>();
+  const withIcon = (item: ToolbarItem): ToolbarItem => {
+    const icon = toolbarIcons[item.key];
+    if (!icon || item.select || item.render) return item;
+    let copy = drawn.get(item);
+    if (!copy) {
+      const size = item.size ?? (iconOnly.has(item.key) ? undefined : "medium");
+      copy = { ...item, icon, size } as ToolbarItem;
+      drawn.set(item, copy);
+    }
+    return copy;
+  };
+  const drawIcons = (tab: ToolbarTab): ToolbarTab => ({
+    ...tab,
+    items: tab.items.map((group) =>
+      "label" in group
+        ? {
+            ...group,
+            items: group.items.map(withIcon),
+            launcher: group.launcher && withIcon(group.launcher),
+          }
+        : group.map(withIcon),
+    ),
+  });
   const group = (label: string, ...items: ToolbarItem[]): ToolbarGroup => ({ label, items });
   // Word's large buttons: copies, so the default toolbar's items stay as they are.
   const large = (item: ToolbarItem): ToolbarItem => ({ ...item, size: "large" });
@@ -1878,7 +1912,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       visible: pictureSelected,
       items: [group("Picture", t.picture), group("Arrange", t.rotateLeft, t.rotateRight)],
     },
-  ];
+  ].map(drawIcons);
 })();
 
 interface LinkDialogState {
@@ -2183,7 +2217,7 @@ export function FoliToolbar({
   // have one, from the end of the row.
   const [small, setSmall] = useState(0);
   const largeGroups = useMemo(
-    () => groups.flatMap((group, g) => (group.items.some((i) => i.size === "large") ? [g] : [])),
+    () => groups.flatMap((group, g) => (group.items.some((i) => i.size !== undefined) ? [g] : [])),
     [groups],
   );
   const smallGroups = new Set(largeGroups.slice(largeGroups.length - small));
@@ -3178,7 +3212,9 @@ export function FoliToolbar({
                 const i = index++;
                 const state = states[i];
                 const launcher = item === group.launcher;
-                const large = item.size === "large" && !smallGroups.has(g);
+                const drawn = smallGroups.has(g) ? undefined : item.size;
+                const large = drawn === "large";
+                const medium = drawn === "medium" && item.icon !== undefined;
                 // Inserting a picture needs the app's upload; editing a selected one does not.
                 // A menu without entries (or colors) cannot open, whatever its `enabled` says.
                 const off =
@@ -3291,11 +3327,11 @@ export function FoliToolbar({
                       buttons.current[i] = element;
                     }}
                     type="button"
-                    className={`foli-toolbar-button foli-toolbar-${item.key}${launcher ? " foli-toolbar-launcher" : large ? " foli-toolbar-large" : ""}`}
+                    className={`foli-toolbar-button foli-toolbar-${item.key}${launcher ? " foli-toolbar-launcher" : large ? " foli-toolbar-large" : medium ? " foli-toolbar-medium" : ""}`}
                     // Speech input users say what they see: "H1", "Undo"; symbols get a name.
                     // A large button shows its text, which names it.
                     aria-label={
-                      launcher || (item.icon !== undefined && !large)
+                      launcher || (item.icon !== undefined && !large && !medium)
                         ? trLabel(item.label)
                         : undefined
                     }
@@ -3330,6 +3366,15 @@ export function FoliToolbar({
                           </span>
                         )}
                         <span className="foli-toolbar-large-text">
+                          {trLabel(item.text ?? item.label)}
+                        </span>
+                      </>
+                    ) : medium ? (
+                      <>
+                        <span className="foli-toolbar-medium-icon" aria-hidden="true">
+                          {typeof item.icon === "string" ? trLabel(item.icon) : item.icon}
+                        </span>
+                        <span className="foli-toolbar-medium-text">
                           {trLabel(item.text ?? item.label)}
                         </span>
                       </>

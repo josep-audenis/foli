@@ -688,6 +688,24 @@
   font-size: 20px;
   line-height: 1;
 }
+.foli-toolbar-large-icon > .foli-toolbar-icon {
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.5;
+}
+/* A medium button (`size: "medium"`): its icon beside its text. */
+.foli-toolbar-medium {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+/* The built-in icons (`toolbarIcons`): centred in a button, 16 px. */
+.foli-toolbar-icon {
+  display: block;
+  flex: none;
+  margin-inline: auto;
+}
 
 /* The ribbon's head: the tabs. The button that collapses or pins it comes after the panel (last
    for Tab) and is drawn at the end of the tabs' row. */

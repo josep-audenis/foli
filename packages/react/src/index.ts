@@ -49,4 +49,5 @@ export {
   toolbarItems,
   wordRibbonTabs,
 } from "./FoliToolbar.js";
+export { toolbarIcons } from "./icons.js";
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";
