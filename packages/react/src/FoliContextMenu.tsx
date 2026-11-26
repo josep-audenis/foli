@@ -15,7 +15,7 @@ import {
   splitCell,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
-import { type KeyboardEvent, useEffect, useRef } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 /** One entry of the right-click menu. */
 export interface ContextMenuItem {
@@ -164,7 +164,15 @@ export interface FoliContextMenuProps {
   onClose: () => void;
   /** Gives the document the focus back (before the clipboard entries run, and on Escape). */
   onFocusDocument?: (() => void) | undefined;
+  /** Nothing changes the document: only Copy is offered. */
+  readOnly?: boolean | undefined;
+  /** Only comments change: Copy and New comment are offered. */
+  commentOnly?: boolean | undefined;
 }
+
+/** What a read-only and a comment-only document offer. */
+const READ_ONLY = new Set(["copy"]);
+const COMMENT_ONLY = new Set(["copy", "newComment"]);
 
 /**
  * Word's right-click menu for the document: a WAI-ARIA menu at the pointer (`.foli-menu`, as the
@@ -178,11 +186,17 @@ export function FoliContextMenu({
   messages,
   onClose,
   onFocusDocument,
+  readOnly = false,
+  commentOnly = false,
 }: FoliContextMenuProps) {
   const t = (label: string) => messages?.[label] ?? label;
   const all = typeof items === "function" ? items(defaultContextMenuItems) : items;
   const state = editor.state;
-  const shown = useRef(all.filter((item) => item.enabled?.(state) ?? true)).current;
+  const allowed = readOnly ? READ_ONLY : commentOnly ? COMMENT_ONLY : null;
+  // Once, when it opens: the dry runs read the document.
+  const [shown] = useState(() =>
+    all.filter((item) => (!allowed || allowed.has(item.key)) && (item.enabled?.(state) ?? true)),
+  );
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const menu = useRef<HTMLDivElement>(null);
   useEffect(() => {

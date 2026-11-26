@@ -93,12 +93,31 @@ describe("FoliContextMenu", () => {
     vi.useFakeTimers();
     const { container } = render(<FoliEditor initialContent={doc} contextMenu toolbar={false} />);
     const content = container.querySelector(".foli-content") as HTMLElement;
-    expect(fireEvent.contextMenu(content, { shiftKey: true })).toBe(true);
+    expect(
+      fireEvent.contextMenu(content, { shiftKey: true, button: 2, clientX: 5, clientY: 5 }),
+    ).toBe(true);
     act(() => vi.runAllTimers());
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(fireEvent.contextMenu(content, { clientX: 5, clientY: 5 })).toBe(false);
+    expect(fireEvent.contextMenu(content, { clientX: 5, clientY: 5, button: 2 })).toBe(false);
+    act(() => vi.runAllTimers());
+    expect(screen.getByRole("menu", { name: "Document menu" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    // Shift+F10: Shift, no button, no point: ours, at the caret.
+    expect(fireEvent.contextMenu(content, { shiftKey: true })).toBe(false);
     act(() => vi.runAllTimers());
     expect(screen.getByRole("menu", { name: "Document menu" })).toBeTruthy();
     vi.useRealTimers();
+  });
+
+  it("offers only Copy in a read-only document, and New comment in a comment-only one", () => {
+    const editor = createEditor({ document: doc });
+    editor.select(1, 4);
+    const { unmount } = render(
+      <FoliContextMenu editor={editor} at={{ x: 0, y: 0 }} onClose={() => {}} readOnly />,
+    );
+    expect(names()).toEqual(["Copy"]);
+    unmount();
+    render(<FoliContextMenu editor={editor} at={{ x: 0, y: 0 }} onClose={() => {}} commentOnly />);
+    expect(names()).toEqual(["Copy", "New comment"]);
   });
 });

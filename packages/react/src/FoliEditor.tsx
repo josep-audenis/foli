@@ -14,6 +14,7 @@ import { documentJSON, wordContext } from "@folijs/core/internal";
 import { forwardRef, type ReactNode, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   FoliEditorProvider,
+  useActiveEditor,
   useEditorState,
   useFoliEditor,
   useIsomorphicLayoutEffect,
@@ -232,6 +233,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   const zoomed = canvas.zoom === undefined && statusBar !== false;
   const zoom = zoomed ? ownZoom : (canvas.zoom ?? 1);
   const onZoomChange = zoomed ? setOwnZoom : canvas.onZoomChange;
+  // The open header's, footer's or note's editor, else the body's: what the menu acts on.
+  const activeEditor = useActiveEditor(editor);
   // Where the right-click menu is open, if it is.
   const [menuAt, setMenuAt] = useState<{ x: number; y: number } | null>(null);
   // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
@@ -259,17 +262,25 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         className="foli-editor-body"
         onContextMenu={(event) => {
           const target = event.target as Element;
-          if (!contextMenu || event.shiftKey || !target.closest?.(".foli-content")) return;
+          // Shift+right-click keeps the browser's menu; Shift+F10 (a key, no button) opens ours.
+          const pointer = event.button === 2 && (event.clientX !== 0 || event.clientY !== 0);
+          if (!contextMenu || (event.shiftKey && pointer) || !target.closest?.(".foli-content"))
+            return;
           event.preventDefault();
           // From the keyboard (the menu key, Shift+F10): at the caret.
           let { clientX: x, clientY: y } = event;
           if (!x && !y) {
             const selection = target.ownerDocument.getSelection();
-            const box = selection?.rangeCount
-              ? selection.getRangeAt(0).getBoundingClientRect()
-              : null;
-            x = box?.left ?? 0;
-            y = box ? box.bottom : 0;
+            const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+            // A caret's box is often empty (an empty paragraph): its first rect, else the
+            // focused element's box.
+            const rect = range?.getBoundingClientRect?.();
+            const box =
+              rect && (rect.width || rect.height)
+                ? rect
+                : (range?.getClientRects?.()[0] ?? target.getBoundingClientRect());
+            x = box.left;
+            y = box.bottom;
           }
           // After the selection a quick press made has reached the editor (`selectionchange`).
           setTimeout(() => setMenuAt({ x, y }));
@@ -299,7 +310,9 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       {menuAt && (
         <FoliContextMenu
           {...(contextMenu === true || contextMenu === false ? {} : contextMenu)}
-          editor={editor}
+          editor={activeEditor}
+          readOnly={readOnly}
+          commentOnly={commentOnly}
           at={menuAt}
           onClose={() => setMenuAt(null)}
           onFocusDocument={() => canvasRef.current?.focus()}

@@ -136,13 +136,17 @@ export interface FoliContextMenuProps {
     onClose: () => void;
     /** Gives the document the focus back (before the clipboard entries run, and on Escape). */
     onFocusDocument?: (() => void) | undefined;
+    /** Nothing changes the document: only Copy is offered. */
+    readOnly?: boolean | undefined;
+    /** Only comments change: Copy and New comment are offered. */
+    commentOnly?: boolean | undefined;
 }
 /**
  * Word's right-click menu for the document: a WAI-ARIA menu at the pointer (`.foli-menu`, as the
  * toolbar's), the arrow keys, Home and End to move, Enter to pick, Escape to close. Entries that
  * do not apply now are left out, Word's way.
  */
-export declare function FoliContextMenu({ editor, at, items, messages, onClose, onFocusDocument, }: FoliContextMenuProps): import("react").JSX.Element | null;
+export declare function FoliContextMenu({ editor, at, items, messages, onClose, onFocusDocument, readOnly, commentOnly, }: FoliContextMenuProps): import("react").JSX.Element | null;
 
 // FoliEditor.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FoliDocument, type Plugin, type ReviewView, type Transaction } from "@folijs/core";
