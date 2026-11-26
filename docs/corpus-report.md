@@ -37,8 +37,8 @@ distinct files, the same checks; compared file by file with the last run of Phas
 | Crash on import or export, hung |        0 |              0 |
 
 **The 93 files read now:** the 71 Strict Open XML files (LibreOffice, docx4j, the Open XML SDK)
-and the 22 whose `word/document.xml` root is `mc:AlternateContent` (docx4j's `mc-root/*`,
-`repeated/rt-5*`). 89 export with no difference counted and read back the same. The other four:
+and the 22 whose `word/document.xml` root is `mc:AlternateContent` (docx4j's `mc-root/*`
+and three in `repeated/`: `rt-50`, `rt-51`, `sm-52`). 89 export with no difference counted and read back the same. The other four:
 
 | Class                                       | Files | Examples                                      | Cause                                                                                  |
 | ------------------------------------------- | ----: | --------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -48,7 +48,7 @@ and the 22 whose `word/document.xml` root is `mc:AlternateContent` (docx4j's `mc
 Word's own reading of the roots, against docx4j's `-word365` twins (Word's resaves): 27 of the 31
 files with such a root in some part import with the twin's text; in `or-50`, `rq-32` and `rq-33`
 the body is the twin's, but Word also moves a dropped `w:hdr`'s paragraphs into its footnote
-separator (not imitated); `rq-31` Word cannot open. Word opened the nine's Strict exports, edited
+separator (not imitated); `rq-31` Word cannot open. Word opened the Strict exports of the nine synthetic documents (`corpus/word/strict/`), edited
 and not, without a repair (28.3).
 
 **Still refused (93):** 38 docx4j tests whose root Word only recovers from (`w:madeUp` 15,
