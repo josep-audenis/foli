@@ -4177,8 +4177,9 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   and WebKit for 29.2–29.10, axe, screenshots of Home light and dark. Built: the try page with `FoliEditor`'s
   status bar, right-click menu, mini toolbar and `wordKeymap()`; light by default (the site's
   dark theme follows the switch: Light, Dark or System, kept in the browser); pages one under the
-  other on the grey desk; the editor in a `<main>` (axe found none); the footer without a stale
-  version. `apps/site/e2e/try.spec.ts` (light by default, the switch, axe in both themes, the
+  other on the grey desk; the editor in a `<main>` (axe found none); the footer without the stale
+  version (changed from the plan: none shown, rather than read from the package); the theme set
+  before the first paint by an inline script, storage blocked or not. `apps/site/e2e/try.spec.ts` (light by default, the switch, axe in both themes, the
   status bar) in three engines; the playground has the parts but not `wordKeymap()` (its specs
   drive Shift+F3 as find's), and no screenshots were added (axe and the e2e cover the themes).
   The gallery's tiles keep the page's colors in dark.

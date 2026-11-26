@@ -49,7 +49,12 @@ function drawLooks(
       id,
       name: capitalized(name),
       quick: !ext || /<w:qFormat\b/.test(ext),
-      priority: Number(ext?.match(/<w:uiPriority w:val="(\d+)"/)?.[1] ?? 99),
+      // A style Foli added (no `ext`): Word's heading priority, else last.
+      priority: ext
+        ? Number(ext.match(/<w:uiPriority\b[^>]*\bw:val=["'](\d+)/)?.[1] ?? 99)
+        : /^Heading\d$/.test(id)
+          ? 9
+          : 99,
       style: {
         fontFamily: run.font.ascii ?? run.font.hAnsi ?? undefined,
         // Half points; a gallery tile shows 9 to 16 pt.
@@ -63,9 +68,11 @@ function drawLooks(
     };
   });
   // Word's order: the default style, the Quick Styles by their priority, then the others.
-  const [first, ...rest] = drawn;
+  const isDefault = (look: { id: string }) =>
+    own.get(look.id)?.isDefault === true && own.get(look.id)?.type === "paragraph";
+  const rest = drawn.filter((look) => !isDefault(look));
   return [
-    ...(first ? [first] : []),
+    ...drawn.filter(isDefault),
     ...rest.filter((s) => s.quick).sort((a, b) => a.priority - b.priority),
     ...rest.filter((s) => !s.quick),
   ];

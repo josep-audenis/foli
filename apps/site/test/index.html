@@ -9,6 +9,16 @@
       content="The real Foli editor, running in your browser. Type, track changes, or open a .docx of your own. Files stay on your device."
     />
     <meta name="theme-color" content="#f3f3f1" />
+    <!-- The theme before the first paint: the reader's choice, else Word's light. -->
+    <script>
+      try {
+        const kept = localStorage.getItem("foli-try-theme");
+        if (kept === "system") document.documentElement.removeAttribute("data-theme");
+        else document.documentElement.dataset.theme = kept === "dark" ? "dark" : "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -31,17 +31,28 @@ const PLUGINS = [wordKeymap()];
 type Theme = "system" | "light" | "dark";
 const THEME_KEY = "foli-try-theme";
 
-/** Light (Word's look) unless the reader picked otherwise; kept in this browser. */
-function useTheme(): [Theme, (theme: Theme) => void] {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const kept = typeof localStorage === "undefined" ? null : localStorage.getItem(THEME_KEY);
+/** The reader's theme, kept in this browser (storage may be blocked: then Word's light). */
+function keptTheme(): Theme {
+  try {
+    const kept = localStorage.getItem(THEME_KEY);
     return kept === "system" || kept === "dark" ? kept : "light";
-  });
+  } catch {
+    return "light";
+  }
+}
+
+/** Light (Word's look) unless the reader picked otherwise; the page's head applied it first. */
+function useTheme(): [Theme, (theme: Theme) => void] {
+  const [theme, setTheme] = useState<Theme>(keptTheme);
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "system") root.removeAttribute("data-theme");
     else root.dataset.theme = theme;
-    localStorage.setItem(THEME_KEY, theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // Not kept: the choice lasts while the page is open.
+    }
   }, [theme]);
   return [theme, setTheme];
 }
