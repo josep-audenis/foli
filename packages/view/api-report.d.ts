@@ -921,8 +921,7 @@ export {};
  * screen, again after each change, scroll or resize.
  * shortcut: the body only; a header, footer or note open on its page shows none.
  */
-/** The glyph for each character a mark is drawn for. */
-export declare const MARK_TEXT: Readonly<Record<string, string>>;
+export {};
 
 // word/matches.d.ts
 export {};
