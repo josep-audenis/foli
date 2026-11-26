@@ -4027,7 +4027,7 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   character or none: `"A"`, `"H"`, `"•"`, `"№"`, `"⇤"`, `"⇥"` (`FoliToolbar.tsx:1146–1238`),
   marks as letters (`mark(key, label, icon)`, line 1003). 25.6 kept the built-ins large because
   they have text and no icon.
-- Core has `verticalAlign` (superscript, subscript; `wordformat.ts:239`), `setFontSize`,
+- Core has `verticalAlign` (superscript, subscript; `v3/resolve.ts:50`), `setFontSize`,
   `setFontFamily`, `setWordTextColor`, `setWordHighlight`, `setParagraphStyle`: no command for
   either script, clearing formatting, changing case, growing or shrinking the font, or copying
   formatting.
@@ -4056,10 +4056,16 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   default, notes and text boxes on request.
 - Mini toolbar: Word shows it faded beside a selection made with the pointer, not the keyboard.
   Proposed: the same, opt-in (`miniToolbar`), its items an ordinary item list.
+- Keys Word uses that Foli already gives to something else (keyboard.md): Ctrl+Shift+8 is the
+  bulleted list (keyboard.md:69), Shift+F3 the previous result of navigation (keyboard.md:102),
+  Ctrl+Shift+V a paste as plain text (keyboard.md:134, `view.ts:4441`). Proposed: Word's keys
+  win only in a new opt-in `wordKeymap()` plugin, on in the try page (¶ marks on Ctrl+Shift+8, change case on Shift+F3, paste format
+  on Ctrl+Shift+V, the bulleted list and plain paste reachable from the ribbon and the context
+  menu); the default keymap keeps today's keys and gives the new commands none of these.
 
 ### Tasks
 
-- [ ] 29.1 The decisions above settled.
+- [ ] 29.1 The decisions above settled, the key clashes included (keyboard.md updated).
 - [ ] 29.2 Icons: every built-in item of `toolbarItems` gets an SVG icon; small buttons show the
   icon only (the label as tooltip and accessible name), large ones the icon over the text; the
   shrinking of 25.6 gets its icon-only step back. Ribbon screenshots updated.
