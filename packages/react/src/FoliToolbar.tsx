@@ -9,7 +9,9 @@ import {
   type Command,
   type ControlJSON,
   canOutdent,
+  changeCase,
   changeIndent,
+  clearFormatting,
   colorAt,
   columnAt,
   controlAt,
@@ -94,18 +96,25 @@ import {
   setTableStyle,
   setTextColor,
   setTrackChanges,
+  setUnderline,
   splitCell,
+  stepFontSize,
+  type TextCase,
   tableStyleAt,
   tableStyles,
   toggleFieldCodes,
   toggleHeaderRow,
   toggleList,
   toggleMark,
+  toggleVerticalAlign,
   trackState,
+  type UNDERLINE_STYLES,
   type UpdateFieldsOptions,
+  underlineAt,
   undo,
   undoDepth,
   updateFields,
+  verticalAlignAt,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
@@ -1483,6 +1492,19 @@ const isWord = (state: EditorState) => wordContext(state) !== null;
 const rowsOf = { enabled: inTable };
 const columnsOf = { enabled: canFormatTable };
 
+/** Word's underline styles, with Word's names. */
+const UNDERLINES: readonly (readonly [(typeof UNDERLINE_STYLES)[number], string])[] = [
+  ["single", "Single"],
+  ["words", "Words only"],
+  ["double", "Double"],
+  ["thick", "Thick"],
+  ["dotted", "Dotted"],
+  ["dash", "Dashed"],
+  ["dotDash", "Dot-dash"],
+  ["dotDotDash", "Dot-dot-dash"],
+  ["wave", "Wave"],
+];
+
 /**
  * Built-in items that are not in the default toolbar: menus' entries as buttons of their own,
  * for the ribbon (`wordRibbonTabs`) and an app's tabs.
@@ -1576,6 +1598,75 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
     command: rotate(QUARTER_TURN),
   },
+  // Word's Font group (29.3).
+  {
+    key: "superscript",
+    label: "Superscript",
+    pressed: (state) => verticalAlignAt(state) === "superscript",
+    enabled: hasTextblock,
+    command: toggleVerticalAlign("superscript"),
+  },
+  {
+    key: "subscript",
+    label: "Subscript",
+    pressed: (state) => verticalAlignAt(state) === "subscript",
+    enabled: hasTextblock,
+    command: toggleVerticalAlign("subscript"),
+  },
+  {
+    key: "growFont",
+    label: "Increase font size",
+    enabled: hasTextblock,
+    command: stepFontSize(1),
+  },
+  {
+    key: "shrinkFont",
+    label: "Decrease font size",
+    enabled: hasTextblock,
+    command: stepFontSize(-1),
+  },
+  {
+    key: "clearFormatting",
+    label: "Clear all formatting",
+    enabled: hasTextblock,
+    command: clearFormatting({ all: true }),
+  },
+  {
+    key: "changeCase",
+    label: "Change case",
+    enabled: isWord,
+    actions: (
+      [
+        ["sentence", "Sentence case."],
+        ["lower", "lowercase"],
+        ["upper", "UPPERCASE"],
+        ["title", "Capitalize Each Word"],
+        ["toggle", "tOGGLE cASE"],
+      ] as const
+    ).map(
+      ([kind, label]): ToolbarAction => ({
+        key: kind,
+        label,
+        command: changeCase(kind as TextCase),
+      }),
+    ),
+  },
+  {
+    key: "underlineStyle",
+    label: "Underline style",
+    enabled: isWord,
+    actions: [
+      ...UNDERLINES.map(
+        ([style, label]): ToolbarAction => ({
+          key: style,
+          label,
+          command: setUnderline(style),
+          checked: (state) => underlineAt(state) === style,
+        }),
+      ),
+      { key: "none", label: "No underline", command: setUnderline(null) },
+    ],
+  },
 ];
 
 /** The names of the built-in items in `toolbarItems`. */
@@ -1647,10 +1738,19 @@ export type ToolbarItemName =
   | "fieldCodes"
   | "navigationPane"
   | "rotateLeft"
-  | "rotateRight";
+  | "rotateRight"
+  | "superscript"
+  | "subscript"
+  | "growFont"
+  | "shrinkFont"
+  | "clearFormatting"
+  | "changeCase"
+  | "underlineStyle";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "changeCase"
+  | "underlineStyle"
   | "table"
   | "section"
   | "headerFooter"
@@ -1769,6 +1869,8 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
   // rest; over it for the large ones. Boxes keep theirs.
   const iconOnly = new Set([
     ...["undo", "redo", "bold", "italic", "underline", "strike", "textColor", "highlight"],
+    ...["superscript", "subscript", "growFont", "shrinkFont", "clearFormatting", "changeCase"],
+    "underlineStyle",
     ...["align-start", "align-center", "align-end", "align-justify"],
     ...["bulletList", "orderedList", "outdent", "indent"],
   ]);
@@ -1815,8 +1917,15 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
           t.size,
           t.bold,
           t.italic,
+          t.growFont,
+          t.shrinkFont,
+          t.changeCase,
+          t.clearFormatting,
           t.underline,
+          t.underlineStyle,
           t.strike,
+          t.subscript,
+          t.superscript,
           t.textColor,
           t.highlight,
         ),

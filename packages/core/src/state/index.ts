@@ -329,12 +329,15 @@ export {
 } from "./wordclip.js";
 export {
   canOutdent,
+  changeCase,
   changeIndent,
+  clearFormatting,
   fontFamilyAt,
   fontSizeAt,
   HIGHLIGHT_HEX,
   type ListKind,
   lineSpacingAt,
+  nextFontSize,
   paragraphStyleAt,
   paragraphStyles,
   setFontFamily,
@@ -342,4 +345,12 @@ export {
   setLineSpacing,
   setParagraphSpacing,
   setParagraphStyle,
+  setUnderline,
+  stepFontSize,
+  type TextCase,
+  toggleVerticalAlign,
+  UNDERLINE_STYLES,
+  underlineAt,
+  type VerticalAlign,
+  verticalAlignAt,
 } from "./wordformat.js";

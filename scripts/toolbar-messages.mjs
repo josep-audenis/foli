@@ -41,7 +41,9 @@ for (const match of code.slice(from, code.indexOf("};", from)).matchAll(new RegE
 
 // Shown text starts with a capital, a digit or a symbol (`1, 2, 3`, `*, †, ‡`), or is a list of
 // letters (`a, b, c`); keys and values (`"nextPage"`, `"#c00000"`) are not.
-const shown = (text) => /^[A-Z0-9*…]/.test(text) || /^[a-z], [a-z]/.test(text);
+// Word's Change Case entries show their own case.
+const CASES = new Set(["lowercase", "tOGGLE cASE"]);
+const shown = (text) => /^[A-Z0-9*…]/.test(text) || /^[a-z], [a-z]/.test(text) || CASES.has(text);
 // By code point: the same order on every machine.
 const list = [...found].filter(shown).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 

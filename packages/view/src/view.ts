@@ -5874,6 +5874,13 @@ const COMPOSITION_INPUT = new Set([
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 
+/** What a US keyboard types on these keys, without and with Shift. */
+const US_PUNCTUATION: Readonly<Record<string, readonly [string, string]>> = {
+  Equal: ["=", "+"],
+  Period: [".", ">"],
+  Comma: [",", "<"],
+};
+
 /**
  * Normalizes a key event to a keymap name: modifiers in the order `Mod-Ctrl-Meta-Alt-Shift-`,
  * then the key (single characters lower-cased). `Mod` is Cmd on Apple platforms, Ctrl elsewhere.
@@ -5900,6 +5907,10 @@ export function keyName(event: KeyboardEvent): string {
     /^(Key[A-Z]|Digit[0-9])$/.test(event.code)
   )
     key = event.code.slice(-1).toLowerCase();
+  // Word's keys on =, period and comma (superscript, subscript, grow and shrink the font): named
+  // by the key's place, as a US keyboard types it, whatever the layout types there.
+  else if (mod && !altGraph && event.code in US_PUNCTUATION)
+    key = (US_PUNCTUATION[event.code] as readonly [string, string])[event.shiftKey ? 1 : 0];
   let name = key;
   if (event.shiftKey && key !== "Shift") name = `Shift-${name}`;
   if (event.altKey) name = `Alt-${name}`;

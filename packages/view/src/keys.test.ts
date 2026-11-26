@@ -179,3 +179,17 @@ describe("keyName with Alt", () => {
     );
   });
 });
+
+describe("keyName for Word's punctuation keys", () => {
+  const key = (init: KeyboardEventInit) => keyName(new KeyboardEvent("keydown", init));
+
+  it("names =, period and comma by their place, as a US keyboard types them", () => {
+    expect(key({ key: "=", code: "Equal", ctrlKey: true })).toBe("Mod-=");
+    expect(key({ key: "+", code: "Equal", ctrlKey: true, shiftKey: true })).toBe("Mod-Shift-+");
+    expect(key({ key: ">", code: "Period", ctrlKey: true, shiftKey: true })).toBe("Mod-Shift->");
+    // A layout typing another character there (French: ";" on the comma's key).
+    expect(key({ key: ";", code: "Comma", ctrlKey: true, shiftKey: true })).toBe("Mod-Shift-<");
+    // Without Ctrl, the character typed.
+    expect(key({ key: ";", code: "Comma" })).toBe(";");
+  });
+});

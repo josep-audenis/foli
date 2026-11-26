@@ -741,6 +741,19 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   style.
 - Text: `setFontFamily(name | null)`, `fontFamilyAt(state)`, `setFontSize(points | null)`,
   `fontSizeAt(state)` (the size applies to complex scripts too, as Word's size box does).
+  Word's Font group (1.11): `toggleVerticalAlign("superscript" | "subscript")` and
+  `verticalAlignAt(state)`; `stepFontSize(1 | -1)` (Grow Font, Shrink Font: each run one of
+  Word's sizes up or down from its own, `nextFontSize(points, direction)`); `clearFormatting()`
+  (Ctrl+Space: direct character formatting off, links and the character style kept) and
+  `clearFormatting({ all: true })` (Clear All Formatting: the character style too and the
+  default paragraph style; the highlight and list numbering stay, as in Word); `changeCase(kind)`
+  (`"sentence"`, `"lower"`, `"upper"`, `"title"`, `"toggle"`, or `"cycle"`: lowercase →
+  Capitalize Each Word → UPPERCASE; the word at a caret; each paragraph on its own, each run
+  keeping its formatting; per selected cell in a cell selection; tracked as a deletion
+  and an insertion while tracking, deleted text left as it is); `setUnderline(style | null)` and
+  `underlineAt(state)` (`UNDERLINE_STYLES`). The ribbon has them in Home's Font group
+  (`toolbarItems.superscript`, `subscript`, `growFont`, `shrinkFont`, `clearFormatting`,
+  `changeCase`, `underlineStyle`; not in the default toolbar).
   `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
   highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
   null removes the highlight and a plain fill (patterned shading stays).
@@ -1235,7 +1248,8 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`); with Mod or Alt
   a letter or digit is named by its physical key when the character is not a–z or 0–9
   (`Alt-Shift-n` for Option+Shift+N on macOS), except a character AltGr types on Windows and Linux
-  (`Mod-Alt-[`).
+  (`Mod-Alt-[`). With Mod, the =, period and comma keys are named by their place, as a US
+  keyboard types them (`Mod-=`, `Mod-Shift-+`, `Mod-Shift->`, `Mod-Shift-<`), for Word's keys.
   Every built-in key: [keyboard.md](keyboard.md).
 - `measureImageFile(file, doc)`: an image file's natural size in CSS px from a local object URL
   (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is

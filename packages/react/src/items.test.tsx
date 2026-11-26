@@ -134,6 +134,13 @@ const NAMES = {
   navigationPane: 1,
   rotateLeft: 1,
   rotateRight: 1,
+  superscript: 1,
+  subscript: 1,
+  growFont: 1,
+  shrinkFont: 1,
+  clearFormatting: 1,
+  changeCase: 1,
+  underlineStyle: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */
