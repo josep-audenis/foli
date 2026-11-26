@@ -1,4 +1,4 @@
-import { type EditorDocument, type EditorState, trackedChanges } from "@folijs/core";
+import { type EditorDocument, wordKeymap } from "@folijs/core";
 import type { DocxPackage, PackageImages } from "@folijs/docx";
 import {
   FoliEditor,
@@ -25,35 +25,36 @@ interface Opened {
   trackChanges: boolean;
 }
 
-/** Which tracked change the selection is on (1-based, 0 for none), of how many. */
-function changesAt(state: EditorState) {
-  const changes = trackedChanges(state.doc);
-  const { from, to } = state.selection;
-  const at = changes.findIndex((c) => c.from <= from && to <= Math.max(c.to, c.from));
-  return { change: at + 1, changes: changes.length };
+/** Word's keys for what Foli's default keymap gives to something else (Shift+F3, Ctrl+Shift+8…). */
+const PLUGINS = [wordKeymap()];
+
+type Theme = "system" | "light" | "dark";
+const THEME_KEY = "foli-try-theme";
+
+/** The reader's theme, kept in this browser (storage may be blocked: then Word's light). */
+function keptTheme(): Theme {
+  try {
+    const kept = localStorage.getItem(THEME_KEY);
+    return kept === "system" || kept === "dark" ? kept : "light";
+  } catch {
+    return "light";
+  }
 }
 
-/** Word's status bar: page count and word count, read from the rendered pages; the changes. */
-function useStatus(
-  host: React.RefObject<HTMLDivElement | null>,
-  editorRef: React.RefObject<FoliEditorHandle | null>,
-) {
-  const [status, setStatus] = useState({ pages: 0, words: 0, change: 0, changes: 0 });
-  const update = useCallback(() => {
-    // After the view has laid out the change; a timeout, not rAF, so a background tab updates too.
-    setTimeout(() => {
-      const el = host.current;
-      if (!el) return;
-      const text = el.querySelector(".foli-content")?.textContent ?? "";
-      const editor = editorRef.current?.editor;
-      setStatus({
-        pages: el.querySelectorAll(".foli-page").length,
-        words: text.split(/\s+/).filter(Boolean).length,
-        ...(editor ? changesAt(editor.state) : { change: 0, changes: 0 }),
-      });
-    });
-  }, [host, editorRef]);
-  return [status, update] as const;
+/** Light (Word's look) unless the reader picked otherwise; the page's head applied it first. */
+function useTheme(): [Theme, (theme: Theme) => void] {
+  const [theme, setTheme] = useState<Theme>(keptTheme);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "system") root.removeAttribute("data-theme");
+    else root.dataset.theme = theme;
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // Not kept: the choice lasts while the page is open.
+    }
+  }, [theme]);
+  return [theme, setTheme];
 }
 
 function Try() {
@@ -69,7 +70,7 @@ function Try() {
   const [saved, setSaved] = useState<{ same: number; total: number; changed: string[] } | null>(
     null,
   );
-  const [status, update] = useStatus(host, editorRef);
+  const [theme, setTheme] = useTheme();
 
   // An opened file shows only images it contains: one linked from the web stays a box, unfetched.
   const resource = useCallback<NonNullable<FoliEditorProps["resource"]>>(
@@ -115,20 +116,6 @@ function Try() {
   useEffect(() => {
     void openSample();
   }, [openSample]);
-
-  // Pages appear after the first layout; web fonts loading later re-flow them.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: each opened document is counted again.
-  useEffect(() => {
-    update();
-    const timer = setTimeout(update, 500);
-    document.fonts?.ready.then(update);
-    // The change count follows the selection too (Next change, a click), not only edits.
-    const unsubscribe = editorRef.current?.editor.subscribe(update);
-    return () => {
-      clearTimeout(timer);
-      unsubscribe?.();
-    };
-  }, [update, opened]);
 
   async function open(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -197,6 +184,14 @@ function Try() {
           </span>
         )}
         <span className="try-actions">
+          <label className="try-theme">
+            <span className="try-theme-label">Theme</span>
+            <select value={theme} onChange={(event) => setTheme(event.target.value as Theme)}>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System</option>
+            </select>
+          </label>
           <button type="button" className="try-link" onClick={openSample}>
             Reset
           </button>
@@ -244,42 +239,34 @@ function Try() {
           </span>
         </aside>
       )}
-      {opened ? (
-        <FoliEditor
-          key={opened.id}
-          ref={editorRef}
-          initialContent={opened.document}
-          trackChanges={opened.trackChanges}
-          author="You"
-          resource={resource}
-          onChange={update}
-          className="try-canvas"
-          toolbar={wordRibbonTabs}
-          toolbarProps={{ overflow: "menu" }}
-        />
-      ) : (
-        <div className="try-loading" role="status">
-          Opening a redlined services agreement…
-        </div>
-      )}
-      <footer className="try-status">
-        <span>
-          {status.pages} {status.pages === 1 ? "page" : "pages"}
-        </span>
-        <span>{status.words} words</span>
-        {status.changes > 0 && (
-          <span className="try-changes">
-            {status.change
-              ? `Change ${status.change} of ${status.changes}`
-              : `${status.changes} ${status.changes === 1 ? "change" : "changes"}`}
-          </span>
+      <main className="try-main">
+        {opened ? (
+          <FoliEditor
+            key={opened.id}
+            ref={editorRef}
+            initialContent={opened.document}
+            trackChanges={opened.trackChanges}
+            author="You"
+            resource={resource}
+            className="try-canvas"
+            toolbar={wordRibbonTabs}
+            toolbarProps={{ overflow: "menu" }}
+            plugins={PLUGINS}
+            statusBar
+            contextMenu
+            miniToolbar
+          />
+        ) : (
+          <div className="try-loading" role="status">
+            Opening a redlined services agreement…
+          </div>
         )}
+      </main>
+      <footer className="try-status">
         <span className="try-message" role="status">
           {message}
         </span>
-        <span className="try-private">
-          Built from main, ahead of npm 0.5.0 · Your files stay in this browser
-        </span>
+        <span className="try-private">Built from main · Your files stay in this browser</span>
       </footer>
     </div>
   );

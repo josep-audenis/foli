@@ -1153,11 +1153,12 @@
   color: var(--foli-text-color);
 }
 .foli-style-gallery-item:hover {
-  background: var(--foli-toolbar-hover);
+  border-color: var(--foli-border-color);
 }
+/* Tiles keep the page's colors (they show text as the page does); the style in use is framed. */
 .foli-style-gallery-item[aria-selected="true"] {
   border-color: var(--foli-focus-ring);
-  background: var(--foli-toolbar-pressed);
+  box-shadow: inset 0 0 0 1px var(--foli-focus-ring);
 }
 .foli-style-gallery-active {
   outline: 1px dashed var(--foli-focus-ring);

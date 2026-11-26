@@ -16,6 +16,8 @@ interface Look {
   name: string;
   /** Word's Quick Styles (`w:qFormat`), and the ones Foli adds: the gallery's first row. */
   quick: boolean;
+  /** Its place in Word's gallery (`w:uiPriority`; 99 without one). */
+  priority: number;
   style: CSSProperties;
 }
 
@@ -40,13 +42,19 @@ function drawLooks(
   context: NonNullable<ReturnType<typeof wordContext>>,
 ): Look[] {
   const own = new Map(context.envelope.styles.map((s) => [s.id, s]));
-  return paragraphStyles(state).map(({ id, name }) => {
+  const drawn = paragraphStyles(state).map(({ id, name }) => {
     const run = context.resolver.run(context.resolver.paragraph({ style: id }).run, []);
     const ext = own.get(id)?.ext;
     return {
       id,
       name: capitalized(name),
       quick: !ext || /<w:qFormat\b/.test(ext),
+      // A style Foli added (no `ext`): Word's heading priority, else last.
+      priority: ext
+        ? Number(ext.match(/<w:uiPriority\b[^>]*\bw:val=["'](\d+)/)?.[1] ?? 99)
+        : /^Heading\d$/.test(id)
+          ? 9
+          : 99,
       style: {
         fontFamily: run.font.ascii ?? run.font.hAnsi ?? undefined,
         // Half points; a gallery tile shows 9 to 16 pt.
@@ -59,6 +67,15 @@ function drawLooks(
       },
     };
   });
+  // Word's order: the default style, the Quick Styles by their priority, then the others.
+  const isDefault = (look: { id: string }) =>
+    own.get(look.id)?.isDefault === true && own.get(look.id)?.type === "paragraph";
+  const rest = drawn.filter((look) => !isDefault(look));
+  return [
+    ...drawn.filter(isDefault),
+    ...rest.filter((s) => s.quick).sort((a, b) => a.priority - b.priority),
+    ...rest.filter((s) => !s.quick),
+  ];
 }
 
 const sameLooks = (a: Look[], b: Look[]) =>
@@ -77,8 +94,8 @@ export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
   const all = useEditorState(looks, { editor, isEqual: sameLooks });
   const current = useEditorState(paragraphStyleAt, { editor });
   const [open, setOpen] = useState(false);
-  // The quick styles first, open or not (the row shows the first few).
-  const shown = [...all.filter((s) => s.quick), ...all.filter((s) => !s.quick)];
+  // In Word's order, open or not (the row shows the first few).
+  const shown = all;
   const list = useRef<HTMLDivElement | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string | null>(null);

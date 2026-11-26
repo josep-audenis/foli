@@ -201,6 +201,36 @@ describe("wordRibbonTabs", () => {
     expect(editor.getDocument().content.content?.[0]?.attrs?.style).toBe("Heading2");
   });
 
+  it("orders the gallery as Word: the default style, Quick Styles by priority, then the rest", () => {
+    const quick = (priority: number, quote = '"') =>
+      `<w:style><w:qFormat/><w:uiPriority w:val=${quote}${priority}${quote}/></w:style>`;
+    const editor = createEditor({
+      document: {
+        ...word,
+        styles: [
+          { id: "Plain", type: "paragraph", name: "Plain", ext: "<w:style/>" },
+          { id: "Late", type: "paragraph", name: "Late", ext: quick(30) },
+          { id: "Early", type: "paragraph", name: "Early", ext: quick(5, "'") },
+          { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+        ],
+      },
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    const names = within(screen.getByRole("listbox", { name: "Styles" }))
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    // Foli's Heading 1 to 3 (not in the document yet) come at Word's priority 9.
+    expect(names).toEqual([
+      "Normal",
+      "Early",
+      "Heading 1",
+      "Heading 2",
+      "Heading 3",
+      "Late",
+      "Plain",
+    ]);
+  });
+
   it("draws Home's Font and Paragraph groups in two rows; the gallery folds on a press away", () => {
     const editor = createEditor({ document: word });
     const { container } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);

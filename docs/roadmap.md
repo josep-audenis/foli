@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.9 merged (#309–#317); 29.10 in review: style gallery                                                                                                                                  |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.10 merged (#309–#318); 29.11 in review: try page                                                                                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4171,10 +4171,18 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   (a custom item: a listbox, Quick Styles first, looks kept by resolver), in Home's Styles group;
   Home's Font and Paragraph groups in two rows (`ToolbarGroup.wrapBefore`) so the gallery fits at
   1440 px. Word's built-in headings not yet in the document show in the default look.
-- [ ] 29.11 Try page and playground: light chrome as Word's by default (white ribbon, grey
+- [x] 29.11 Try page and playground: light chrome as Word's by default (white ribbon, grey
   canvas, pages with shadows), a light/dark/system switch, the status bar of 29.7, the context
   menu and mini toolbar on; the footer's version read from the package. e2e in Chromium, Firefox
-  and WebKit for 29.2–29.10, axe, screenshots of Home light and dark.
+  and WebKit for 29.2–29.10, axe, screenshots of Home light and dark. Built: the try page with `FoliEditor`'s
+  status bar, right-click menu, mini toolbar and `wordKeymap()`; light by default (the site's
+  dark theme follows the switch: Light, Dark or System, kept in the browser); pages one under the
+  other on the grey desk; the editor in a `<main>` (axe found none); the footer without the stale
+  version (changed from the plan: none shown, rather than read from the package); the theme set
+  before the first paint by an inline script, storage blocked or not. `apps/site/e2e/try.spec.ts` (light by default, the switch, axe in both themes, the
+  status bar) in three engines; the playground has the parts but not `wordKeymap()` (its specs
+  drive Shift+F3 as find's), and no screenshots were added (axe and the e2e cover the themes).
+  The gallery's tiles keep the page's colors in dark.
 - [ ] 29.12 Docs and release: api.md, keyboard.md, theming.md, styling.md, limitations.md,
   architecture.md, the React README; changesets; bench (zoom and ¶ marks must not slow typing
   past 1.10); published with the owner's approval.
