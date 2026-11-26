@@ -67,6 +67,7 @@ import {
   setLink,
   setPictureSize,
   splitBlock,
+  stopFormatPainter,
   storyOfSection,
   TextSelection,
   type Transaction,
@@ -4290,9 +4291,14 @@ export class EditorView {
    * formatting, once the browser's selection has reached the state (after this event).
    */
   private onPaint = (event: MouseEvent): void => {
-    if (event.button !== 0 || !formatPainterState(this.state).armed) return;
+    if (event.button !== 0 || !this.editable || !formatPainterState(this.state).armed) return;
     setTimeout(() => {
-      if (!this.destroyed && formatPainterState(this.state).armed) this.run(pasteFormat);
+      const armed = formatPainterState(this.state).armed;
+      if (this.destroyed || !armed) return;
+      this.syncSelection();
+      this.run(pasteFormat);
+      // Dropped (comment-only, a locked control): the painter is put away all the same.
+      if (armed === "once" && formatPainterState(this.state).armed) this.run(stopFormatPainter);
     });
   };
 

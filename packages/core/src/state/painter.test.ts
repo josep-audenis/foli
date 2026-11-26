@@ -84,6 +84,30 @@ describe("format painter", () => {
     ]);
   });
 
+  it("changes nothing where the formatting is already the copied one", () => {
+    const editor = editorOf([p({}, text("ab", [bold]), text(" cd", [bold]))]);
+    editor.select(1, 2);
+    editor.run(copyFormat("sticky"));
+    const before = editor.state.doc;
+    editor.select(4, 6);
+    editor.run(pasteFormat);
+    expect(editor.state.doc).toBe(before);
+  });
+
+  it("a click on no word puts a once-armed painter away; a click paints no paragraph", () => {
+    const editor = editorOf([p({ style: "Heading1" }, text("ab")), p({}, text("one 2"))]);
+    editor.select(2);
+    editor.run(copyFormat("once"));
+    editor.select(9);
+    expect(editor.run(pasteFormat)).toBe(true);
+    expect(formatPainterState(editor.state).armed).toBe(null);
+    editor.run(copyFormat("once"));
+    // A caret in a one-word paragraph: the word gets the run formatting, not the style.
+    editor.select(6);
+    editor.run(pasteFormat);
+    expect(blocks(editor)[1]?.attrs ?? {}).toEqual({});
+  });
+
   it("does nothing before something is copied", () => {
     const editor = editorOf([p({}, text("ab"))]);
     editor.select(1, 3);

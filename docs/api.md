@@ -764,7 +764,9 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `formatPainterState(state)` is `{ copied, armed }`. The ribbon's Home tab has
   `toolbarItems.formatPainter` (Clipboard group): a click arms it once, a second click puts it
   away, a double-click keeps it on. `wordKeymap()` gives it Ctrl+Shift+C and Ctrl+Shift+V
-  ([keyboard.md](keyboard.md)).
+  ([keyboard.md](keyboard.md)). A click paints the word under it (run formatting only) and
+  puts a once-armed painter away even on no word. Each story (a header, a note) has its own
+  painter: formatting copied in the body is not painted in a header.
   `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
   highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
   null removes the highlight and a plain fill (patterned shading stays).

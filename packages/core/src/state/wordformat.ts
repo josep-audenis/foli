@@ -1475,8 +1475,11 @@ export function copyFormat(armed: "once" | "sticky" | null = null): Command {
       if (first) marks = first;
     }
     const paragraph: Attrs = Object.fromEntries(
+      // Not `ext`, the source's own `w:pPr` (its section, revision ids, unknown children).
       PARAGRAPH_PROPERTY_KEYS.flatMap((k) =>
-        $from.parent.type.name === "paragraph" ? [[k, $from.parent.attrs[k] ?? null]] : [],
+        $from.parent.type.name === "paragraph" && k !== "ext"
+          ? [[k, $from.parent.attrs[k] ?? null]]
+          : [],
       ),
     );
     const format = { run: marks.filter((m) => RUN_MARKS.has(m.type.name)), paragraph };
@@ -1507,7 +1510,12 @@ export const pasteFormat: Command = (state, dispatch) => {
   const { selection } = state;
   const word = selection.empty ? wordAt(state) : null;
   const target = word ? TextSelection.create(state.doc, word.from, word.to) : selection;
-  if (target.empty) return false;
+  // A click on no word still puts a once-armed painter away, as in Word.
+  if (target.empty) {
+    if (value.armed !== "once") return false;
+    dispatch?.(state.tr.setMeta(painterKey, { ...value, armed: null }));
+    return true;
+  }
   const at = state.apply(state.tr.setSelection(target));
   const tr = state.tr;
   const types = RUN_PROPERTY_MARKS.flatMap((n) => state.schema.marks[n] ?? []);
@@ -1515,11 +1523,15 @@ export const pasteFormat: Command = (state, dispatch) => {
     for (const { node, pos } of runsIn(at, type)) {
       const from = Math.max(target.from, pos);
       const to = Math.min(target.to, pos + node.nodeSize);
-      if (type.isInSet(node.marks)) tr.removeMark(from, to, type);
+      const existing = type.isInSet(node.marks);
       const mark = format.run.find((m) => m.type === type);
+      // Unchanged runs stay untouched: no empty undo step, no tracked change of nothing.
+      if (mark ? existing?.eq(mark) : !existing) continue;
+      if (existing) tr.removeMark(from, to, type);
       if (mark) tr.addMark(from, to, mark);
     }
-  for (const { node, pos } of paragraphsIn(at)) {
+  // Paragraph properties only to a selection the user made (a click paints the word alone).
+  for (const { node, pos } of word ? [] : paragraphsIn(at)) {
     const whole = target.from <= pos + 1 && target.to >= pos + node.nodeSize - 1;
     if (!whole) continue;
     const attrs = { ...node.attrs, ...format.paragraph };
