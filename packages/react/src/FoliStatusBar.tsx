@@ -113,6 +113,7 @@ export function FoliStatusBar({
     onZoomChange?.(next / 100);
   };
   return (
+    // biome-ignore lint/a11y/useSemanticElements: a fieldset is for form controls, not a status bar.
     <div
       role="group"
       aria-label={t("Status bar")}
