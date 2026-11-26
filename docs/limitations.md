@@ -570,9 +570,11 @@ Details in the [package README](../packages/docx/README.md).
   (U+2011) in `w:t` comes back as `w:softHyphen` / `w:noBreakHyphen`.
 - Strict Open XML documents are read and written back Strict (Phase 28, ADR-0014: translated to
   Transitional names and values as they are read, and back as they are written). A Strict
-  document saved as JSON and exported without its package comes out Transitional. Refused: a
-  document a document whose root is inside markup compatibility (`mc:AlternateContent`,
-  60 files, all docx4j tests). Encrypted zip entries, ZIP64 and compression methods other than
+  document saved as JSON and exported without its package comes out Transitional. A part whose root is
+  `mc:AlternateContent` is read as Word reads it (Phase 28.4: the branch it understands, the
+  documents in it joined); Word's own recovery from other roots (`w:madeUp`, a bare `w:p` and
+  the like, 38 docx4j tests) is not imitated: refused, the message naming the root. One docx4j
+  test Word cannot open (`rq-31`, a text box's content as the branch) is read, its text kept. Encrypted zip entries, ZIP64 and compression methods other than
   stored and deflate are refused too. A package whose zip entries name one part twice
   (`word/document.xml` and `word/%64ocument.xml`) is refused; a name that is no valid part name
   (a leading `/`, a backslash, a `..` segment) is kept as a part of its own, as Word's own reading

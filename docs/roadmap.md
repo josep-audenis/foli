@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —                         | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1–28.2 merged (#299, #303); 28.3 in review: Strict written back                                                                                                                            |
+| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1–28.3 merged (#299, #303, #304); 28.4 in review: `mc:AlternateContent` roots                                                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3951,7 +3951,7 @@ agent's review.
   comparison finds one file (`Strict01`) with a picture's duplicate ids renumbered, as Foli does
   for Transitional files too. Word (16.0) opened the nine's exports, unedited and with a word
   added to every paragraph, without a repair: pages, comments and revisions as the originals'.)
-- [ ] 28.4 `mc:AlternateContent` roots: the branch Word takes chosen at the root of
+- [x] 28.4 `mc:AlternateContent` roots: the branch Word takes chosen at the root of
   `word/document.xml` (the 22 of the 60) and of the other parts (`c79-10`…`c79-18`), by the
   namespaces Foli reads (a root cannot stay opaque as inline alternate content does: its
   content is the part); no branch taken (`rw-24-mc-root-nothing-selected`,
@@ -3961,6 +3961,17 @@ agent's review.
   reduced fixtures written by hand (no docx4j file committed); each of the 21 with a twin
   imports with its twin's text, and `rq-31-branch-txbxcontent` (no twin) with the text of the
   branch Word's rules take, checked in Word through `word-reference.ps1`.
+  (Done: `alternate.ts`, applied in `DocxPackage.text()` (after Strict's translation), the
+  dropped branches reported. Word's rules, from the twins: a branch's `w:document`s joined (the
+  last section kept, the first one's background), a bare body or bare blocks read, an unknown
+  wrapper's blocks read, another part's root in a document's branch dropped. An unchanged part is
+  exported as it was (its `mc:AlternateContent` root); a rewritten one with its own root.
+  Fixtures in `alternate.test.ts`. Over docx4j's files with such a root, 31: 27 import with
+  their twin's text (the 18 documents and `c79-10`…`c79-18`), all export without a crash (the
+  footnote and endnote ones included); in `or-50`, `rq-32` and `rq-33` the body is the twin's,
+  but Word also moves a dropped `w:hdr`'s paragraphs into its footnote separator, which Foli
+  does not imitate; `rq-31` Word cannot open ("Word experienced an error"), Foli reads its
+  text box's words. The unknown roots: refused, naming the root.)
 - [ ] 28.5 The corpus run again: the whole set; `docs/corpus-report.md` updated (refusals and
   losses before and after, what the newly read files add to the other rows). New losses in the
   Strict files are fixed here if they are this phase's (names or values the map misses);

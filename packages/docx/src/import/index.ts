@@ -61,7 +61,9 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   const report = new Recorder();
   const main = pkg.xml(pkg.mainDocument);
   if (!isW(main.root, "document"))
-    throw new DocxError(`${pkg.mainDocument}: not a WordprocessingML document`);
+    throw new DocxError(
+      `${pkg.mainDocument}: not a WordprocessingML document (its root is <${main.root.name}>)`,
+    );
   const body = child(main.root, "body");
   if (!body) throw new DocxError(`${pkg.mainDocument}: no w:body`);
 
@@ -179,6 +181,8 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     // element over 16 MiB kept verbatim…). A DocxError like every other import failure.
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
   }
+  // A part read through its `mc:AlternateContent` root: what Word leaves out of it, Foli too.
+  for (const names of pkg.alternateRoots().values()) for (const name of names) report.dropped(name);
   return { document, package: pkg, report: report.report(), trackRevisions };
 }
 
