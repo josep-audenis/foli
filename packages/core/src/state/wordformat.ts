@@ -1179,7 +1179,7 @@ export function clearFormatting(options: { all?: boolean } = {}): Command {
       return true;
     }
     return attempt(state, dispatch, (tr) => {
-      for (const type of types)
+      for (const type of selection.empty ? [] : types)
         for (const { node, pos } of runsIn(state, type))
           if (type.isInSet(node.marks))
             tr.removeMark(
@@ -1189,9 +1189,16 @@ export function clearFormatting(options: { all?: boolean } = {}): Command {
             );
       if (options.all)
         // No style named is the default paragraph style.
-        for (const { node, pos } of paragraphsIn(state))
+        for (const { node, pos } of selection.empty
+          ? [{ node: selection.$from.parent, pos: selection.$from.before() }]
+          : paragraphsIn(state))
           if (node.attrs.style != null)
             tr.setNodeMarkup(pos, node.type, { ...node.attrs, style: null });
+      // After the steps, which clear stored marks.
+      if (selection.empty)
+        tr.setStoredMarks(
+          (state.storedMarks ?? marksAt(selection.$from)).filter((m) => !types.includes(m.type)),
+        );
     });
   };
 }
@@ -1200,43 +1207,58 @@ export function clearFormatting(options: { all?: boolean } = {}): Command {
 export type TextCase = "sentence" | "lower" | "upper" | "title" | "toggle" | "cycle";
 
 const LETTER = /\p{L}/u;
-const titled = (text: string) =>
-  text
-    .toLocaleLowerCase()
-    .replace(
-      /(^|[^\p{L}\p{N}'’])(\p{L})/gu,
-      (_, before: string, letter: string) => before + letter.toLocaleUpperCase(),
-    );
-const sentenced = (text: string, start: boolean) =>
-  text
-    .toLocaleLowerCase()
-    .replace(/(^|[.!?]\s+)(\p{L})/gu, (all: string, before: string, letter: string, at: number) =>
-      at === 0 && !start ? all : before + letter.toLocaleUpperCase(),
-    );
+/** What joins a word to the next letter (`don't`, `it’s`): not a word's start. */
+const IN_WORD = /[\p{L}\p{N}'’]/u;
 
-/** `text` in `kind` (`start`: whether it starts its paragraph, for sentence case). */
-function inCase(text: string, kind: Exclude<TextCase, "cycle">, start: boolean): string {
-  switch (kind) {
-    case "lower":
-      return text.toLocaleLowerCase();
-    case "upper":
-      return text.toLocaleUpperCase();
-    case "title":
-      return titled(text);
-    case "sentence":
-      return sentenced(text, start);
-    case "toggle":
-      return [...text]
-        .map((c) => (c === c.toLocaleUpperCase() ? c.toLocaleLowerCase() : c.toLocaleUpperCase()))
-        .join("");
+/** A run of text the case applies to: where it is, its text and its marks. */
+interface CaseRun {
+  from: number;
+  to: number;
+  text: string;
+  marks: readonly Mark[];
+}
+
+/**
+ * For each character of `text` (a paragraph's selected text, `￼` where something else is
+ * between runs), whether `kind` writes it upper case (title and sentence case look at what is
+ * before it; the others at the character alone). `start`: the paragraph's text before is blank.
+ */
+function upperAt(text: string, kind: Exclude<TextCase, "cycle">, start: boolean): boolean[] {
+  const chars = [...text];
+  if (kind === "upper") return chars.map(() => true);
+  if (kind === "lower") return chars.map(() => false);
+  if (kind === "toggle") return chars.map((c) => c === c.toLocaleLowerCase());
+  const out: boolean[] = [];
+  let capital = kind === "title" || start;
+  let stop = false;
+  for (const c of chars) {
+    if (kind === "title") {
+      out.push(LETTER.test(c) && capital);
+      capital = !IN_WORD.test(c);
+      continue;
+    }
+    if (LETTER.test(c)) {
+      out.push(capital);
+      capital = stop = false;
+    } else {
+      out.push(false);
+      if (/[.!?]/.test(c)) stop = true;
+      else if (/\s/.test(c)) capital ||= stop;
+      else stop = false;
+    }
   }
+  return out;
 }
 
 /** Shift+F3, as Word: lowercase → Capitalize Each Word → UPPERCASE → lowercase. */
-function nextCase(text: string): Exclude<TextCase, "cycle"> {
+function nextCase(paragraphs: readonly string[]): Exclude<TextCase, "cycle"> {
+  const text = paragraphs.join("\n");
   if (text === text.toLocaleLowerCase()) return "title";
-  if (text === titled(text) && text !== text.toLocaleUpperCase()) return "upper";
-  return "lower";
+  const titled = paragraphs.every((p) => {
+    const upper = upperAt(p, "title", true);
+    return [...p].every((c, i) => c === (upper[i] ? c.toLocaleUpperCase() : c.toLocaleLowerCase()));
+  });
+  return titled && text !== text.toLocaleUpperCase() ? "upper" : "lower";
 }
 
 /** The word around a caret (null between words). */
@@ -1252,47 +1274,75 @@ function wordAt(state: EditorState): { from: number; to: number } | null {
 
 /**
  * Word's Change Case: the selected text (or the word at the caret) in another case, its
- * formatting kept; tracked as a deletion and an insertion while tracking, as in Word. Text of
+ * formatting kept; tracked as a deletion and an insertion while tracking, as in Word. Each
+ * paragraph is cased on its own (sentence case starts one where the paragraph starts); text of
  * tracked deletions is left as it is.
  */
 export function changeCase(kind: TextCase): Command {
   return (state, dispatch) => {
     if (!wordContext(state)) return false;
-    const range = state.selection.empty ? wordAt(state) : state.selection;
-    if (!range) return false;
+    const { selection } = state;
+    const word = selection.empty ? wordAt(state) : null;
+    const ranges = word ? [word] : selection.empty ? [] : selection.ranges;
     const deletion = state.schema.marks.deletion;
-    const runs: { from: number; to: number; text: string; marks: readonly Mark[] }[] = [];
-    state.doc.nodesBetween(range.from, range.to, (node, pos) => {
-      if (!node.isText) return undefined;
-      if (deletion?.isInSet(node.marks)) return false;
-      const from = Math.max(range.from, pos);
-      const to = Math.min(range.to, pos + node.nodeSize);
-      const text = (node.text ?? "").slice(from - pos, to - pos);
-      runs.push({ from, to, text, marks: node.marks });
-      return false;
-    });
-    const all = runs.map((r) => r.text).join("");
-    if (!LETTER.test(all)) return false;
-    const $start = state.doc.resolve(range.from);
-    const start = /^\s*$/.test($start.parent.textBetween(0, $start.parentOffset));
-    const changed = inCase(all, kind === "cycle" ? nextCase(all) : kind, start);
-    if (changed === all) return false;
-    return attempt(state, dispatch, (tr) => {
-      // The new text cut by the old runs (a case can change the length: ß → SS, at a run's end).
-      let offset = 0;
-      for (const [i, run] of runs.entries()) {
-        const length = i === runs.length - 1 ? changed.length - offset : run.text.length;
-        const text = changed.slice(offset, offset + length);
-        offset += length;
-        if (text === run.text) continue;
-        const from = tr.mapping.map(run.from);
-        const to = tr.mapping.map(run.to);
-        tr.delete(from, to);
-        if (text) tr.insert(from, state.schema.text(text, run.marks));
+    // The runs of each paragraph, in order, and each paragraph's text (gaps as U+FFFC).
+    const paragraphs: { runs: CaseRun[]; text: string; start: boolean }[] = [];
+    let last = null as Node | null;
+    for (const range of ranges)
+      state.doc.nodesBetween(range.from, range.to, (node, pos, parent) => {
+        if (!node.isText) return !node.isInline;
+        if (deletion?.isInSet(node.marks)) return false;
+        const from = Math.max(range.from, pos);
+        const to = Math.min(range.to, pos + node.nodeSize);
+        const run = {
+          from,
+          to,
+          text: (node.text ?? "").slice(from - pos, to - pos),
+          marks: node.marks,
+        };
+        const paragraph = paragraphs.at(-1);
+        if (paragraph && parent === last) {
+          const before = paragraph.runs.at(-1) as CaseRun;
+          paragraph.text += (before.to === from ? "" : "￼") + run.text;
+          paragraph.runs.push(run);
+        } else {
+          const $from = state.doc.resolve(from);
+          const start = /^\s*$/.test($from.parent.textBetween(0, $from.parentOffset));
+          paragraphs.push({ runs: [run], text: run.text, start });
+        }
+        last = parent;
+        return false;
+      });
+    if (!paragraphs.some((p) => LETTER.test(p.text))) return false;
+    const target = kind === "cycle" ? nextCase(paragraphs.map((p) => p.text)) : kind;
+    // Each run's new text, character by character (a case can change a character's length: ß).
+    const changes: { run: CaseRun; text: string }[] = [];
+    for (const paragraph of paragraphs) {
+      const upper = upperAt(paragraph.text, target, paragraph.start);
+      let at = 0;
+      for (const [i, run] of paragraph.runs.entries()) {
+        if (i > 0 && paragraph.runs[i - 1]?.to !== run.from) at++;
+        const text = [...run.text]
+          .map((c) => (upper[at++] ? c.toLocaleUpperCase() : c.toLocaleLowerCase()))
+          .join("");
+        if (text !== run.text) changes.push({ run, text });
       }
-      if (!state.selection.empty)
+    }
+    if (!changes.length) return false;
+    return attempt(state, dispatch, (tr) => {
+      for (const { run, text } of changes) {
+        const from = tr.mapping.map(run.from);
+        tr.delete(from, tr.mapping.map(run.to));
+        tr.insert(from, state.schema.text(text, run.marks));
+      }
+      // A text selection keeps covering the text; others map as they do.
+      if (selection instanceof TextSelection && !selection.empty)
         tr.setSelection(
-          TextSelection.create(tr.doc, tr.mapping.map(range.from, -1), tr.mapping.map(range.to)),
+          TextSelection.create(
+            tr.doc,
+            tr.mapping.map(selection.from, -1),
+            tr.mapping.map(selection.to),
+          ),
         );
     });
   };
@@ -1324,11 +1374,13 @@ export function stepFontSize(direction: 1 | -1): Command {
   return setRunMark("fontSize", (existing, inherited, type) => {
     // From the run's own size (`inherited` is without its mark).
     const own = (existing?.attrs.value as number | null | undefined) ?? inherited.size;
+    const ownCs = (existing?.attrs.complexScript as number | null | undefined) ?? inherited.sizeCs;
     const half = nextFontSize(own / 2, direction) * 2;
-    if (inherited.size === half && inherited.sizeCs === half) return null;
+    const halfCs = nextFontSize(ownCs / 2, direction) * 2;
+    if (inherited.size === half && inherited.sizeCs === halfCs) return null;
     return type.create({
       value: inherited.size === half ? null : half,
-      complexScript: inherited.sizeCs === half ? null : half,
+      complexScript: inherited.sizeCs === halfCs ? null : halfCs,
     });
   });
 }

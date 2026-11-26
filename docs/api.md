@@ -748,7 +748,8 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `clearFormatting({ all: true })` (Clear All Formatting: the character style too and the
   default paragraph style; the highlight and list numbering stay, as in Word); `changeCase(kind)`
   (`"sentence"`, `"lower"`, `"upper"`, `"title"`, `"toggle"`, or `"cycle"`: lowercase →
-  Capitalize Each Word → UPPERCASE; the word at a caret; formatting kept, tracked as a deletion
+  Capitalize Each Word → UPPERCASE; the word at a caret; each paragraph on its own, each run
+  keeping its formatting; per selected cell in a cell selection; tracked as a deletion
   and an insertion while tracking, deleted text left as it is); `setUnderline(style | null)` and
   `underlineAt(state)` (`UNDERLINE_STYLES`). The ribbon has them in Home's Font group
   (`toolbarItems.superscript`, `subscript`, `growFont`, `shrinkFont`, `clearFormatting`,

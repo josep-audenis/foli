@@ -165,6 +165,32 @@ describe("changeCase", () => {
     expect((blocks(editor)[0]?.content ?? []).map((r) => r.text)).toEqual(["ab", "ab"]);
   });
 
+  it("cases each paragraph on its own", () => {
+    const editor = editorOf([p({}, text("foo")), p({}, text("bar"))]);
+    editor.select(1, 9);
+    editor.run(changeCase("title"));
+    expect(textOf(editor)).toBe(["Foo", "Bar"].join("\n"));
+    const sentences = editorOf([p({}, text("HELLO.")), p({}, text("WORLD"))]);
+    sentences.select(1, 15);
+    sentences.run(changeCase("sentence"));
+    expect(textOf(sentences)).toBe(["Hello.", "World"].join("\n"));
+  });
+
+  it("keeps each run's formatting when a case changes a run's length (ß)", () => {
+    const editor = editorOf([p({}, text("aß"), text("bc", [bold]))]);
+    editor.select(1, 5);
+    editor.run(changeCase("upper"));
+    expect(blocks(editor)[0]).toEqual(p({}, text("ASS"), text("BC", [bold])));
+  });
+
+  it("at a caret, Clear All clears what is typed next too", () => {
+    const editor = editorOf([p({ style: "Heading1" }, text("ab", [bold]))]);
+    editor.select(2);
+    expect(editor.run(clearFormatting({ all: true }))).toBe(true);
+    editor.commands.insertText("c");
+    expect(blocks(editor)[0]).toEqual(p({}, text("a", [bold]), text("c"), text("b", [bold])));
+  });
+
   it("keeps the text when a case changes its length (ß)", () => {
     const editor = editorOf([p({}, text("straße"))]);
     editor.select(1, 7);
@@ -192,13 +218,15 @@ describe("grow and shrink font", () => {
     const editor = editorOf([p({}, text("a"), text("b", [size(28)]))]);
     editor.select(1, 3);
     expect(editor.handleKey("Mod-Shift->")).toBe(true);
-    expect(blocks(editor)[0]).toEqual(p({}, text("a", [size(24)]), text("b", [size(32)])));
+    // Each script's size from its own: the document's complex-script size is Word's 10 pt.
+    const sizes = (value: number, complexScript: number): MarkJSON => ({
+      type: "fontSize",
+      attrs: { value, complexScript },
+    });
+    expect(blocks(editor)[0]).toEqual(p({}, text("a", [sizes(24, 22)]), text("b", [size(32)])));
     editor.handleKey("Mod-Shift-<");
     editor.handleKey("Mod-Shift-<");
-    // The document's complex-script size is Word's default 10 pt: "a" needs none of its own.
-    expect(blocks(editor)[0]).toEqual(
-      p({}, text("a", [{ type: "fontSize", attrs: { value: 20 } }]), text("b", [size(24)])),
-    );
+    expect(blocks(editor)[0]).toEqual(p({}, text("a", [sizes(20, 18)]), text("b", [size(24)])));
   });
 });
 
