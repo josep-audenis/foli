@@ -4,6 +4,7 @@
  * was not asked to replace copied from the original file byte for byte.
  */
 
+import { isStrictPackage, transitionalOf } from "./strict.js";
 import {
   type ParseXmlOptions,
   parseXml,
@@ -97,6 +98,11 @@ export class DocxPackage {
   readonly parts: readonly DocxPart[];
   /** The main document part: the target of the package's `officeDocument` relationship. */
   readonly mainDocument: string;
+  /**
+   * `strict` for Strict Open XML (ECMA-376 Part 1): its XML parts are read in Transitional names
+   * and values (`text`, `xml`, `relationships`; ADR-0014).
+   */
+  readonly conformance: "strict" | "transitional";
   readonly #entries: readonly ZipEntry[];
   readonly #options: ParseXmlOptions;
   /** `maxNodes`: for the whole package, every part read counting towards it. */
@@ -106,6 +112,8 @@ export class DocxPackage {
   readonly #byName = new Map<string, DocxPart>();
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
+  /** A Strict package's XML parts in Transitional, translated once. */
+  readonly #texts = new Map<string, string>();
   readonly #defaults: ReadonlyMap<string, string>;
   readonly #overridden: ReadonlySet<string>;
   readonly #contentTypesText: string;
@@ -120,7 +128,7 @@ export class DocxPackage {
     this.#nodes = this.#maxNodes;
     const index = entries.findIndex((e) => key(partName(e.name)) === key(CONTENT_TYPES));
     if (index === -1) throw new DocxError("Not a .docx: no [Content_Types].xml");
-    const typesXml = this.#parse(data[index] as Uint8Array, CONTENT_TYPES);
+    const typesXml = this.#parse(text(data[index] as Uint8Array, CONTENT_TYPES), CONTENT_TYPES);
     const types = contentTypes(typesXml.root);
     this.#defaults = types.defaults;
     this.#overridden = new Set(types.overrides.keys());
@@ -146,6 +154,11 @@ export class DocxPackage {
       this.#byName.set(key(name), part);
     });
     this.parts = parts;
+    const rootRelationships = this.part("/_rels/.rels");
+    this.conformance =
+      rootRelationships && isStrictPackage(text(rootRelationships.data, rootRelationships.name))
+        ? "strict"
+        : "transitional";
 
     const main = this.relationships("/").find((r) => OFFICE_DOCUMENT.test(r.type) && !r.external);
     const part = main?.partName ? this.part(main.partName) : undefined;
@@ -178,13 +191,24 @@ export class DocxPackage {
     if (!part) throw new DocxError(`No part ${name}`);
     // shortcut: the encoding and byte order mark are not reported; export (8.5) needs them to
     // re-encode a part it rewrites that was not BOM-less UTF-8 (Word writes only that).
-    return text(part.data, part.name);
+    if (this.conformance !== "strict" || !isXml(part)) return text(part.data, part.name);
+    let translated = this.#texts.get(key(part.name));
+    if (translated === undefined) {
+      // Parsed once within maxNodes, counted then; the translated text's parse is not counted again.
+      translated = transitionalOf(this.#parse(text(part.data, part.name), part.name));
+      this.#texts.set(key(part.name), translated);
+    }
+    return translated;
   }
 
-  #parse(data: Uint8Array, name: string): XmlDocument {
+  #parse(source: string, name: string, counted = true): XmlDocument {
     try {
-      const doc = xml(data, name, { ...this.#options, maxNodes: this.#nodes });
-      this.#nodes -= doc.nodes;
+      const doc = xml(
+        source,
+        name,
+        counted ? { ...this.#options, maxNodes: this.#nodes } : this.#options,
+      );
+      if (counted) this.#nodes -= doc.nodes;
       return doc;
     } catch (error) {
       if (!((error as Error).cause instanceof XmlLimitError)) throw error;
@@ -202,7 +226,8 @@ export class DocxPackage {
     if (!part) throw new DocxError(`No part ${name}`);
     let doc = this.#xml.get(key(part.name));
     if (!doc) {
-      doc = this.#parse(part.data, part.name);
+      const translated = this.conformance === "strict" && isXml(part);
+      doc = this.#parse(this.text(part.name), part.name, !translated);
       this.#xml.set(key(part.name), doc);
     }
     return doc;
@@ -221,6 +246,9 @@ export class DocxPackage {
     /** Parts left out of the file, their `Override`s with them; `main`: the main part's new type. */
     change: { drop?: readonly string[]; main?: string } = {},
   ): Promise<Uint8Array<ArrayBuffer>> {
+    // shortcut: until 28.3 writes Strict back, a Strict package is not written at all.
+    if (this.conformance === "strict")
+      throw new DocxError("Writing Strict Open XML documents is not supported yet");
     const dropped = new Set((change.drop ?? []).map(key));
     const pending = new Map<string, Uint8Array>();
     for (const [name, data] of replace) {
@@ -407,8 +435,12 @@ function text(data: Uint8Array, name: string): string {
   }
 }
 
-function xml(data: Uint8Array, name: string, options: ParseXmlOptions): XmlDocument {
-  const source = text(data, name);
+/** A part that holds XML: typed so, or a relationships part. */
+function isXml(part: DocxPart): boolean {
+  return /[+/]xml$/.test(part.contentType) || /.(rels|vml)$/i.test(part.name);
+}
+
+function xml(source: string, name: string, options: ParseXmlOptions): XmlDocument {
   try {
     return parseXmlCosting(source, options, cost);
   } catch (error) {

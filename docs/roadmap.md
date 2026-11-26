@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —                         | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1 in review (#299): Strict twins of the nine, ADR-0014                                                                                                                                     |
+| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1 merged (#299); 28.2 in review: Strict files read                                                                                                                                         |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3928,10 +3928,15 @@ agent's review.
   `start`/`end` for left and right. Decided: each Strict part's
   text translated to Transitional where it is read and back where it is written, so the model
   and kept XML are Transitional only.)
-- [ ] 28.2 Strict import: the refusal removed; parts, relationships and kept XML read through
+- [x] 28.2 Strict import: the refusal removed; parts, relationships and kept XML read through
   the map; Strict's value forms read by the property readers. Tested: each of the nine's Strict
   files imports to the same document as its Transitional twin; `pnpm corpus:run` over the 71,
   none refused for Strict.
+  (Done: `strict.ts` translates a part's text both ways; `DocxPackage.conformance`, and in a
+  Strict package `text()`, `xml()` and `relationships()` give Transitional. Each of the nine's
+  Strict files imports as its twin (save ids aside), and `toStrict` gives back every XML part of
+  them character for character. The 71: all imported, none refused; export refuses a Strict
+  original until 28.3, so the run counts 71 export failures for now.)
 - [ ] 28.3 Strict export: a document imported from a Strict package exported Strict (names,
   relationship types, `w:conformance`, value forms), edited or not; exported without its
   package, all Transitional. Tested: export without edits compared part by part with the

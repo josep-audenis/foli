@@ -4,11 +4,6 @@ import type { XmlElement, XmlNode } from "../xml.js";
 
 /** @internal */
 export const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-/**
- * Strict Open XML's WordprocessingML namespace (not supported yet: other units and names).
- * @internal
- */
-export const W_STRICT = "http://purl.oclc.org/ooxml/wordprocessingml/main";
 /** @internal */
 export const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 /** @internal */

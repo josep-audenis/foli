@@ -280,6 +280,11 @@ export declare class DocxPackage {
     readonly parts: readonly DocxPart[];
     /** The main document part: the target of the package's `officeDocument` relationship. */
     readonly mainDocument: string;
+    /**
+     * `strict` for Strict Open XML (ECMA-376 Part 1): its XML parts are read in Transitional names
+     * and values (`text`, `xml`, `relationships`; ADR-0014).
+     */
+    readonly conformance: "strict" | "transitional";
     /** The part named `name`, if any. Part names compare case-insensitively and percent-decoded. */
     part(name: string): DocxPart | undefined;
     /** The relationships whose source is the part `source` ("/" for the package itself). */
@@ -312,6 +317,16 @@ export interface NewPart {
 }
 
 // settings.d.ts
+export {};
+
+// strict.d.ts
+/**
+ * Strict Open XML (ECMA-376 Part 1) to Transitional (Part 4) and back, on a part's text
+ * (ADR-0014). Each direction parses the part and replaces only the spans the tables below name:
+ * namespace URIs, relationship types, `w:conformance`, values Strict writes otherwise (twips as
+ * points, percentages with `%`, `start`/`end`), and the names Strict changes. Every other
+ * character stays as it was, so kept XML sliced from the result is the original's text.
+ */
 export {};
 
 // xml.d.ts

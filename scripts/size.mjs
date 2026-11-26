@@ -148,13 +148,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React and FoliEditor raised in 25.2 (179.9 and 177.9 kB; 187.5 allowed): the Word ribbon
  * (`wordRibbonTabs`, 26 more built-in items), with room for Phase 25's large buttons, launchers,
  * collapse, shrinking groups and KeyTips.
+ * Docx raised in 28.2 (64.2 kB, 66.0 allowed): Strict Open XML (`strict.ts`, ADR-0014: its names
+ * and value forms, both ways), with room for 28.4's markup-compatibility roots.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 130_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 192_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 192_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 67_584 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
