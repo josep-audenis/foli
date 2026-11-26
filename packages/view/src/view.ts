@@ -831,6 +831,7 @@ export class EditorView {
     host.replaceChildren();
     this.review = trackState(this.state)?.view ?? "markup";
     this.fieldCodes = fieldCodesShown(this.state);
+    this.showMarks(formattingMarksShown(this.state));
     this.resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
@@ -1074,7 +1075,9 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
-    this.showMarks(formattingMarksShown(state));
+    const marks = formattingMarksShown(state);
+    const marksChanged = marks !== this.marksShown;
+    this.showMarks(marks);
     // The format painter armed: Word's brush cursor over the text (`.foli-format-painter`).
     this.host.classList.toggle("foli-format-painter", formatPainterState(state).armed !== null);
     // A resize is of the picture at its position when it started: the document changed, over.
@@ -1123,7 +1126,7 @@ export class EditorView {
     if (this.shownHint && redrawn) this.drawHint();
     if (lost) this.closeStory(true);
     // The open story has its own editor, which hears nothing of this.
-    if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
+    if (codesChanged || marksChanged) this.mount?.view.update(this.mount.view.editor.state);
     this.showSelectedNode();
     // Redrawn blocks may have held the DOM selection.
     this.writeSelection(redrawn);
@@ -1170,6 +1173,8 @@ export class EditorView {
     try {
       this.renderPages();
       if (this.drawn.length) this.dropDrawn(false);
+      // Formatting marks follow every render: a change, a relayout, fonts loaded, a resize.
+      this.onMarksMove();
     } catch (error) {
       // What it had changed is not input: read back, it would render and fail again, for ever.
       this.observer.takeRecords();
@@ -2297,29 +2302,29 @@ export class EditorView {
     this.peerMarks.draw(drawings);
   }
 
-  /** Formatting marks on or off: drawn after each change, scroll and resize while on. */
+  /**
+   * Formatting marks on or off. While on they are drawn after each render (a change, a relayout,
+   * fonts loaded, a resize) and each scroll or window resize, once per frame.
+   */
   private showMarks(on: boolean): void {
+    if (on === this.marksShown) return;
+    this.marksShown = on;
     const doc = this.host.ownerDocument;
     const win = doc.defaultView;
-    if (on !== this.marksShown) {
-      this.marksShown = on;
-      const listen = on ? "addEventListener" : "removeEventListener";
-      doc[listen]("scroll", this.onMarksMove, SCROLL_OPTIONS);
-      win?.[listen]("resize", this.onMarksMove);
-      if (!on) {
-        if (this.marksFrame) win?.cancelAnimationFrame(this.marksFrame);
-        this.marksFrame = 0;
-        this.formattingMarks.clear();
-        return;
-      }
-    }
-    // After this change's layout, which an earlier frame request runs first.
+    const listen = on ? "addEventListener" : "removeEventListener";
+    doc[listen]("scroll", this.onMarksMove, SCROLL_OPTIONS);
+    win?.[listen]("resize", this.onMarksMove);
     if (on) this.onMarksMove();
+    else {
+      if (this.marksFrame) win?.cancelAnimationFrame(this.marksFrame);
+      this.marksFrame = 0;
+      this.formattingMarks.clear();
+    }
   }
 
   private readonly onMarksMove = (): void => {
     const win = this.host.ownerDocument.defaultView;
-    if (this.marksFrame || !win) return;
+    if (!this.marksShown || this.marksFrame || !win) return;
     this.marksFrame = win.requestAnimationFrame(() => {
       this.marksFrame = 0;
       if (!this.destroyed && this.marksShown) this.drawMarks();
@@ -2330,24 +2335,28 @@ export class EditorView {
   private drawMarks(): void {
     const near = this.paged ? this.pagesNearView() : null;
     const glyphs: MarkGlyph[] = [];
-    const rectOf = (from: number, to: number, last = false) => {
-      const ranges = this.rangesOf(from, to);
-      const range = last ? ranges.at(-1) : ranges[0];
+    const win = this.host.ownerDocument.defaultView as Window;
+    const probe = this.host.ownerDocument.createRange();
+    const lineOf = (range: Range | undefined, last: boolean) => {
       const rects = range ? [...range.getClientRects()].filter((r) => r.height > 0) : [];
       return last ? rects.at(-1) : rects[0];
     };
-    try {
-      this.state.doc.descendants((node, pos) => {
-        if (!node.isTextblock) return true;
-        if (!this.blockNear(pos, near)) return false;
-        node.forEach((child, offset) => {
-          const at = pos + 1 + offset;
-          if (child.isText) {
-            const text = child.text ?? "";
-            for (let i = 0; i < text.length; i++) {
-              const mark = MARK_TEXT[text[i] as string];
-              const rect = mark && rectOf(at + i, at + i + 1);
-              if (mark && rect)
+    const paragraph = (node: ModelNode, pos: number) => {
+      node.forEach((child, offset) => {
+        const at = pos + 1 + offset;
+        if (child.isText) {
+          // One range per text leaf; the probe moves over its characters.
+          for (const range of this.rangesOf(at, at + child.nodeSize)) {
+            const text = range.startContainer;
+            if (text.nodeType !== Node.TEXT_NODE) continue;
+            const data = (text as Text).data;
+            for (let k = range.startOffset; k < range.endOffset; k++) {
+              const mark = MARK_TEXT[data[k] as string];
+              if (!mark) continue;
+              probe.setStart(text, k);
+              probe.setEnd(text, k + 1);
+              const rect = lineOf(probe, false);
+              if (rect)
                 glyphs.push({
                   text: mark,
                   x: rect.left + rect.width / 2,
@@ -2356,58 +2365,89 @@ export class EditorView {
                   align: "center",
                 });
             }
-            return;
           }
-          const name = child.type.name;
-          const mark =
-            name === "hardBreak"
-              ? "↵"
-              : name === "pageBreak"
-                ? "···· Page Break ····"
-                : name === "columnBreak"
-                  ? "···· Column Break ····"
-                  : null;
-          const rect = mark && (rectOf(at, at + 1) ?? rectOf(pos + 1, at, true));
-          if (mark && rect)
-            glyphs.push({
-              text: mark,
-              x: rect.width ? rect.left : rect.right,
-              top: rect.top,
-              height: rect.height,
-              align: "start",
-            });
-        });
-        // The paragraph mark after its last line (an empty paragraph: where its line starts).
-        const end = pos + node.nodeSize - 1;
-        const last = end > pos + 1 ? rectOf(pos + 1, end, true) : undefined;
-        if (last)
+          return;
+        }
+        const name = child.type.name;
+        const mark =
+          name === "hardBreak"
+            ? "↵"
+            : name === "pageBreak"
+              ? "···· Page Break ····"
+              : name === "columnBreak"
+                ? "···· Column Break ····"
+                : null;
+        if (!mark) return;
+        // The break's own box, else the end of the text before it on its line.
+        const own = lineOf(this.rangesOf(at, at + 1)[0], false);
+        const before = own ? undefined : lineOf(this.rangesOf(pos + 1, at).at(-1), true);
+        const rect = own ?? before;
+        if (rect)
           glyphs.push({
-            text: "¶",
-            x: last.right + 1,
-            top: last.top,
-            height: last.height,
+            text: mark,
+            x: own ? rect.left : rect.right,
+            top: rect.top,
+            height: rect.height,
             align: "start",
           });
-        else {
-          const dom = this.blocks[this.blockFrom(pos)]?.dom;
-          if (dom instanceof HTMLElement) {
-            const box = dom.getBoundingClientRect();
-            const style = getComputedStyle(dom);
-            const line = Number.parseFloat(style.fontSize) * 1.2 || 16;
-            const left =
-              box.left +
-              (Number.parseFloat(style.paddingLeft) || 0) +
-              (Number.parseFloat(style.textIndent) || 0);
-            const top = box.top + (Number.parseFloat(style.paddingTop) || 0);
-            glyphs.push({ text: "¶", x: left, top, height: line, align: "start" });
-          }
-        }
-        return false;
+      });
+      // The paragraph mark after its last line (an empty paragraph: where its line starts).
+      const end = pos + node.nodeSize - 1;
+      const last = end > pos + 1 ? lineOf(this.rangesOf(pos + 1, end).at(-1), true) : undefined;
+      if (last) {
+        glyphs.push({
+          text: "¶",
+          x: last.right + 1,
+          top: last.top,
+          height: last.height,
+          align: "start",
+        });
+        return;
+      }
+      const dom = this.blocks[this.blockFrom(pos)]?.dom;
+      if (!dom || dom.nodeType !== Node.ELEMENT_NODE) return;
+      const box = (dom as Element).getBoundingClientRect();
+      const style = win.getComputedStyle(dom as Element);
+      const px = (value: string) => Number.parseFloat(value) || 0;
+      glyphs.push({
+        text: "¶",
+        x: box.left + px(style.paddingLeft) + px(style.textIndent),
+        top: box.top + px(style.paddingTop),
+        height: px(style.fontSize) * 1.2 || 16,
+        align: "start",
+      });
+    };
+    try {
+      // Top-level blocks on far pages are skipped whole (their tables' cells too).
+      this.state.doc.forEach((block, offset) => {
+        if (!this.blockNear(offset, near)) return;
+        if (block.isTextblock) paragraph(block, offset);
+        else
+          block.descendants((node, pos) => {
+            if (!node.isTextblock) return true;
+            paragraph(node, offset + 1 + pos);
+            return false;
+          });
       });
     } catch (error) {
       if (!(error instanceof RangeError)) throw error;
     }
-    this.formattingMarks.draw(glyphs, this.host.getBoundingClientRect());
+    this.formattingMarks.draw(glyphs, this.visibleBox());
+  }
+
+  /** Where the editor shows on the screen: its box within every clipping ancestor's. */
+  private visibleBox(): { left: number; top: number; right: number; bottom: number } {
+    const win = this.host.ownerDocument.defaultView as Window;
+    let { left, top, right, bottom } = this.host.getBoundingClientRect();
+    for (let el = this.host.parentElement; el; el = el.parentElement) {
+      if (win.getComputedStyle(el).overflow === "visible") continue;
+      const box = el.getBoundingClientRect();
+      left = Math.max(left, box.left);
+      top = Math.max(top, box.top);
+      right = Math.min(right, box.right);
+      bottom = Math.min(bottom, box.bottom);
+    }
+    return { left, top, right, bottom };
   }
 
   /** Whether the block at `pos` is on a page in `near` (always, unpaged). */

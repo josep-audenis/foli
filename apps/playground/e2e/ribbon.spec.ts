@@ -245,7 +245,7 @@ test("shows formatting marks over the text, the document's text unchanged", asyn
   await expect(layer).toHaveAttribute("aria-hidden", "true");
   await expect.poll(() => layer.evaluate((l) => l.textContent?.includes("¶") ?? false)).toBe(true);
   expect(await layer.evaluate((l) => (l.textContent?.match(/·/g) ?? []).length)).toBeGreaterThan(5);
-  // Typing draws them again; the document's text is as it was.
+  // The document's text is as it was.
   expect(await editor(page).innerText()).toBe(before);
   await button.click();
   await expect(layer).toHaveCount(0);

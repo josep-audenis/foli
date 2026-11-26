@@ -2,8 +2,8 @@
  * Word's Show/Hide ¶ (29.5): paragraph marks, spaces, tabs and breaks drawn over the text, in a
  * layer of their own outside the document (`aria-hidden`, no pointer events), so copying,
  * finding, exporting and screen readers meet the text as it is. Drawn for the pages near the
- * screen, again after each change, scroll or resize.
- * shortcut: the body only; a header, footer or note open on its page shows none.
+ * screen, again after each render, scroll or resize. A header, footer or note open on its page
+ * draws its own, its view being one of its own.
  */
 
 /** @internal One mark, where it goes on the screen (viewport coordinates). */
@@ -25,7 +25,10 @@ export class FormattingMarks {
   constructor(private readonly doc: Document) {}
 
   /** Draws `glyphs`, shown only where `clip` (the editor's box on the screen) is. */
-  draw(glyphs: readonly MarkGlyph[], clip: DOMRect): void {
+  draw(
+    glyphs: readonly MarkGlyph[],
+    clip: { left: number; top: number; right: number; bottom: number },
+  ): void {
     const layer = this.layer ?? this.create();
     const win = this.doc.defaultView;
     const width = win?.innerWidth ?? 0;
