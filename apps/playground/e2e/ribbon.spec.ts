@@ -189,3 +189,47 @@ test("KeyTips: Alt, a tab's letter, an item's letter", async ({ page }) => {
   // The letters went to the ribbon, not into the document.
   expect(await editor(page).innerText()).toBe(text);
 });
+
+test("paints the formatting copied with Format painter onto a pointer selection", async ({
+  page,
+}) => {
+  await open(page);
+  /** Where a word of the sample is on the screen. */
+  const box = (word: string) =>
+    page.evaluate((word) => {
+      const walker = document.createTreeWalker(
+        document.querySelector("section.foli-page") as Node,
+        NodeFilter.SHOW_TEXT,
+      );
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.textContent?.indexOf(word) ?? -1;
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + word.length);
+        const { left, right, top, height } = range.getBoundingClientRect();
+        return { left, right, y: top + height / 2 };
+      }
+      throw new Error(`no ${word}`);
+    }, word);
+  const bold = await box("Bold");
+  await page.mouse.dblclick((bold.left + bold.right) / 2, bold.y);
+  const painter = page.getByRole("button", { name: "Format painter" });
+  await painter.click();
+  await expect(painter).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".foli-format-painter")).toHaveCount(1);
+  const target = await box("Open");
+  await page.mouse.move(target.left + 1, target.y);
+  await page.mouse.down();
+  await page.mouse.move(target.right - 1, target.y, { steps: 4 });
+  await page.mouse.up();
+  await expect(painter).toHaveAttribute("aria-pressed", "false");
+  const weight = await page.evaluate(() => {
+    const span = [...document.querySelectorAll("section.foli-page span")].find((s) =>
+      s.textContent?.startsWith("Open"),
+    );
+    return span && getComputedStyle(span).fontWeight;
+  });
+  expect(weight).toBe("700");
+  await editor(page).press("Control+z");
+});

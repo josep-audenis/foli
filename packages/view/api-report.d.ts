@@ -741,6 +741,11 @@ export declare class EditorView {
      * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
      * selection to the start of the next block, so typing over it would merge the two blocks.
      */
+    /**
+     * A selection made with the pointer while the format painter is armed gets the copied
+     * formatting, once the browser's selection has reached the state (after this event).
+     */
+    private onPaint;
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only

@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.2 merged (#309, #310); 29.3 in review: Font group commands                                                                                                                            |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.3 merged (#309–#311); 29.4 in review: format painter                                                                                                                                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4117,9 +4117,14 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   Word has its eraser; underline styles as a menu beside Underline (the toolbar has no split
   button). Shift+F3 comes with `wordKeymap()` in 29.4. Checked in Chromium: Ctrl+= applies
   subscript without zooming the browser.
-- [ ] 29.4 Format painter: a click copies the formatting at the caret (run and paragraph), the
+- [x] 29.4 Format painter: a click copies the formatting at the caret (run and paragraph), the
   next selection gets it; a double-click keeps it until Escape; Ctrl+Shift+C / Ctrl+Shift+V.
-  One undo step per paste.
+  One undo step per paste. Built: `copyFormat`, `pasteFormat`, `stopFormatPainter` and
+  `formatPainterState` in core, a built-in plugin's state; the view pastes on a pointer
+  selection's mouseup and shows a copy cursor; the ribbon's Clipboard group; `wordKeymap()` with
+  Ctrl+Shift+C/V, Shift+F3 (change case) and Ctrl+Shift+L (bullets). Paragraph properties go to
+  paragraphs the selection covers whole (Word's rule is the paragraph mark selected). e2e in
+  Chromium, Firefox and WebKit.
 - [ ] 29.5 Show ¶ marks (Ctrl+Shift+8): paragraph marks, spaces as dots, tabs as arrows, line
   and page breaks, drawn by the view, not part of the text (copy, find, export and the
   accessibility tree unchanged). A View option and a Home item.

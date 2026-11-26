@@ -26,6 +26,7 @@ import {
   type FoundMatches,
   fieldCodesShown,
   fieldsIn,
+  formatPainterState,
   goToCellVertically,
   insertControlText,
   insertHardBreak,
@@ -50,6 +51,7 @@ import {
   parseContentV2,
   parseFieldInstruction,
   pasteCells,
+  pasteFormat,
   presence,
   type ResourceJSON,
   type ReviewView,
@@ -277,7 +279,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -847,6 +849,7 @@ export class EditorView {
     this.listen("compositionend", this.onCompositionEnd);
     this.listen("blur", this.onBlur);
     this.listen("mousedown", this.onPress);
+    this.listen("mouseup", this.onPaint);
     this.listen("pointerdown", this.onPointerDown);
     this.listen("mousemove", this.onMouseMove);
     this.listen("mouseleave", () => this.controlChrome.hover(null));
@@ -1062,6 +1065,8 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
+    // The format painter armed: Word's brush cursor over the text (`.foli-format-painter`).
+    this.host.classList.toggle("foli-format-painter", formatPainterState(state).armed !== null);
     // A resize is of the picture at its position when it started: the document changed, over.
     if (state.doc !== this.state.doc) this.onResizeCancel();
     const review = trackState(state)?.view ?? "markup";
@@ -4280,6 +4285,17 @@ export class EditorView {
    * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
    * selection to the start of the next block, so typing over it would merge the two blocks.
    */
+  /**
+   * A selection made with the pointer while the format painter is armed gets the copied
+   * formatting, once the browser's selection has reached the state (after this event).
+   */
+  private onPaint = (event: MouseEvent): void => {
+    if (event.button !== 0 || !formatPainterState(this.state).armed) return;
+    setTimeout(() => {
+      if (!this.destroyed && formatPainterState(this.state).armed) this.run(pasteFormat);
+    });
+  };
+
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that

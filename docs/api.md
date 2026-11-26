@@ -754,6 +754,17 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `underlineAt(state)` (`UNDERLINE_STYLES`). The ribbon has them in Home's Font group
   (`toolbarItems.superscript`, `subscript`, `growFont`, `shrinkFont`, `clearFormatting`,
   `changeCase`, `underlineStyle`; not in the default toolbar).
+- Format painter (1.11, built in): `copyFormat(armed?)` copies the run formatting where the
+  selection starts and its paragraph's properties; `armed` `"once"` gives them to the next
+  selection made with the pointer (the view runs `pasteFormat` on mouseup and draws
+  `.foli-format-painter`, a copy cursor, meanwhile), `"sticky"` to each one until
+  `stopFormatPainter` (Escape). `pasteFormat` replaces the selection's (or the caret's word's)
+  run formatting with the copied one, links and review marks kept, and gives paragraphs the
+  selection covers whole the paragraph properties: one undo step, tracked while tracking.
+  `formatPainterState(state)` is `{ copied, armed }`. The ribbon's Home tab has
+  `toolbarItems.formatPainter` (Clipboard group): a click arms it once, a second click puts it
+  away, a double-click keeps it on. `wordKeymap()` gives it Ctrl+Shift+C and Ctrl+Shift+V
+  ([keyboard.md](keyboard.md)).
   `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
   highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
   null removes the highlight and a plain fill (patterned shading stays).
