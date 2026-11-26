@@ -268,7 +268,24 @@ export interface EditorViewOptions {
   paged?: boolean;
   /** What a note's own mark shows, for the view of a note being edited. */
   noteMark?: () => string;
+  /**
+   * How large the pages are drawn (1 is 100%, from 0.1 to 5, Word's 10% to 500%): CSS `zoom` on
+   * the view's element; the layout is not flowed again. Default 1.
+   */
+  zoom?: number;
+  /**
+   * Ctrl+wheel (Cmd+wheel on macOS) over the document asks for another zoom, 10% a notch: the
+   * app sets it (`zoom`). Without it (or `null`) the wheel stays the browser's.
+   */
+  onZoom?: ((zoom: number) => void) | null;
 }
+
+/** Word's zoom range. */
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
+/** A zoom in Word's range, to the percent. */
+const zoomIn = (zoom: number) =>
+  Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(zoom * 100) / 100)) || 1;
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 /** On the span of a selected picture (it holds the resize handle). */
@@ -316,12 +333,12 @@ function viewPrintStyles(settings: DocumentSettings, sheets: readonly Sheet[], i
     width: `${width}mm`,
     height: `${height}mm`,
   });
-  return printStyles(
+  return `${printStyles(
     `[${VIEW_ATTR}="${id}"]>.foli-page`,
     mm(settings.pageSize),
     sheets.map(({ settings: { pageSize }, index }) => ({ ...mm(pageSize), index })),
     id,
-  );
+  )}@media print{[${VIEW_ATTR}="${id}"]{zoom:1!important}}`;
 }
 
 /** Whether `node` is inside an element of `stop` that is not displayed (hidden deleted text). */
@@ -745,6 +762,12 @@ export class EditorView {
   private readonly formattingMarks: FormattingMarks;
   private marksShown = false;
   private marksFrame = 0;
+  /** The pages' zoom (29.6), and who asks for another on Ctrl+wheel. */
+  private zoom = 1;
+  private onZoom: ((zoom: number) => void) | null = null;
+  /** The zoom Ctrl+wheel asked for and the app has not set yet, and the wheel's leftover. */
+  private zoomAsked: number | null = null;
+  private wheelDelta = 0;
   private readonly hintMarks: HintMarks;
   /** The hint shown, as positions of the body (18.1). */
   private shownHint: {
@@ -859,6 +882,7 @@ export class EditorView {
     this.listen("blur", this.onBlur);
     this.listen("mousedown", this.onPress);
     this.listen("mouseup", this.onPaint);
+    this.listen("wheel", this.onWheel);
     this.listen("pointerdown", this.onPointerDown);
     this.listen("mousemove", this.onMouseMove);
     this.listen("mouseleave", () => this.controlChrome.hover(null));
@@ -964,6 +988,8 @@ export class EditorView {
     this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
+    // The zoom is the view's: a view made on the element later starts at 100%.
+    this.host.style.removeProperty("zoom");
     this.unsubscribe();
     this.peerMarks.clear();
     if (this.peersShown) this.showPeers(false);
@@ -1026,6 +1052,15 @@ export class EditorView {
       this.showSelectedPicture();
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+    if (options.onZoom !== undefined) this.onZoom = options.onZoom;
+    if (options.zoom !== undefined) this.zoomAsked = null;
+    if (options.zoom !== undefined && zoomIn(options.zoom) !== this.zoom) {
+      this.zoom = zoomIn(options.zoom);
+      host.style.zoom = this.zoom === 1 ? "" : String(this.zoom);
+      // What is drawn from screen positions follows.
+      this.onMarksMove();
+      if (this.peersShown) this.onPeerScroll();
+    }
     if (options.upload !== undefined) this.upload = options.upload ?? undefined;
     this.mount?.view.setOptions({
       ...(options.upload !== undefined ? { upload: options.upload } : {}),
@@ -2436,9 +2471,11 @@ export class EditorView {
   }
 
   /** Where the editor shows on the screen: its box within every clipping ancestor's. */
-  private visibleBox(): { left: number; top: number; right: number; bottom: number } {
+  private visibleBox(own = true): { left: number; top: number; right: number; bottom: number } {
     const win = this.host.ownerDocument.defaultView as Window;
-    let { left, top, right, bottom } = this.host.getBoundingClientRect();
+    let { left, top, right, bottom } = own
+      ? this.host.getBoundingClientRect()
+      : { left: 0, top: 0, right: win.innerWidth, bottom: win.innerHeight };
     for (let el = this.host.parentElement; el; el = el.parentElement) {
       if (win.getComputedStyle(el).overflow === "visible") continue;
       const box = el.getBoundingClientRect();
@@ -2447,7 +2484,13 @@ export class EditorView {
       right = Math.min(right, box.right);
       bottom = Math.min(bottom, box.bottom);
     }
-    return { left, top, right, bottom };
+    // And the window's.
+    return {
+      left: Math.max(0, left),
+      top: Math.max(0, top),
+      right: Math.min(win.innerWidth, right),
+      bottom: Math.min(win.innerHeight, bottom),
+    };
   }
 
   /** Whether the block at `pos` is on a page in `near` (always, unpaged). */
@@ -4463,6 +4506,43 @@ export class EditorView {
       if (armed === "once" && formatPainterState(this.state).armed) this.run(stopFormatPainter);
     });
   };
+
+  /** Ctrl+wheel asks the app for the next zoom, 10% a notch (29.6). */
+  private onWheel = (event: WheelEvent): void => {
+    // Ctrl+wheel; on macOS Cmd+wheel too, and a trackpad pinch (which comes as Ctrl+wheel).
+    if (!this.onZoom || !(event.ctrlKey || (IS_MAC && event.metaKey)) || !event.deltaY) return;
+    event.preventDefault();
+    // A notch of a mouse wheel is about 100 px; a pinch comes as many small deltas: 10% a
+    // hundred px, from what was asked last (several events come before the app sets it).
+    // shortcut: page-mode deltas (deltaMode 2) are read as px, and an app that ignores the zoom
+    // asked lets the next ask run ahead of what shows; handle them if a device or app needs it.
+    const px = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
+    this.wheelDelta += px;
+    const notches = Math.trunc(this.wheelDelta / 100);
+    if (!notches) return;
+    this.wheelDelta -= notches * 100;
+    const from = this.zoomAsked ?? this.zoom;
+    this.zoomAsked = zoomIn(from - notches * 0.1);
+    this.onZoom(this.zoomAsked);
+  };
+
+  /**
+   * The zoom that fits the first page's width (`"width"`), or the whole page (`"page"`), in
+   * the part of the screen the view's element has (its width, and its visible height), with a
+   * little room around the page.
+   */
+  fitZoom(kind: "width" | "page"): number {
+    const page = this.pages[0];
+    if (!page) return this.zoom;
+    const shown = page.getBoundingClientRect();
+    const host = this.host.getBoundingClientRect();
+    // The height from where the editor starts to the bottom of what can show it (its clipping
+    // ancestors and the window), not its own bottom, which moves with the zoom.
+    const box = this.visibleBox(false);
+    const across = ((host.width - 32) / shown.width) * this.zoom;
+    const down = ((box.bottom - Math.max(host.top, box.top) - 32) / shown.height) * this.zoom;
+    return zoomIn(kind === "width" ? across : Math.min(across, down));
+  }
 
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();

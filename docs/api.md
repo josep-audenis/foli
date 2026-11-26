@@ -61,6 +61,8 @@ migrated (`parseDocument`), and what it reports is v5.
 | `label`           | `string`                                                                                                 | `"Document"`  | Accessible name of the editable area.                                                                                                                                |
 | `upload`          | `(file) => Promise<…>`                                                                                   | —             | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too.                                                                  |
 | `resource`        | `(key, resource) => string \| null \| undefined`                                                         | —             | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box.                                                                  |
+| `zoom`            | `number`                                                                                                 | `1`           | How large the pages are drawn (1.11): 0.1 to 5, Word's 10% to 500%; CSS `zoom`, the layout is not flowed again.                                                      |
+| `onZoomChange`    | `(zoom) => void`                                                                                         | —             | Ctrl+wheel (Cmd+wheel) over the document asks for the next zoom, 10% a notch; without it the wheel is the browser's.                                                 |
 | `className`       | `string`                                                                                                 | —             | Added to the `.foli-canvas` element.                                                                                                                                 |
 | `children`        | `ReactNode`                                                                                              | —             | Rendered between the toolbar and the pages, inside the editor's context.                                                                                             |
 
@@ -82,10 +84,12 @@ a document of any version too).
 
 The pages alone, for your own layout. Props: `editor` (default: the nearest
 `FoliEditorProvider`'s), `readOnly`, `placeholder`, `label`, `className`, `upload`, `resource`,
-as above (`upload` and `resource` are the view's options, in place from its first render; give
+`zoom`, `onZoomChange`, as above (`upload` and `resource` are the view's options, in place from its first render; give
 `resource` a stable function: a new one draws every picture again).
-`ref` → `FoliCanvasHandle`: `{ focus(): void }` (focuses the document, shows the editor's
-selection and scrolls it into view).
+`ref` → `FoliCanvasHandle`: `{ focus(): void, fitZoom(kind): number }` (`focus` focuses the
+document, shows the editor's selection and scrolls it into view; `fitZoom("width" | "page")` is
+the zoom that fits a page's width, or the whole page, in the part of the screen the canvas has).
+`FoliEditorHandle` has both.
 
 ### `<FoliComments>`
 
@@ -1181,7 +1185,13 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   uses; paste fits Foli JSON, HTML and text to the document (`fitPaste`, `fitPastedV2`: its own
   styles by name, others added, lists of another document as lists of their own, comments
   copied, bookmarks whose names it has left out).
-- `view.setOptions({ editable?, placeholder?, resource?, upload? })`: changes the given options.
+- `view.setOptions({ editable?, placeholder?, resource?, upload?, zoom?, onZoom? })`: changes the
+  given options. `zoom` (1.11; 0.1 to 5, default 1) draws the pages larger or smaller with CSS
+  `zoom` on the view's element (positions, the selection, pointer gestures, comments and
+  formatting marks follow; nothing is flowed again; printed at 100%; gone with `destroy`);
+  `onZoom(zoom)` is called on Ctrl+wheel (on macOS Cmd+wheel and a trackpad pinch too) over the
+  document with the next zoom, 10% for each hundred px the wheel moves: the app sets it. `view.fitZoom(
+  "width" | "page")` gives the zoom that fits.
   `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
   the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;
   without it image files are not pasted or dropped. `view.insertFiles(files)` inserts image files

@@ -179,6 +179,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     () => ({
       editor,
       focus: () => canvasRef.current?.focus(),
+      fitZoom: (kind) => canvasRef.current?.fitZoom(kind) ?? 1,
       hint: (target, options) => hint(editor, target, options),
     }),
     [editor],
