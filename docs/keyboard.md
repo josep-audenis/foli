@@ -96,12 +96,12 @@ and the like), as it takes the browser's undo, redo and bold, italic, underline 
 Word's meaning; pass it in `createEditor`'s `plugins`. Its keys run before the view's and the
 core keymaps.
 
-| Windows and Linux | macOS        | Name          | Command                                                                          |
-| ----------------- | ------------ | ------------- | -------------------------------------------------------------------------------- |
-| Shift+F3          | Shift+Fn+F3  | `Shift-F3`    | `changeCase("cycle")` (instead of find's previous result)                        |
-| Ctrl+Shift+L      | Cmd+Shift+L  | `Mod-Shift-l` | `toggleList("bulletList")` (Word's List Bullet)                                  |
-| Ctrl+Shift+C      | Cmd+Shift+C  | `Mod-Shift-c` | `copyFormat()`: copies the formatting at the selection                           |
-| Ctrl+Shift+V      | Cmd+Shift+V  | `Mod-Shift-v` | `pasteFormat` while formatting is copied; else passes on (the plain-text paste)  |
+| Windows and Linux | macOS       | Name          | Command                                                                         |
+| ----------------- | ----------- | ------------- | ------------------------------------------------------------------------------- |
+| Shift+F3          | Shift+Fn+F3 | `Shift-F3`    | `changeCase("cycle")` (instead of find's previous result)                       |
+| Ctrl+Shift+L      | Cmd+Shift+L | `Mod-Shift-l` | `toggleList("bulletList")` (Word's List Bullet)                                 |
+| Ctrl+Shift+C      | Cmd+Shift+C | `Mod-Shift-c` | `copyFormat()`: copies the formatting at the selection                          |
+| Ctrl+Shift+V      | Cmd+Shift+V | `Mod-Shift-v` | `pasteFormat` while formatting is copied; else passes on (the plain-text paste) |
 
 The format painter (built in, every editor) also takes Escape while it is on
 (`stopFormatPainter`), then lets the key go on.
