@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { createEditor, setTrackChanges, trackState } from "@folijs/core";
+import { createEditor, type FoliDocument, setTrackChanges, trackState } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliEditor, FoliStatusBar } from "./index.js";
 
 afterEach(cleanup);
 
-const doc = {
+const doc: FoliDocument = {
   schemaVersion: 5,
   section: {},
   defaults: {},
@@ -17,7 +17,7 @@ const doc = {
     type: "doc",
     content: [{ type: "paragraph", content: [{ type: "text", text: "one two three" }] }],
   },
-} as const;
+};
 
 describe("FoliStatusBar", () => {
   it("counts words, of the selection too, and opens Word's count", () => {
