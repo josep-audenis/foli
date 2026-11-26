@@ -4,7 +4,7 @@
  * was not asked to replace copied from the original file byte for byte.
  */
 
-import { isStrictPackage, transitionalOf } from "./strict.js";
+import { isStrictPackage, toStrict, transitionalOf } from "./strict.js";
 import {
   type ParseXmlOptions,
   parseXml,
@@ -241,14 +241,30 @@ export class DocxPackage {
    * come last.
    */
   async write(
-    replace: ReadonlyMap<string, Uint8Array> = new Map(),
-    add: readonly NewPart[] = [],
+    replacing: ReadonlyMap<string, Uint8Array> = new Map(),
+    adding: readonly NewPart[] = [],
     /** Parts left out of the file, their `Override`s with them; `main`: the main part's new type. */
     change: { drop?: readonly string[]; main?: string } = {},
   ): Promise<Uint8Array<ArrayBuffer>> {
-    // shortcut: until 28.3 writes Strict back, a Strict package is not written at all.
-    if (this.conformance === "strict")
-      throw new DocxError("Writing Strict Open XML documents is not supported yet");
+    // What a Strict package read in Transitional goes back in Strict's names and values (ADR-0014).
+    const strict = this.conformance === "strict";
+    const replace: ReadonlyMap<string, Uint8Array> = strict
+      ? new Map(
+          [...replacing].map(([name, data]) => {
+            const part = this.part(name);
+            return [name, part && isXml(part) ? strictBytes(data, name) : data];
+          }),
+        )
+      : replacing;
+    const add = strict
+      ? adding.map((part) => {
+          const contentType =
+            part.contentType ?? (/.xml$/i.test(part.name) ? "application/xml" : "");
+          return isXml({ name: part.name, contentType, data: part.data })
+            ? { ...part, data: strictBytes(part.data, part.name) }
+            : part;
+        })
+      : adding;
     const dropped = new Set((change.drop ?? []).map(key));
     const pending = new Map<string, Uint8Array>();
     for (const [name, data] of replace) {
@@ -432,6 +448,15 @@ function text(data: Uint8Array, name: string): string {
     return new TextDecoder(encoding, { fatal: true }).decode(data);
   } catch {
     throw new DocxError(`${name}: not valid ${encoding.toUpperCase()}`);
+  }
+}
+
+/** A part written in Transitional (UTF-8), in Strict's names and values. */
+function strictBytes(data: Uint8Array, name: string): Uint8Array {
+  try {
+    return new TextEncoder().encode(toStrict(text(data, name)));
+  } catch (error) {
+    throw new DocxError(`${name}: ${(error as Error).message}`, { cause: error });
   }
 }
 
