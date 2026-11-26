@@ -4066,8 +4066,8 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
 
 ### Tasks
 
-- [x] 29.1 The decisions above settled (each documented in api.md and keyboard.md with the task
-  that builds it; none typed ahead of its behaviour). Decided:
+- [x] 29.1 The decisions above settled, recorded here; api.md and keyboard.md get each one in
+  the task that builds it (none typed ahead of its behaviour). Decided:
   - Icons: Lucide's (ISC) SVG paths copied into `@folijs/react` as data, an entry in
     `THIRD_PARTY_NOTICES.md`, no runtime dependency; Foli's own drawing on the same 24-unit grid
     (2 px stroke, `currentColor`) where Lucide has none. An item's `icon` stays a `ReactNode`, so
@@ -4089,9 +4089,15 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
     change case, Ctrl+Shift+C copy formatting and Ctrl+Shift+V paste it while formatting is
     copied (else the key passes on, so the plain paste still works). Without it the keys stay
     as keyboard.md has them; superscript (Ctrl+Shift+=), subscript (Ctrl+=), clear formatting
-    (Ctrl+Space) and grow/shrink (Ctrl+Shift+> and <) clash with none of Foli's keys and go in
-    the base keymap; with the focus in the document, Ctrl+= and Ctrl+Shift+= are taken from the
-    browser's zoom (the page's own zoom is Ctrl+wheel, 29.6).
+    (Ctrl+Space; Ctrl+Space on macOS too, as Word for Mac, Cmd+Space being Spotlight) and
+    grow/shrink (Ctrl+Shift+> and <) clash with none of Foli's keys and go in the base keymap.
+    `keyName` gives the typed character for these (`Mod-=`, `Mod-Shift-+`, `Mod-Shift->`,
+    `Mod-Shift-<`), so on a layout without them on those keys they do not fire: 29.3 maps the
+    `Equal`, `Period` and `Comma` codes as `keyName` maps `Key*` and `Digit*`. With the focus in
+    the document, Ctrl+= and Ctrl+Shift+= are taken from the browser's zoom, so the keyboard
+    zooms the browser out (Ctrl+minus) but not in: accepted, as in Word on the web; keyboard.md's
+    Reserved section says so. Ctrl+Space also switches some CJK input methods on Windows (the
+    IME has it first, as any key while composing).
 - [ ] 29.2 Icons: every built-in item of `toolbarItems` gets an SVG icon; small buttons show the
   icon only (the label as tooltip and accessible name), large ones the icon over the text; the
   shrinking of 25.6 gets its icon-only step back. Ribbon screenshots updated.
