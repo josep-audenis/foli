@@ -754,6 +754,9 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `underlineAt(state)` (`UNDERLINE_STYLES`). The ribbon has them in Home's Font group
   (`toolbarItems.superscript`, `subscript`, `growFont`, `shrinkFont`, `clearFormatting`,
   `changeCase`, `underlineStyle`; not in the default toolbar).
+  `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
+  highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
+  null removes the highlight and a plain fill (patterned shading stays).
 - Format painter (1.11, built in): `copyFormat(armed?)` copies the run formatting where the
   selection starts and its paragraph's properties; `armed` `"once"` gives them to the next
   selection made with the pointer (the view runs `pasteFormat` on mouseup and draws
@@ -767,9 +770,6 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   ([keyboard.md](keyboard.md)). A click paints the word under it (run formatting only) and
   puts a once-armed painter away even on no word. Each story (a header, a note) has its own
   painter: formatting copied in the body is not painted in a header.
-  `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
-  highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
-  null removes the highlight and a plain fill (patterned shading stays).
 - Paragraphs: `setAlign` writes Word's justification; `setLineSpacing(multiple | null)`,
   `lineSpacingAt(state)`, `setParagraphSpacing({ before?, after? })` in points (turning that
   side's auto spacing off), `changeIndent(1 | -1)` (a list level for a numbered paragraph, only
