@@ -48,6 +48,8 @@ test("shows above a pointer selection, bolds it, and goes on a key", async ({ pa
   await expect
     .poll(() => page.evaluate(() => window.foliEdit.editor.isMarkActive("bold")))
     .toBe(true);
+  // A pick keeps it, as Word's: more formatting can follow.
+  await expect(mini).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(mini).toHaveCount(0);
   // A keyboard selection brings none.
