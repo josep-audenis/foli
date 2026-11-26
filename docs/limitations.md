@@ -709,7 +709,8 @@ Details in the [package README](../packages/docx/README.md).
   paragraph properties go to paragraphs a selection covers whole.
 - Formatting marks are drawn over the text in a layer of their own (fixed, clipped to the
   editor): when the whole window scrolls, they can paint over an app's sticky toolbar that has no
-  `z-index` of its own. Page and column breaks show as labels, not Word's dotted line.
+  `z-index` of its own. Page and column breaks show as labels, not Word's dotted line. Their
+  color token is read from `:root` only: in a shadow root the marks keep the default color.
 - Zoom is CSS `zoom`: a picture's resize handles and a header or footer edited at a zoom other
   than 100% are not checked by hand yet. A device sending page-mode wheel deltas barely zooms.
 - The status bar has no document language (Foli does not keep `w:lang`) and no line count;

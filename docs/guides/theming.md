@@ -79,7 +79,8 @@ toolbar's tokens (`--foli-toolbar-background`, `--foli-toolbar-color`, `--foli-b
 `--foli-toolbar-hover`, `--foli-toolbar-pressed`, `--foli-focus-ring`): set them where the editor
 is (around `FoliEditor`), not only on `.foli-toolbar`, and they follow. The gallery's tiles keep
 `--foli-page-background` and `--foli-text-color`, as the page does: they show text as it will
-look. Formatting marks are drawn in `--foli-formatting-marks`.
+look. Formatting marks are drawn in `--foli-formatting-marks`, read from the page's root
+(`:root`), not from around the editor: their layer is on `document.body`.
 
 ## Dark
 
