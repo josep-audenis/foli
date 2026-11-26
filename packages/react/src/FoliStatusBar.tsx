@@ -1,4 +1,10 @@
-import { countWords, type Editor, setTrackChanges, trackState } from "@folijs/core";
+import {
+  countWords,
+  type Editor,
+  type EditorState,
+  setTrackChanges,
+  trackState,
+} from "@folijs/core";
 import { useEffect, useId, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
 
@@ -47,6 +53,14 @@ export interface FoliStatusBarProps {
   className?: string | undefined;
 }
 
+// Selectors at module scope: `useEditorState` keeps a value while its selector stays the same.
+const headOf = (state: EditorState) => state.selection.head;
+const trackingOf = (state: EditorState) => trackState(state)?.on ?? null;
+/** The body's count: kept by document, so a selection moving does not count it again. */
+const wordsOf = (state: EditorState) => countWords(state).words;
+const selectedOf = (state: EditorState) =>
+  state.selection.empty ? null : countWords(state, { selection: true }).words;
+
 /** Word's zoom steps for the minus and plus buttons, in percent. */
 const STEPS = [10, 25, 50, 75, 100, 125, 150, 200, 300, 400, 500];
 
@@ -71,7 +85,7 @@ export function FoliStatusBar({
   const t = (message: (typeof statusBarMessages)[number], values?: Record<string, number>) => {
     const text = messages?.[message] ?? message;
     return values
-      ? text.replace(/\{(\w+)\}/g, (all, name: string) => String(values[name] ?? all))
+      ? text.replace(/\{(\w+)\}/g, (all, name: string) => values[name]?.toLocaleString() ?? all)
       : text;
   };
   // Pages are laid out after a change: read again in the next frame.
@@ -90,16 +104,10 @@ export function FoliStatusBar({
       if (frame) cancelAnimationFrame(frame);
     };
   }, [editor]);
-  const head = useEditorState((state) => state.selection.head, { editor });
-  const tracking = useEditorState((state) => trackState(state)?.on ?? null, { editor });
-  const count = useEditorState((state) => countWords(state).words, { editor });
-  const selected = useEditorState(
-    (state) =>
-      state.selection.empty
-        ? null
-        : countWords(state, { from: state.selection.from, to: state.selection.to }).words,
-    { editor },
-  );
+  const head = useEditorState(headOf, { editor });
+  const tracking = useEditorState(trackingOf, { editor });
+  const count = useEditorState(wordsOf, { editor });
+  const selected = useEditorState(selectedOf, { editor });
   const layout = editor.storyView?.fieldLayout;
   const index = layout?.pageAt(head)?.index;
   const [dialog, setDialog] = useState(false);
@@ -213,7 +221,10 @@ export function FoliStatusBar({
   );
 }
 
-/** Word's Word Count dialog: pages, words, characters with and without spaces, paragraphs. */
+/**
+ * Word's Word Count dialog: pages, words, characters with and without spaces, paragraphs. A
+ * popover, not modal: Escape (with the focus in it) or Close puts it away.
+ */
 function WordCountDialog({
   editor,
   t,
@@ -228,10 +239,7 @@ function WordCountDialog({
   const close = useRef<HTMLButtonElement>(null);
   useEffect(() => close.current?.focus(), []);
   const { state } = editor;
-  const count = countWords(state, {
-    notes,
-    ...(state.selection.empty ? {} : { from: state.selection.from, to: state.selection.to }),
-  });
+  const count = countWords(state, { notes, selection: !state.selection.empty });
   const pages = editor.storyView?.fieldLayout?.pages;
   const rows: [(typeof statusBarMessages)[number], number | undefined][] = [
     ["Pages", pages],

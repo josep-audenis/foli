@@ -758,9 +758,11 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   the document has, or `Heading1`–`Heading9`, `ListParagraph`). `setBlockType("heading",
   { level })` uses the document's "heading N" style, `setBlockType("paragraph")` the default
   style.
-- Counting: `countWords(state, { from?, to?, notes? })` is Word's Word Count without what only
+- Counting: `countWords(state, { from?, to?, selection?, notes? })` is Word's Word Count without what only
   the pages know: `{ words, characters, charactersWithSpaces, paragraphs }` of the body (a range
-  of it, or with its footnotes and endnotes); deleted text is not counted, field codes neither.
+  of it, the selection's ranges, or with its footnotes and endnotes, separators left out);
+  deleted text, field codes, bookmarks and other markers are not counted. The whole body's count
+  is kept by document.
 - Text: `setFontFamily(name | null)`, `fontFamilyAt(state)`, `setFontSize(points | null)`,
   `fontSizeAt(state)` (the size applies to complex scripts too, as Word's size box does).
   Word's Font group (1.11): `toggleVerticalAlign("superscript" | "subscript")` and

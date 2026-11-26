@@ -1107,16 +1107,19 @@ export interface WordCount {
     paragraphs: number;
 }
 export interface CountOptions {
-    /** Only this range of the body (a selection); default: the whole body. */
+    /** Only this range of the body; default: the whole body. */
     from?: number | undefined;
     to?: number | undefined;
+    /** Only the selection (its ranges: a cell selection's selected cells). */
+    selection?: boolean | undefined;
     /** Footnotes and endnotes too, as Word's "Include textboxes, footnotes and endnotes". */
     notes?: boolean | undefined;
 }
 /**
  * Counts the document's words, characters and paragraphs as Word's Word Count does: the body (or
- * a range of it), its notes on request; text of tracked deletions is not counted, insertions are
- * (Word's count with changes shown). Field codes are not text; their results are.
+ * a range of it, or the selection), its notes on request; text of tracked deletions is not
+ * counted, insertions are (Word's count with changes shown). Field codes, bookmarks, comment and
+ * control ends are not text; a line break separates words, a tab is a character with spaces.
  */
 export declare function countWords(state: EditorState, options?: CountOptions): WordCount;
 

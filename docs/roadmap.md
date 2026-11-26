@@ -4076,7 +4076,8 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
     size follows; layout is not re-flowed. The view already divides client rects by the scale it
     measures (`layoutScale`, `view.ts:5244`); 29.6 checks every place that reads a client rect
     goes through it. 10–500%, Word's range.
-  - Word count in core from the document (`countWords(state, { notes, textBoxes })`): words as
+  - Word count in core from the document (`countWords(state, { notes })`; text boxes not
+    counted yet, they are opaque): words as
     Word splits them (runs of non-space between spaces, an em dash no break), characters with and
     without spaces, paragraphs (non-empty); lines and pages from the view's layout. Body only by
     default; tracked deletions are not counted, insertions are (Word's count with changes shown).

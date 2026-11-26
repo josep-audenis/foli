@@ -53,4 +53,37 @@ describe("countWords", () => {
     expect(countWords(editor.state).words).toBe(1);
     expect(countWords(editor.state, { notes: true })).toMatchObject({ words: 4, paragraphs: 2 });
   });
+
+  it("does not split words at a bookmark or count a field's code", () => {
+    const editor = editorOf([
+      p(
+        text("wo"),
+        { type: "bookmarkStart", attrs: { id: 0, name: "_GoBack" } },
+        text("rd"),
+        { type: "bookmarkEnd", attrs: { id: 0 } },
+        text(" page "),
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " PAGE " } },
+        { type: "fieldSeparator" },
+        text("3"),
+        { type: "fieldEnd" },
+      ),
+    ]);
+    expect(countWords(editor.state)).toMatchObject({
+      words: 3,
+      characters: 9,
+      charactersWithSpaces: 11,
+    });
+  });
+
+  it("leaves note separators out", () => {
+    const editor = editorOf([p(text("body"))], {
+      s: {
+        kind: "footnote",
+        noteType: "separator",
+        content: { type: "doc", content: [p(text("x y"))] },
+      },
+    });
+    expect(countWords(editor.state, { notes: true }).words).toBe(1);
+  });
 });
