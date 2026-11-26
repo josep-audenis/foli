@@ -121,7 +121,9 @@ const plugins = [
     : []),
 ];
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user", plugins });
-let view = new EditorView(host, editor, { upload, editable: !commenting });
+// Ctrl+wheel zooms the pages (29.6), as the status bar's slider will.
+const onZoom = (zoom: number) => view.setOptions({ zoom });
+let view = new EditorView(host, editor, { upload, editable: !commenting, onZoom });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
@@ -175,6 +177,7 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
   view = new EditorView(host, editor, {
     upload,
     editable: !commenting,
+    onZoom,
     ...(images ? { resource: images.url } : {}),
   });
   original = from;

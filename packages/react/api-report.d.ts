@@ -23,12 +23,21 @@ export interface FoliCanvasProps {
      * `useCallback`) and give a new one only with new images.
      */
     resource?: EditorViewOptions["resource"] | undefined;
+    /** How large the pages are drawn: 1 is 100%, 0.1 to 5 (Word's 10% to 500%). Default 1. */
+    zoom?: number | undefined;
+    /**
+     * Ctrl+wheel (Cmd+wheel on macOS) over the document asks for this zoom, 10% a notch: set
+     * `zoom` to it. Without it the wheel stays the browser's.
+     */
+    onZoomChange?: ((zoom: number) => void) | undefined;
     className?: string | undefined;
 }
 /** What a `ref` on `FoliCanvas` gives. */
 export interface FoliCanvasHandle {
     /** Focuses the document and shows the editor's selection in it. */
     focus(): void;
+    /** The zoom that fits a page's width, or the whole page, in the space the canvas has. */
+    fitZoom(kind: "width" | "page"): number;
 }
 /**
  * The editable document on real pages (size and margins from the document settings). The view

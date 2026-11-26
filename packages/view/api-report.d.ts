@@ -165,6 +165,16 @@ export interface EditorViewOptions {
     paged?: boolean;
     /** What a note's own mark shows, for the view of a note being edited. */
     noteMark?: () => string;
+    /**
+     * How large the pages are drawn (1 is 100%, from 0.1 to 5, Word's 10% to 500%): CSS `zoom` on
+     * the view's element; the layout is not flowed again. Default 1.
+     */
+    zoom?: number;
+    /**
+     * Ctrl+wheel (Cmd+wheel on macOS) over the document asks for another zoom, 10% a notch: the
+     * app sets it (`zoom`). Without it (or `null`) the wheel stays the browser's.
+     */
+    onZoom?: ((zoom: number) => void) | null;
 }
 /**
  * The editable view of an `Editor` from `@folijs/core`: renders its state into one
@@ -338,6 +348,9 @@ export declare class EditorView {
     private readonly formattingMarks;
     private marksShown;
     private marksFrame;
+    /** The pages' zoom (29.6), and who asks for another on Ctrl+wheel. */
+    private zoom;
+    private onZoom;
     private readonly hintMarks;
     /** The hint shown, as positions of the body (18.1). */
     private shownHint;
@@ -760,6 +773,14 @@ export declare class EditorView {
      * formatting, once the browser's selection has reached the state (after this event).
      */
     private onPaint;
+    /** Ctrl+wheel asks the app for the next zoom, 10% a notch (29.6). */
+    private onWheel;
+    /**
+     * The zoom that fits the first page's width (`"width"`), or the whole page (`"page"`), in
+     * the part of the screen the view's element has (its width, and its visible height), with a
+     * little room around the page.
+     */
+    fitZoom(kind: "width" | "page"): number;
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
