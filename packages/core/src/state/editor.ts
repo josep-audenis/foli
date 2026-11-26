@@ -84,7 +84,7 @@ import {
   wordContext,
   wordPlugin,
 } from "./word.js";
-import { formatPainterPlugin, type ListKind } from "./wordformat.js";
+import { formatPainterPlugin, formattingMarksPlugin, type ListKind } from "./wordformat.js";
 
 /**
  * A document an editor loads: schema v3 (Word's model), or one saved by 0.1.0 or 0.2.0, migrated
@@ -624,6 +624,7 @@ export function createEditor({
     commentsPlugin(),
     notesPlugin(),
     formatPainterPlugin(),
+    formattingMarksPlugin(),
     tableKeymap(),
     listKeymap(),
     baseKeymap(),
@@ -680,6 +681,7 @@ export function createEditor({
         controlsPlugin(),
         commentsPlugin(),
         formatPainterPlugin(),
+        formattingMarksPlugin(),
         tableKeymap(),
         listKeymap(),
         baseKeymap(),

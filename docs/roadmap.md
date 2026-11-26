@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.3 merged (#309–#311); 29.4 in review: format painter                                                                                                                                  |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1–29.4 merged (#309–#312); 29.5 in review: formatting marks                                                                                                                                |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4125,9 +4125,13 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   Ctrl+Shift+C/V, Shift+F3 (change case) and Ctrl+Shift+L (bullets). Paragraph properties go to
   paragraphs the selection covers whole (Word's rule is the paragraph mark selected). e2e in
   Chromium, Firefox and WebKit.
-- [ ] 29.5 Show ¶ marks (Ctrl+Shift+8): paragraph marks, spaces as dots, tabs as arrows, line
+- [x] 29.5 Show ¶ marks (Ctrl+Shift+8): paragraph marks, spaces as dots, tabs as arrows, line
   and page breaks, drawn by the view, not part of the text (copy, find, export and the
-  accessibility tree unchanged). A View option and a Home item.
+  accessibility tree unchanged). A View option and a Home item. Built: `toggleFormattingMarks` /
+  `formattingMarksShown` (a built-in plugin's setting, a story asks the body's); the view's
+  `.foli-formatting-marks` layer (fixed, clipped to the editor, `aria-hidden`) drawn for pages
+  near the screen after each change, scroll and resize, from the text's own boxes; Home's
+  Paragraph group and View's Show group; Ctrl+Shift+8 in `wordKeymap()`. e2e in three engines.
 - [ ] 29.6 Zoom in the view: `zoom` option and `setZoom`, Ctrl+wheel when the app allows
   (Word's; Ctrl+minus and Ctrl+0 stay the browser's), fit page width and whole page; caret,
   selection, drag, picture handles, comments' anchors and headers stay where they are drawn at

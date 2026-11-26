@@ -31,6 +31,7 @@ import {
   fontFamilyAt,
   fontSizeAt,
   formatPainterState,
+  formattingMarksShown,
   insertColumn,
   insertColumnBreak,
   insertControl,
@@ -106,6 +107,7 @@ import {
   tableStyleAt,
   tableStyles,
   toggleFieldCodes,
+  toggleFormattingMarks,
   toggleHeaderRow,
   toggleList,
   toggleMark,
@@ -1616,6 +1618,13 @@ const RIBBON_ITEMS: readonly Item[] = [
         : copyFormat("once")(state, dispatch),
     double: copyFormat("sticky"),
   },
+  {
+    key: "formattingMarks",
+    label: "Show formatting marks",
+    pressed: formattingMarksShown,
+    enabled: isWord,
+    command: toggleFormattingMarks,
+  },
   // Word's Font group (29.3).
   {
     key: "superscript",
@@ -1764,7 +1773,8 @@ export type ToolbarItemName =
   | "clearFormatting"
   | "changeCase"
   | "underlineStyle"
-  | "formatPainter";
+  | "formatPainter"
+  | "formattingMarks";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -1891,6 +1901,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     ...["superscript", "subscript", "growFont", "shrinkFont", "clearFormatting", "changeCase"],
     "underlineStyle",
     "formatPainter",
+    "formattingMarks",
     ...["align-start", "align-center", "align-end", "align-justify"],
     ...["bulletList", "orderedList", "outdent", "indent"],
   ]);
@@ -1961,6 +1972,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
           t.alignEnd,
           t.alignJustify,
           t.lineSpacing,
+          t.formattingMarks,
         ),
         group("Styles", t.style),
         group("Editing", t.navigate),
@@ -2018,7 +2030,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     {
       key: "view",
       label: "View",
-      items: [group("Show", t.navigationPane, t.fieldCodes)],
+      items: [group("Show", t.navigationPane, t.fieldCodes, t.formattingMarks)],
     },
     {
       key: "tableDesign",

@@ -272,6 +272,7 @@ export const toolbarMessages = [
   "Show",
   "Show changes as",
   "Show field codes",
+  "Show formatting marks",
   "Show notes",
   "Simple markup",
   "Single",
