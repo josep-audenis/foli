@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | Ready                    | —                         | Planned 2026-11-26, nothing built: icons, zoom, status bar, context menu, mini toolbar, Home commands                                                                                         |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1 decisions settled; 29.2 icons next                                                                                                                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4066,7 +4066,32 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
 
 ### Tasks
 
-- [ ] 29.1 The decisions above settled, the key clashes included (keyboard.md updated).
+- [x] 29.1 The decisions above settled (each documented in api.md and keyboard.md with the task
+  that builds it; none typed ahead of its behaviour). Decided:
+  - Icons: Lucide's (ISC) SVG paths copied into `@folijs/react` as data, an entry in
+    `THIRD_PARTY_NOTICES.md`, no runtime dependency; Foli's own drawing on the same 24-unit grid
+    (2 px stroke, `currentColor`) where Lucide has none. An item's `icon` stays a `ReactNode`, so
+    an app replaces any of them.
+  - Zoom: CSS `zoom` on the pages' container (in every engine since Firefox 126), so the scroll
+    size follows; layout is not re-flowed. The view already divides client rects by the scale it
+    measures (`layoutScale`, `view.ts:5244`); 29.6 checks every place that reads a client rect
+    goes through it. 10–500%, Word's range.
+  - Word count in core from the document (`countWords(state, { notes, textBoxes })`): words as
+    Word splits them (runs of non-space between spaces, an em dash no break), characters with and
+    without spaces, paragraphs (non-empty); lines and pages from the view's layout. Body only by
+    default; tracked deletions are not counted, insertions are (Word's count with changes shown).
+  - Mini toolbar as proposed: after a pointer selection, faded until the pointer nears it,
+    gone on typing, Escape or the pointer moving away; opt-in.
+  - ¶ marks are a core plugin's state (`formattingMarks()`, `toggleFormattingMarks`), so the
+    command is an ordinary `Command` a keymap or toolbar item runs; the view draws from it.
+  - Keys: `wordKeymap()` (core, opt-in, on in the try page and playground) gives Word's meaning:
+    Ctrl+Shift+8 ¶ marks and Ctrl+Shift+L the bulleted list (Word's List Bullet key), Shift+F3
+    change case, Ctrl+Shift+C copy formatting and Ctrl+Shift+V paste it while formatting is
+    copied (else the key passes on, so the plain paste still works). Without it the keys stay
+    as keyboard.md has them; superscript (Ctrl+Shift+=), subscript (Ctrl+=), clear formatting
+    (Ctrl+Space) and grow/shrink (Ctrl+Shift+> and <) clash with none of Foli's keys and go in
+    the base keymap; with the focus in the document, Ctrl+= and Ctrl+Shift+= are taken from the
+    browser's zoom (the page's own zoom is Ctrl+wheel, 29.6).
 - [ ] 29.2 Icons: every built-in item of `toolbarItems` gets an SVG icon; small buttons show the
   icon only (the label as tooltip and accessible name), large ones the icon over the text; the
   shrinking of 25.6 gets its icon-only step back. Ribbon screenshots updated.
@@ -4082,9 +4107,10 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
 - [ ] 29.5 Show ¶ marks (Ctrl+Shift+8): paragraph marks, spaces as dots, tabs as arrows, line
   and page breaks, drawn by the view, not part of the text (copy, find, export and the
   accessibility tree unchanged). A View option and a Home item.
-- [ ] 29.6 Zoom in the view: `zoom` option and `setZoom`, Ctrl+wheel and Ctrl+plus/minus/0
-  when the app allows, fit page width and whole page; caret, selection, drag, picture handles,
-  comments' anchors and headers stay where they are drawn at 50%, 100% and 200%.
+- [ ] 29.6 Zoom in the view: `zoom` option and `setZoom`, Ctrl+wheel when the app allows
+  (Word's; Ctrl+minus and Ctrl+0 stay the browser's), fit page width and whole page; caret,
+  selection, drag, picture handles, comments' anchors and headers stay where they are drawn at
+  50%, 100% and 200%.
 - [ ] 29.7 `FoliStatusBar`: page X of Y at the caret, the word count (a click opens Word's
   count dialog), track changes on or off, the document's language, a zoom slider with its
   percentage and fit buttons; every part optional, all strings in `messages`. The count from
