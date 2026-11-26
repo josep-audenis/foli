@@ -3861,8 +3861,8 @@ thread someone is in, keeping deleted comments.
 
 The two largest refusals of Phase 20's corpus run ([corpus-report.md](corpus-report.md),
 "Refused, by reason"), picked by the owner on 2026-11-25: 71 Strict Open XML files and 60 whose
-`word/document.xml` root is not `w:document`. Both are refused by `importPackage` today
-(`packages/docx/src/import/index.ts`). Planned 2026-11-25, nothing built.
+`word/document.xml` root is not `w:document`. Both were refused by `importPackage` in 1.10.0
+(`packages/docx/src/import/index.ts`). Planned 2026-11-25, built 2026-11-25…26 (see Tasks).
 
 **Strict Open XML** is Word's "Strict Open XML Document" (Save As). The parts, their structure
 and their content types are Transitional's; what differs: namespaces and relationship types
@@ -3889,9 +3889,9 @@ format. This phase reads the first kind, as Word does; the second stays refused,
 that names the root. A document whose root was resolved is exported with a `w:document` root,
 as Word's twin is, and the import reports it (`dropped`: the branch not taken). Besides the 60,
 docx4j's `c79-10`…`c79-18` put an `mc:AlternateContent` root in other parts (header, footer,
-notes, comments, styles, numbering, settings): they import today, and two of them
-(`c79-12-footnotes-root`, `c79-13-endnotes-root`) crash on export with "A note reference has no
-note".
+notes, comments, styles, numbering, settings): they imported in 1.10.0, and two of them
+(`c79-12-footnotes-root`, `c79-13-endnotes-root`) crashed on export with "A note reference has no
+note" (fixed in 28.4).
 
 Not in this phase: unknown roots (above); writing a Transitional file from a Strict one or the
 reverse (an export option nobody asked for); Strict spreadsheets or presentations; the other
@@ -3993,7 +3993,8 @@ agent's review.
   opens their Strict exports without a repair, with the original's pages, revisions and
   comments.
 - The 22 `mc:AlternateContent` roots of the 60 import, those with a `-word365` twin with its
-  text; `c79-10`…`c79-18` import and export without a crash; the 38 unknown roots are refused
+  text (but `or-50`, `rq-32` and `rq-33`: their body is the twin's, and Word also moves a dropped
+  `w:hdr`'s paragraphs into its footnote separator, which Foli does not imitate: accepted); `c79-10`…`c79-18` import and export without a crash; the 38 unknown roots are refused
   with a message naming the root.
 - No file that imported before 28.2 imports or exports differently, but as
   `docs/corpus-report.md` records.
