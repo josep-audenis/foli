@@ -90,6 +90,37 @@ describe("a document whose root is mc:AlternateContent, read as Word reads it", 
     expect(JSON.stringify(again.document)).toContain("NOTE");
   });
 
+  it("keeps the namespaces the branch's content is written in", async () => {
+    // A default namespace on the document, and a prefix only the unknown wrapper declares.
+    const plain = `<mc:AlternateContent xmlns:mc="${MC}"><mc:Choice Requires=""><document xmlns="${W}"><body><p><r><t>PLAIN</t></r></p></body></document></mc:Choice></mc:AlternateContent>`;
+    expect((await read(plain)).texts).toEqual(["PLAIN"]);
+    const wrapped = root(
+      choice(
+        "w14",
+        `<w:madeUp xmlns:q="${W14}"><w:p q:paraId="00000001"><w:r><w:t>WRAPPED</w:t></w:r></w:p></w:madeUp>`,
+      ),
+    );
+    expect((await read(wrapped)).texts).toEqual(["WRAPPED"]);
+  });
+
+  it("finds the root after comments and instructions, and reads a nested one again", async () => {
+    const commented = `<!-- a comment --><?pi x?>${root(choice("w14", doc(p("AFTER")))).replace(/^<\?xml[^>]*>/, "")}`;
+    expect((await read(commented)).texts).toEqual(["AFTER"]);
+    const rels =
+      '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>';
+    const nested = root(
+      choice(
+        "w14",
+        `<mc:AlternateContent><mc:Choice Requires="z"><w:footnotes/></mc:Choice><mc:Fallback><w:footnotes><w:footnote w:id="1">${p("NESTED")}</w:footnote></w:footnotes></mc:Fallback></mc:AlternateContent>`,
+      ),
+    );
+    const body = '<w:p><w:r><w:t>T</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p>';
+    const { document } = await importDocx(
+      await docx(body, { parts: { "word/footnotes.xml": nested }, rels }),
+    );
+    expect(JSON.stringify(document)).toContain("NESTED");
+  });
+
   it("refuses an unknown root, naming it", async () => {
     await expect(
       importDocx(await docx("", { root: `<w:madeUp xmlns:w="${W}">${p("X")}</w:madeUp>` })),

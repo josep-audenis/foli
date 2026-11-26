@@ -182,6 +182,8 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
   }
   // A part read through its `mc:AlternateContent` root: what Word leaves out of it, Foli too.
+  // shortcut: only the parts import read; one read first by export is not reported here, add a
+  // report on export if that ever matters.
   for (const names of pkg.alternateRoots().values()) for (const name of names) report.dropped(name);
   return { document, package: pkg, report: report.report(), trackRevisions };
 }

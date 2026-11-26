@@ -206,14 +206,23 @@ export class DocxPackage {
     if (alternate) {
       if (strict) doc = this.#parse(result, part.name, false);
       const main = this.mainDocument as string | undefined;
-      const resolved = resolveAlternateRoot(
-        doc,
-        main !== undefined && key(main) === key(part.name),
-      );
-      if (resolved) {
+      const isMain = main !== undefined && key(main) === key(part.name);
+      const dropped: string[] = [];
+      let resolvedAny = false;
+      // A branch whose root is mc:AlternateContent again is read again (a few levels at most).
+      for (let depth = 0; depth < 4; depth++) {
+        const resolved = resolveAlternateRoot(doc, isMain);
+        if (!resolved) break;
+        resolvedAny = true;
+        dropped.push(...resolved.dropped);
+        if (resolved.text === result || !mayHaveAlternateRoot(resolved.text)) {
+          result = resolved.text;
+          break;
+        }
         result = resolved.text;
-        this.#alternates.set(part.name, resolved.dropped);
+        doc = this.#parse(result, part.name, false);
       }
+      if (resolvedAny) this.#alternates.set(part.name, dropped);
     }
     this.#texts.set(key(part.name), result);
     return result;

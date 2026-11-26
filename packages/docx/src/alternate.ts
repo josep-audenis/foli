@@ -70,7 +70,7 @@ const prefixOf = (a: XmlAttribute) => (a.name === "xmlns" ? "" : a.local);
  * @internal
  */
 export function mayHaveAlternateRoot(text: string): boolean {
-  return /^﻿?\s*(?:<\?[\s\S]*?\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<(?:[\w.-]+:)?AlternateContent[\s>/]/.test(
+  return /^﻿?\s*(?:<\?[\s\S]*?\?>\s*|<!--[\s\S]*?-->\s*)*<(?:[\w.-]+:)?AlternateContent[\s>/]/.test(
     text,
   );
 }
@@ -97,27 +97,34 @@ export function resolveAlternateRoot(doc: XmlDocument, main: boolean): ResolvedR
   const taken =
     branches.find((b) => b.local === "Choice" && understood(b)) ??
     branches.find((b) => b.local === "Fallback");
-  const dropped = branches.filter((b) => b !== taken).map((b) => `${b.name} (root)`);
+  const dropped = elementsOf(root)
+    .filter((b) => b !== taken)
+    .map((b) => `${b.name} (root)`);
   const before = source.slice(0, root.start);
   const after = source.slice(root.end);
-  /** Declarations in scope down to `el`, later ones winning, as `xmlns:x="…"` text. */
+  /**
+   * Declarations in scope down to `from`, by prefix, later ones winning. shortcut: one scope for
+   * all the joined content, so a prefix a later document binds to another URI wins for the earlier
+   * ones too; no such file is known, a per-element scope if one turns up.
+   */
   const declarations = (...from: XmlElement[]) => {
-    const all = new Map<string, string>();
+    const all = new Map<string, { text: string; uri: string }>();
     for (const el of [root, ...(taken ? [taken] : []), ...from])
       for (const a of el.attributes.filter(isDeclaration))
-        all.set(prefixOf(a), source.slice(a.start, a.end));
+        all.set(prefixOf(a), { text: source.slice(a.start, a.end), uri: a.value });
     return all;
   };
   const kids = taken ? elementsOf(taken) : [];
 
   if (!main) {
     const first = kids[0];
-    if (!first) return undefined;
+    // Nothing to read: the part stays as it is, what was not taken reported.
+    if (!first) return { text: source, dropped };
     for (const other of kids.slice(1)) dropped.push(`${other.name} (in ${taken?.name})`);
     const own = new Set(first.attributes.filter(isDeclaration).map(prefixOf));
     const extra = [...declarations()]
       .filter(([prefix]) => !own.has(prefix))
-      .map(([, text]) => ` ${text}`)
+      .map(([, { text }]) => ` ${text}`)
       .join("");
     const nameEnd = first.start + 1 + first.name.length;
     return {
@@ -151,17 +158,18 @@ export function resolveAlternateRoot(doc: XmlDocument, main: boolean): ResolvedR
               : elementsOf(k).filter((c) => c.ns === W && BLOCKS.has(c.local)),
       );
   }
-  const used = new Set<XmlElement>([...documents, ...bodies, ...blocks]);
-  for (const kid of kids) if (blocks.some((b) => elementsOf(kid).includes(b))) used.add(kid);
-  if (!documents.length && bodies.length) used.add(bodies[0] as XmlElement);
+  const wrappers = kids.filter((kid) => blocks.some((b) => elementsOf(kid).includes(b)));
+  const used = new Set<XmlElement>([...documents, ...bodies, ...blocks, ...wrappers]);
   for (const kid of kids) if (!used.has(kid)) dropped.push(`${kid.name} (in ${taken?.name})`);
 
   const first = documents[0];
   const named = first ?? bodies[0] ?? blocks[0];
-  const prefix = named?.prefix ? `${named.prefix}:` : "w:";
-  const decls = declarations(...documents, ...bodies);
-  if (![...decls.values()].some((d) => d.includes(W)))
-    decls.set(prefix.slice(0, -1), `xmlns:${prefix.slice(0, -1)}="${W}"`);
+  const prefix = named ? (named.prefix ? `${named.prefix}:` : "") : "w:";
+  const decls = declarations(...documents, ...bodies, ...wrappers);
+  // The new root's prefix bound to WordprocessingML, whatever the levels above bound it to.
+  const key = prefix.slice(0, -1);
+  if (decls.get(key)?.uri !== W)
+    decls.set(key, { text: `${key ? `xmlns:${key}` : "xmlns"}="${W}"`, uri: W });
   // The first document's other attributes (`mc:Ignorable`), else the root's.
   const attributes = (first ?? root).attributes
     .filter((a) => !isDeclaration(a))
@@ -173,25 +181,33 @@ export function resolveAlternateRoot(doc: XmlDocument, main: boolean): ResolvedR
         .map((c) => source.slice(c.start, c.end))
         .join("")
     : "";
+  for (const later of documents.slice(1))
+    for (const c of elementsOf(later))
+      if (c !== bodyOf(later)) dropped.push(`${c.name} (in a joined w:document)`);
   const last = bodies[bodies.length - 1];
   const inner = bodies.length
     ? bodies
         .map((body) =>
           elementsOf(body)
-            .filter(
-              (c) =>
-                !(c.ns === W && c.local === "sectPr") ||
-                (body === last && c === elementsOf(body).at(-1)),
-            )
+            .filter((c) => {
+              // The joined body's section: the last body's own, at its end; others reported.
+              if (
+                c.ns === W &&
+                c.local === "sectPr" &&
+                !(body === last && c === elementsOf(body).at(-1))
+              ) {
+                dropped.push(`${c.name} (in a joined w:body)`);
+                return false;
+              }
+              return true;
+            })
             .map((c) => source.slice(c.start, c.end))
             .join(""),
         )
         .join("")
     : blocks.map((b) => source.slice(b.start, b.end)).join("");
-  if (bodies.length > 1)
-    dropped.push(...Array(bodies.length - 1).fill(`${prefix}sectPr (joined body)`));
   const text =
-    `${before}<${prefix}document${[...decls.values()].map((d) => ` ${d}`).join("")}${attributes}>` +
+    `${before}<${prefix}document${[...decls.values()].map((d) => ` ${d.text}`).join("")}${attributes}>` +
     `${head}<${prefix}body>${inner}</${prefix}body></${prefix}document>${after}`;
   return { text, dropped };
 }
