@@ -39,7 +39,7 @@ place that says what is in progress; check it before starting work.
 | 25 Word ribbon                | ✅ Done                  | —                         | Merged in #282–#289; 1.9.0, `@folijs/agent` 0.4.3, `@folijs/mcp` 0.3.3 and `@folijs/collab` 0.2.2 on npm (2026-11-25)                                                                         |
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
-| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1–28.3 merged (#299, #303, #304); 28.4 in review: `mc:AlternateContent` roots                                                                                                              |
+| 28 Strict & mc roots          | In progress              | `phase-28/strict-mc-root` | 28.1–28.4 merged (#299, #303–#305); 28.5 in review: the corpus run again                                                                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3972,10 +3972,15 @@ agent's review.
   but Word also moves a dropped `w:hdr`'s paragraphs into its footnote separator, which Foli
   does not imitate; `rq-31` Word cannot open ("Word experienced an error"), Foli reads its
   text box's words. The unknown roots: refused, naming the root.)
-- [ ] 28.5 The corpus run again: the whole set; `docs/corpus-report.md` updated (refusals and
+- [x] 28.5 The corpus run again: the whole set; `docs/corpus-report.md` updated (refusals and
   losses before and after, what the newly read files add to the other rows). New losses in the
   Strict files are fixed here if they are this phase's (names or values the map misses);
   others go to the backlog, ranked.
+  (Done: [corpus-report.md](corpus-report.md), "After Phase 28". Refused 186 → 93, imported 3 259
+  → 3 352; of the 93 read now, 89 with no difference, 3 with a paragraph added to an empty body,
+  1 with a picture's duplicate ids renumbered: nothing of this phase's to fix. Two files that do not
+  go through Phase 28's code differ since Phase 20 (`tdf124670`, `Comment040`): to the backlog.
+  The renderer: 3 352 files, 6 106 pages, no error, the same 10 overflowing pages.)
 - [ ] 28.6 Docs (limitations.md, the docx README, `docs/testing/corpus.md`), changesets; the
   release published with the owner's approval (the Release workflow).
 
@@ -4035,8 +4040,10 @@ first group and from .docx files the corpus does not cover.
 
 **Robustness** (left by Phase 20's corpus run, [corpus-report.md](corpus-report.md)):
 
-- Strict Open XML (71 files refused) and the `mc:AlternateContent` roots (22):
-  planned as Phase 28.
+- Strict Open XML (71 files) and the `mc:AlternateContent` roots (22): read since Phase 28.
+- Since Phase 20, two files differ on export that did not (corpus-report.md, "After Phase 28"):
+  LibreOffice's `tdf124670`, a paragraph's text; the Open XML SDK's `Comment040`, comment ids
+  renumbered. Both from Phases 21–27's changes to `@folijs/docx`, not yet looked into.
 - The rest of docx4j's `mc-root/*`: an unknown root (`w:madeUp` and the like), Word's error
   recovery; refused, left out of Phase 28.
 - What changes the file without changing what it shows (the report's rows 8 and 10–13): empty

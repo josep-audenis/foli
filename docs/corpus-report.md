@@ -1,6 +1,6 @@
 # Corpus report: real .docx files (Phase 20)
 
-What Foli 1.4.0 (`main` after #208) does with real Word files: 3 551 test documents of five
+What Foli 1.4.0 (`main` after #208) did with real Word files (Phase 28's run follows): 3 551 test documents of five
 open-source projects ([ADR-0011](decisions/ADR-0011-external-corpus.md); `corpus/external.json`
 pins them), 3 445 distinct by content, run 2026-11-22 on Windows 11, Node 25, Chromium
 (Playwright). Counts, names and file names only, never document text. Reproduce:
@@ -23,6 +23,49 @@ at every save (`rsid*`, `w14:paraId` and `w14:textId` outside comments, `w:proof
 `w:lastRenderedPageBreak`), and runs with nothing in them, which Foli drops (the import report
 lists them as dropped). Before these rules, runs joined on export made about 1 200 files look
 lossy, and reading no-break spaces as spaces Word drops about 50 more.
+
+## After Phase 28 (Strict Open XML, `mc:AlternateContent` roots)
+
+Run again 2026-11-26 on `main` after #305 (the packages at 1.10.0 plus Phase 28), the same 3 445
+distinct files, the same checks; compared file by file with the last run of Phase 20
+(2026-11-22, after its fixes). Reproduce as above; the comparison is by SHA-256.
+
+| Outcome                         | Phase 20 | After Phase 28 |
+| ------------------------------- | -------: | -------------: |
+| Imported, exported, read back   |    3 259 |          3 352 |
+| Refused with a reason           |      186 |             93 |
+| Crash on import or export, hung |        0 |              0 |
+
+**The 93 files read now:** the 71 Strict Open XML files (LibreOffice, docx4j, the Open XML SDK)
+and the 22 whose `word/document.xml` root is `mc:AlternateContent` (docx4j's `mc-root/*`
+and three in `repeated/`: `rt-50`, `rt-51`, `sm-52`). 89 export with no difference counted and read back the same. The other four:
+
+| Class                                       | Files | Examples                                      | Cause                                                                                  |
+| ------------------------------------------- | ----: | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| A paragraph added to an empty body          |     3 | `c79-71-empty-branch-taken`, `or-50`, `rw-24` | The branch Word takes holds no body content; a body needs a paragraph (row 12 below)   |
+| A picture's ids renumbered, read back other |     1 | Open XML SDK `Strict01`                       | Two drawings with one `wp:docPr@id`: the export makes them unique, as for Transitional |
+
+Word's own reading of the roots, against docx4j's `-word365` twins (Word's resaves): 27 of the 31
+files with such a root in some part import with the twin's text; in `or-50`, `rq-32` and `rq-33`
+the body is the twin's, but Word also moves a dropped `w:hdr`'s paragraphs into its footnote
+separator (not imitated); `rq-31` Word cannot open. Word opened the Strict exports of the nine synthetic documents (`corpus/word/strict/`), edited
+and not, without a repair (28.3).
+
+**Still refused (93):** 38 docx4j tests whose root Word only recovers from (`w:madeUp` 15,
+`w:sdtContent` 4, `w:foo`/`foo`/`z:foo` 6, `z:madeUp` 2, `w:footnotes` 2, and one each of
+`madeUp`, `w:p`, `w:tc`, `w:body`, `w:hdr`, `w:ftr`, `w:endnotes`, `w:comments`, `w:styles`): the
+message names the root. The other 55 are broken on purpose or right to refuse, as in "Refused, by
+reason": not a zip (13), encrypted or a legacy `.doc` (8), duplicate zip entries (10), malformed
+XML (18), no `w:body` or `[Content_Types].xml` (4), a damaged zip or another main part (2).
+
+**Changed though Phase 28 does not touch them:** 2 files read the same way in both runs
+(Transitional, no `mc:AlternateContent` root) but differ now: LibreOffice's `tdf124670` (a
+paragraph's text differs on export) and the Open XML SDK's `Comment040` (comment ids renumbered,
+read back otherwise). Both come from the `@folijs/docx` changes of Phases 21–27; to the backlog.
+
+**Renderer:** 3 352 files laid out, 6 106 pages, no exception or page error; median 10 ms, p95
+54 ms, the slowest 8.2 s (POI's `bug65649`). The same 10 files as before have a page that overflows
+its sheet; none of the 93 new ones does.
 
 ## Outcomes
 
