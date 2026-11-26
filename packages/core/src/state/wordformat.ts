@@ -1112,3 +1112,250 @@ export function unstyleLink(tr: Transaction, state: EditorState, from: number, t
       tr.removeMark(Math.max(from, pos), Math.min(to, pos + node.nodeSize), type);
   });
 }
+
+// ---------- Word's Font group: scripts, clearing, case, growing ----------
+
+/** Raised or lowered text. */
+export type VerticalAlign = "superscript" | "subscript";
+
+/**
+ * Word's Superscript and Subscript buttons (Ctrl+Shift+=, Ctrl+=): the selected text (or the
+ * text typed next) raised or lowered, or back on its baseline where it all already is.
+ */
+export function toggleVerticalAlign(value: VerticalAlign): Command {
+  return (state, dispatch) => {
+    const want = verticalAlignAt(state) === value ? "baseline" : value;
+    return setRunMark("verticalAlign", (_existing, inherited, type) =>
+      inherited.verticalAlign === want ? null : type.create({ value: want }),
+    )(state, dispatch);
+  };
+}
+
+/** Whether the selected text (or the text typed next) is raised or lowered, if all the same. */
+export function verticalAlignAt(state: EditorState): VerticalAlign | "baseline" | null {
+  return runValueAt(state, (run) => run.verticalAlign);
+}
+
+/** The run marks clearing takes off: links, review and comment marks are not formatting. */
+const CLEARED = [
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "doubleStrike",
+  "caps",
+  "smallCaps",
+  "hidden",
+  "font",
+  "fontSize",
+  "color",
+  "highlight",
+  "shading",
+  "verticalAlign",
+  "characterSpacing",
+];
+
+/**
+ * Takes direct character formatting off the selected text (or the text typed next): Word's
+ * Ctrl+Space. The text then shows its paragraph's and character style's formatting.
+ * `{ all: true }` is Word's Clear All Formatting: the character style goes too and the
+ * paragraphs get the default paragraph style; highlight stays, as in Word, and so does list
+ * numbering.
+ */
+export function clearFormatting(options: { all?: boolean } = {}): Command {
+  return (state, dispatch) => {
+    const context = wordContext(state);
+    if (!context) return false;
+    const names = options.all
+      ? [...CLEARED.filter((n) => n !== "highlight"), "characterStyle"]
+      : CLEARED;
+    const types = names.flatMap((n) => state.schema.marks[n] ?? []);
+    const { selection } = state;
+    if (selection.empty && selection instanceof TextSelection && !options.all) {
+      const marks = state.storedMarks ?? marksAt(selection.$from);
+      const rest = marks.filter((m) => !types.includes(m.type));
+      if (rest.length === marks.length) return false;
+      dispatch?.(state.tr.setStoredMarks(rest));
+      return true;
+    }
+    return attempt(state, dispatch, (tr) => {
+      for (const type of types)
+        for (const { node, pos } of runsIn(state, type))
+          if (type.isInSet(node.marks))
+            tr.removeMark(
+              Math.max(selection.from, pos),
+              Math.min(selection.to, pos + node.nodeSize),
+              type,
+            );
+      if (options.all)
+        // No style named is the default paragraph style.
+        for (const { node, pos } of paragraphsIn(state))
+          if (node.attrs.style != null)
+            tr.setNodeMarkup(pos, node.type, { ...node.attrs, style: null });
+    });
+  };
+}
+
+/** Word's Change Case entries; `"cycle"` is Shift+F3's next one. */
+export type TextCase = "sentence" | "lower" | "upper" | "title" | "toggle" | "cycle";
+
+const LETTER = /\p{L}/u;
+const titled = (text: string) =>
+  text
+    .toLocaleLowerCase()
+    .replace(
+      /(^|[^\p{L}\p{N}'’])(\p{L})/gu,
+      (_, before: string, letter: string) => before + letter.toLocaleUpperCase(),
+    );
+const sentenced = (text: string, start: boolean) =>
+  text
+    .toLocaleLowerCase()
+    .replace(/(^|[.!?]\s+)(\p{L})/gu, (all: string, before: string, letter: string, at: number) =>
+      at === 0 && !start ? all : before + letter.toLocaleUpperCase(),
+    );
+
+/** `text` in `kind` (`start`: whether it starts its paragraph, for sentence case). */
+function inCase(text: string, kind: Exclude<TextCase, "cycle">, start: boolean): string {
+  switch (kind) {
+    case "lower":
+      return text.toLocaleLowerCase();
+    case "upper":
+      return text.toLocaleUpperCase();
+    case "title":
+      return titled(text);
+    case "sentence":
+      return sentenced(text, start);
+    case "toggle":
+      return [...text]
+        .map((c) => (c === c.toLocaleUpperCase() ? c.toLocaleLowerCase() : c.toLocaleUpperCase()))
+        .join("");
+  }
+}
+
+/** Shift+F3, as Word: lowercase → Capitalize Each Word → UPPERCASE → lowercase. */
+function nextCase(text: string): Exclude<TextCase, "cycle"> {
+  if (text === text.toLocaleLowerCase()) return "title";
+  if (text === titled(text) && text !== text.toLocaleUpperCase()) return "upper";
+  return "lower";
+}
+
+/** The word around a caret (null between words). */
+function wordAt(state: EditorState): { from: number; to: number } | null {
+  const { $from } = state.selection;
+  const text = $from.parent.textBetween(0, $from.parent.content.size, undefined, "￼");
+  let from = $from.parentOffset;
+  let to = from;
+  while (from > 0 && LETTER.test(text[from - 1] ?? "")) from--;
+  while (to < text.length && LETTER.test(text[to] ?? "")) to++;
+  return from === to ? null : { from: $from.start() + from, to: $from.start() + to };
+}
+
+/**
+ * Word's Change Case: the selected text (or the word at the caret) in another case, its
+ * formatting kept; tracked as a deletion and an insertion while tracking, as in Word. Text of
+ * tracked deletions is left as it is.
+ */
+export function changeCase(kind: TextCase): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state)) return false;
+    const range = state.selection.empty ? wordAt(state) : state.selection;
+    if (!range) return false;
+    const deletion = state.schema.marks.deletion;
+    const runs: { from: number; to: number; text: string; marks: readonly Mark[] }[] = [];
+    state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+      if (!node.isText) return undefined;
+      if (deletion?.isInSet(node.marks)) return false;
+      const from = Math.max(range.from, pos);
+      const to = Math.min(range.to, pos + node.nodeSize);
+      const text = (node.text ?? "").slice(from - pos, to - pos);
+      runs.push({ from, to, text, marks: node.marks });
+      return false;
+    });
+    const all = runs.map((r) => r.text).join("");
+    if (!LETTER.test(all)) return false;
+    const $start = state.doc.resolve(range.from);
+    const start = /^\s*$/.test($start.parent.textBetween(0, $start.parentOffset));
+    const changed = inCase(all, kind === "cycle" ? nextCase(all) : kind, start);
+    if (changed === all) return false;
+    return attempt(state, dispatch, (tr) => {
+      // The new text cut by the old runs (a case can change the length: ß → SS, at a run's end).
+      let offset = 0;
+      for (const [i, run] of runs.entries()) {
+        const length = i === runs.length - 1 ? changed.length - offset : run.text.length;
+        const text = changed.slice(offset, offset + length);
+        offset += length;
+        if (text === run.text) continue;
+        const from = tr.mapping.map(run.from);
+        const to = tr.mapping.map(run.to);
+        tr.delete(from, to);
+        if (text) tr.insert(from, state.schema.text(text, run.marks));
+      }
+      if (!state.selection.empty)
+        tr.setSelection(
+          TextSelection.create(tr.doc, tr.mapping.map(range.from, -1), tr.mapping.map(range.to)),
+        );
+    });
+  };
+}
+
+/** Word's sizes for Grow Font and Shrink Font, in points. */
+const STEPS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+
+/**
+ * The next size up or down from `points`, as Word's Grow Font and Shrink Font step: by 1 under
+ * 8 pt, Word's sizes to 72, by 10 above (1 to 1638 pt).
+ */
+export function nextFontSize(points: number, direction: 1 | -1): number {
+  if (direction > 0) {
+    if (points < 8) return Math.floor(points) + 1;
+    if (points >= 72) return Math.min(1638, Math.floor(points / 10) * 10 + 10);
+    return STEPS.find((s) => s > points) ?? 72;
+  }
+  if (points <= 8) return Math.max(1, Math.ceil(points) - 1);
+  if (points > 80) return Math.ceil(points / 10) * 10 - 10;
+  return [...STEPS].reverse().find((s) => s < points) ?? 8;
+}
+
+/**
+ * Word's Grow Font and Shrink Font (Ctrl+Shift+> and <): each run of the selection (or the text
+ * typed next) one of Word's sizes up or down from its own.
+ */
+export function stepFontSize(direction: 1 | -1): Command {
+  return setRunMark("fontSize", (existing, inherited, type) => {
+    // From the run's own size (`inherited` is without its mark).
+    const own = (existing?.attrs.value as number | null | undefined) ?? inherited.size;
+    const half = nextFontSize(own / 2, direction) * 2;
+    if (inherited.size === half && inherited.sizeCs === half) return null;
+    return type.create({
+      value: inherited.size === half ? null : half,
+      complexScript: inherited.sizeCs === half ? null : half,
+    });
+  });
+}
+
+/** Word's underline styles (`w:u`) the toolbar offers; a document's other ones are kept. */
+export const UNDERLINE_STYLES = [
+  "single",
+  "words",
+  "double",
+  "thick",
+  "dotted",
+  "dash",
+  "dotDash",
+  "dotDotDash",
+  "wave",
+] as const;
+
+/** The selected text (or the text typed next) underlined in `style`; null removes it. */
+export function setUnderline(style: string | null): Command {
+  return setRunMark("underline", (existing, inherited, type) => {
+    if (style === null) return inherited.underline === null ? null : type.create({ style: "none" });
+    if (inherited.underline === style) return null;
+    return type.create({ style, color: existing?.attrs.color ?? null });
+  });
+}
+
+/** The underline style of the selected text (or the text typed next) if all the same: "none" for none. */
+export function underlineAt(state: EditorState): string | null {
+  return runValueAt(state, (run) => run.underline ?? "none");
+}

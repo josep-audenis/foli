@@ -14,7 +14,9 @@ its physical key instead: `Mod-Shift-7` whatever Ctrl+Shift+7 types on the layou
 Ctrl+B on a Cyrillic layout, `Alt-Shift-n` for Option+Shift+N on macOS (which types a character).
 A layout's own letters keep their name (Ctrl+A on AZERTY is `Mod-a`). On Windows and Linux, AltGr
 (Ctrl+Alt on Windows) typing a character is named by that character (`Mod-Alt-[` for AltGr+F on a
-Hungarian layout), so it types.
+Hungarian layout), so it types. With Mod, the =, period and comma keys are named by their place
+as a US keyboard types them, whatever the layout types there: `Mod-=`, `Mod-Shift-+`, `Mod-.`,
+`Mod-Shift->`, `Mod-,`, `Mod-Shift-<` (Word's keys for subscript, superscript, grow and shrink).
 
 Option on macOS and AltGr (Ctrl+Alt) on Windows type characters on many layouts (`@`, `[`, `€`,
 accented letters): an app should not bind `Alt-` plus a letter or digit, nor `Mod-Alt-` plus one,
@@ -73,6 +75,9 @@ command that applies wins.
 | Tab                        | Tab                      | `Tab`                        | `insertTab` (Escape, then Tab, leaves the editor: reserved, below)        |
 | Backspace, Delete          | Delete, Fn+Delete        | `Backspace`, `Delete`        | `deleteBackward()`, `deleteForward()`                                     |
 | Ctrl+B, Ctrl+I, Ctrl+U     | Cmd+B, Cmd+I, Cmd+U      | `Mod-b`, `Mod-i`, `Mod-u`    | `toggleMark("bold")`, `toggleMark("italic")`, `toggleMark("underline")`   |
+| Ctrl+Shift+=, Ctrl+=       | Cmd+Shift+=, Cmd+=       | `Mod-Shift-+`, `Mod-=`       | `toggleVerticalAlign("superscript")`, `toggleVerticalAlign("subscript")`  |
+| Ctrl+Space                 | Ctrl+Space               | `Mod- `, `Ctrl- `            | `clearFormatting()`: direct character formatting off                      |
+| Ctrl+Shift+>, Ctrl+Shift+< | Cmd+Shift+>, Cmd+Shift+< | `Mod-Shift->`, `Mod-Shift-<` | `stepFontSize(1)`, `stepFontSize(-1)`                                     |
 | Ctrl+K                     | Cmd+K                    | `Mod-k`                      | `openLinkEditor` (the app's link dialog: `FoliToolbar` answers it)        |
 | Ctrl+A                     | Cmd+A                    | `Mod-a`                      | `selectAll`                                                               |
 | Left, Right                | the same                 | `ArrowLeft`, `ArrowRight`    | `arrowAcrossLeaf(±1, "char")`: over a picture or an opaque leaf           |
@@ -132,6 +137,7 @@ These stay the view's whatever a keymap binds (ADR-0008):
 | Escape in a header, footer or note                                                                      | The way out of a nested editing host: no keyboard trap.                                                                                            |
 | Tab, Shift+Tab after Escape, or when read-only                                                          | The way out of the document: no keyboard trap.                                                                                                     |
 | Ctrl+Shift+V (Cmd+Shift+V)                                                                              | Only marks the next paste as plain text; it does not take the key.                                                                                 |
+| Ctrl+= and Ctrl+Shift+= in the document (not reserved: a keymap may bind them)                          | Taken from the browser's zoom for subscript and superscript, as in Word on the web: Ctrl+minus still zooms the browser out, Ctrl+0 resets it.      |
 | Escape while dragging a column border or resizing a picture                                             | The keys of a gesture, not of the document.                                                                                                        |
 | Keys inside a control's list or date pop-up                                                             | The keys of a pop-up widget, not of the document.                                                                                                  |
 | Any key while composing (IME)                                                                           | An input method owns the keys until it commits.                                                                                                    |

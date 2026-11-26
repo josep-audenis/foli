@@ -39,7 +39,14 @@ import {
   wordContext,
   wordToggleActive,
 } from "./word.js";
-import { defaultParagraphStyleOf, setParagraphStyle, setStyleNamed } from "./wordformat.js";
+import {
+  clearFormatting,
+  defaultParagraphStyleOf,
+  setParagraphStyle,
+  setStyleNamed,
+  stepFontSize,
+  toggleVerticalAlign,
+} from "./wordformat.js";
 
 export type DeleteUnit = "char" | "word";
 
@@ -627,6 +634,15 @@ export function baseKeymap(): Plugin {
       "Mod-b": toggleMark("bold"),
       "Mod-i": toggleMark("italic"),
       "Mod-u": toggleMark("underline"),
+      // Word's: superscript, subscript, clear character formatting, grow and shrink the font.
+      // The view names these keys by their place on a US keyboard (`keyName`).
+      "Mod-Shift-+": toggleVerticalAlign("superscript"),
+      "Mod-=": toggleVerticalAlign("subscript"),
+      "Mod- ": clearFormatting(),
+      // Ctrl+Space on macOS too, as Word for Mac (Cmd+Space is the system's).
+      "Ctrl- ": clearFormatting(),
+      "Mod-Shift->": stepFontSize(1),
+      "Mod-Shift-<": stepFontSize(-1),
       "Mod-k": openLinkEditor,
       "Mod-a": selectAll,
       // Up/Down from a caret need the view's line geometry: it runs arrowAcrossLeaf(dir, "line").

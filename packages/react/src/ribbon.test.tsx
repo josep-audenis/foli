@@ -155,6 +155,26 @@ describe("wordRibbonTabs", () => {
       expect(boxes.has(item.key) || item.key in toolbarIcons, item.key).toBe(true);
   });
 
+  it("has Word's Font group: scripts, grow and shrink, change case, clear all", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    act(() => {
+      editor.select(1, 6);
+    });
+    const press = (name: string) =>
+      fireEvent.click(screen.getByRole("button", { name }), { detail: 1 });
+    press("Superscript");
+    expect(screen.getByRole("button", { name: "Superscript" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    press("Increase font size");
+    press("Change case");
+    fireEvent.click(screen.getByRole("menuitem", { name: "UPPERCASE" }));
+    expect(editor.getDocument().content.content?.[0]?.content?.[0]?.text).toBe("HELLO");
+    press("Clear all formatting");
+    expect(editor.getDocument().content.content?.[0]?.content?.[0]?.marks).toBeUndefined();
+  });
+
   it("leaves the default toolbar's items as they were: letters and text", () => {
     const editor = createEditor({ document: word });
     render(<FoliToolbar editor={editor} tabs={defaultToolbarTabs} />);
