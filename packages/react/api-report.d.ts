@@ -748,13 +748,7 @@ export declare function FoliToolbar({ editor: given, disabled, commentOnly, onCl
 export {};
 
 // StyleGallery.d.ts
-import type { ToolbarCustomProps } from "./FoliToolbar.js";
-/**
- * Word's Styles gallery (29.10): a listbox of the paragraph styles, each drawn in its own look;
- * Up and Down (and Home, End) move through them, Enter and a click apply one, Alt+Down or the
- * arrow at its end shows them all. Left and Right stay the toolbar's.
- */
-export declare function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: ToolbarCustomProps): import("react").JSX.Element;
+export {};
 
 // editor.d.ts
 import { type Command, type Editor, type EditorDocument, type EditorState, type Extension, type FoliCommands, type Plugin, type ReviewView } from "@folijs/core";

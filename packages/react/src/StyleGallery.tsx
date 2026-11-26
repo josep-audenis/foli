@@ -68,6 +68,7 @@ const sameLooks = (a: Look[], b: Look[]) =>
  * Word's Styles gallery (29.10): a listbox of the paragraph styles, each drawn in its own look;
  * Up and Down (and Home, End) move through them, Enter and a click apply one, Alt+Down or the
  * arrow at its end shows them all. Left and Right stay the toolbar's.
+ * @internal `toolbarItems.styleGallery` is how apps use it.
  */
 export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: ToolbarCustomProps) {
   const t = useT();
