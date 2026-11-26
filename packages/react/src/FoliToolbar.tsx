@@ -1791,7 +1791,11 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         ? {
             ...group,
             items: group.items.map(withIcon),
-            launcher: group.launcher && withIcon(group.launcher),
+            // A launcher is drawn as Word's corner arrow whatever its size.
+            launcher: group.launcher && {
+              ...group.launcher,
+              icon: toolbarIcons[group.launcher.key],
+            },
           }
         : group.map(withIcon),
     ),
@@ -2217,7 +2221,17 @@ export function FoliToolbar({
   // have one, from the end of the row.
   const [small, setSmall] = useState(0);
   const largeGroups = useMemo(
-    () => groups.flatMap((group, g) => (group.items.some((i) => i.size !== undefined) ? [g] : [])),
+    // Groups with a button whose small form is narrower: large, or medium with an icon.
+    () =>
+      groups.flatMap((group, g) =>
+        group.items.some(
+          (i) =>
+            i !== group.launcher &&
+            (i.size === "large" || (i.size === "medium" && i.icon !== undefined)),
+        )
+          ? [g]
+          : [],
+      ),
     [groups],
   );
   const smallGroups = new Set(largeGroups.slice(largeGroups.length - small));
