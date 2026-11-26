@@ -154,6 +154,7 @@ import {
   useT,
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
+import { StyleGallery } from "./StyleGallery.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -259,6 +260,11 @@ export interface ToolbarGroup {
    * Usually a `ToolbarDialog` (`{ ...toolbarItems.pageSetup }`).
    */
   readonly launcher?: ToolbarItem | undefined;
+  /**
+   * The key of the item that starts the group's second row (Word's Font and Paragraph groups):
+   * the items before it make the first row (1.11).
+   */
+  readonly wrapBefore?: string | undefined;
 }
 
 /** A toolbar's groups, a separator between them: arrays of items, or groups with a caption. */
@@ -1625,6 +1631,12 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: isWord,
     command: toggleFormattingMarks,
   },
+  {
+    key: "styleGallery",
+    label: "Styles",
+    enabled: hasTextblock,
+    render: StyleGallery,
+  },
   // Word's Font group (29.3).
   {
     key: "superscript",
@@ -1774,7 +1786,8 @@ export type ToolbarItemName =
   | "changeCase"
   | "underlineStyle"
   | "formatPainter"
-  | "formattingMarks";
+  | "formattingMarks"
+  | "styleGallery";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -1815,7 +1828,9 @@ export const toolbarItems = Object.fromEntries(
         ? ToolbarColorMenu
         : Name extends ToolbarDialogItemName
           ? ToolbarDialog
-          : ToolbarButton;
+          : Name extends "styleGallery"
+            ? ToolbarCustom
+            : ToolbarButton;
 };
 
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
@@ -1831,6 +1846,8 @@ const labelOf = (group: ToolbarGroups[number]): string | undefined =>
   Array.isArray(group) ? undefined : (group as ToolbarGroup).label;
 const launcherOf = (group: ToolbarGroups[number]): ToolbarItem | undefined =>
   Array.isArray(group) ? undefined : (group as ToolbarGroup).launcher;
+const wrapOf = (group: ToolbarGroups[number]): string | undefined =>
+  Array.isArray(group) ? undefined : (group as ToolbarGroup).wrapBefore;
 
 /**
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
@@ -1943,38 +1960,44 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       items: [
         group("Undo", t.undo, t.redo),
         group("Clipboard", t.formatPainter),
-        group(
-          "Font",
-          t.font,
-          t.size,
-          t.bold,
-          t.italic,
-          t.growFont,
-          t.shrinkFont,
-          t.changeCase,
-          t.clearFormatting,
-          t.underline,
-          t.underlineStyle,
-          t.strike,
-          t.subscript,
-          t.superscript,
-          t.textColor,
-          t.highlight,
-        ),
-        group(
-          "Paragraph",
-          t.bulletList,
-          t.orderedList,
-          t.outdent,
-          t.indent,
-          t.alignStart,
-          t.alignCenter,
-          t.alignEnd,
-          t.alignJustify,
-          t.lineSpacing,
-          t.formattingMarks,
-        ),
-        group("Styles", t.style),
+        {
+          ...group(
+            "Font",
+            t.font,
+            t.size,
+            t.growFont,
+            t.shrinkFont,
+            t.changeCase,
+            t.clearFormatting,
+            t.bold,
+            t.italic,
+            t.underline,
+            t.underlineStyle,
+            t.strike,
+            t.subscript,
+            t.superscript,
+            t.textColor,
+            t.highlight,
+          ),
+          wrapBefore: "bold",
+        },
+        {
+          ...group(
+            "Paragraph",
+            t.bulletList,
+            t.orderedList,
+            t.outdent,
+            t.indent,
+            t.formattingMarks,
+            t.alignStart,
+            t.alignCenter,
+            t.alignEnd,
+            t.alignJustify,
+            t.lineSpacing,
+          ),
+          wrapBefore: "align-start",
+        },
+        group("Styles", t.styleGallery),
         group("Editing", t.navigate),
       ],
     },
@@ -2221,6 +2244,7 @@ const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) 
       return (
         labelOf(group) === labelOf(other) &&
         launcherOf(group) === launcherOf(other) &&
+        wrapOf(group) === wrapOf(other) &&
         sameItems(itemsOf(group), itemsOf(other))
       );
     }));
@@ -2328,6 +2352,7 @@ export function FoliToolbar({
         // The launcher is the group's last item, for the arrow keys and the More panel.
         return {
           label: labelOf(group),
+          wrapBefore: wrapOf(group),
           launcher: own.length > 0 && launcher ? launcher : null,
           items: own.length > 0 && launcher ? [...own, launcher] : own,
         };
@@ -3647,6 +3672,18 @@ export function FoliToolbar({
                   </span>
                 );
               });
+              // Word's two-row groups: the items before `wrapBefore`, then the rest (the
+              // launcher stays last, in the caption's corner).
+              const wrap = group.items.findIndex((item) => item.key === group.wrapBefore);
+              const rows = (row: ReactNode[]) =>
+                wrap > 0 ? (
+                  <>
+                    <div className="foli-toolbar-row">{row.slice(0, wrap)}</div>
+                    <div className="foli-toolbar-row">{row.slice(wrap)}</div>
+                  </>
+                ) : (
+                  row
+                );
               return (
                 <Fragment key={group.items[0]?.key}>
                   {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
@@ -3659,7 +3696,11 @@ export function FoliToolbar({
                       aria-label={trLabel(group.label)}
                       className="foli-toolbar-group"
                     >
-                      <div className="foli-toolbar-group-items">{controls.slice(0, -1)}</div>
+                      <div
+                        className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
+                      >
+                        {rows(controls.slice(0, -1))}
+                      </div>
                       <div className="foli-toolbar-group-foot">
                         <div className="foli-toolbar-group-label" aria-hidden="true">
                           {trLabel(group.label)}
@@ -3674,7 +3715,11 @@ export function FoliToolbar({
                       aria-label={trLabel(group.label)}
                       className="foli-toolbar-group"
                     >
-                      <div className="foli-toolbar-group-items">{controls}</div>
+                      <div
+                        className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
+                      >
+                        {rows(controls)}
+                      </div>
                       <div className="foli-toolbar-group-label" aria-hidden="true">
                         {trLabel(group.label)}
                       </div>

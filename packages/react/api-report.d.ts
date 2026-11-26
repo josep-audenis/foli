@@ -459,6 +459,11 @@ export interface ToolbarGroup {
      * Usually a `ToolbarDialog` (`{ ...toolbarItems.pageSetup }`).
      */
     readonly launcher?: ToolbarItem | undefined;
+    /**
+     * The key of the item that starts the group's second row (Word's Font and Paragraph groups):
+     * the items before it make the first row (1.11).
+     */
+    readonly wrapBefore?: string | undefined;
 }
 /** A toolbar's groups, a separator between them: arrays of items, or groups with a caption. */
 export type ToolbarGroups = readonly (readonly ToolbarItem[] | ToolbarGroup)[];
@@ -708,7 +713,7 @@ export interface ToolbarAction {
     readonly checked?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
 /** The names of the built-in items in `toolbarItems`. */
-export type ToolbarItemName = "style" | "font" | "size" | "bold" | "italic" | "underline" | "strike" | "link" | "textColor" | "highlight" | "alignStart" | "alignCenter" | "alignEnd" | "alignJustify" | "lineSpacing" | "bulletList" | "orderedList" | "outdent" | "indent" | "newComment" | "trackChanges" | "reviewView" | "previousChange" | "nextChange" | "acceptChange" | "rejectChange" | "acceptAll" | "rejectAll" | "undo" | "redo" | "table" | "tableStyle" | "cellShading" | "picture" | "pageBreak" | "horizontalRule" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls" | "rowAbove" | "rowBelow" | "columnLeft" | "columnRight" | "deleteRows" | "deleteColumns" | "deleteTable" | "mergeCells" | "splitCell" | "columnWidth" | "headerRow" | "pageSetup" | "controlProperties" | "footnote" | "endnote" | "goToNote" | "noteOptions" | "tableOfContents" | "updateFields" | "pageNumber" | "date" | "crossReference" | "fieldCodes" | "navigationPane" | "rotateLeft" | "rotateRight" | "superscript" | "subscript" | "growFont" | "shrinkFont" | "clearFormatting" | "changeCase" | "underlineStyle" | "formatPainter" | "formattingMarks";
+export type ToolbarItemName = "style" | "font" | "size" | "bold" | "italic" | "underline" | "strike" | "link" | "textColor" | "highlight" | "alignStart" | "alignCenter" | "alignEnd" | "alignJustify" | "lineSpacing" | "bulletList" | "orderedList" | "outdent" | "indent" | "newComment" | "trackChanges" | "reviewView" | "previousChange" | "nextChange" | "acceptChange" | "rejectChange" | "acceptAll" | "rejectAll" | "undo" | "redo" | "table" | "tableStyle" | "cellShading" | "picture" | "pageBreak" | "horizontalRule" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls" | "rowAbove" | "rowBelow" | "columnLeft" | "columnRight" | "deleteRows" | "deleteColumns" | "deleteTable" | "mergeCells" | "splitCell" | "columnWidth" | "headerRow" | "pageSetup" | "controlProperties" | "footnote" | "endnote" | "goToNote" | "noteOptions" | "tableOfContents" | "updateFields" | "pageNumber" | "date" | "crossReference" | "fieldCodes" | "navigationPane" | "rotateLeft" | "rotateRight" | "superscript" | "subscript" | "growFont" | "shrinkFont" | "clearFormatting" | "changeCase" | "underlineStyle" | "formatPainter" | "formattingMarks" | "styleGallery";
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName = "changeCase" | "underlineStyle" | "table" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls";
 type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
@@ -719,7 +724,7 @@ type ToolbarDialogItemName = "columnWidth" | "pageSetup" | "controlProperties" |
  * except the alignments: `align-start`, `align-center`, `align-end`, `align-justify`). A copy
  * with another `label` or `icon` keeps what the built-in does.
  */
-export declare const toolbarItems: { readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : Name extends ToolbarSelectName ? ToolbarSelect : Name extends ToolbarColorName ? ToolbarColorMenu : Name extends ToolbarDialogItemName ? ToolbarDialog : ToolbarButton; };
+export declare const toolbarItems: { readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : Name extends ToolbarSelectName ? ToolbarSelect : Name extends ToolbarColorName ? ToolbarColorMenu : Name extends ToolbarDialogItemName ? ToolbarDialog : Name extends "styleGallery" ? ToolbarCustom : ToolbarButton; };
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export declare const defaultToolbarItems: readonly (readonly ToolbarItem[])[];
 /**
@@ -740,6 +745,9 @@ export declare const selectionInTable: (state: EditorState) => boolean;
  */
 export declare const wordRibbonTabs: readonly ToolbarTab[];
 export declare function FoliToolbar({ editor: given, disabled, commentOnly, onClickCommand: givenClickCommand, label: givenLabel, className, comments, localFonts, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, collapsed: givenCollapsed, defaultCollapsed, onCollapsedChange, keyTips, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
+export {};
+
+// StyleGallery.d.ts
 export {};
 
 // editor.d.ts

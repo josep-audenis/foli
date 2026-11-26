@@ -49,7 +49,9 @@ describe("wordRibbonTabs", () => {
         ? [...g.items, ...(g.launcher ? [g.launcher] : [])].map((i) => i.key)
         : g.map((i) => i.key);
     const all = new Set(groups.flatMap(keysOf));
-    for (const item of Object.values(toolbarItems)) expect(all.has(item.key)).toBe(true);
+    // The Styles gallery stands for the style box there, as in Word.
+    for (const item of Object.values(toolbarItems))
+      expect(all.has(item.key) || item.key === "style", item.key).toBe(true);
     // An item twice in one tab would share a key.
     for (const tab of wordRibbonTabs) {
       const keys = tab.items.flatMap(keysOf);
@@ -150,7 +152,10 @@ describe("wordRibbonTabs", () => {
     const table = screen.getByRole("button", { name: "Table" });
     expect(table.querySelector(".foli-toolbar-large-icon svg")).not.toBeNull();
     // Every built-in but the boxes has an icon in the ribbon.
-    const boxes = new Set(["style", "font", "size", "lineSpacing", "reviewView", "tableStyle"]);
+    const boxes = new Set([
+      ...["style", "font", "size", "lineSpacing", "reviewView", "tableStyle"],
+      "styleGallery",
+    ]);
     for (const item of Object.values(toolbarItems))
       expect(boxes.has(item.key) || item.key in toolbarIcons, item.key).toBe(true);
   });
@@ -173,6 +178,45 @@ describe("wordRibbonTabs", () => {
     expect(editor.getDocument().content.content?.[0]?.content?.[0]?.text).toBe("HELLO");
     press("Clear all formatting");
     expect(editor.getDocument().content.content?.[0]?.content?.[0]?.marks).toBeUndefined();
+  });
+
+  it("has Word's Styles gallery: each style in its look; arrows, Enter and a click apply", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    const gallery = screen.getByRole("listbox", { name: "Styles" });
+    const names = within(gallery)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(names.slice(0, 2)).toEqual(["Normal", "Heading 1"]);
+    expect(
+      within(gallery).getByRole("option", { name: "Normal" }).getAttribute("aria-selected"),
+    ).toBe("true");
+    fireEvent.click(within(gallery).getByRole("option", { name: "Heading 1" }));
+    expect(editor.getDocument().content.content?.[0]?.attrs?.style).toBe("Heading1");
+    act(() => {
+      editor.select(1);
+    });
+    fireEvent.keyDown(gallery, { key: "ArrowDown" });
+    fireEvent.keyDown(gallery, { key: "Enter" });
+    expect(editor.getDocument().content.content?.[0]?.attrs?.style).toBe("Heading2");
+  });
+
+  it("draws Home's Font and Paragraph groups in two rows; the gallery folds on a press away", () => {
+    const editor = createEditor({ document: word });
+    const { container } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    const font = screen.getByRole("group", { name: "Font" });
+    const rows = font.querySelectorAll(".foli-toolbar-row");
+    expect(rows).toHaveLength(2);
+    expect(
+      within(rows[1] as HTMLElement)
+        .getAllByRole("button")[0]
+        ?.getAttribute("aria-label"),
+    ).toBe("Bold");
+    const gallery = container.querySelector(".foli-style-gallery") as HTMLElement;
+    fireEvent.click(gallery.querySelector(".foli-style-gallery-more") as Element);
+    expect(gallery.classList.contains("foli-style-gallery-open")).toBe(true);
+    fireEvent.pointerDown(document.body);
+    expect(gallery.classList.contains("foli-style-gallery-open")).toBe(false);
   });
 
   it("leaves the default toolbar's items as they were: letters and text", () => {

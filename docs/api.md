@@ -460,6 +460,12 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
 <FoliEditor toolbar={wordRibbonTabs} />;
 ```
 
+- Styles gallery (1.11): Home's Styles group is `toolbarItems.styleGallery`, Word's gallery: a
+  `listbox` of the paragraph styles, each drawn in its own font, size (9 to 16 pt), color,
+  weight and slant, Word's Quick Styles first; Up, Down, Home and End move, Enter or a click
+  applies, Alt+Down or the arrow at its end shows them all (Escape folds it). The style box
+  (`toolbarItems.style`) stays for the one-row toolbar. Home's Font and Paragraph groups are in
+  two rows, as Word's: `wrapBefore` on a `ToolbarGroup` (an item's key) starts the second row.
 - Icons (1.11): the ribbon draws an SVG icon for each built-in item but the boxes, from
   `toolbarIcons` (by the item's `key`; Lucide's shapes, ISC, `LICENSE-lucide` in the package).
   The formatting buttons, Undo and Redo show the icon alone (their label names them); the others
