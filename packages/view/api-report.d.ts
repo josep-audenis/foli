@@ -351,6 +351,9 @@ export declare class EditorView {
     /** The pages' zoom (29.6), and who asks for another on Ctrl+wheel. */
     private zoom;
     private onZoom;
+    /** The zoom Ctrl+wheel asked for and the app has not set yet, and the wheel's leftover. */
+    private zoomAsked;
+    private wheelDelta;
     private readonly hintMarks;
     /** The hint shown, as positions of the body (18.1). */
     private shownHint;
