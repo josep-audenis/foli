@@ -1188,8 +1188,9 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `view.setOptions({ editable?, placeholder?, resource?, upload?, zoom?, onZoom? })`: changes the
   given options. `zoom` (1.11; 0.1 to 5, default 1) draws the pages larger or smaller with CSS
   `zoom` on the view's element (positions, the selection, pointer gestures, comments and
-  formatting marks follow; nothing is flowed again); `onZoom(zoom)` is called on Ctrl+wheel
-  (Cmd+wheel) over the document with the next zoom, 10% a notch: the app sets it. `view.fitZoom(
+  formatting marks follow; nothing is flowed again; printed at 100%; gone with `destroy`);
+  `onZoom(zoom)` is called on Ctrl+wheel (on macOS Cmd+wheel and a trackpad pinch too) over the
+  document with the next zoom, 10% for each hundred px the wheel moves: the app sets it. `view.fitZoom(
   "width" | "page")` gives the zoom that fits.
   `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
   the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;

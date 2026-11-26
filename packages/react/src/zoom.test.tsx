@@ -28,4 +28,22 @@ describe("FoliCanvas zoom", () => {
     expect(event).toBe(true);
     expect(onZoomChange).not.toHaveBeenCalled();
   });
+
+  it("steps by notches of a hundred px (a pinch's small deltas add up), from the zoom asked", () => {
+    const editor = createEditor();
+    const onZoomChange = vi.fn();
+    const { container, unmount } = render(
+      <FoliCanvas editor={editor} zoom={1} onZoomChange={onZoomChange} />,
+    );
+    const content = container.querySelector(".foli-content") as HTMLElement;
+    for (let i = 0; i < 3; i++) fireEvent.wheel(content, { deltaY: -40, ctrlKey: true });
+    expect(onZoomChange.mock.calls).toEqual([[1.1]]);
+    // Before the app sets it, the next notch goes on from 1.1.
+    fireEvent.wheel(content, { deltaY: -100, ctrlKey: true });
+    expect(onZoomChange).toHaveBeenLastCalledWith(1.2);
+    // Printed at 100% whatever the zoom; the zoom goes with the view.
+    expect(document.head.textContent).toContain("zoom:1!important");
+    unmount();
+    expect(content.style.zoom).toBe("");
+  });
 });

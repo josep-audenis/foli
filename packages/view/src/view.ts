@@ -333,12 +333,12 @@ function viewPrintStyles(settings: DocumentSettings, sheets: readonly Sheet[], i
     width: `${width}mm`,
     height: `${height}mm`,
   });
-  return printStyles(
+  return `${printStyles(
     `[${VIEW_ATTR}="${id}"]>.foli-page`,
     mm(settings.pageSize),
     sheets.map(({ settings: { pageSize }, index }) => ({ ...mm(pageSize), index })),
     id,
-  );
+  )}@media print{[${VIEW_ATTR}="${id}"]{zoom:1!important}}`;
 }
 
 /** Whether `node` is inside an element of `stop` that is not displayed (hidden deleted text). */
@@ -765,6 +765,9 @@ export class EditorView {
   /** The pages' zoom (29.6), and who asks for another on Ctrl+wheel. */
   private zoom = 1;
   private onZoom: ((zoom: number) => void) | null = null;
+  /** The zoom Ctrl+wheel asked for and the app has not set yet, and the wheel's leftover. */
+  private zoomAsked: number | null = null;
+  private wheelDelta = 0;
   private readonly hintMarks: HintMarks;
   /** The hint shown, as positions of the body (18.1). */
   private shownHint: {
@@ -985,6 +988,8 @@ export class EditorView {
     this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
+    // The zoom is the view's: a view made on the element later starts at 100%.
+    this.host.style.removeProperty("zoom");
     this.unsubscribe();
     this.peerMarks.clear();
     if (this.peersShown) this.showPeers(false);
@@ -1048,6 +1053,7 @@ export class EditorView {
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
     if (options.onZoom !== undefined) this.onZoom = options.onZoom;
+    if (options.zoom !== undefined) this.zoomAsked = null;
     if (options.zoom !== undefined && zoomIn(options.zoom) !== this.zoom) {
       this.zoom = zoomIn(options.zoom);
       host.style.zoom = this.zoom === 1 ? "" : String(this.zoom);
@@ -2465,9 +2471,11 @@ export class EditorView {
   }
 
   /** Where the editor shows on the screen: its box within every clipping ancestor's. */
-  private visibleBox(): { left: number; top: number; right: number; bottom: number } {
+  private visibleBox(own = true): { left: number; top: number; right: number; bottom: number } {
     const win = this.host.ownerDocument.defaultView as Window;
-    let { left, top, right, bottom } = this.host.getBoundingClientRect();
+    let { left, top, right, bottom } = own
+      ? this.host.getBoundingClientRect()
+      : { left: 0, top: 0, right: win.innerWidth, bottom: win.innerHeight };
     for (let el = this.host.parentElement; el; el = el.parentElement) {
       if (win.getComputedStyle(el).overflow === "visible") continue;
       const box = el.getBoundingClientRect();
@@ -4501,9 +4509,19 @@ export class EditorView {
 
   /** Ctrl+wheel asks the app for the next zoom, 10% a notch (29.6). */
   private onWheel = (event: WheelEvent): void => {
-    if (!this.onZoom || !(IS_MAC ? event.metaKey : event.ctrlKey) || !event.deltaY) return;
+    // Ctrl+wheel; on macOS Cmd+wheel too, and a trackpad pinch (which comes as Ctrl+wheel).
+    if (!this.onZoom || !(event.ctrlKey || (IS_MAC && event.metaKey)) || !event.deltaY) return;
     event.preventDefault();
-    this.onZoom(zoomIn(this.zoom + (event.deltaY < 0 ? 0.1 : -0.1)));
+    // A notch of a mouse wheel is about 100 px; a pinch comes as many small deltas: 10% a
+    // hundred px, from what was asked last (several events come before the app sets it).
+    const px = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
+    this.wheelDelta += px;
+    const notches = Math.trunc(this.wheelDelta / 100);
+    if (!notches) return;
+    this.wheelDelta -= notches * 100;
+    const from = this.zoomAsked ?? this.zoom;
+    this.zoomAsked = zoomIn(from - notches * 0.1);
+    this.onZoom(this.zoomAsked);
   };
 
   /**
@@ -4515,10 +4533,12 @@ export class EditorView {
     const page = this.pages[0];
     if (!page) return this.zoom;
     const shown = page.getBoundingClientRect();
-    const { top, bottom } = this.visibleBox();
-    const across = ((this.host.getBoundingClientRect().width - 32) / shown.width) * this.zoom;
-    // The height from where the editor starts showing to the bottom of what shows of it.
-    const down = ((bottom - Math.max(top, 0) - 32) / shown.height) * this.zoom;
+    const host = this.host.getBoundingClientRect();
+    // The height from where the editor starts to the bottom of what can show it (its clipping
+    // ancestors and the window), not its own bottom, which moves with the zoom.
+    const { bottom } = this.visibleBox(false);
+    const across = ((host.width - 32) / shown.width) * this.zoom;
+    const down = ((bottom - Math.max(host.top, 0) - 32) / shown.height) * this.zoom;
     return zoomIn(kind === "width" ? across : Math.min(across, down));
   }
 
