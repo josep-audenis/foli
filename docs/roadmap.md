@@ -41,6 +41,18 @@ place that says what is in progress; check it before starting work.
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
+| 30 Font & Paragraph dialogs   | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 31 Ruler                      | Blocked by 30            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 32 Page decoration            | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 33 Text boxes & layout        | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 35 Insert extras              | Ready                    | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
+| 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 37 File tab & views           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 38 Proofing & AutoFormat      | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 39 App shell                  | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 40 Charts & SmartArt          | Blocked by 34            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 41 Extension gallery          | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4019,8 +4031,7 @@ toolbar built from `items` stay as in 1.10 (1.x semver).
 Not in this phase: the ruler, the Paragraph and Font dialogs, the Layout tab's quick menus
 (Margins, Orientation, Size, Columns), a Design tab (watermark, page color and borders), shapes,
 text boxes, equations and symbols to insert, a File tab, view modes (read, web layout, outline),
-and a floating picture toolbar (Picture Format has its commands). They stay under After 1.0
-("Word look, next"). No Microsoft icons or artwork: Foli draws its own.
+and a floating picture toolbar (Picture Format has its commands). They are planned as Phases 30 to 41. No Microsoft icons or artwork: Foli draws its own.
 
 **Starts from (1.10.0), checked 2026-11-26:**
 
@@ -4205,6 +4216,409 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
   tests pass unchanged; axe finds no new violation.
 - `pnpm check` green; the bench shows no keystroke slower than 1.10.
 
+## Word parity: the phases after Phase 29
+
+The rest of the comparison with Umo Editor, MROffice and Word (2026-11-26), written down as
+phases on the owner's request (2026-11-26): what Word has that people use every day and Foli
+does not. Each phase follows "Working on a phase" (claim, plan the PRs, build, close) and the
+task-by-task PR and review. The order is the value seen from a user's chair; the dependencies
+are said per phase. Nothing here is started. Sizes as in Principles.
+
+| Phase | Name                               | Size | Depends on   |
+| ----- | ---------------------------------- | ---- | ------------ |
+| 30    | Font, Paragraph and Layout dialogs | M    | —            |
+| 31    | Ruler                              | M    | 30           |
+| 32    | Page decoration (Design tab)       | M    | —            |
+| 33    | Text boxes and picture layout      | L    | —            |
+| 34    | Shapes                             | L    | 33           |
+| 35    | Insert extras                      | M    | — (35.6: 34) |
+| 36    | Tables as Word's                   | M    | —            |
+| 37    | File tab, export and views         | L    | —            |
+| 38    | Proofing, language, AutoFormat     | M    | —            |
+| 39    | App shell: languages, help, saving | M    | —            |
+| 40    | Charts and SmartArt shown          | L    | 34           |
+| 41    | Extension gallery                  | S    | —            |
+
+## Phase 30 — Font, Paragraph and Layout dialogs · M → next minor
+
+Word's Font and Paragraph dialogs, its Layout tab's quick menus and lengths in inches. Phase 29
+left the Font and Paragraph groups without dialog launchers and the right-click menu without
+Font… and Paragraph…; the Layout tab has one Section menu and the Page setup dialog.
+
+**Starts from (1.11), checked 2026-11-26:** the model has every property these dialogs set:
+paragraph `justification`, `indent`, `spacing` (line rules auto, exact, at least), `keepNext`,
+`keepLines`, `widowControl`, `pageBreakBefore`, `contextualSpacing`, `outlineLevel`, `tabs`,
+`borders`, `shading` (`v3/schema.ts` `paragraphProperties`); run marks for every Font effect
+(`RUN_PROPERTY_MARKS`: caps, small caps, double strike, hidden, character spacing…). Core has
+`setParagraphSpacing`, `setLineSpacing`, `changeIndent`, `setFontSize`, `setUnderline`… but no
+command for an indent's exact value, a line rule, tabs or character spacing. The Page setup
+dialog (`FoliToolbar.tsx`, `SETUP_LABELS`) takes centimetres only.
+
+**Decisions to take in 30.1:** the unit (Word's: from the locale, inches in en-US, cm elsewhere,
+and a `units` prop); whether the dialogs are built-in toolbar dialogs (`ToolbarDialogName`) or
+components of their own (proposed: built-in dialogs, as Page setup, opened by launchers, the
+context menu and `editor.commands`); how mixed values show (Word: blank).
+
+### Tasks
+
+- [ ] 30.1 Decisions above; core commands for what the dialogs set that no command sets yet:
+  `setIndent({ left?, right?, firstLine?, hanging? })`, `setLineSpacing` with a rule,
+  `setParagraphFlags({ keepNext?, keepLines?, widowControl?, pageBreakBefore?,
+  contextualSpacing? })`, `setOutlineLevel`, `setCharacterSpacing`, `setRunEffects` (caps, small
+  caps, double strike, hidden), each tracked while tracking.
+- [ ] 30.2 Paragraph dialog: Indents and Spacing (alignment, outline level, left, right, special
+  first line or hanging, before, after, line spacing and its value, no space between paragraphs
+  of the same style) and Line and Page Breaks (widow control, keep with next, keep lines
+  together, page break before); a preview; mixed values blank; launcher on Home's and Layout's
+  Paragraph groups; Paragraph… in the right-click menu.
+- [ ] 30.3 Font dialog: font, style, size, color, underline style and color, effects
+  (strikethrough, double, superscript, subscript, small caps, all caps, hidden), Advanced
+  (character spacing, scale where the model has it); a preview; launcher on Home's Font group;
+  Font… in the right-click menu; Ctrl+D (with `wordKeymap()`).
+- [ ] 30.4 Tabs dialog (stops, alignment, leader, default stop, clear), from the Paragraph
+  dialog's Tabs… button.
+- [ ] 30.5 Layout tab quick menus as Word's: Margins (Normal, Narrow, Moderate, Wide, Mirrored,
+  Custom… to Page setup), Orientation, Size (Letter, Legal, A3, A4, A5, Executive, Custom…),
+  Columns (One to Three, Left, Right, More…), Breaks (page, column, text wrapping, the four
+  section breaks); Spacing and Indent boxes in Layout's Paragraph group.
+- [ ] 30.6 Units: inches or centimetres in every dialog (the locale's, `units` on the toolbar),
+  the Page setup dialog included.
+- [ ] 30.7 e2e in three engines with axe for each dialog and menu; docs (api.md, keyboard.md,
+  limitations.md); changesets.
+
+### Acceptance
+
+- Every property the Paragraph and Font dialogs show round-trips through `.docx` and undoes in
+  one step; a mixed selection shows blank and changes only what was set.
+- The Layout tab's menus set what Word's set on the caret's section; the units follow the locale.
+- `pnpm check` green; axe finds no violation in the dialogs.
+
+## Phase 31 — Ruler · M → next minor
+
+Word's horizontal and vertical rulers: margins, indents and tab stops seen and dragged.
+
+**Starts from:** indents and tabs in the model, Phase 30's commands to set them; the view knows
+each page's margins and each block's position (`layoutScale`, page regions); zoom (29.6) is CSS
+`zoom`. Nothing draws a ruler.
+
+**Decisions to take in 31.1:** where the ruler lives (proposed: `FoliRuler` in `@folijs/react`,
+reading the caret's paragraph and section from core and positions from the view through a small
+view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced (each handle a
+`slider` with its value in the unit).
+
+### Tasks
+
+- [ ] 31.1 Decisions; `view.rulerGeometry()` (the caret's page box, margins, the paragraph's
+  indents and tabs in screen px, table column edges), following scroll and zoom.
+- [ ] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
+  right indent handles dragged (one undo step per drag), Alt for exact values.
+- [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,
+  decimal, bar), drag to move, drag off to remove; double-click opens the Tabs dialog.
+- [ ] 31.4 Table columns on the ruler in a table (drag a column edge, as dragging its border).
+- [ ] 31.5 Vertical ruler: top and bottom margins of the caret's page, dragged.
+- [ ] 31.6 View tab's Ruler toggle; `FoliEditor`'s `ruler`; keyboard (each handle a slider:
+  arrows move by a step); e2e in three engines at 100% and 200% zoom; docs; changesets.
+
+### Acceptance
+
+- Dragging an indent, a tab stop, a margin or a column changes the document as the matching
+  dialog does, undoes in one step, and the handle stays under the pointer at any zoom.
+- Every handle is reachable and changeable by keyboard; axe clean.
+
+## Phase 32 — Page decoration (Design tab) · M → next minor
+
+Word's Design tab where Foli has something to put in it: page color, page borders, watermarks,
+and Home's Borders and Shading for paragraphs.
+
+**Starts from:** paragraph `borders` and `shading` in the model; a section's `w:pgBorders` and
+`w:lnNumType` kept verbatim (`docx/src/export/properties.ts`), not drawn; `w:background` not read
+(kept by the package only); a watermark is a header's shape (VML `PowerPlusWaterMarkObject` or a
+DrawingML shape), kept opaque.
+
+**Decisions to take in 32.1:** page color as a document setting (`settings.background`) or the
+envelope's; watermark model (proposed: recognised on import as a header's watermark with text,
+font, color, size, layout, or a picture, drawn by the view, written back as Word writes it;
+anything else stays opaque); page borders as section attributes (`pageBorders`) instead of kept
+XML.
+
+### Tasks
+
+- [ ] 32.1 Decisions; import and export of `w:background` and `w:pgBorders` into the model,
+  schema bump with migration; drawn by the view, print and `exportPdf`.
+- [ ] 32.2 Page Color (theme and standard colors, No Color) and Page Borders dialog (setting,
+  style, color, width, which sides, apply to section or document).
+- [ ] 32.3 Watermark: read Word's text and picture watermarks from headers, draw them on every
+  page under the text, Design ▸ Watermark menu (Confidential, Draft, Do not copy…, Custom…,
+  Remove), written back as Word writes them.
+- [ ] 32.4 Borders and Shading for paragraphs: Home's Borders menu (bottom, top, left, right,
+  none, all, outside, horizontal line), the Borders and Shading dialog (style, color, width,
+  shading fill and pattern), tracked as paragraph formatting.
+- [ ] 32.5 Line numbers (Layout ▸ Line Numbers: none, continuous, restart each page or section,
+  suppress for paragraph) drawn in the margin, from `w:lnNumType`.
+- [ ] 32.6 Design tab in `wordRibbonTabs`; e2e, corpus files with watermarks and borders
+  through import, export and compare; docs; changesets.
+
+### Acceptance
+
+- Corpus files with page color, page borders, watermarks and line numbers show them and save
+  them back as Word reads them; the parts not edited stay byte-identical.
+
+## Phase 33 — Text boxes and picture layout · L → next minor
+
+Text boxes drawn and edited, and Word's Layout Options for pictures.
+
+**Starts from:** text boxes kept opaque and not drawn (`limitations.md`, Pictures: "Charts,
+shapes, text boxes and linked images stay opaque"); floating pictures with square,
+top-and-bottom, behind and in front of text (tight and through shown as square); crop by dialog
+only (19.5 left crop handles for later); stories (headers, footers, notes) edited on their page
+by a nested view (ADR-0007).
+
+**Decisions to take in 33.1 (an ADR):** a text box's content as a story (as notes are), opened
+on its page by a nested view; the box as a floating anchor like a picture (position, size,
+wrap); tight and through wrapping (a wrap polygon, or the box for now).
+
+### Tasks
+
+- [ ] 33.1 ADR: text boxes as stories in floating anchors; schema bump with migration; import
+  and export of `wps:txbx` / VML text boxes, the rest of the drawing kept.
+- [ ] 33.2 Drawing: the box, its fill and outline, its text laid out inside, wrapped around as a
+  picture is; read-only pages and `exportPdf` too.
+- [ ] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and
+  replace look in text boxes (left from 19); Insert ▸ Text Box draws a new one.
+- [ ] 33.4 Layout Options for pictures and boxes (in line, square, tight, through, top and
+  bottom, behind, in front; move with text or fix on page) as a menu beside the selected object
+  and in Picture Format ▸ Wrap Text; position (Position menu, Layout dialog).
+- [ ] 33.5 Crop handles on the page (left from 19.5), resize keeping the ratio with Shift, a
+  Size dialog (height, width, scale, rotation).
+- [ ] 33.6 Picture Format tab as Word's (Size group boxes, Arrange: wrap, position, bring
+  forward, send backward, align); corpus run; e2e; docs; changesets.
+
+### Acceptance
+
+- The corpus's text boxes show their text, are edited and saved back; Word opens the result
+  without repair. Every wrap kind lays text out as Word does on the corpus's samples (measured).
+
+## Phase 34 — Shapes · L → next minor
+
+Word's basic shapes drawn, inserted, moved, resized and formatted.
+
+**Starts from:** shapes kept opaque; Phase 33's floating anchors, text in a box as a story.
+
+**Decisions to take in 34.1:** which preset geometries are drawn (proposed: Word's Lines,
+Rectangles, Basic Shapes, Block Arrows, Callouts: about 40 of `prstGeom`'s, drawn as SVG paths;
+the rest drawn as their bounding box, kept whole); custom geometry (`custGeom`) drawn from its
+paths; text in shapes through Phase 33's stories.
+
+### Tasks
+
+- [ ] 34.1 Decisions; schema for a shape (geometry, fill, outline, effects kept), import and
+  export.
+- [ ] 34.2 SVG drawing of preset and custom geometries, fill (solid, gradient), outline (color,
+  width, dash, arrows), rotation, flip; on read-only pages and `exportPdf`.
+- [ ] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions.
+- [ ] 34.4 Selected shape: move, resize, rotate handles, adjustment handles for the shapes that
+  have them; arrow keys move; one undo step per gesture; text in a shape.
+- [ ] 34.5 Shape Format tab: fill, outline, styles, size, arrange (shared with 33.6).
+- [ ] 34.6 Corpus run on files with shapes; e2e; docs; changesets.
+
+### Acceptance
+
+- The corpus's shapes show as Word draws them (a visual compare within the tolerance) and are
+  written back unchanged unless edited; new shapes open in Word.
+
+## Phase 35 — Insert extras · M → next minor
+
+What Word's Insert tab has and Foli does not, short of shapes and charts.
+
+**Starts from:** `insertBookmark` and the bookmarks dialog (navigation); `SEQ` and `REF` fields
+updated (11.8); equations (`m:oMath`) kept opaque; no symbol picker; date fields with pictures.
+
+### Tasks
+
+- [ ] 35.1 Symbol: a recent-symbols menu and the Symbol dialog (Unicode blocks by font, special
+  characters: em dash, non-breaking space and hyphen, ©, ®, ™, §, ¶…, their keys), inserting
+  text in the font chosen.
+- [ ] 35.2 Date & Time dialog: Word's formats for the document's language, update
+  automatically (a `DATE` field) or as text.
+- [ ] 35.3 Caption: Insert Caption (label, numbering, position above or below) as Word writes it
+  (`SEQ` field in a Caption-style paragraph); Table of Figures from References.
+- [ ] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on
+  pages, read-only pages and `exportPdf`; the text of an equation for find and screen readers.
+- [ ] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
+  OMML; Insert ▸ Equation with Word's common ones.
+- [ ] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34
+  for its shapes; a text-only cover before).
+- [ ] 35.7 e2e; docs; changesets.
+
+### Acceptance
+
+- Corpus equations show and round-trip unchanged; a new equation opens in Word as an equation.
+- Symbols, captions and dates insert what Word inserts.
+
+## Phase 36 — Tables as Word's · M → next minor
+
+Word's table tools: the grid picker, the styles gallery with its options, Table Properties,
+AutoFit and drawing borders.
+
+**Starts from:** tables, cells, rows with `height`, `borders`, `shading`, table styles with
+conditional formats and `tblLook` in the model; the Insert table dialog; the Table style box;
+column widths by dragging a border or the dialog; Table Design and Table Layout tabs (25.3).
+
+### Tasks
+
+- [ ] 36.1 Insert ▸ Table grid picker (drag over a 10×8 grid, as Word's) beside Insert Table….
+- [ ] 36.2 Table Styles gallery with previews (each style drawn on a sample), and Table Style
+  Options (header row, total row, banded rows, first and last column, banded columns:
+  `tblLook`).
+- [ ] 36.3 Table Properties dialog: table (width, alignment, indent, text wrapping), row (height
+  and rule, header row, allow break), column (width), cell (width, vertical alignment, margins).
+- [ ] 36.4 AutoFit (contents, window, fixed), Distribute Rows and Columns, row heights by
+  dragging a row's bottom border, the whole table by its corner handle.
+- [ ] 36.5 Borders for cells: Borders menu and Border Painter (style, width, color), Shading
+  (exists) beside them; Cell Margins; Text Direction.
+- [ ] 36.6 e2e; corpus tables through import, edit, export; docs; changesets.
+
+### Acceptance
+
+- Each command does to the `.docx` what Word's does (checked on the corpus) and undoes in one
+  step; the styles gallery shows the document's table styles as Word draws them.
+
+## Phase 37 — File tab, export and views · L → next minor
+
+Word's File tab (backstage) and View tab's views, and export to the formats Umo Editor offers.
+
+**Starts from:** open and save are the app's (the try page has its own buttons); `exportPdf`
+(`@folijs/pdf`); `view.print()`; the navigation pane and zoom; `paged: false` views exist for
+stories (ADR-0007); no HTML, Markdown or text export.
+
+**Decisions to take in 37.1:** the File tab's shape (proposed: a `FoliBackstage` component an app
+fills with its own actions, the built-in ones calling hooks it gives: `onOpen`, `onSave`); where
+HTML and Markdown export live (proposed: `@folijs/core` serializers of the model, no DOM, with
+what each format cannot hold listed); views as a view option (`layout: "print" | "web" |
+"read" | "outline" | "draft"`).
+
+### Tasks
+
+- [ ] 37.1 Decisions; `exportHtml(document)`, `exportMarkdown(document)`, `exportText(document)`
+  with tests on the corpus (headings, lists, tables, links, pictures as data URLs or the app's
+  URLs, comments and tracked changes dropped or shown as the app asks).
+- [ ] 37.2 Print preview and Print: the pages as printed beside print settings (pages, copies
+  are the browser's), through `view.print()`.
+- [ ] 37.3 `FoliBackstage`: New, Open, Save, Save As (docx, PDF, HTML, Markdown, text), Print,
+  Info (properties: title, author, subject, keywords from `docProps/core.xml`, editable; the
+  statistics of 29.7), Close; the File tab in `wordRibbonTabs` opening it.
+- [ ] 37.4 Web Layout (one flow without pages, the width of the window) and Read Mode (read-only,
+  columns of the screen's height, arrows turn) for the body.
+- [ ] 37.5 Outline view: headings as a tree, collapse and expand, promote and demote (outline
+  level and heading styles), move up and down with their content.
+- [ ] 37.6 Focus mode (the chrome hidden), full screen, multiple pages side by side; View tab's
+  Views and Zoom groups; the try page's File tab; e2e; docs; changesets.
+
+### Acceptance
+
+- Exports keep what each format can hold (listed per format) and say what they dropped.
+- Each view edits the same document with undo intact; switching back keeps the caret.
+
+## Phase 38 — Proofing, language and AutoFormat · M → next minor
+
+Spelling where the browser can, the document's languages, and Word's AutoFormat As You Type.
+
+**Starts from:** `w:lang` not kept (After 1.0: "`w:lang` given to the DOM"); the editing host
+leaves the browser's spellcheck on; Word's autocorrect is the browser's; lists by Ctrl+Shift+7
+and 8 only.
+
+**Decisions to take in 38.1:** `lang` as a run mark (schema bump) with the styles' and defaults'
+language resolved; `lang` written on the DOM per run so the browser spell-checks and hyphenates
+in the right language; what Foli's own AutoFormat does and what stays the browser's.
+
+### Tasks
+
+- [ ] 38.1 Decisions; `w:lang` read and written (run mark, styles, defaults), the DOM's `lang`
+  per run and paragraph; screen readers read each part in its language.
+- [ ] 38.2 Language: the status bar's language (29.7's left gap), Set Proofing Language (Review
+  ▸ Language: for the selection, do not check spelling, `w:noProof`).
+- [ ] 38.3 Spelling: Review ▸ Spelling on/off for the document (`spellcheck` on the host),
+  Shift+right-click's browser suggestions documented; checked in Chromium, Firefox and WebKit.
+- [ ] 38.4 Hyphenation: Layout ▸ Hyphenation (none, automatic: CSS `hyphens` with the
+  language; `w:autoHyphenation` read and written); pages measured with it.
+- [ ] 38.5 AutoFormat As You Type (`autoFormat()` plugin, opt-in, in `wordKeymap`'s company):
+  "1. " and "a) " start a numbered list, "* " and "- " a bulleted one, "---" a border, straight
+  quotes to smart ones, (c) © and the like, -- to an en dash; each one undone by the next Ctrl+Z,
+  as Word's.
+- [ ] 38.6 e2e (IME untouched by AutoFormat), docs, changesets.
+
+### Acceptance
+
+- A document's languages survive import and export and reach the DOM; spelling and hyphenation
+  follow them in the browsers that do it.
+- Each AutoFormat rule fires as Word's and one Ctrl+Z puts the typed text back.
+
+## Phase 39 — App shell: languages, help, saving · M → next minor
+
+What makes Foli an app and not only an editor: its own interface in other languages, a keyboard
+help, and saving state.
+
+**Starts from:** every string of the toolbar, status bar and context menu has a `messages` key
+(`toolbarMessages`, `statusBarMessages`, `contextMenuMessages`); `FoliEditor`'s `onChange`; the
+try page saves by download only.
+
+### Tasks
+
+- [ ] 39.1 Translations shipped: `@folijs/react/locales/<lang>` for es, ca, fr, de, it, pt (one
+  object for all components), a `locale` prop picking them, KeyTips following the translated
+  names (25.7); a check that every message has every translation.
+- [ ] 39.2 Keyboard shortcuts help (F1 or Ctrl+/ with `wordKeymap`): every key the editor
+  handles, from `keyboard.md`'s tables as data, searchable.
+- [ ] 39.3 Saved state: `editor.dirty` and `markSaved()` in core, the status bar's
+  Saved/Unsaved, `onSaveRequest` for Ctrl+S.
+- [ ] 39.4 The try page: autosave to IndexedDB, recent files, versions kept on each save (view,
+  restore, compare as tracked changes against the current one).
+- [ ] 39.5 docs (a localisation guide), changesets.
+
+### Acceptance
+
+- Each shipped language covers every string; switching it changes every component at once.
+- A closed and reopened try page has the document as it was.
+
+## Phase 40 — Charts and SmartArt shown · L → next minor
+
+Charts and SmartArt drawn where they are, read-only, and kept as they are.
+
+**Starts from:** both kept opaque; charts are `c:chart` parts with cached values; SmartArt has a
+`dsp:` drawing of its shapes cached by Word; Phase 34 draws shapes.
+
+### Tasks
+
+- [ ] 40.1 Decisions (which chart kinds: column, bar, line, pie, area, scatter first; drawn as
+  SVG from the cached values; the rest as a placeholder with the chart's title).
+- [ ] 40.2 Charts drawn on pages, read-only pages and `exportPdf`, sized as their anchor;
+  alt text read.
+- [ ] 40.3 SmartArt drawn from its cached `dsp:` drawing through Phase 34's shapes.
+- [ ] 40.4 Selected as one object (moved, resized, deleted, wrapped as a picture); the data not
+  edited; corpus compare; docs; changesets.
+
+### Acceptance
+
+- The corpus's charts and SmartArt show close to Word's (a visual compare within a tolerance
+  set in 40.1) and are written back byte-identical.
+
+## Phase 41 — Extension gallery · S → no release (examples and docs)
+
+Umo Editor's extras that are not Word's, as examples of Foli's extension API rather than built
+in: a QR code, a Mermaid diagram, an ECharts chart, a signature box, a video link, mentions
+(Phase 27 has comment mentions; `examples/extension` has one in text).
+
+### Tasks
+
+- [ ] 41.1 Each extra as an example under `examples/` (custom node, view hook, toolbar item,
+  `.docx` fallback as a picture or text Word shows), with a page on the site.
+- [ ] 41.2 What the examples needed from the API, fixed or recorded; their licenses checked
+  (no editor engine among them).
+
+### Acceptance
+
+- Each example runs on the site, saves to `.docx` with a fallback Word shows, and passes axe.
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -4214,11 +4628,7 @@ first group and from .docx files the corpus does not cover.
 
 **From the audit of 2026-11-22** (not in Phase 21; candidates for the next phases):
 
-- Word look, next (after Phase 29, from the comparison of 2026-11-26): a ruler; the Layout
-  tab's Margins, Orientation, Size and Columns menus; a Design tab (watermark, page color and
-  borders); symbols, text boxes, shapes and equations to insert; a table grid picker and
-  Table Properties; picture wrap options; a File tab with print preview and export; read,
-  web-layout and outline views; spelling squiggles and a language; UI translations.
+- Word look, next: planned as Phases 30 to 41 (2026-11-26), above.
 - (Phase 29 takes superscript, subscript, clear formatting, change case, the status bar, zoom,
   format painter and ¶ marks from the two items below.)
 - Word commands: superscript and subscript (the `verticalAlign` mark exists), clear formatting,
