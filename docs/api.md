@@ -56,6 +56,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
 | `statusBar`       | `boolean \| FoliStatusBarProps`                                                                          | `false`       | Word's status bar under the pages (1.11, `FoliStatusBar`); the zoom is then the editor's own unless `zoom` is given.                                                 |
 | `contextMenu`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's right-click menu on the document (1.11, `FoliContextMenu`); Shift+right-click keeps the browser's.                                                            |
+| `miniToolbar`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's mini toolbar above a selection made with the pointer (1.11, `FoliMiniToolbar`).                                                                               |
 | `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
 | `readOnly`        | `boolean`                                                                                                | `false`       | Read, select, copy; no editing. Disables the toolbar.                                                                                                                |
 | `commentOnly`     | `boolean`                                                                                                | `false`       | Select, copy, find and comment; no other change. Read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin. 1.10.                       |
@@ -92,6 +93,17 @@ The pages alone, for your own layout. Props: `editor` (default: the nearest
 document, shows the editor's selection and scrolls it into view; `fitZoom("width" | "page")` is
 the zoom that fits a page's width, or the whole page, in the part of the screen the canvas has).
 `FoliEditorHandle` has both.
+
+### `<FoliMiniToolbar>`
+
+Word's mini toolbar (1.11): a `FoliToolbar` of one row named "Mini toolbar" in
+`.foli-mini-toolbar`, above a point (the selection's start), faded until the pointer comes to it
+(`:hover`, `:focus-within`), gone when a key is pressed outside it, the pointer moves 120 px away
+or the selection is gone. It takes no focus, as Word's: the keyboard has the ribbon. Its
+`miniToolbarItems` are font, size, grow and shrink, bold, italic, underline, text color,
+highlight, styles and New comment, with the ribbon's icons. Props: `editor`, `at`, `items`,
+`messages` (the toolbar's), `commentOnly`, `onClose`, `onClickCommand`. `FoliEditor`'s
+`miniToolbar` shows it after a pointer selection in the document (not in a read-only one).
 
 ### `<FoliContextMenu>`
 

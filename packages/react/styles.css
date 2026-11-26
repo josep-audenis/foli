@@ -1080,3 +1080,23 @@
   display: flex;
   flex-direction: column;
 }
+
+/* Word's mini toolbar (FoliMiniToolbar): faded until the pointer comes to it. */
+.foli-mini-toolbar {
+  z-index: 15;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 6px;
+  background: var(--foli-toolbar-background);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.14);
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+.foli-mini-toolbar:hover,
+.foli-mini-toolbar:focus-within {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .foli-mini-toolbar {
+    transition: none;
+  }
+}
