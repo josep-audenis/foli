@@ -1358,8 +1358,8 @@ Details (what import keeps, what export writes, limits): the
 - `parseXml(source, options?): XmlDocument`: the XML reader that keeps every node's offsets in
   the source (`ParseXmlOptions`; `XmlNode`: `XmlElement`, `XmlText` or `XmlOther`, with `XmlName`
   and `XmlAttribute`).
-- Errors: `DocxError` (not a WordprocessingML document, Strict Open XML, content export cannot
-  write), `ZipError` (the container), `XmlError` (with the `offset`).
+- Errors: `DocxError` (not a WordprocessingML document, the message naming its root; content
+  export cannot write), `ZipError` (the container), `XmlError` (with the `offset`).
 
 ## `@folijs/agent`
 
