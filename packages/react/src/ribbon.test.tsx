@@ -201,6 +201,24 @@ describe("wordRibbonTabs", () => {
     expect(editor.getDocument().content.content?.[0]?.attrs?.style).toBe("Heading2");
   });
 
+  it("draws Home's Font and Paragraph groups in two rows; the gallery folds on a press away", () => {
+    const editor = createEditor({ document: word });
+    const { container } = render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    const font = screen.getByRole("group", { name: "Font" });
+    const rows = font.querySelectorAll(".foli-toolbar-row");
+    expect(rows).toHaveLength(2);
+    expect(
+      within(rows[1] as HTMLElement)
+        .getAllByRole("button")[0]
+        ?.getAttribute("aria-label"),
+    ).toBe("Bold");
+    const gallery = container.querySelector(".foli-style-gallery") as HTMLElement;
+    fireEvent.click(gallery.querySelector(".foli-style-gallery-more") as Element);
+    expect(gallery.classList.contains("foli-style-gallery-open")).toBe(true);
+    fireEvent.pointerDown(document.body);
+    expect(gallery.classList.contains("foli-style-gallery-open")).toBe(false);
+  });
+
   it("leaves the default toolbar's items as they were: letters and text", () => {
     const editor = createEditor({ document: word });
     render(<FoliToolbar editor={editor} tabs={defaultToolbarTabs} />);

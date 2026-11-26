@@ -5,7 +5,7 @@ import {
   setParagraphStyle,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
-import { type CSSProperties, type KeyboardEvent, useEffect, useId, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useEditorState } from "./editor.js";
 import type { ToolbarCustomProps } from "./FoliToolbar.js";
 import { type ToolbarMessage, useT } from "./messages.js";
@@ -62,7 +62,8 @@ function drawLooks(
 }
 
 const sameLooks = (a: Look[], b: Look[]) =>
-  a.length === b.length && a.every((look, i) => JSON.stringify(look) === JSON.stringify(b[i]));
+  a === b ||
+  (a.length === b.length && a.every((look, i) => JSON.stringify(look) === JSON.stringify(b[i])));
 
 /**
  * Word's Styles gallery (29.10): a listbox of the paragraph styles, each drawn in its own look;
@@ -76,14 +77,31 @@ export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
   const all = useEditorState(looks, { editor, isEqual: sameLooks });
   const current = useEditorState(paragraphStyleAt, { editor });
   const [open, setOpen] = useState(false);
-  // The quick styles first; open, all of them.
-  const shown = open ? all : [...all.filter((s) => s.quick), ...all.filter((s) => !s.quick)];
+  // The quick styles first, open or not (the row shows the first few).
+  const shown = [...all.filter((s) => s.quick), ...all.filter((s) => !s.quick)];
+  const list = useRef<HTMLDivElement | null>(null);
+  const box = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState<string | null>(null);
   const at = shown.findIndex((s) => s.id === (active ?? current));
-  // The active style stays in view (the gallery's row shows a few).
+  // The active style stays in view: the list scrolls, never the page.
   useEffect(() => {
-    if (at >= 0) document.getElementById(`${id}-${at}`)?.scrollIntoView?.({ block: "nearest" });
-  }, [at, id]);
+    const element = list.current;
+    const item = element?.children[at] as HTMLElement | undefined;
+    if (!element || !item) return;
+    if (item.offsetTop < element.scrollTop) element.scrollTop = item.offsetTop;
+    else if (item.offsetTop + item.offsetHeight > element.scrollTop + element.clientHeight)
+      element.scrollTop = item.offsetTop + item.offsetHeight - element.clientHeight;
+  }, [at]);
+  // Open, a press anywhere else folds it.
+  useEffect(() => {
+    if (!open) return;
+    const doc = box.current?.ownerDocument ?? document;
+    const away = (event: PointerEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    doc.addEventListener("pointerdown", away, true);
+    return () => doc.removeEventListener("pointerdown", away, true);
+  }, [open]);
   const apply = (style: string) => {
     if (disabled) return;
     editor.run(setParagraphStyle(style));
@@ -113,9 +131,12 @@ export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
     }
   };
   return (
-    <div className={`foli-style-gallery${open ? " foli-style-gallery-open" : ""}`}>
+    <div ref={box} className={`foli-style-gallery${open ? " foli-style-gallery-open" : ""}`}>
       <div
-        ref={ref}
+        ref={(element) => {
+          ref(element);
+          list.current = element;
+        }}
         role="listbox"
         aria-label={t("Styles" as ToolbarMessage)}
         aria-disabled={disabled || undefined}
@@ -150,7 +171,12 @@ export function StyleGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
         aria-hidden="true"
         className="foli-style-gallery-more"
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (disabled) return;
+          setOpen(!open);
+          // The keys go to the list now open, as Word's gallery takes them.
+          if (!open) list.current?.focus();
+        }}
       >
         ▾
       </span>
