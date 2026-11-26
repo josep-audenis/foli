@@ -40,7 +40,7 @@ place that says what is in progress; check it before starting work.
 | 26 Comment-only mode          | ✅ Done                  | —                         | Merged in #290; released in 1.10.0, `@folijs/collab` 0.3.0 (2026-11-25)                                                                                                                       |
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
-| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1 decisions settled; 29.2 icons next                                                                                                                                                       |
+| 29 Word look & commands       | In progress              | `phase-29/word-look`      | 29.1 merged (#309); 29.2 in review: icons                                                                                                                                                     |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -4098,9 +4098,13 @@ and a floating picture toolbar (Picture Format has its commands). They stay unde
     zooms the browser out (Ctrl+minus) but not in: accepted, as in Word on the web; keyboard.md's
     Reserved section says so. Ctrl+Space also switches some CJK input methods on Windows (the
     IME has it first, as any key while composing).
-- [ ] 29.2 Icons: every built-in item of `toolbarItems` gets an SVG icon; small buttons show the
-  icon only (the label as tooltip and accessible name), large ones the icon over the text; the
-  shrinking of 25.6 gets its icon-only step back. Ribbon screenshots updated.
+- [x] 29.2 Icons: every built-in item but the boxes has an SVG icon in `toolbarIcons` (62 of
+  Lucide's, copied as data; `LICENSE-lucide` published with the package), drawn by
+  `wordRibbonTabs`: alone for formatting, Undo and Redo, beside the text for the rest (the new
+  `size: "medium"`), over it for the large ones. `toolbarItems` and `defaultToolbarTabs` keep
+  their letters and text (1.x). The shrinking of 25.6 works again: large and medium buttons are
+  drawn small before groups go under More, and Review now fits down to about 640 px. Ribbon
+  screenshots updated; `ribbon.spec.ts` checks the shrinking comes first.
 - [ ] 29.3 Home commands in core, with Word's keys (keyboard.md) and built-in items in Home:
   superscript (Ctrl+Shift+=), subscript (Ctrl+=), clear formatting (Ctrl+Space keeps the
   paragraph style; Clear All in the styles group resets it too), change case (Shift+F3 cycles;

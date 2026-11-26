@@ -355,9 +355,11 @@ interface ToolbarItemBase {
     /**
      * `"large"`: as Word's large buttons, the group's height, its `icon` (if any) over its text,
      * which is then the accessible name (`.foli-toolbar-large`). Buttons, menus, color menus and
-     * dialog buttons; a box or an app's control stays as it is.
+     * dialog buttons; a box or an app's control stays as it is. `"medium"`: as Word's small buttons
+     * with a label, its `icon` beside its text, which names it (`.foli-toolbar-medium`). Both are
+     * drawn small (the icon alone, else the text) when the row is too narrow.
      */
-    readonly size?: "large" | undefined;
+    readonly size?: "large" | "medium" | undefined;
     /** Its KeyTip, a letter or digit (default: one from its label that its tab has free). */
     readonly keyTip?: string | undefined;
     /**
@@ -678,6 +680,15 @@ export declare function useCommand(command: Command, options?: UseCommandOptions
  */
 export declare function useCommand<K extends keyof FoliCommands>(name: K, ...args: Parameters<FoliCommands[K]>): CommandState;
 
+// icons.d.ts
+import { type ReactElement } from "react";
+/**
+ * An SVG icon for each built-in toolbar item, by the item's `key` (`align-start`…): what
+ * `wordRibbonTabs` draws. Give one to an item of your own: `{ ...toolbarItems.bold, icon:
+ * toolbarIcons.bold }`. Drawn in `currentColor`, 16 px (`.foli-toolbar-icon`; CSS sizes it).
+ */
+export declare const toolbarIcons: Readonly<Record<string, ReactElement>>;
+
 // index.d.ts
 export { type CommandState, FoliEditorProvider, type UseCommandOptions, type UseEditorStateOptions, type UseFoliEditorOptions, useCommand, useCurrentEditor, useEditorState, useFoliEditor, } from "./editor.js";
 export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
@@ -685,6 +696,7 @@ export { FoliComments, type FoliCommentsProps, type MentionEvent, type MentionSo
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, selectionInTable, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, wordRibbonTabs, } from "./FoliToolbar.js";
+export { toolbarIcons } from "./icons.js";
 export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";
 
 // localFonts.d.ts

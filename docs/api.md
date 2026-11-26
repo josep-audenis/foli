@@ -410,11 +410,22 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
 <FoliEditor toolbar={wordRibbonTabs} />;
 ```
 
+- Icons (1.11): the ribbon draws an SVG icon for each built-in item but the boxes, from
+  `toolbarIcons` (by the item's `key`; Lucide's shapes, ISC, `LICENSE-lucide` in the package).
+  The formatting buttons, Undo and Redo show the icon alone (their label names them); the others
+  are `size: "medium"`; the large ones keep `"large"`. `toolbarItems` and `defaultToolbarTabs`
+  are unchanged (letters and text): give an item of yours an icon with
+  `{ ...toolbarItems.bold, icon: toolbarIcons.bold }`. Each is a 16 px `<svg
+  class="foli-toolbar-icon">` in `currentColor` (28 px in a large button).
+
 - `size: "large"` on an item (a button, a menu, a color menu or a dialog button; not a box or
   an app's control) draws it as Word's large buttons (`.foli-toolbar-large`): the group's
   height, its `icon` (if it has one, `.foli-toolbar-large-icon`) over its text, which is then
   its accessible name. `wordRibbonTabs` has copies of Table, Picture, Table of contents,
-  Footnote, New comment, Track changes, Accept and Reject at that size.
+  Footnote, New comment, Track changes, Accept and Reject at that size. `size: "medium"` (1.11)
+  draws Word's small buttons with a label: its `icon` beside its text, which names it
+  (`.foli-toolbar-medium`, `.foli-toolbar-medium-icon`, `.foli-toolbar-medium-text`); without an
+  icon it is an ordinary button.
 - `launcher` on a `ToolbarGroup`: an item shown as Word's dialog launcher, a small button in the
   caption's corner (`.foli-toolbar-launcher`, in `.foli-toolbar-group-foot` with the caption),
   named by its `label`; for the arrow keys and the More panel it is the group's last item.
@@ -428,11 +439,11 @@ import { FoliEditor, wordRibbonTabs } from "@folijs/react";
   (`.foli-ribbon-collapse`, "Collapse the ribbon" or "Pin the ribbon", `aria-expanded`)
   collapse or pin it. With `collapsed` the app decides: those only call `onCollapsedChange`.
   Without tabs these do nothing.
-- With `overflow: "menu"`, a row too narrow first draws its large buttons small, a group at a
-  time from the end of the row, while that narrows the row, then puts whole groups under More; a
-  wider row draws them large again (measured again at each width, not while typing). A large
-  button with text and no icon is often narrower than its small form (its text wraps), so
-  `wordRibbonTabs`' built-ins stay large and their groups go under More.
+- With `overflow: "menu"`, a row too narrow first draws its large and medium buttons small (the
+  icon alone, named by its `label`), a group at a time from the end of the row, while that
+  narrows the row, then puts whole groups under More; a wider row draws them as they were again
+  (measured again at each width, not while typing). A large button with text and no icon is
+  often narrower than its small form (its text wraps): it then stays large.
 - `keyTips` (default true; with tabs): Word's KeyTips. Alt pressed and released alone, with the
   focus in the ribbon or in the document (an editable element of the page, or none; a
   read-only document is not editable, so only the ribbon's own focus counts there; the first

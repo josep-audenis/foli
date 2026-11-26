@@ -2,7 +2,14 @@
 import { createEditor, type FoliDocument, fieldCodesShown, insertTable } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, onTestFinished } from "vitest";
-import { FoliToolbar, selectionInTable, toolbarItems, wordRibbonTabs } from "./index.js";
+import {
+  defaultToolbarTabs,
+  FoliToolbar,
+  selectionInTable,
+  toolbarIcons,
+  toolbarItems,
+  wordRibbonTabs,
+} from "./index.js";
 
 const word: FoliDocument = {
   schemaVersion: 5,
@@ -124,6 +131,37 @@ describe("wordRibbonTabs", () => {
     screen.getByRole("dialog", { name: "Note options" });
   });
 
+  it("draws icons: alone for formatting, beside the text for the rest, over it when large", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    // Bold: its icon only, named by its label.
+    const bold = screen.getByRole("button", { name: "Bold" });
+    expect(bold.querySelector("svg.foli-toolbar-icon")).not.toBeNull();
+    expect(bold.textContent).toBe("");
+    // Undo keeps its text out, as Word's.
+    expect(screen.getByRole("button", { name: "Undo" }).textContent).toBe("");
+    fireEvent.click(screen.getByRole("tab", { name: "Insert" }), { detail: 1 });
+    // Page break: its icon beside its text, which names it.
+    const pageBreak = screen.getByRole("button", { name: "Page break" });
+    expect(pageBreak.classList.contains("foli-toolbar-medium")).toBe(true);
+    expect(pageBreak.hasAttribute("aria-label")).toBe(false);
+    expect(pageBreak.querySelector(".foli-toolbar-medium-icon svg")).not.toBeNull();
+    // Table, large: its icon over its text.
+    const table = screen.getByRole("button", { name: "Table" });
+    expect(table.querySelector(".foli-toolbar-large-icon svg")).not.toBeNull();
+    // Every built-in but the boxes has an icon in the ribbon.
+    const boxes = new Set(["style", "font", "size", "lineSpacing", "reviewView", "tableStyle"]);
+    for (const item of Object.values(toolbarItems))
+      expect(boxes.has(item.key) || item.key in toolbarIcons, item.key).toBe(true);
+  });
+
+  it("leaves the default toolbar's items as they were: letters and text", () => {
+    const editor = createEditor({ document: word });
+    render(<FoliToolbar editor={editor} tabs={defaultToolbarTabs} />);
+    expect(screen.getByRole("button", { name: "Bold" }).textContent).toBe("B");
+    expect(toolbarItems.bold.icon).toBe("B");
+  });
+
   it("collapses to its tabs: a click shows a tab over the document, Escape puts it away", () => {
     const editor = createEditor({ document: word });
     const changes: boolean[] = [];
@@ -237,7 +275,9 @@ describe("wordRibbonTabs", () => {
     // jsdom lays nothing out: the row's widths are given, from its large buttons.
     const widths = (scroll: (large: number) => number) => {
       const bar = (e: Element) => e.classList.contains("foli-toolbar");
-      const large = (e: Element) => e.querySelectorAll(".foli-toolbar-large").length;
+      // Large and medium buttons, which drawn small save room.
+      const large = (e: Element) =>
+        e.querySelectorAll(".foli-toolbar-large, .foli-toolbar-medium").length;
       const scrollWidth = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth");
       const clientWidth = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth");
       Object.defineProperty(Element.prototype, "scrollWidth", {
@@ -285,6 +325,39 @@ describe("wordRibbonTabs", () => {
         (b) => b.getAttribute("aria-label") ?? b.textContent,
       );
       expect(large).toEqual(["*A"]);
+    });
+
+    it("draws medium buttons as their icon alone when that narrows the row", () => {
+      widths((large) => 400 + 40 * large);
+      const mid = (key: string) => ({
+        key,
+        label: key,
+        text: key,
+        icon: "*",
+        size: "medium" as const,
+        command: () => true,
+      });
+      const editor = createEditor({ document: word });
+      const { container } = render(
+        <FoliToolbar
+          editor={editor}
+          tabs={[
+            {
+              key: "t",
+              label: "T",
+              items: [
+                { label: "One", items: [big("a", "A")] },
+                { label: "Two", items: [mid("m")] },
+              ],
+            },
+          ]}
+          overflow="menu"
+        />,
+      );
+      // The last group's medium button drawn small: its icon, named by its label.
+      const m = container.querySelector(".foli-toolbar-m") as HTMLElement;
+      expect(m.classList.contains("foli-toolbar-medium")).toBe(false);
+      expect(m.getAttribute("aria-label")).toBe("m");
     });
 
     it("keeps them large when drawing them small does not narrow the row", () => {

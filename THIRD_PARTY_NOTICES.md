@@ -12,3 +12,11 @@ original license notice.
 - **Used in:** `apps/playground/e2e/fixtures.ts`, which serves the Latin faces to the
   playground during Playwright runs so page breaks and screenshots are deterministic. Foli
   does not ship or load any font; nothing of it is in a published package.
+
+## Lucide icons
+
+- **Source:** the `lucide-static` npm package (1.81.0), from https://github.com/lucide-icons/lucide.
+  Not a dependency: the shapes of 62 icons were copied as data (Phase 29.2).
+- **License:** ISC; the icons Lucide derives from Feather also under MIT (Cole Bemis). The full
+  text is `packages/react/LICENSE-lucide`, published with `@folijs/react`.
+- **Used in:** `packages/react/src/icons.tsx` (`toolbarIcons`), each entry naming its Lucide icon.

@@ -138,17 +138,23 @@ test("puts groups under More as the row narrows, nothing cut off, every item rea
   expect(wide.large).toBe(4);
   expect(wide.more).toBe(false);
   let more = false;
-  for (let width = 1366; width >= 640; width -= 22) {
+  let large = wide.large;
+  let moreAt = 0;
+  for (let width = 1366; width >= 320; width -= 22) {
     const at = await reviewAt(page, width);
+    // With icons (29.2), large buttons drawn small are narrower: they shrink before any group
+    // goes under More, and never grow back as the row narrows.
+    if (at.more && !more) expect(at.large, `at ${width} px`).toBeLessThan(4);
+    if (at.more && !more) moreAt = width;
     more ||= at.more;
     expect(at.cut, `at ${width} px`).toBeLessThanOrEqual(1);
     expect(at.items, `at ${width} px`).toBe(wide.items);
-    // Their text wraps under them: drawn small they would be wider, so they stay large.
-    expect(at.large, `at ${width} px`).toBe(4);
+    expect(at.large, `at ${width} px`).toBeLessThanOrEqual(large);
+    large = at.large;
   }
   expect(more).toBe(true);
-  // At 768 px the panel's items are reachable: More opens them.
-  await reviewAt(page, 768);
+  // Where More first shows, the panel's items are reachable: More opens them.
+  await reviewAt(page, moreAt);
   await page.getByRole("button", { name: "More" }).click();
   for (const button of await toolbar(page)
     .locator(".foli-toolbar-more-panel .foli-toolbar-button")
