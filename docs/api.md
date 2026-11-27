@@ -395,7 +395,7 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
   focus from the document unless the control prevents it on `mousedown`.
 
 - `dialog: "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" |
-  "controlProperties" | "noteOptions" | "columnWidth" | "paragraph" | "font"` (`ToolbarDialogName`): the button opens that dialog of
+  "controlProperties" | "noteOptions" | "columnWidth" | "paragraph" | "font" | "tabs"` (`ToolbarDialogName`): the button opens that dialog of
   the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does); a
   dialog closed without applying gives the focus back to the button (the link dialog, to where
   it was), one that applied calls `onClickCommand`. Without `enabled` it is enabled where the
@@ -879,7 +879,14 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   `setUnderline(style, color?)` (`color` `#rrggbb` or null for automatic; left out, the text's
   own stays), `setRunEffects` (also `bold` and `italic`, their complex-script half kept),
   `setVerticalAlign("superscript" | "subscript" | "baseline")` (not a toggle) and
-  `setCharacterSpacing`.
+  `setCharacterSpacing`. The Paragraph dialog's Tabs… applies what it changed and opens the Tabs
+  dialog (also `openDialog("tabs")`): the stops all the selected paragraphs share, a position
+  (in the unit, or typed with one), alignment (left, center, right, decimal, bar) and leader
+  (none, dots, dashes, underline) to Set, Clear the stop picked, Clear All; OK sets a position
+  typed but not Set, as Word's. Its command, `setTabStops({ set?, clear? })` (`TabStop`:
+  `{ position, alignment, leader? }`, positions in points; `clear` positions or `"all"`), works
+  on each paragraph from the stops it shows: its own stops are written as those its style does
+  not give, plus a `clear` stop for each of the style's it no longer has.
 - Lists are Word's numbering: `toggleList` / `wrapInList` number the paragraphs (a list of the
   kind right before goes on; otherwise bullets share one definition and a numbered list starts
   at 1 in a new instance; definitions are added to the document's numbering), and put Normal

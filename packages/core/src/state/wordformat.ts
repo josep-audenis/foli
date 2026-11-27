@@ -21,7 +21,7 @@ import type {
   StyleJSON,
 } from "../v3/document.js";
 import type { ParagraphFormat, RunFormat } from "../v3/resolve.js";
-import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS, TAB_LEADERS } from "../v3/schema.js";
 import { attempt } from "./attempt.js";
 import { chainCommands } from "./dialogs.js";
 import { idsOf } from "./ids.js";
@@ -908,6 +908,74 @@ export function setOutlineLevel(level: number | null): Command {
         level === null ? body(p.outlineLevel) : p.outlineLevel === level,
       ),
     );
+  };
+}
+
+/** A tab stop as Word's Tabs dialog sets it: its position in points, alignment and leader. */
+export interface TabStop {
+  position: number;
+  alignment: "left" | "center" | "right" | "decimal" | "bar";
+  /** The characters that fill the space before the stop (default none). */
+  leader?: (typeof TAB_LEADERS)[number];
+}
+
+const TAB_ALIGNMENTS: readonly string[] = ["left", "center", "right", "decimal", "bar"];
+
+/**
+ * Word's Tabs dialog on the selected paragraphs, each from the stops it shows (its style's and
+ * its own): `clear` removes the stops at these positions in points (`"all"`: every one, Clear
+ * All), then `set` adds or replaces stops. Written as Word writes them: the paragraph's own stops
+ * are those its style does not give, and a `clear` stop for each of the style's it no longer has.
+ * At most 64 stops; positions from 0 to 1584 pt.
+ */
+export function setTabStops(change: {
+  set?: readonly TabStop[];
+  clear?: readonly number[] | "all";
+}): Command {
+  return (state, dispatch) => {
+    const context = wordContext(state);
+    const set = change.set ?? [];
+    const valid = (pt: number) => pt >= 0 && pt <= 1584;
+    if (
+      !context ||
+      set.some(
+        (s) =>
+          !valid(s.position) ||
+          !TAB_ALIGNMENTS.includes(s.alignment) ||
+          (s.leader !== undefined && !TAB_LEADERS.includes(s.leader)),
+      ) ||
+      (Array.isArray(change.clear) && !change.clear.every(valid))
+    )
+      return false;
+    const twips = (pt: number) => Math.round(pt * 20);
+    return updateParagraphs(state, dispatch, (node) => {
+      const shown = context.resolver.paragraph(node.attrs).paragraph.tabs;
+      const inherited = context.resolver.paragraph({ ...node.attrs, tabs: null }).paragraph.tabs;
+      const stops = new Map(
+        change.clear === "all" ? [] : shown.map((t) => [t.position, t] as const),
+      );
+      if (Array.isArray(change.clear)) for (const pt of change.clear) stops.delete(twips(pt));
+      for (const s of set) {
+        const position = twips(s.position);
+        const leader = s.leader && s.leader !== "none" ? s.leader : null;
+        stops.set(position, { position, kind: s.alignment, leader });
+      }
+      if (stops.size > 64) return null;
+      const own: { position: number; kind: string; leader?: string }[] = [];
+      for (const t of stops.values()) {
+        const from = inherited.find((i) => i.position === t.position);
+        if (from && from.kind === t.kind && (from.leader ?? null) === (t.leader ?? null)) continue;
+        own.push(
+          t.leader
+            ? { position: t.position, kind: t.kind, leader: t.leader }
+            : { position: t.position, kind: t.kind },
+        );
+      }
+      for (const t of inherited)
+        if (!stops.has(t.position)) own.push({ position: t.position, kind: "clear" });
+      own.sort((a, b) => a.position - b.position);
+      return { ...node.attrs, tabs: own.length ? own : null };
+    });
   };
 }
 

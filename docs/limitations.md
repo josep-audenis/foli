@@ -730,7 +730,7 @@ Details in the [package README](../packages/docx/README.md).
 
 ## Word's dialogs (Phase 30)
 
-- The Font and Paragraph dialogs are the toolbar's: `openDialog`, Ctrl+D and the right-click
+- The Font, Paragraph and Tabs dialogs are the toolbar's: `openDialog`, Ctrl+D and the right-click
   menu's Font… and Paragraph… open nothing without a toolbar on the editor (the entries still
   show), nor on a comment-only toolbar.
 - Paragraphs with different special indents (first line on one, hanging on another, or the same
@@ -741,6 +741,10 @@ Details in the [package README](../packages/docx/README.md).
   the toolbar's color menu has those). With no text selected (empty paragraphs only), the
   dialog shows the paragraph's formatting but OK changes nothing: Word would format the
   paragraph marks, which Foli keeps (`markFormat`) but does not set from the dialog.
+- Tab stops set in the Tabs dialog are kept and saved, but the pages lay text out with the
+  default stops every half inch (custom stops are not drawn yet, see architecture.md). The
+  dialog has no Default tab stops box: Foli keeps `w:defaultTabStop` in the settings part as the
+  file has it. Paragraphs with different stops show only those they share.
 - The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
   Suppress line numbers, Don't hyphenate or the Asian Typography tab.
 

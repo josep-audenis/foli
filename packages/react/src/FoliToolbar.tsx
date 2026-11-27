@@ -156,7 +156,7 @@ import {
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
 import { StyleGallery } from "./StyleGallery.js";
-import { FontDialog, ParagraphDialog } from "./WordDialogs.js";
+import { FontDialog, ParagraphDialog, TabsDialog } from "./WordDialogs.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -437,12 +437,13 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
- * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"` and `"font"` (Word's
- * Paragraph and Font dialogs for the selection, 1.11).
+ * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"`, `"font"` and
+ * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11).
  */
 export type ToolbarDialogName =
   | "paragraph"
   | "font"
+  | "tabs"
   | "link"
   | "picture"
   | "insertTable"
@@ -2149,6 +2150,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   columnWidth: canFormatTable,
   paragraph: isWord,
   font: isWord,
+  tabs: isWord,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -2707,7 +2709,7 @@ export function FoliToolbar({
         if (disabled) return;
         // `openDialog`: one toolbar opens it, as one opens the link dialog.
         const asked = transactions.map(requestedDialog).find((name) => name !== null);
-        if (asked === "paragraph" || asked === "font") {
+        if (asked) {
           const active = typeof document === "undefined" ? null : document.activeElement;
           const owners = (linkOwners.get(editor) ?? []).filter(
             (owner) => !owner.disabled && !owner.commentOnly,
@@ -2867,7 +2869,7 @@ export function FoliToolbar({
   }, [disabled]);
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
-    name: "paragraph" | "font";
+    name: "paragraph" | "font" | "tabs";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -2970,7 +2972,8 @@ export function FoliToolbar({
       }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
-      else if (name === "paragraph" || name === "font") setWordDialog({ name, restore, selection });
+      else if (name === "paragraph" || name === "font" || name === "tabs")
+        setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });
       else if (name === "crossReference") setReferenceDialog({ restore, selection });
@@ -3834,6 +3837,21 @@ export function FoliToolbar({
       )}
       {wordDialog?.name === "paragraph" && !disabled && (
         <ParagraphDialog
+          editor={editor}
+          unit="in"
+          onClose={(applied) => {
+            const { restore } = wordDialog;
+            setWordDialog(null);
+            closed(applied, restore);
+          }}
+          onTabs={() =>
+            // After this dialog's changes (which close it): the Tabs dialog, for the same focus.
+            setWordDialog({ ...wordDialog, name: "tabs", selection: editor.state.selection })
+          }
+        />
+      )}
+      {wordDialog?.name === "tabs" && !disabled && (
+        <TabsDialog
           editor={editor}
           unit="in"
           onClose={(applied) => {

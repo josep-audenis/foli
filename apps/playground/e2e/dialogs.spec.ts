@@ -94,3 +94,25 @@ test("Font… in the right-click menu opens the Font dialog", async ({ page }) =
   await page.getByRole("menuitem", { name: "Font…" }).click();
   await expect(page.getByRole("dialog", { name: "Font" })).toBeVisible();
 });
+
+test("the Tabs dialog, from the Paragraph dialog's Tabs…, sets a stop", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.foliEdit.editor.select(3));
+  await page.getByRole("button", { name: "Paragraph settings" }).click();
+  await page
+    .getByRole("dialog", { name: "Paragraph" })
+    .getByRole("button", { name: "Tabs…" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Tabs" });
+  await expect(dialog.getByLabel("Tab stop position")).toBeFocused();
+  await dialog.getByLabel("Tab stop position").fill("1.5");
+  await dialog.getByLabel("Center").check();
+  await dialog.getByLabel("Dots").check();
+  await dialog.getByRole("button", { name: "Set" }).click();
+  await expect(dialog.getByRole("option", { name: '1.5"' })).toBeAttached();
+  const results = await new AxeBuilder({ page }).include(".foli-tabs-dialog").analyze();
+  expect(results.violations).toEqual([]);
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect((await attrs(page, 0)).tabs).toEqual([{ position: 2160, kind: "center", leader: "dot" }]);
+});
