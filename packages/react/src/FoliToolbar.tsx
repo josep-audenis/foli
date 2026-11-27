@@ -62,8 +62,10 @@ import {
   noteProperties,
   openLinkEditor,
   pageColorOf,
+  paragraphBordersAt,
   paragraphStyleAt,
   paragraphStyles,
+  paragraphsHaveBorder,
   previousChangeWrapping,
   type ReviewView,
   redo,
@@ -93,6 +95,8 @@ import {
   setLink,
   setNoteProperties,
   setPageColor,
+  setParagraphBorder,
+  setParagraphShading,
   setParagraphStyle,
   setPictureAlt,
   setPictureCrop,
@@ -144,7 +148,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { PageBordersDialog, textWatermark, WatermarkDialog } from "./DesignDialogs.js";
+import {
+  BordersShadingDialog,
+  PageBordersDialog,
+  textWatermark,
+  WatermarkDialog,
+} from "./DesignDialogs.js";
 import {
   development,
   sameItems,
@@ -464,9 +473,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"`, `"font"` and
  * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11), `"pageBorders"`
  * (Word's Page Borders, the caret's section or the document), `"watermark"` (its Printed
- * Watermark dialog, every header).
+ * Watermark dialog, every header), `"bordersShading"` (its Borders and Shading dialog for the
+ * selected paragraphs).
  */
 export type ToolbarDialogName =
+  | "bordersShading"
   | "pageBorders"
   | "watermark"
   | "paragraph"
@@ -827,6 +838,38 @@ const MARGIN_ACTIONS: readonly Action[] = [
     label: "Custom margins…",
     command: (state) => sectionAt(state) !== null,
     dialog: "pageSetup",
+  },
+];
+
+/** Home ▸ Borders: Word's menu for the selected paragraphs. */
+const BORDER_ACTIONS: readonly Action[] = [
+  ...(
+    [
+      ["bottom", "Bottom border"],
+      ["top", "Top border"],
+      ["left", "Left border"],
+      ["right", "Right border"],
+      ["none", "No border"],
+      ["all", "All borders"],
+      ["outside", "Outside borders"],
+      ["inside", "Inside horizontal border"],
+    ] as const
+  ).map(
+    ([preset, label]): Action => ({
+      key: `border-${preset}`,
+      label,
+      command: setParagraphBorder(preset),
+      ...(preset === "none"
+        ? {}
+        : { checked: (state: EditorState) => paragraphsHaveBorder(state, preset) }),
+    }),
+  ),
+  { key: "borderLine", label: "Horizontal line", command: insertHorizontalRule },
+  {
+    key: "bordersShading",
+    label: "Borders and Shading…",
+    command: (state) => paragraphBordersAt(state) !== null,
+    dialog: "bordersShading",
   },
 ];
 
@@ -1974,6 +2017,31 @@ const RIBBON_ITEMS: readonly Item[] = [
       pick: (color) => setPageColor(color ? color.slice(1).toUpperCase() : null),
     },
   },
+  // Home's Paragraph group (32.4): Shading and Borders.
+  {
+    key: "shading",
+    label: "Shading",
+    enabled: (state) => isWord(state) && hasTextblock(state),
+    colors: {
+      options: SHADINGS,
+      columns: 10,
+      custom: true,
+      value: (state) => {
+        const fill = paragraphBordersAt(state)?.shading?.fill;
+        return fill && fill.toLowerCase() !== "auto" ? `#${fill.toLowerCase()}` : null;
+      },
+      pick: (color) =>
+        setParagraphShading(
+          color ? { pattern: "clear", color: "auto", fill: color.slice(1).toUpperCase() } : null,
+        ),
+    },
+  },
+  {
+    key: "borders",
+    label: "Borders",
+    enabled: (state) => isWord(state) && hasTextblock(state),
+    actions: BORDER_ACTIONS,
+  },
   {
     key: "watermark",
     label: "Watermark",
@@ -2189,11 +2257,14 @@ export type ToolbarItemName =
   | "spaceAfter"
   | "pageColor"
   | "pageBorders"
-  | "watermark";
+  | "watermark"
+  | "shading"
+  | "borders";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
   | "watermark"
+  | "borders"
   | "margins"
   | "orientation"
   | "pageSize"
@@ -2209,7 +2280,7 @@ type ToolbarMenuName =
   | "notes"
   | "controls";
 type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
-type ToolbarColorName = "textColor" | "highlight" | "cellShading" | "pageColor";
+type ToolbarColorName = "textColor" | "highlight" | "cellShading" | "pageColor" | "shading";
 type ToolbarDialogItemName =
   | "pageBorders"
   | "paragraphSettings"
@@ -2406,6 +2477,8 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
             t.alignEnd,
             t.alignJustify,
             t.lineSpacing,
+            t.shading,
+            t.borders,
           ),
           wrapBefore: "align-start",
           launcher: t.paragraphSettings,
@@ -2577,6 +2650,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   tabs: isWord,
   pageBorders: isWord,
   watermark: isWord,
+  bordersShading: (state) => paragraphBordersAt(state) !== null,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -3299,7 +3373,7 @@ export function FoliToolbar({
   }, [disabled]);
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
-    name: "paragraph" | "font" | "tabs" | "pageBorders" | "watermark";
+    name: "paragraph" | "font" | "tabs" | "pageBorders" | "watermark" | "bordersShading";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3407,7 +3481,8 @@ export function FoliToolbar({
         name === "font" ||
         name === "tabs" ||
         name === "pageBorders" ||
-        name === "watermark"
+        name === "watermark" ||
+        name === "bordersShading"
       )
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
@@ -4309,6 +4384,20 @@ export function FoliToolbar({
         )}
         {wordDialog?.name === "pageBorders" && !disabled && (
           <PageBordersDialog
+            editor={editor}
+            colors={themeColors(editor.state).filter(
+              (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
+                c.shade === undefined && c.color !== null,
+            )}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "bordersShading" && !disabled && (
+          <BordersShadingDialog
             editor={editor}
             colors={themeColors(editor.state).filter(
               (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>

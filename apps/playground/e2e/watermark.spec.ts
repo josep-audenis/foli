@@ -37,7 +37,8 @@ test("Custom watermark… sets a horizontal red text in one undo step", async ({
   await page.getByRole("button", { name: "Watermark" }).click();
   await page.getByRole("menuitem", { name: "Custom watermark…" }).click();
   const dialog = page.getByRole("dialog", { name: "Watermark" });
-  await expect(dialog.getByRole("radio", { name: "Text watermark" })).toBeChecked();
+  await expect(dialog.getByRole("radio", { name: "No watermark" })).toBeChecked();
+  await dialog.getByRole("radio", { name: "Text watermark" }).check();
   const results = await new AxeBuilder({ page }).include(".foli-watermark-dialog").analyze();
   expect(results.violations).toEqual([]);
   await dialog.getByLabel("Text", { exact: true }).fill("Internal");

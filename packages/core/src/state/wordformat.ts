@@ -16,12 +16,18 @@ import type { Alignment } from "../schema.js";
 import { NodeMarkupBatchStep, NodeMarkupStep } from "../transform/index.js";
 import type {
   AbstractNumberingJSON,
+  BorderJSON,
   NumberingInstanceJSON,
   NumberingLevelJSON,
   StyleJSON,
 } from "../v3/document.js";
 import type { ParagraphFormat, RunFormat } from "../v3/resolve.js";
-import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS, TAB_LEADERS } from "../v3/schema.js";
+import {
+  checkParagraphProperties,
+  PARAGRAPH_PROPERTY_KEYS,
+  RUN_PROPERTY_MARKS,
+  TAB_LEADERS,
+} from "../v3/schema.js";
 import { attempt } from "./attempt.js";
 import { chainCommands } from "./dialogs.js";
 import { idsOf } from "./ids.js";
@@ -1935,3 +1941,131 @@ export const setRulerShown = (on: boolean): Command => ruler.set(on);
  * tabs and breaks over the text, or stops. Nothing of them is in the document.
  */
 export const toggleFormattingMarks: Command = marks.set(null);
+
+// ---------- paragraph borders and shading (32.4) ----------
+
+/** A paragraph's borders (`w:pBdr`): its sides, the one between paragraphs alike, a bar. */
+export type ParagraphBorders = Partial<
+  Record<"top" | "bottom" | "left" | "right" | "between" | "bar", BorderJSON>
+>;
+
+/** Home ▸ Borders' entries (Word's): one side, none, all, outside, inside. */
+export type BorderPreset =
+  | "bottom"
+  | "top"
+  | "left"
+  | "right"
+  | "none"
+  | "all"
+  | "outside"
+  | "inside";
+
+const PRESET_SIDES: Record<BorderPreset, readonly (keyof ParagraphBorders)[]> = {
+  bottom: ["bottom"],
+  top: ["top"],
+  left: ["left"],
+  right: ["right"],
+  none: [],
+  all: ["top", "bottom", "left", "right", "between"],
+  outside: ["top", "bottom", "left", "right"],
+  inside: ["between"],
+};
+
+/** Word's default border: a half-point single line, a point from the text (four at the sides). */
+const DEFAULT_LINE: BorderJSON = { style: "single", size: 4, space: 1, color: "auto" };
+const lineFor = (side: string, line: BorderJSON): BorderJSON =>
+  line === DEFAULT_LINE && (side === "left" || side === "right") ? { ...line, space: 4 } : line;
+
+const drawn = (border: BorderJSON | undefined) =>
+  !!border && border.style !== "none" && border.style !== "nil";
+
+/**
+ * Whether every selected paragraph shows a border on each of `preset`'s sides (its own, or its
+ * style's): what Home ▸ Borders checks, and what turns the entry off.
+ */
+export function paragraphsHaveBorder(state: EditorState, preset: BorderPreset): boolean {
+  const context = wordContext(state);
+  const sides = PRESET_SIDES[preset];
+  const paragraphs = paragraphsIn(state);
+  if (!context || !sides.length || !paragraphs.length) return false;
+  return paragraphs.every(({ node }) => {
+    const shown = context.resolver.paragraph(node.attrs).paragraph.borders ?? {};
+    return sides.every((side) => drawn(shown[side]));
+  });
+}
+
+/**
+ * Home ▸ Borders on the selected paragraphs, as Word's menu: a side, All, Outside or Inside (the
+ * border between paragraphs) turns its sides on (with `line`, by default Word's half-point
+ * single line), or off when every paragraph shows them already; None removes them. A side the
+ * paragraph's style draws is turned off as Word does, with a `nil` border of its own. One undo
+ * step; tracked as paragraph formatting.
+ */
+export function setParagraphBorder(preset: BorderPreset, line: BorderJSON = DEFAULT_LINE): Command {
+  return (state, dispatch) => {
+    const context = wordContext(state);
+    if (!context) return false;
+    if (line !== DEFAULT_LINE && checkParagraphProperties({ borders: { top: line } })) return false;
+    const sides = preset === "none" ? PRESET_SIDES.all : PRESET_SIDES[preset];
+    const off = preset === "none" || paragraphsHaveBorder(state, preset);
+    return updateParagraphs(state, dispatch, (node) => {
+      const own = (node.attrs.borders as ParagraphBorders | null) ?? {};
+      // What the style alone draws: those sides need a `nil` of the paragraph's own to go.
+      const styled = context.resolver.paragraph({ ...node.attrs, borders: null }).paragraph.borders;
+      const next: ParagraphBorders = { ...own };
+      for (const side of sides) {
+        if (!off) next[side] = lineFor(side, line);
+        else if (drawn(styled?.[side])) next[side] = { style: "nil" };
+        else delete next[side];
+      }
+      return { ...node.attrs, borders: Object.keys(next).length ? next : null };
+    });
+  };
+}
+
+/**
+ * Sets the selected paragraphs' borders to `borders` (the Borders and Shading dialog), null
+ * removing them. One undo step; tracked as paragraph formatting.
+ */
+export function setParagraphBorders(borders: ParagraphBorders | null): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state)) return false;
+    const value = borders && Object.keys(borders).length ? borders : null;
+    if (value && checkParagraphProperties({ borders: value })) return false;
+    return updateParagraphs(state, dispatch, (node) => ({ ...node.attrs, borders: value }));
+  };
+}
+
+/** A paragraph's shading (`w:shd`): Word's pattern (`clear`, `solid`, `pct10`…), its color, the fill. */
+export interface ParagraphShading {
+  pattern: string;
+  color?: string;
+  fill?: string;
+}
+
+/**
+ * Sets the selected paragraphs' shading, null removing it. One undo step; tracked as paragraph
+ * formatting.
+ */
+export function setParagraphShading(shading: ParagraphShading | null): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state)) return false;
+    if (shading && checkParagraphProperties({ shading })) return false;
+    return updateParagraphs(state, dispatch, (node) => ({ ...node.attrs, shading }));
+  };
+}
+
+/**
+ * The selected paragraphs' own borders and shading when they share them (null: none or mixed;
+ * a style's are not included).
+ */
+export function paragraphBordersAt(
+  state: EditorState,
+): { borders: ParagraphBorders | null; shading: ParagraphShading | null } | null {
+  const paragraphs = paragraphsIn(state);
+  if (!wordContext(state) || !paragraphs.length) return null;
+  return {
+    borders: common(paragraphs.map(({ node }) => node.attrs.borders as ParagraphBorders | null)),
+    shading: common(paragraphs.map(({ node }) => node.attrs.shading as ParagraphShading | null)),
+  };
+}

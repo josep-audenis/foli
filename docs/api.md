@@ -354,7 +354,13 @@ caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `dat
 menu: No Color and the theme's colors, More colors…; `setPageColor`) and `pageBorders` (Word's
 Page Borders dialog: None, Box or Custom; the line's style, color and width; which sides; Apply
 to the whole document, this section, its first page only or all but its first page; measured
-from the page's edge or the text, one distance for every side), and `watermark` (a menu: Word's diagonal Confidential, Do not
+from the page's edge or the text, one distance for every side), Home's Paragraph group (32.4): `shading` (a color menu: None and the theme's colors, a clear
+fill) and `borders` (a menu: Bottom, Top, Left and Right border, checked where the selection has
+them (every selected paragraph shows them, its style's included), No border, All borders,
+Outside borders, Inside horizontal border (each checked the same way), Horizontal line,
+Borders and Shading…, Word's dialog for the paragraphs' borders and shading: None, Box or
+Custom, the line, the sides and the one between paragraphs, the fill, its pattern and pattern
+color); and `watermark` (a menu: Word's diagonal Confidential, Do not
 copy, Draft, Sample, ASAP and Urgent, checked when the caret's page shows it; Custom watermark…,
 Word's Printed Watermark dialog: none, a picture with its scale and washout through `upload`, or
 a text with its font, size, color, transparency and layout; Remove watermark), which
@@ -1069,6 +1075,14 @@ change of each section while tracking); `setWatermark(watermark, image?)` (`Wate
 null; in every header the pages show, each section's default one and its first and even pages'
 where it has them, made where missing; null removes every watermark; a picture's new image as
 `image`, a `ResourceJSON`; one undo step, not tracked), `watermarkOf(state)` (the caret's page's).
+Paragraph borders and shading (32.4, tracked as paragraph formatting, one undo step each):
+`setParagraphBorder(preset, line?)` (Home ▸ Borders: `bottom`, `top`, `left`, `right` turn a
+side on, or off when every selected paragraph shows it; `all`, `outside`, `inside` (the border
+between paragraphs) likewise; `none`; a side a style draws turned off with a `nil` border of the
+paragraph's own, as Word does; `paragraphsHaveBorder(state, preset)` says which; `line` by default Word's half-point single line, a point from the
+text, four at the sides), `setParagraphBorders(borders)` and `setParagraphShading(shading)`
+(the dialog's: replace them, null removes), `paragraphBordersAt(state)` (the selected
+paragraphs' own `borders` and `shading` when they share them).
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),
