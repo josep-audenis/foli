@@ -44,7 +44,7 @@ place that says what is in progress; check it before starting work.
 | 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
 | 31 Ruler                      | In review                | `phase-31/ruler`          | 31.1–31.6 merged (#330–#335); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
-| 33 Text boxes & layout        | In progress              | `phase-33/textboxes`      | Started 2026-11-27 (the owner assigned it; Phase 29 is merged, its release pending)                                                                                                           |
+| 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 35 Insert extras              | Blocked by 29            | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4695,6 +4695,29 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   without repair. Every wrap kind lays text out as Word does on the corpus's samples (measured).
 
 - `pnpm check` green; axe finds no new violation.
+
+Closed 2026-11-27: 33.1–33.6 merged (#343, #344, #345, #346 and #347 for 33.4, #348, #349),
+each reviewed by a subagent and fixed before merging (33.1's review found a box with a page
+break failing the whole import and a cycle through a header's box; 33.3's a press in a second
+box after typing going to the body; 33.6's an order drawn and written that was not the one
+shown, now stored on every floating object at each move). Acceptance: the flyer's (11) text
+boxes show their text (each within 1.5 px of Word's place and at its size, three engines),
+are edited and saved back, and Word 16 opens the unchanged and edited files without repair
+with the boxes as Foli wrote them (`textbox-roundtrip.mjs`; `picture-roundtrip.mjs` too, its
+moved pictures now edited in their own drawing). Square, top-and-bottom, in front and behind
+boxes, and tight and through pictures (drawn as square, ADR-0016) are placed as Word places them
+on the corpus's samples, lines around them (`word-textboxes.spec.ts`, `word-layout.spec.ts`).
+`pnpm check` green on every push; axe on the boxes, the Layout Options button and menu, the
+Layout dialog and the Picture Format tab finds nothing. `pnpm bench --engines chromium`
+(2026-11-27, `main` after #349, a busy machine): `exportPdf` of the corpus 967 ms the first run
+(+43%, past its threshold), 943 ms the second (+40%, within it), against a 675 ms baseline; the
+corpus has an eleventh document since 33.1 (the flyer), which the bench exports too, and Phase
+32's close measured 1036 ms on that machine. Layout, typing, reflow and find within their
+ranges. Firefox and WebKit not benched; a quiet machine's run is still owed. Not done
+(limitations.md): tight and through follow the frame's rectangle, not a wrap polygon; a
+square object placed against the page vertically is drawn at its paragraph's top; a header's
+text box is not opened from the body; corner crop handles; a file's own z-order read before
+the first move; Shape Format's fill and outline (Phase 34).
 ## Phase 34 — Shapes · L → next minor
 
 Word's basic shapes drawn, inserted, moved, resized and formatted.
