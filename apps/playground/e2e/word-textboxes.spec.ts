@@ -2,7 +2,8 @@
  * Text boxes drawn (33.2, ADR-0016): the corpus's text box flyer (11) on the editing page, each
  * box with its text where Word puts it (its reference measurements), the lines going around a
  * square one, none beside a top-and-bottom one, one in front of the text fixed on the page, one
- * in the header; and in `renderDocument`'s pages.
+ * in the header; and in `renderDocument`'s pages. Edited (33.3): a click puts the caret in a box,
+ * Escape leaves it selected, undo takes the typing back; Insert ▸ Text Box draws a new one.
  */
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
@@ -31,8 +32,8 @@ const reference = JSON.parse(
 /** CSS px per point. */
 const PX = 96 / 72;
 
-async function open(page: Page): Promise<void> {
-  await page.goto("/edit.html?toolbar");
+async function open(page: Page, ribbon = false): Promise<void> {
+  await page.goto(ribbon ? "/edit.html" : "/edit.html?toolbar");
   await page.waitForFunction(() => "foliEdit" in window);
   const base64 = readFileSync(new URL(NAME, CORPUS)).toString("base64");
   await page.evaluate((data) => window.foliEdit.loadDocx(data), base64);
@@ -143,4 +144,108 @@ test("renderDocument draws the boxes too (print, exportPdf)", async ({ page }) =
       "Saturday 14 March",
     ].sort(),
   );
+});
+
+const boxText = (page: Page, story: string) =>
+  page.evaluate(
+    (id) =>
+      (
+        window as unknown as {
+          foliEdit: {
+            editor: { getDocument(): { stories?: Record<string, { content: unknown }> } };
+          };
+        }
+      ).foliEdit.editor.getDocument().stories?.[id],
+    story,
+  );
+const textOf = (node: unknown): string => {
+  const n = node as { text?: string; content?: unknown[] } | undefined;
+  return n?.text ?? (n?.content ?? []).map(textOf).join("");
+};
+
+test("a click puts the caret in a box; Escape leaves it selected; undo takes the typing back", async ({
+  page,
+}) => {
+  await open(page);
+  const box = page.locator('[data-foli-text-box="textbox:1"]').first();
+  const line = box.locator("p").nth(1);
+  const at = await line.boundingBox();
+  if (!at) throw new Error("no box line");
+  // On its first line.
+  await page.mouse.click(at.x + 2, at.y + 4);
+  await expect(page.locator(".foli-story-mount")).toHaveCount(1);
+  await page.keyboard.press("Home");
+  await page.keyboard.type("New: ");
+  expect(textOf((await boxText(page, "textbox:1"))?.content)).toContain("New: Workshops, talks");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".foli-story-mount")).toHaveCount(0);
+  await expect(page.locator('[data-foli-text-box="textbox:1"]').first()).toContainText(
+    "New: Workshops",
+  );
+  const selected = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          foliEdit: { editor: { state: { selection: { node?: { type: { name: string } } } } } };
+        }
+      ).foliEdit.editor.state.selection.node?.type.name,
+  );
+  expect(selected).toBe("textBox");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.locator('[data-foli-text-box="textbox:1"]').first()).not.toContainText("New:");
+});
+
+test("Insert ▸ Text Box draws a new box, the caret in it", async ({ page }) => {
+  await open(page, true);
+  const before = await page.locator("[data-foli-text-box]").count();
+  await page.getByRole("tab", { name: "Insert" }).click();
+  await page.getByRole("button", { name: "Insert text box" }).click();
+  await expect(page.locator(".foli-story-mount")).toHaveCount(1);
+  await page.keyboard.type("Typed in a new box");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-foli-text-box]")).toHaveCount(before + 1);
+  await expect(page.locator("[data-foli-text-box]", { hasText: "Typed in a new box" })).toHaveCount(
+    1,
+  );
+});
+
+test("find goes into a text box: its match revealed opens the box", async ({ page }) => {
+  await open(page);
+  const opened = await page.evaluate(() => {
+    const { editor } = (
+      window as unknown as {
+        foliEdit: {
+          editor: {
+            storyView: {
+              reveal(t: { story: string; from: number; to: number }, o: object): boolean;
+            } | null;
+          };
+        };
+      }
+    ).foliEdit;
+    return editor.storyView?.reveal({ story: "textbox:2", from: 1, to: 9 }, { focus: true });
+  });
+  expect(opened).toBe(true);
+  await expect(page.locator(".foli-story-mount")).toHaveCount(1);
+  await page.keyboard.type("All");
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-foli-text-box="textbox:2"]').first()).toContainText(
+    "All is welcome",
+  );
+});
+
+test("a press in another box after typing in one opens that one", async ({ page }) => {
+  await open(page);
+  const first = await page.locator('[data-foli-text-box="textbox:1"] p').first().boundingBox();
+  if (!first) throw new Error("no first box");
+  await page.mouse.click(first.x + 2, first.y + 4);
+  await page.keyboard.type("Q");
+  const second = await page.locator('[data-foli-text-box="textbox:2"] p').first().boundingBox();
+  if (!second) throw new Error("no second box");
+  await page.mouse.click(second.x + second.width / 2, second.y + 4);
+  await expect(page.locator(".foli-story-mount")).toHaveCount(1);
+  await page.keyboard.type("Z");
+  await page.keyboard.press("Escape");
+  expect(textOf((await boxText(page, "textbox:2"))?.content)).toContain("Z");
+  expect(textOf((await boxText(page, "textbox:1"))?.content)).toContain("Q");
 });

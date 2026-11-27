@@ -144,6 +144,8 @@ import {
   PICTURE_ATTR,
   PICTURE_IMAGE_ATTR,
   PX_PER_TWIP,
+  TEXT_BOX_ATTR,
+  TEXT_BOX_CONTENT_CLASS,
   WORD_COLUMN_BREAK_ATTR,
 } from "./word/blocks.js";
 import {
@@ -182,7 +184,7 @@ import { HintMarks, MATCH_STYLES, MatchMarks, rangesInCopy, rangesInText } from 
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { type PeerDrawing, PeerMarks } from "./word/presence.js";
-import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
+import { PageRegions, REGION_CLASS, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
   collect,
   drawnColumns,
@@ -701,6 +703,8 @@ export class EditorView {
    */
   private printStyles: HTMLStyleElement[] = [];
   private destroyed = false;
+  /** `destroy` running: nothing is drawn again. */
+  private closingDown = false;
   /** Set by a render during a composition, which places blocks but does not flow them. */
   private unflowed = false;
   /**
@@ -1045,6 +1049,8 @@ export class EditorView {
   destroy(): void {
     this.eachPluginView((view) => view.destroy?.());
     this.pluginViews = [];
+    // Nothing drawn again on the way out (a text box closing would).
+    this.closingDown = true;
     this.closeStory(false);
     this.showFound(null);
     this.endHint();
@@ -1222,7 +1228,8 @@ export class EditorView {
     const boxesChanged =
       storiesChanged &&
       Object.entries(envelope?.stories ?? {}).some(
-        ([id, story]) => story.kind === "textBox" && before?.stories?.[id] !== story,
+        ([id, story]) =>
+          story.kind === "textBox" && before?.stories?.[id] !== story && id !== this.mount?.id,
       );
     if (redrawn || boxesChanged || (storiesChanged && !this.redrawRegions())) this.render();
     // Blocks drawn again hold new text nodes: the hint's ranges are made again on them (and
@@ -1309,6 +1316,7 @@ export class EditorView {
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
     if (!renewed) word.context = context;
+    const openBox = this.mount?.side === "textBox" ? this.mount.id : null;
     if (renewed) {
       // A document with pictures: the mark of one without alt text is the view's stylesheet's.
       if (context.envelope.resources) injectStyles(this.host);
@@ -1325,6 +1333,8 @@ export class EditorView {
       word.drawn = this.drawn;
       this.invalidateLayout();
     }
+    // The box being edited keeps its drawing (its view is in it) until it closes.
+    word.openBox = openBox;
     const references = this.noteReferences();
     word.setNotes(noteTexts(references), this.noteMark?.());
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
@@ -1930,7 +1940,8 @@ export class EditorView {
   private drawRegions(): void {
     const { regions, facts } = this;
     // A note open for editing is `drawNotes`' to look after.
-    const mount = this.mount?.side === "note" ? null : (this.mount as HeaderMount | null);
+    const side = this.mount?.side;
+    const mount = side === "header" || side === "footer" ? (this.mount as HeaderMount) : null;
     if (!regions) return;
     const sides = ["header", "footer"] as const;
     const wanted = facts.map((page) =>
@@ -2040,6 +2051,7 @@ export class EditorView {
 
   /** The story being edited, moved with its region: the focus goes back to it. */
   private afterPlace(): void {
+    this.keepTextBox();
     this.drawControls();
     this.drawMatches();
     this.drawHint();
@@ -2060,6 +2072,7 @@ export class EditorView {
     },
     edit: (side, page) => view.openStory(side, page),
     editNote: (id) => view.openNote(id),
+    editTextBox: (id) => view.openTextBox(id),
     toReference: () => view.toReference(),
     close: () => view.closeStory(),
     get fieldLayout() {
@@ -2646,6 +2659,7 @@ export class EditorView {
   private openForReveal(id: string): boolean {
     const kind = wordContext(this.state)?.stories.get(id)?.kind;
     if (kind === "footnote" || kind === "endnote") return this.openNote(id, false);
+    if (kind === "textBox") return this.openTextBox(id, false);
     if (kind !== "header" && kind !== "footer") return false;
     const page = this.pageRegions.findIndex((regions) => regions[kind]?.id === id);
     return page >= 0 && this.openStory(kind, page, false, false);
@@ -3026,6 +3040,90 @@ export class EditorView {
     return true;
   }
 
+  /** Where text box `id` is in the body, or null. */
+  private textBoxPos(id: string): number | null {
+    let found: number | null = null;
+    this.state.doc.descendants((node, pos) => {
+      if (found !== null) return false;
+      if (node.type.name === "textBox" && node.attrs.story === id) found = pos;
+      return true;
+    });
+    return found;
+  }
+
+  /** The body's drawing of text box `id` (not a header's copy). */
+  private textBoxElement(id: string): HTMLElement | null {
+    for (const box of this.host.querySelectorAll<HTMLElement>(
+      `[${TEXT_BOX_ATTR}="${CSS.escape(id)}"]`,
+    ))
+      if (!box.closest(`.${REGION_CLASS}`) && !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`))
+        return box;
+    return null;
+  }
+
+  /**
+   * Opens text box `id` (33.3) for editing where it is drawn: its story's view in the box, the
+   * body read-only around it, as a note opens. A header's box is not opened from the body.
+   * Whether it is open now.
+   */
+  openTextBox(id: string, focus = true): boolean {
+    if (!this.editable || this.composing) return false;
+    if (this.mount?.id === id) {
+      if (focus) this.mount.view.focus();
+      return true;
+    }
+    if (wordContext(this.state)?.stories.get(id)?.kind !== "textBox") return false;
+    this.closeStory(false);
+    const editor = this.editor.story(id);
+    const box = this.textBoxElement(id);
+    const element = box?.firstElementChild as HTMLElement | null | undefined;
+    if (!editor || !box || !element) return false;
+    const page = Math.max(this.pages.indexOf(box.closest(".foli-page") as HTMLElement), 0);
+    // The section it is in: what the toolbar's section commands act on meanwhile.
+    const pos = this.textBoxPos(id);
+    const block = pos === null ? 0 : this.state.doc.resolve(pos).index(0);
+    const context = wordContext(this.state) as WordContext;
+    const section = Math.max(
+      sectionSpans(this.state.doc, context.envelope.section).findIndex(
+        (span) => block >= span.from && block < span.to,
+      ),
+      0,
+    );
+    this.mountStory(
+      editor,
+      {
+        id,
+        side: "textBox",
+        variant: "default",
+        section,
+        page,
+        region: { element, drawing: {}, section, id },
+      },
+      box.getAttribute("aria-label") ?? "Text box",
+      undefined,
+      focus,
+    );
+    return true;
+  }
+
+  /** The open text box, put back in its box when its block was drawn again. */
+  private keepTextBox(): void {
+    const { mount } = this;
+    // shortcut: moving the view during a composition in the box ends it; such a redraw comes
+    // only from another editor's change (collaboration), not from typing here.
+    if (mount?.side !== "textBox" || mount.wrapper.isConnected) return;
+    const element = this.textBoxElement(mount.id)?.firstElementChild as HTMLElement | null;
+    if (!element) {
+      queueMicrotask(() => this.closeStory(true));
+      return;
+    }
+    const shown = element.querySelector<HTMLElement>(`:scope > .${TEXT_BOX_CONTENT_CLASS}`);
+    if (shown) shown.style.display = "none";
+    element.append(mount.wrapper);
+    mount.region = { ...mount.region, element };
+    mount.moved = true;
+  }
+
   /** From the note being edited back to its reference, the caret after it. */
   private toReference(): boolean {
     const { mount } = this;
@@ -3066,7 +3164,9 @@ export class EditorView {
     const inner = doc.createElement("div");
     inner.setAttribute("aria-label", label);
     wrapper.append(inner);
-    const shown = region.element.querySelector<HTMLElement>(`:scope > .${REGION_CONTENT_CLASS}`);
+    const shown = region.element.querySelector<HTMLElement>(
+      `:scope > .${REGION_CONTENT_CLASS}, :scope > .${TEXT_BOX_CONTENT_CLASS}`,
+    );
     if (shown) {
       shown.style.display = "none";
       wrapper.style.paddingBottom = shown.style.paddingBottom;
@@ -3123,7 +3223,7 @@ export class EditorView {
     mount.view.destroy();
     mount.wrapper.remove();
     const shown = mount.region.element.querySelector<HTMLElement>(
-      `:scope > .${REGION_CONTENT_CLASS}`,
+      `:scope > .${REGION_CONTENT_CLASS}, :scope > .${TEXT_BOX_CONTENT_CLASS}`,
     );
     if (shown) shown.style.display = "";
     if (mount.side === "note" && this.notes) {
@@ -3132,6 +3232,14 @@ export class EditorView {
       if (!this.destroyed) this.render();
     }
     this.bodyEditable();
+    if (mount.side === "textBox" && !this.destroyed && !this.closingDown) {
+      // Its block drawn again with what was typed (its key changes now it is closed), and the
+      // box selected, as Word leaves it.
+      this.render();
+      const pos = this.textBoxPos(mount.id);
+      if (focus && pos !== null)
+        this.editor.dispatch(this.state.tr.setSelection(NodeSelection.create(this.state.doc, pos)));
+    }
     if (focus && !this.destroyed) this.focus();
     if (!this.destroyed) this.drawMatches();
     this.editor.storyChanged();
@@ -3149,7 +3257,8 @@ export class EditorView {
   /** The page's own story, after what was open is shown nowhere any more. */
   private reopenStory = (): void => {
     const { mount } = this;
-    if (!mount || mount.side === "note" || this.facts.length === 0) return;
+    if (!mount || mount.side === "note" || mount.side === "textBox" || this.facts.length === 0)
+      return;
     const { side, page, id } = mount;
     // A story that went (undone) is not made again.
     const create = !!wordContext(this.state)?.stories.has(id);
@@ -3178,7 +3287,18 @@ export class EditorView {
    * first click may have scrolled the page (Firefox) and the double click would land elsewhere.
    */
   private onPress = (event: MouseEvent): void => {
+    // A press in a body's text box puts the caret in it (33.3), as Word does. Read before a box
+    // that was open closes: its block is drawn again then, the target with it.
+    const pressed = event.target instanceof Element ? event.target : null;
+    const inBox = pressed?.closest(`[${TEXT_BOX_ATTR}]`);
+    const pressedId = inBox?.getAttribute(TEXT_BOX_ATTR);
+    const boxId = pressedId && this.textBoxElement(pressedId) === inBox ? pressedId : null;
     this.closeStory(false);
+    if (boxId && event.button === 0 && !event.shiftKey && this.editable) {
+      event.preventDefault();
+      if (this.openTextBox(boxId)) this.mount?.view.placeCaret(event.clientX, event.clientY);
+      return;
+    }
     // A note on the page, or the number of its reference: the second press opens the note.
     const target = event.target instanceof Element ? event.target : null;
     const onNote = target?.closest(`[${NOTE_ATTR}]`);

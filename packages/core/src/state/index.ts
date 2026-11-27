@@ -314,6 +314,11 @@ export {
   pasteCells,
 } from "./tables.js";
 export {
+  type InsertTextBoxOptions,
+  insertTextBox,
+  selectedTextBox,
+} from "./textboxes.js";
+export {
   type ReviewView,
   setReviewView,
   setTrackChanges,

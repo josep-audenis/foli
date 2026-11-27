@@ -47,6 +47,7 @@ import {
   insertSectionBreak,
   insertTable,
   insertTableOfContents,
+  insertTextBox,
   isHeaderRow,
   isSafeHref,
   lineSpacingAt,
@@ -83,6 +84,7 @@ import {
   type StorySide,
   sectionAt,
   selectedPicture,
+  selectedTextBox,
   setAlign,
   setCellShading,
   setColumnWidth,
@@ -1158,7 +1160,7 @@ function storyActions(body: Editor): readonly Action[] {
   const linked = (state: EditorState) => {
     const story = open();
     if (!story) return false;
-    if (story.side === "note") return false;
+    if (story.side !== "header" && story.side !== "footer") return false;
     const references = story.side === "header" ? setup(state).headers : setup(state).footers;
     return !references?.[story.variant];
   };
@@ -1196,7 +1198,7 @@ function storyActions(body: Editor): readonly Action[] {
       checked: linked,
       command: (state, dispatch) => {
         const story = open();
-        return story && story.side !== "note"
+        return story && (story.side === "header" || story.side === "footer")
           ? setStoryLinked(
               story.side,
               story.variant,
@@ -1204,6 +1206,26 @@ function storyActions(body: Editor): readonly Action[] {
               story.section,
             )(state, dispatch)
           : false;
+      },
+    },
+  ];
+}
+
+/** Insert ▸ Text Box (33.3): a new box, the caret in it. */
+function textBoxActions(body: Editor): readonly Action[] {
+  return [
+    {
+      key: "textBox",
+      label: "Insert text box",
+      movesFocus: true,
+      command: (state, dispatch) => {
+        if (!insertTextBox()(state)) return false;
+        if (dispatch) {
+          insertTextBox()(state, dispatch);
+          const box = selectedTextBox(body.state);
+          if (box) body.storyView?.editTextBox?.(String(box.attrs.story));
+        }
+        return true;
       },
     },
   ];
@@ -1953,6 +1975,12 @@ const RIBBON_ITEMS: readonly Item[] = [
   // Word's Font group's launcher (Home).
   { key: "fontSettings", label: "Font settings", dialog: "font", enabled: isWord },
   fromEntry(CONTROL_ACTIONS, "controlProperties", { text: "Properties…" }),
+  bodyEntry(textBoxActions, "textBox", {
+    key: "textBox",
+    label: "Insert text box",
+    text: "Text Box",
+    command: insertTextBox(),
+  }),
   bodyEntry(noteActions, "footnote", {
     key: "footnote",
     label: "Insert footnote",
@@ -2283,6 +2311,7 @@ export type ToolbarItemName =
   | "headerRow"
   | "pageSetup"
   | "controlProperties"
+  | "textBox"
   | "footnote"
   | "endnote"
   | "goToNote"
@@ -2561,7 +2590,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         group("Illustrations", large(t.picture)),
         group("Links", t.link, t.crossReference),
         group("Header & Footer", t.headerFooter, t.pageNumber),
-        group("Text", t.controls, t.controlProperties, t.fields, t.date),
+        group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.date),
       ],
     },
     {

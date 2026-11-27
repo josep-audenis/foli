@@ -1002,7 +1002,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                                                                                                 |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                                                                                                      |
 | `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                                                                                                       |
-| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages), `rulerGeometry()` (optional). `storyChanged()` tells listeners it changed.                                                                       |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `editTextBox(id)` (optional), `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages), `rulerGeometry()` (optional). `storyChanged()` tells listeners it changed.                                         |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                                                                                                    |
 | `extensions`                   | The extensions it was made with (`EditorOptions.extensions`); a view reads its node views, mark views, decorations and plugin views from them.                                                                                                                                                                                                                                                         |
 
@@ -1020,6 +1020,13 @@ hideDeleted })` gives each reference's number, `noteTexts(numbers)` them by stor
 `noteAtSelection(state)` the reference at the selection, `noteProperties(envelope, kind, section?)`
 what is in force. Deleting a reference deletes its note in the same transaction; while tracking
 both are recorded, as Word does, and settled together.
+
+Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
+inches, floating, wrapped square, white with a thin black line) and its story at the end of the
+selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the
+selected box node. A box's text is the story its `story` attribute names (`editor.story(id)`);
+`storyView.editTextBox(id)` opens it where it is drawn. Deleting a box deletes its story in
+the same transaction.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering

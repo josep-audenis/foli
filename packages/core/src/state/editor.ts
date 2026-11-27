@@ -128,7 +128,7 @@ export type EditorListener = (state: EditorState, transactions: readonly Transac
 /** A header, footer or note open for editing on its page. */
 export interface OpenStory {
   id: string;
-  side: StorySide | "note";
+  side: StorySide | "note" | "textBox";
   variant: StoryVariant;
   /** The section it was opened from (a linked one shows an earlier section's story). */
   section: number;
@@ -212,6 +212,11 @@ export interface StoryView {
   edit(side: StorySide, page?: number): boolean;
   /** Opens a note where it is: `id`, or the one whose reference is at the selection. */
   editNote(id?: string): boolean;
+  /**
+   * Opens text box `id` where it is drawn, the caret in it (33.3). Optional: a view made before
+   * Phase 33 has none.
+   */
+  editTextBox?(id: string): boolean;
   /** Back from the note being edited to its reference, the caret after it. */
   toReference(): boolean;
   close(): void;

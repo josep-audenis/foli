@@ -20,7 +20,7 @@ export interface CountOptions {
   to?: number | undefined;
   /** Only the selection (its ranges: a cell selection's selected cells). */
   selection?: boolean | undefined;
-  /** Footnotes and endnotes too, as Word's "Include textboxes, footnotes and endnotes". */
+  /** Text boxes, footnotes and endnotes too, as Word's "Include textboxes, footnotes and endnotes". */
   notes?: boolean | undefined;
 }
 
@@ -77,10 +77,18 @@ export function countWords(state: EditorState, options: CountOptions = {}): Word
       paragraph(inner);
       return "";
     };
-    for (const story of Object.values(stories))
+    // The body's boxes, not one deleted as a tracked change (a header's counts with the header,
+    // which the count leaves out).
+    const boxes = new Set<string>();
+    state.doc.descendants((node) => {
+      if (node.type.name === "textBox" && !deleted(node.marks)) boxes.add(String(node.attrs.story));
+      return true;
+    });
+    for (const [id, story] of Object.entries(stories))
       if (
-        (story.kind === "footnote" || story.kind === "endnote") &&
-        (story.noteType ?? "normal") === "normal"
+        (story.kind === "textBox" && boxes.has(id)) ||
+        ((story.kind === "footnote" || story.kind === "endnote") &&
+          (story.noteType ?? "normal") === "normal")
       )
         walk(story.content);
   }
