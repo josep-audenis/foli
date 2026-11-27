@@ -1095,6 +1095,9 @@ export function TabsDialog({
   const [cleared, setCleared] = useState<number[]>([]);
   const [clearAll, setClearAll] = useState(false);
   const [position, setPosition] = useState("");
+  // The stop picked from the list, exactly: its position shown in the unit may be rounded.
+  const [pickedAt, setPickedAt] = useState<number | null>(null);
+  const at = pickedAt ?? parseLength(position, unit);
   const [alignment, setAlignment] = useState<Stop["alignment"]>("left");
   const [leader, setLeader] = useState<Stop["leader"]>("none");
   const [error, setError] = useState(false);
@@ -1103,8 +1106,8 @@ export function TabsDialog({
 
   /** The stop the fields describe, or null (the position is marked) when it is not one. */
   const typed = (): Stop | null => {
-    const twips = parseLength(position, unit);
-    if (twips === null || twips < 0 || twips > 31_680) {
+    const twips = at;
+    if (twips === null || (pickedAt === null && (twips < 0 || twips > 31_680))) {
       setError(true);
       first.current?.focus();
       return null;
@@ -1122,12 +1125,13 @@ export function TabsDialog({
     if (stop) add(stop);
   };
   const onClear = () => {
-    const twips = parseLength(position, unit);
+    const twips = at;
     if (twips === null || !stops.some((s) => s.position === twips)) return;
     setStops((list) => list.filter((s) => s.position !== twips));
     setSet((list) => list.filter((s) => s.position !== twips));
     setCleared((list) => [...list, twips]);
     setPosition("");
+    setPickedAt(null);
   };
   const onClearAll = () => {
     setStops([]);
@@ -1135,11 +1139,13 @@ export function TabsDialog({
     setCleared([]);
     setClearAll(true);
     setPosition("");
+    setPickedAt(null);
   };
   const pick = (twips: number) => {
     const stop = stops.find((s) => s.position === twips);
     if (!stop) return;
     setPosition(formatLength(stop.position, unit));
+    setPickedAt(stop.position);
     setAlignment(stop.alignment);
     setLeader(stop.leader);
     setError(false);
@@ -1148,11 +1154,13 @@ export function TabsDialog({
   const apply = (event: FormEvent) => {
     event.preventDefault();
     let toSet = set;
-    // A position typed but not Set is set by OK, as in Word.
-    if (position.trim() && !stops.some((s) => s.position === parseLength(position, unit))) {
+    // A position typed (or picked and changed) but not Set is set by OK, as in Word.
+    if (position.trim()) {
       const stop = typed();
       if (!stop) return;
-      toSet = [...set.filter((s) => s.position !== stop.position), stop];
+      const listed = stops.find((s) => s.position === stop.position);
+      if (!listed || listed.alignment !== stop.alignment || listed.leader !== stop.leader)
+        toSet = [...set.filter((s) => s.position !== stop.position), stop];
     }
     if (!toSet.length && !cleared.length && !clearAll) return onClose(false);
     const pt = (twips: number) => twips / 20;
@@ -1167,7 +1175,7 @@ export function TabsDialog({
     onClose(editor.run(command));
   };
 
-  const picked = parseLength(position, unit);
+  const picked = at;
   const radios = <T extends string>(
     name: string,
     legend: string,
@@ -1218,6 +1226,7 @@ export function TabsDialog({
                 aria-describedby={error ? `${id}-error` : undefined}
                 onChange={(event) => {
                   setPosition(event.target.value);
+                  setPickedAt(null);
                   setError(false);
                 }}
               />

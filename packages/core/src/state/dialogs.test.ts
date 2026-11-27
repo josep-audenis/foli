@@ -415,3 +415,16 @@ describe("setTabStops", () => {
     );
   });
 });
+
+describe("setTabStops limits", () => {
+  it("changes no paragraph when one would get more than 64 stops", () => {
+    const editor = editorOf([p({}, text("a"))]);
+    editor.select(2);
+    const many = Array.from({ length: 65 }, (_, i) => ({
+      position: i,
+      alignment: "left" as const,
+    }));
+    expect(editor.run(setTabStops({ set: many }))).toBe(false);
+    expect(attrsOf(editor).tabs).toBeNull();
+  });
+});

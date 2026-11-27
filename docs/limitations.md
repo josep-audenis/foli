@@ -744,7 +744,8 @@ Details in the [package README](../packages/docx/README.md).
 - Tab stops set in the Tabs dialog are kept and saved, but the pages lay text out with the
   default stops every half inch (custom stops are not drawn yet, see architecture.md). The
   dialog has no Default tab stops box: Foli keeps `w:defaultTabStop` in the settings part as the
-  file has it. Paragraphs with different stops show only those they share.
+  file has it. Paragraphs with different stops show none in the list (Set and Clear All still
+  work on each).
 - The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
   Suppress line numbers, Don't hyphenate or the Asian Typography tab.
 
