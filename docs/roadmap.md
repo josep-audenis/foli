@@ -43,7 +43,7 @@ place that says what is in progress; check it before starting work.
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
 | 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
 | 31 Ruler                      | In review                | `phase-31/ruler`          | 31.1–31.6 merged (#330–#335); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
-| 32 Page decoration            | In progress              | `phase-32/design`         | Started 2026-11-27 (assigned by the owner; Phase 29 is merged on `main`, its release waits)                                                                                                   |
+| 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 35 Insert extras              | Blocked by 29            | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
@@ -4576,6 +4576,22 @@ XML.
   three engines draws it (color, border, watermark, numbers 5, 10…, axe). Word's automation
   refuses `SuppressLineNumbers` there (unit tests cover it). It has no Strict twin. Docs:
   architecture.md ("Page decoration"), the corpus README.
+
+Closed 2026-11-27: 32.1–32.6 merged (#337–#342), each reviewed by a subagent and fixed before
+merging (32.5's review found schema 8 documents losing what they kept in `ext` on export: v8 →
+v9 now adopts it, and a page color left out keeps the file's). `pnpm bench --engines chromium`
+on a busy machine (other sessions' browsers and builds running) put eight numbers past their
+thresholds; `main` before this phase (3747bfa), run back to back on the same machine, gives the
+same picture: `exportPdf` of the corpus 1036 ms before, 1041 ms after; typing and Enter in the
+100-section document a little slower (typePaintP95 21.0 → 24.1, enterPaintP95 47.4 → 54.2), in
+the 200-section one a little faster (typePaintP95 40.1 → 33.5, reflow 406 → 377); layout and find
+within their ranges. No change from this phase, whose drawing work runs only for a document that
+has a page color, borders, a watermark or line numbers. Firefox and WebKit not benched; a quiet
+machine's run is still owed. Found, not from this phase: `pdf.spec.ts` (04 and 08: the editor's
+print has two extra blank landscape pages) fails the same on 3747bfa. Not done (limitations.md,
+"Page decoration"): Fill Effects, art and 3-D borders drawn, a theme page color kept as a theme
+color, DrawingML watermarks, neighbouring paragraphs' borders joined, shading patterns drawn,
+line numbers in Word's Line Number style.
 
 ### Acceptance
 
