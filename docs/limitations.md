@@ -799,7 +799,24 @@ Details in the [package README](../packages/docx/README.md).
 - The ruler reads the pages again in the next animation frame: in a hidden browser tab it waits
   until the tab shows.
 
-## Docs and tooling
+## Page decoration (Phase 32)
+
+- The page color is drawn as its color: Fill Effects (a gradient, texture, pattern or picture
+  behind the page) are kept in the file while the color stays, not drawn; a new color replaces
+  them, as Word's Page Color does. A theme color is drawn as the RGB value Word wrote beside it.
+  The page color is printed and in `exportPdf` (Word prints it only with "Print background
+  colors and images" on).
+- Page borders are drawn as lines: an art border (apples, stars…) as a solid line of its width,
+  a double, triple or thick-thin border as CSS draws `double` (one line when thin), a wave or 3-D
+  border as a solid line. A border's shadow (`w:shadow`) and frame are kept in the file, not
+  drawn; changing the borders writes them anew without them. Borders measured from the text
+  are placed from the section's margins, not around a header or footer (Word's "Surround
+  header" and "Surround footer" settings are kept, not applied).
+- Line numbers (`w:lnNumType`) are read and written but not drawn yet (32.5); an element without
+  `countBy` numbers no line in Word and stays in the section's verbatim XML.
+- On a dark page color, text in Automatic color stays black (Word draws it white).
+- A file whose `w:background` Word hides (no `w:displayBackgroundShape` in its settings) shows
+  the color in Foli; its settings stay as they are unless the color is changed.
 
 - The docs site's search matches headings and API names, not body text. The API pages show
   each declaration's `.d.ts` text; code is not highlighted.

@@ -160,14 +160,18 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React and FoliEditor raised in 30.2 (200.9 and 198.4 kB; 212.0 allowed): Word's Paragraph
  * dialog (tabs, tri-state boxes, a preview, lengths typed with units), with room for Phase 30's
  * Font and Tabs dialogs and the Layout tab's menus.
+ * React and FoliEditor raised in 32.1 (212.2 and 209.3 kB; 222.0 allowed): schema 9's checks
+ * and the page decoration drawn, with room for Phase 32's Design tab (Page Color, Page
+ * Borders, Watermark, Borders and Shading, Line Numbers). `@folijs/pdf` and its renderer raised
+ * in 32.1 (18.6 and 95.5 kB; 19.0 and 98.0 allowed): the same checks and drawing in the page.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 101_376 },
   { name: "@folijs/view", entry: dist("view"), budget: 135_168 },
-  { name: "@folijs/react", entry: dist("react"), budget: 217_088 },
-  { name: "FoliEditor only", entry: appEntry, budget: 217_088 },
+  { name: "@folijs/react", entry: dist("react"), budget: 227_328 },
+  { name: "FoliEditor only", entry: appEntry, budget: 227_328 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 69_632 },
-  { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
+  { name: "@folijs/pdf", entry: dist("pdf"), budget: 19_456 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
@@ -176,7 +180,7 @@ const BUILT = [
   {
     name: "pdf's renderer",
     file: join(root, "packages", "pdf", "dist", "renderer.js"),
-    budget: 97_500,
+    budget: 100_352,
   },
 ];
 

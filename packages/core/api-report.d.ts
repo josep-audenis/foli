@@ -44,7 +44,7 @@ export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, Foli
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
 export { AllSelection, acceptAllChanges, acceptChange, acceptChangeAndNext, acceptChangesById, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BroadcastJSON, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type CollabOptions, type Command, type CommentContent, type CommentMatch, type CommentMention, type CommentOptions, type CommentStepsOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CountOptions, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, chainCommands, changeCase, changeIndent, clearFormatting, closeHistory, collab, colorAt, columnAt, commentAnchors, commentMentions, commentOnly, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, copyFormat, countWords, createEditor, crossReferenceTargets, type DeleteUnit, type DialogName, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, dialogRequest, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, formatPainterState, formattingMarksShown, getVersion, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type LineRule, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mentionText, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextChangeWrapping, nextFontSize, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, onlyCommentSteps, openDialog, openLinkEditor, type ParagraphFlags, type ParagraphFormatAt, type PictureCrop, Plugin, PluginKey, type PluginSpec, type Presence, type PresenceMessage, pageVariant, paragraphFormatAt, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, pasteFormat, presence, presenceMessage, previousChange, previousChangeWrapping, type ReceivedBroadcast, type ReplaceRefusal, type ReplaceReport, type ReviewView, type RulerGeometry, type RunEffects, receiveBroadcast, receivePresence, receiveTransaction, redo, redoDepth, rejectAllChanges, rejectChange, rejectChangeAndNext, rejectChangesById, remote, removeLink, removePresence, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestedDialog, requestsLinkEditor, resolveComment, revealSelection, rulerShown, runFormatAt, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type SendableSteps, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, sendableSteps, setAlign, setBlockType, setCellShading, setCharacterSpacing, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setIndent, setLineSpacing, setLink, setNoteProperties, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setRulerShown, setRunEffects, setSectionSetup, setStoryLinked, setTableStyle, setTabStops, setTextColor, setTrackChanges, setUnderline, setVerticalAlign, sinkListItem, splitBlock, splitCell, splitListItem, stepFontSize, stopFormatPainter, storyOfSection, type TableOfContentsOptions, type TabStop, type TextCase, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleFormattingMarks, toggleHeaderRow, toggleList, toggleMark, toggleRuler, toggleVerticalAlign, trackedChanges, trackState, trackTransaction, UNDERLINE_STYLES, type UpdateFieldsOptions, underlineAt, undo, undoDepth, untracked, updateFields, type VerticalAlign, verticalAlignAt, type WordCount, wordKeymap, wrapInList, } from "./state/index.js";
 export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, type StoryMaps, Transform, TransformError, } from "./transform/index.js";
-export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
+export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type LineNumbersJSON, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type PageBackgroundJSON, type PageBordersJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
 export { isCommentOnly, resolvedCommentIds } from "./state/comments.js";
@@ -3615,9 +3615,10 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
  * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
- * formatting, Phase 23 task 23.2).
+ * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
+ * and line numbers, ADR-0015).
  */
-export declare const SCHEMA_VERSION = 8;
+export declare const SCHEMA_VERSION = 9;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -3663,6 +3664,10 @@ export interface SectionJSON {
         start?: number;
         format?: string;
     };
+    /** `w:pgBorders` (v9): borders around the section's pages. */
+    pageBorders?: PageBordersJSON;
+    /** `w:lnNumType` (v9): the section's lines numbered in the margin. */
+    lineNumbers?: LineNumbersJSON;
     footnotes?: NotePropertiesJSON;
     endnotes?: NotePropertiesJSON;
     /** `w:sectPrChange`: who changed the page setup while tracking, and what it was. */
@@ -3674,6 +3679,31 @@ export interface SectionJSON {
     };
     /** The `w:sectPr` this was read from, verbatim. */
     ext?: string;
+}
+/** A section's page borders (`w:pgBorders`, schema 9). */
+export interface PageBordersJSON {
+    top?: BorderJSON;
+    left?: BorderJSON;
+    bottom?: BorderJSON;
+    right?: BorderJSON;
+    /** What each border's `space` (points) is measured from: the text (Word's default) or the page's edge. */
+    offsetFrom?: "text" | "page";
+    /** Which pages show them: every page (the default), the section's first, or all but its first. */
+    display?: "allPages" | "firstPage" | "notFirstPage";
+    /** In front of the text (the default) or behind it. */
+    zOrder?: "front" | "back";
+}
+/**
+ * A section's line numbers (`w:lnNumType`, schema 9), as Word writes them: every `countBy`th line
+ * numbered (an element without it numbers none, and stays in the section's `ext`), from `start` + 1 (Word's "Start at" less one), `distance` twips from
+ * the text (left out: Word's automatic distance), restarting on each page (the default), section,
+ * or not at all.
+ */
+export interface LineNumbersJSON {
+    countBy: number;
+    start?: number;
+    distance?: number;
+    restart?: "newPage" | "newSection" | "continuous";
 }
 /** How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`). */
 export interface NotePropertiesJSON {
@@ -3986,6 +4016,22 @@ export interface WordSettingsJSON {
      * never said (an editor tracks when told to; `exportDocx` keeps the package's).
      */
     trackRevisions?: boolean;
+    /**
+     * The page color (schema 9): the main document's `w:background` (it lives in `document.xml`, not
+     * in the settings part). `color` is RRGGBB; a theme color also gives its tint or shade, as Word
+     * writes them (two hex digits). What else the element holds (Fill Effects) is kept while the
+     * color stays.
+     */
+    background?: PageBackgroundJSON;
+}
+/** The page color (`w:background`, schema 9). */
+export interface PageBackgroundJSON {
+    color?: string;
+    themeColor?: string;
+    themeTint?: string;
+    themeShade?: string;
+    /** The `w:background` this was read from, verbatim. */
+    ext?: string;
 }
 /** A document in the Word model: the content tree and what Word keeps beside it. */
 export interface FoliDocument {
@@ -3993,7 +4039,7 @@ export interface FoliDocument {
      * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
      * added (6: a picture's rotation or crop, 1.4).
      */
-    schemaVersion: 5 | 6 | 7 | typeof SCHEMA_VERSION;
+    schemaVersion: 5 | 6 | 7 | 8 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */
@@ -4121,7 +4167,7 @@ export declare const foreignTextOf: (json: NodeJSON) => string | undefined;
 export declare function withForeignText<T extends NodeJSON>(json: T, text: string): T;
 
 // v3/index.d.ts
-export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ControlJSON, checkControl, createDocument, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, type MeasureJSON, migrateToV4, migrateToV5, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, parseContent, parseDocument, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, type WordSettingsJSON, } from "./document.js";
+export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ControlJSON, checkControl, createDocument, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, type LineNumbersJSON, type MeasureJSON, migrateToV4, migrateToV5, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type PageBackgroundJSON, type PageBordersJSON, type ParagraphPropertiesJSON, parseContent, parseDocument, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, type WordSettingsJSON, } from "./document.js";
 export { type ContentOptions, type Extension, type ExtensionNodeSpec, foreignTextOf, type ParseOptions, schemaWith, withForeignText, } from "./extensions.js";
 export { migrateToV3 } from "./migrate.js";
 export { type CellFormat, type CellPlace, formatNumber, type ListMarker, type ParagraphFormat, Resolver, type RunFormat, type TableFormat, tableConditions, } from "./resolve.js";

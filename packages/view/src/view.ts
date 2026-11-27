@@ -48,6 +48,7 @@ import {
   noteProperties,
   noteTexts,
   type OpenStory,
+  type PageBordersJSON,
   pageVariant,
   parseContentV2,
   parseFieldInstruction,
@@ -159,6 +160,12 @@ import {
   CONTROL_UI_ATTR,
   ControlChrome,
 } from "./word/controls.js";
+import {
+  PAGE_BORDERS_ATTR,
+  pageBordersElement,
+  pageBordersKey,
+  pageColor,
+} from "./word/decoration.js";
 import {
   FLOAT_ANCHORS,
   spacing,
@@ -310,7 +317,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_BORDERS_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -382,6 +389,10 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
+/** The page color each page element was last given. */
+const pageColors = new WeakMap<HTMLElement, string>();
+/** Each page element's borders (Phase 32), as last drawn, and what they were drawn from. */
+const pageFrames = new WeakMap<HTMLElement, { key: string; element: HTMLElement | null }>();
 /** The margins a header or footer gave each page element, as last written. */
 const pagePads = new WeakMap<HTMLElement, string>();
 /** What a view without pages gives its one flow of content. */
@@ -3282,15 +3293,32 @@ export class EditorView {
         sheets[p - 1] ?? (layout[0] as BlockLayout | undefined)?.sheet ?? this.lastSheet();
     this.sheets = sheets.slice(0, count);
     while (this.pages.length < count) this.pages.push(this.createPage());
+    const context = this.paged ? wordContext(this.state) : null;
+    const color = pageColor(context?.envelope.settings) ?? "";
+    const setups = context ? this.sections() : [];
     this.sheets.forEach((sheet, p) => {
       const page = this.pages[p] as HTMLElement;
       const key = `${sheet.index} ${sheet.css}`;
       if (pageSheets.get(page) !== key) {
         pageSheets.set(page, key);
         pagePads.delete(page);
+        pageColors.delete(page);
         page.style.cssText = sheet.css;
         page.setAttribute(SHEET_ATTR, String(sheet.index));
       }
+      if ((pageColors.get(page) ?? "") !== color) {
+        pageColors.set(page, color);
+        page.style.backgroundColor = color;
+        // Printed as drawn: a browser leaves backgrounds out of print otherwise.
+        page.style.setProperty("print-color-adjust", color ? "exact" : "");
+        page.style.setProperty("-webkit-print-color-adjust", color ? "exact" : "");
+      }
+      this.drawPageBorders(
+        page,
+        setups[this.facts[p]?.section ?? -1]?.pageBorders,
+        sheet,
+        !!this.facts[p]?.first,
+      );
       const { top = "", bottom = "" } = this.pageMargins[p] ?? {};
       const pads = `${top} ${bottom}`;
       if ((pagePads.get(page) ?? " ") !== pads) {
@@ -3315,8 +3343,10 @@ export class EditorView {
       const notes = this.pageNotes[p];
       /** What follows the text of a column: its endnotes. */
       const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
-      /** A page's children: its header, what it holds, its notes, its footer. */
+      const frame = pageFrames.get(page)?.element;
+      /** A page's children: its borders, its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
+        ...(frame ? [frame] : []),
         ...(header ? [header.element] : []),
         ...list,
         ...(notes?.foot ?? []),
@@ -3409,6 +3439,29 @@ export class EditorView {
       });
     }
     return out;
+  }
+
+  /** Gives `page` the element of its section's page borders (none: null), made when they change. */
+  private drawPageBorders(
+    page: HTMLElement,
+    borders: PageBordersJSON | undefined,
+    sheet: Sheet,
+    first: boolean,
+  ): void {
+    const { pageSize, margins } = sheet.settings;
+    const px = (mm: number) => (mm * 96) / 25.4;
+    const box = {
+      width: px(pageSize.width),
+      height: px(pageSize.height),
+      top: px(margins.top),
+      right: px(margins.right),
+      bottom: px(margins.bottom),
+      left: px(margins.left),
+    };
+    const key = pageBordersKey(borders, box, first);
+    if (pageFrames.get(page)?.key === key) return;
+    const element = key ? pageBordersElement(this.host.ownerDocument, borders, box, first) : null;
+    pageFrames.set(page, { key, element });
   }
 
   private createPage(): HTMLElement {
@@ -4692,7 +4745,11 @@ export class EditorView {
     // Word's blank page before an even or odd page section holds nothing: the caret goes to the
     // section after it (the browser would put it at the document's start).
     const blank = event.target as HTMLElement;
-    if (!event.shiftKey && this.pages.includes(blank) && !blank.firstChild) {
+    if (
+      !event.shiftKey &&
+      this.pages.includes(blank) &&
+      ![...blank.children].some((c) => !c.hasAttribute(PAGE_BORDERS_ATTR))
+    ) {
       const pos = this.posFromDOM(blank, 0);
       if (pos !== null) {
         event.preventDefault();

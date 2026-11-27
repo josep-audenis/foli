@@ -183,13 +183,23 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   back as off), `footnotes` and `endnotes`, and `doNotUseHTMLParagraphAutoSpacing` (`w:compat`:
   a paragraph's space after and the next one's space before add up; without it Word takes the
   larger), from `word/settings.xml`, whose other content is kept verbatim. They change through
-  `EnvelopeStep`s.
+  `EnvelopeStep`s. `background` (v9) is the page color, the main part's `w:background`: `color`
+  (RRGGBB), a theme color's `themeColor` with `themeTint` or `themeShade` (two hex digits), and
+  `ext`, the element verbatim (Fill Effects, its VML children, are kept while the color stays; a
+  new color is written without them, as Word's Page Color does). Exporting a color set
+  anew (no `ext`) turns on `w:displayBackgroundShape`, without which Word does not show it; a
+  file's own background leaves its settings as they are.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
   in the paragraph's properties); the envelope's `section` is the last one. Every part of a
   section is optional (Word's defaults apply). `type` says how the section starts; `columns`
   (`w:cols`: `count`, `space`, `separator`, and `widths` when `equalWidth` is false),
   `pageNumbers` (`w:pgNumType`), `footnotes` and `endnotes` (`w:footnotePr`, `w:endnotePr`) are
-  read and written since 11.6. `change` (`w:sectPrChange`: `id`, `author`, `date`, `previous`) is
+  read and written since 11.6. `pageBorders` (v9, `w:pgBorders`: `top`, `left`, `bottom`,
+  `right` borders, each `style`, `size` in eighths of a point, `space` in points, `color`;
+  `offsetFrom` text or page, `display` allPages, firstPage or notFirstPage, `zOrder` front or
+  back) and `lineNumbers` (v9, `w:lnNumType`: `countBy`, required, `start` as Word writes it, one
+  less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous)
+  were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`, `previous`) is
   a tracked change of the setup; accepting drops it, rejecting restores `previous` with the
   section's header and footer references.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
@@ -485,7 +495,8 @@ Migrations never drop content. A published version never changes in place.
 | 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
 | 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
 | 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                          |
-| 8       | 1.7.0       | — (the current version: a table's, row's or cell's recorded formatting, `formatChange`, 23.2)                        |
+| 8       | 1.7.0       | v8 → v9: only the version changes (v9 only adds a setting and section parts)                                         |
+| 9       | next minor  | — (the current version: page decoration, `settings.background`, a section's `pageBorders` and `lineNumbers`, 32.1)   |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
@@ -494,7 +505,10 @@ is refused. From 1.6.0 a document that holds `settings.trackRevisions` (on, or t
 being on) needs 7; every earlier release refuses it, and a document that says 5 or 6 holding it is refused.
 From 1.7.0 a table, row or cell with a recorded formatting change (`formatChange`: `id`,
 `author`, `date`, `previous`, the properties before; `w:tblPrChange`, `w:trPrChange`,
-`w:tcPrChange`) needs 8, and a document that says 7 or less holding one is refused.
+`w:tcPrChange`) needs 8, and a document that says 7 or less holding one is refused. From the
+minor after 1.9 (Phase 32) a page color (`settings.background`) or a section with `pageBorders`
+or `lineNumbers` (the envelope's, a paragraph's `section`, or the setup a tracked change
+recorded) needs 9, and a document that says 8 or less holding one is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.

@@ -7,6 +7,7 @@ import {
   type StoryJSON,
   type WordSettingsJSON,
 } from "@folijs/core";
+import { readBackground } from "../background.js";
 import { customFromWord } from "../custom.js";
 import {
   DocxError,
@@ -151,6 +152,8 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   } catch (error) {
     if (!(error instanceof DocxError)) throw error;
   }
+  const background = readBackground(main.root, main.source);
+  if (background) settings = { ...settings, background };
 
   let document: FoliDocument;
   try {

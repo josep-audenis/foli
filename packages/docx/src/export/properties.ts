@@ -355,18 +355,7 @@ function paragraphChild(name: string, value: unknown, ns: Namespaces): string {
       return el(
         "w:pBdr",
         {},
-        BORDER_SIDES.map((side) => {
-          const b = v[side] as Json | undefined;
-          return b
-            ? el(`w:${side}`, {
-                "w:val": s(b.style),
-                "w:sz": s(b.size),
-                "w:space": s(b.space),
-                "w:color": s(b.color),
-                "w:themeColor": s(b.themeColor),
-              })
-            : "";
-        }).join(""),
+        BORDER_SIDES.map((side) => borderXml(side, v[side] as Json | undefined)).join(""),
       );
     case "shading":
       return el("w:shd", {
@@ -518,6 +507,20 @@ export function paragraphPropertiesXml(
     : "";
 }
 
+/** A border element (`w:top`…) of `border`; "" for none. */
+function borderXml(side: string, border: Json | undefined): string {
+  const s = (x: unknown) => (x === undefined || x === null ? undefined : String(x));
+  return border
+    ? el(`w:${side}`, {
+        "w:val": s(border.style),
+        "w:sz": s(border.size),
+        "w:space": s(border.space),
+        "w:color": s(border.color),
+        "w:themeColor": s(border.themeColor),
+      })
+    : "";
+}
+
 // ---- w:sectPr ------------------------------------------------------------------------------
 
 /** CT_SectPr child order (17.6.17). */
@@ -554,6 +557,8 @@ const SECTION_CHILDREN: Record<string, readonly string[]> = {
   titlePage: ["titlePg"],
   columns: ["cols"],
   pageNumbers: ["pgNumType"],
+  pageBorders: ["pgBorders"],
+  lineNumbers: ["lnNumType"],
   footnotes: ["footnotePr"],
   endnotes: ["endnotePr"],
   change: ["sectPrChange"],
@@ -635,6 +640,26 @@ function sectionChild(name: string, value: unknown, ns: Namespaces): string {
           .map((col) => el("w:col", { "w:w": s(col.width), "w:space": s(col.space) }))
           .join(""),
       );
+    case "pageBorders":
+      return el(
+        "w:pgBorders",
+        {
+          "w:zOrder": s(v.zOrder),
+          "w:display": s(v.display),
+          "w:offsetFrom": s(v.offsetFrom),
+        },
+        // CT_PageBorders: top, left, bottom, right.
+        ["top", "left", "bottom", "right"]
+          .map((side) => borderXml(side, v[side] as Json | undefined))
+          .join(""),
+      );
+    case "lineNumbers":
+      return el("w:lnNumType", {
+        "w:countBy": s(v.countBy),
+        "w:start": s(v.start),
+        "w:distance": s(v.distance),
+        "w:restart": s(v.restart),
+      });
     case "pageNumbers":
       return el("w:pgNumType", { "w:fmt": s(v.format), "w:start": s(v.start) });
     case "footnotes":

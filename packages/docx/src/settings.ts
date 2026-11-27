@@ -1,8 +1,9 @@
 /**
  * Word's document settings part (`settings.xml`): Foli reads and writes `w:trackRevisions`
  * (whether Word records edits as tracked changes), `w:evenAndOddHeaders` and the note properties
- * of `w:footnotePr` and `w:endnotePr`, and reads `w:doNotUseHTMLParagraphAutoSpacing`; the rest is
- * kept verbatim, and so is the part when none of them changes.
+ * of `w:footnotePr` and `w:endnotePr`, and reads `w:doNotUseHTMLParagraphAutoSpacing`; with a page
+ * color it turns on `w:displayBackgroundShape` (Word shows the color only then). The rest is kept
+ * verbatim, and so is the part when none of them changes.
  */
 import type { NotePropertiesJSON, WordSettingsJSON } from "@folijs/core";
 import { child, isW, toggle, W } from "./import/ooxml.js";
@@ -220,6 +221,10 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
     current = parseXml(text).root;
   };
   const prefix = prefixOf(root);
+  // Word shows the page color in Print Layout only with this on (it writes both). Only for a
+  // color set anew (no `ext`): a file's own background stays as shown or hidden there.
+  if (settings.background && !settings.background.ext && !isOn(current, "displayBackgroundShape"))
+    put("displayBackgroundShape", `<${prefix}displayBackgroundShape/>`);
   const even = settings.evenAndOddHeaders;
   if (even !== undefined && even !== isOn(current, "evenAndOddHeaders"))
     put("evenAndOddHeaders", even ? `<${prefix}evenAndOddHeaders/>` : "");
@@ -299,6 +304,7 @@ export function newSettingsXml(
           .join("")
       : "");
   const children =
+    (settings.background ? "<w:displayBackgroundShape/>" : "") +
     (trackRevisions ? "<w:trackRevisions/>" : "") +
     (settings.evenAndOddHeaders ? "<w:evenAndOddHeaders/>" : "") +
     NOTES.map(([key, local]) => notesXml("w:", local, settings[key] ?? {})).join("") +
