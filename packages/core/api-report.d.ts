@@ -3042,7 +3042,7 @@ export interface TabStop {
  * its own): `clear` removes the stops at these positions in points (`"all"`: every one, Clear
  * All), then `set` adds or replaces stops. Written as Word writes them: the paragraph's own stops
  * are those its style does not give, and a `clear` stop for each of the style's it no longer has.
- * Positions set from 0 to 1584 pt (any stop the paragraphs have can be cleared). Does not apply
+ * Positions set from -1584 to 1584 pt (any stop the paragraphs have can be cleared). Does not apply
  * when a paragraph would get more than 64 stops.
  */
 export declare function setTabStops(change: {

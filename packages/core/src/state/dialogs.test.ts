@@ -409,7 +409,7 @@ describe("setTabStops", () => {
         { position: 1440, kind: "clear" },
         { position: 4320, kind: "decimal" },
       ]);
-    expect(editor.run(setTabStops({ set: [{ position: -1, alignment: "left" }] }))).toBe(false);
+    expect(editor.run(setTabStops({ set: [{ position: -2000, alignment: "left" }] }))).toBe(false);
     expect(editor.run(setTabStops({ set: [{ position: 1, alignment: "clear" as "left" }] }))).toBe(
       false,
     );

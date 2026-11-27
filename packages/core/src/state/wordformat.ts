@@ -926,7 +926,7 @@ const TAB_ALIGNMENTS: readonly string[] = ["left", "center", "right", "decimal",
  * its own): `clear` removes the stops at these positions in points (`"all"`: every one, Clear
  * All), then `set` adds or replaces stops. Written as Word writes them: the paragraph's own stops
  * are those its style does not give, and a `clear` stop for each of the style's it no longer has.
- * Positions set from 0 to 1584 pt (any stop the paragraphs have can be cleared). Does not apply
+ * Positions set from -1584 to 1584 pt (any stop the paragraphs have can be cleared). Does not apply
  * when a paragraph would get more than 64 stops.
  */
 export function setTabStops(change: {
@@ -936,7 +936,8 @@ export function setTabStops(change: {
   return (state, dispatch) => {
     const context = wordContext(state);
     const set = change.set ?? [];
-    const valid = (pt: number) => pt >= 0 && pt <= 1584;
+    // Word takes stops into the left margin too.
+    const valid = (pt: number) => pt >= -1584 && pt <= 1584;
     if (
       !context ||
       set.some(

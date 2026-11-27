@@ -1107,7 +1107,7 @@ export function TabsDialog({
   /** The stop the fields describe, or null (the position is marked) when it is not one. */
   const typed = (): Stop | null => {
     const twips = at;
-    if (twips === null || (pickedAt === null && (twips < 0 || twips > 31_680))) {
+    if (twips === null || twips < -31_680 || twips > 31_680) {
       setError(true);
       first.current?.focus();
       return null;
