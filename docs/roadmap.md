@@ -4802,7 +4802,16 @@ paths; text in shapes through Phase 33's stories.
   the shape's `a:fontRef` (or a style that draws nothing else). `shapes.test.ts` (core, docx),
   `word-shapes.spec.ts` (fill, weight, dashes, arrows disabled off a line, outline, style, undo,
   axe; three engines).
-- [ ] 34.6 Corpus run on files with shapes; e2e; docs; changesets.
+- [x] 34.6 Corpus run on files with shapes; e2e; docs; changesets. Built:
+  `word-reference.ps1` records each shape Word reads (type, place, size, turn, flips, fill, line,
+  adjustment, text); `scripts/corpus/shape-roundtrip.mjs` (the poster unchanged, edited and with
+  new shapes; Word 16 opens both without repair, the unchanged one's shapes as Word's reference,
+  the edited one's as Foli wrote them: corpus/README.md); the corpus's reference updated with
+  `shapes`. The run found Word's `a:shade` taken in linear light (its 15% shade of 156082 is 042433,
+  not 030E13): import, `insertShape` and the styles now shade so, and `a:tint` likewise
+  (inferred, as LibreOffice reads it: the corpus has no tint). Text boxes'
+  round trip (`textbox-roundtrip.mjs`) again as written; the ink compare (`shapes.word.ts`) 0.988
+  to 1.0.
 
 ### Acceptance
 

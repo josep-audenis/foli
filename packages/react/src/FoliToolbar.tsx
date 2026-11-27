@@ -1200,11 +1200,15 @@ const ARROW_ACTIONS: readonly Action[] = (
 /** `hex`'s channels times `factor` (a darker shade, as a style's line). */
 const darker = (color: string, factor: number) =>
   [0, 2, 4]
-    .map((i) =>
-      Math.floor(Number.parseInt(color.slice(i, i + 2), 16) * factor)
+    .map((i) => {
+      // In linear light, as Word shades.
+      const c = Number.parseInt(color.slice(i, i + 2), 16) / 255;
+      const l = (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4) * factor;
+      const s = l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055;
+      return Math.round(s * 255)
         .toString(16)
-        .padStart(2, "0"),
-    )
+        .padStart(2, "0");
+    })
     .join("")
     .toUpperCase();
 

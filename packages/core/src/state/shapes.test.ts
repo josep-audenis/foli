@@ -218,7 +218,7 @@ describe("shapes (schema 11)", () => {
       width: 914_400,
       height: 457_200,
       fill: "156082",
-      outline: { color: "030E13", width: 12_700 },
+      outline: { color: "042433", width: 12_700 },
       float: {
         wrap: "inFront",
         horizontal: { relativeTo: "column", offset: 9525 },

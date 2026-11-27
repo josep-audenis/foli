@@ -114,9 +114,17 @@ export function modified(hex: string, color: XmlElement): string {
   };
   const shade = value("shade");
   const tint = value("tint");
-  if (shade !== undefined) [r, g, b] = [r * shade, g * shade, b * shade];
-  if (tint !== undefined)
-    [r, g, b] = [r + (1 - r) * (1 - tint), g + (1 - g) * (1 - tint), b + (1 - b) * (1 - tint)];
+  // Shade and tint in linear light, as Word draws them (its 15% shade of 156082 is 042433).
+  const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const gamma = (c: number) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+  if (shade !== undefined || tint !== undefined) {
+    [r, g, b] = [r, g, b].map((c) => {
+      let l = linear(c);
+      if (shade !== undefined) l *= shade;
+      if (tint !== undefined) l = l + (1 - l) * (1 - tint);
+      return gamma(l);
+    }) as [number, number, number];
+  }
   const lumMod = value("lumMod");
   const lumOff = value("lumOff");
   if (lumMod !== undefined || lumOff !== undefined) {

@@ -95,7 +95,7 @@ describe("shapes (Phase 34)", () => {
     // The theme's style (fillRef, lnRef) resolved: Word's accent 1 and its shade.
     const rect = byAlt(document, "Preset 1");
     expect(rect.fill).toBe("156082");
-    expect(rect.outline).toEqual({ color: "030E13", width: 12700 });
+    expect(rect.outline).toEqual({ color: "042433", width: 12700 });
     expect(rect.float).toMatchObject({ wrap: "inFront", horizontal: { relativeTo: "page" } });
     expect(byAlt(document, "Rounded rectangle, adjusted").adjust).toEqual({ adj: 35000 });
     expect(byAlt(document, "Right triangle flipped")).toMatchObject({ flipH: true, flipV: true });
