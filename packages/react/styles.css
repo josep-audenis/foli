@@ -1330,12 +1330,15 @@
   transform: translateY(-50%);
   cursor: ns-resize;
 }
+/* Inside the narrow ruler, the value reads along it. */
 .foli-ruler-vertical .foli-ruler-value {
   bottom: auto;
-  left: 24px;
+  left: 2px;
+  padding: 3px 1px;
   transform: translateY(-50%);
+  writing-mode: vertical-rl;
 }
-.foli-ruler-guide-across {
+.foli-ruler-guide.foli-ruler-guide-across {
   width: auto;
   height: 0;
   border-left: 0;

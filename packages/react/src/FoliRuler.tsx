@@ -236,7 +236,7 @@ function verticalHandles(g: RulerGeometry): Handle[] {
       value: twips(page.bottom - margins.bottom),
       min: 0,
       max: twips(page.bottom - margins.top) - ROOM,
-      grid: page.top,
+      grid: page.bottom,
       set: (value) => margin("bottom", value),
     },
   ];

@@ -164,8 +164,7 @@ while one is dragged with the pointer). On a focused handle:
 
 On the vertical ruler Down and Up move a margin the way they point and Right and Left change
 its value (Right larger); Page Up and Page Down as above. Right and Left move a handle the way they point, so on a right-hand handle (the right indent,
-the right margin) Right makes its value smaller; Up and Page Up always make it larger, as a
-slider's. Each key is one change (one undo step), as a drag is. A drag with Alt held does not
+the right margin) Right makes its value smaller; on the horizontal ruler Up and Page Up always make it larger, as a slider's. Each key is one change (one undo step), as a drag is. A drag with Alt held does not
 snap. A tab stop moved with the keys steps over another (the focus stays on it). The hanging marker's value is the left indent's; it also says the hanging (or first-line)
 indent it gives (`aria-valuetext` `1", hanging 0.5"`).
 

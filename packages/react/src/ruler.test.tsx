@@ -433,6 +433,18 @@ describe("FoliRuler", () => {
     expect(margins()?.bottom).toBe(-1530);
   });
 
+  it("vertical, in centimetres: the bottom margin snaps from the page's bottom edge", async () => {
+    const editor = createEditor({ document: doc() });
+    fakeView(editor);
+    render(<FoliRuler editor={editor} units="cm" orientation="vertical" />);
+    const bottom = await waitFor(() => slider("Bottom margin"));
+    // From 1 inch (2.54 cm) up 60 px (about 1.06 cm): 3.5 cm, a whole step of 0.25 cm from the edge.
+    fireEvent.pointerDown(bottom, { button: 0, pointerId: 1, clientY: 1440 });
+    fireEvent.pointerMove(bottom, { pointerId: 1, clientY: 1440 - 60 });
+    fireEvent.pointerUp(bottom, { pointerId: 1, clientY: 1440 - 60 });
+    expect(sectionAt(editor.state)?.setup.margins?.bottom).toBe(Math.round((3.5 * 1440) / 2.54));
+  });
+
   it("changes nothing when disabled, and is empty without a view", async () => {
     const editor = await setup({ left: 720 }, true);
     act(() => drag(slider("Left indent"), 316, 416));
