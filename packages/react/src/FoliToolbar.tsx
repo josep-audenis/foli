@@ -156,7 +156,7 @@ import {
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
 import { StyleGallery } from "./StyleGallery.js";
-import { ParagraphDialog } from "./WordDialogs.js";
+import { FontDialog, ParagraphDialog } from "./WordDialogs.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -437,11 +437,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
- * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"` (Word's Paragraph
- * dialog for the selected paragraphs, 1.11).
+ * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"` and `"font"` (Word's
+ * Paragraph and Font dialogs for the selection, 1.11).
  */
 export type ToolbarDialogName =
   | "paragraph"
+  | "font"
   | "link"
   | "picture"
   | "insertTable"
@@ -1546,6 +1547,8 @@ const RIBBON_ITEMS: readonly Item[] = [
   fromEntry(SECTION_ACTIONS, "pageSetup", {}),
   // Word's Paragraph group's launcher (Home and Layout).
   { key: "paragraphSettings", label: "Paragraph settings", dialog: "paragraph", enabled: isWord },
+  // Word's Font group's launcher (Home).
+  { key: "fontSettings", label: "Font settings", dialog: "font", enabled: isWord },
   fromEntry(CONTROL_ACTIONS, "controlProperties", { text: "Properties…" }),
   bodyEntry(noteActions, "footnote", {
     key: "footnote",
@@ -1794,7 +1797,8 @@ export type ToolbarItemName =
   | "formatPainter"
   | "formattingMarks"
   | "styleGallery"
-  | "paragraphSettings";
+  | "paragraphSettings"
+  | "fontSettings";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -1811,6 +1815,7 @@ type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView
 type ToolbarColorName = "textColor" | "highlight" | "cellShading";
 type ToolbarDialogItemName =
   | "paragraphSettings"
+  | "fontSettings"
   | "columnWidth"
   | "pageSetup"
   | "controlProperties"
@@ -1988,6 +1993,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
             t.highlight,
           ),
           wrapBefore: "bold",
+          launcher: t.fontSettings,
         },
         {
           ...group(
@@ -2142,6 +2148,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   noteOptions: (state) => wordContext(state) !== null,
   columnWidth: canFormatTable,
   paragraph: isWord,
+  font: isWord,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -2700,7 +2707,7 @@ export function FoliToolbar({
         if (disabled) return;
         // `openDialog`: one toolbar opens it, as one opens the link dialog.
         const asked = transactions.map(requestedDialog).find((name) => name !== null);
-        if (asked === "paragraph") {
+        if (asked === "paragraph" || asked === "font") {
           const active = typeof document === "undefined" ? null : document.activeElement;
           const owners = (linkOwners.get(editor) ?? []).filter(
             (owner) => !owner.disabled && !owner.commentOnly,
@@ -2746,7 +2753,7 @@ export function FoliToolbar({
               : current,
           );
           // So is the paragraph dialog: its paragraphs may have changed.
-          setParagraphDialog((current) =>
+          setWordDialog((current) =>
             current &&
             (!transactions.length ||
               transactions.some((tr) => tr.docChanged) ||
@@ -2796,7 +2803,7 @@ export function FoliToolbar({
         setReferenceDialog(null);
         setControlDialog(null);
         setNoteDialog(null);
-        setParagraphDialog(null);
+        setWordDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -2858,13 +2865,14 @@ export function FoliToolbar({
   useEffect(() => {
     if (disabled) setControlDialog(null);
   }, [disabled]);
-  // Word's Paragraph dialog, for the paragraphs selected when it opened.
-  const [paragraphDialog, setParagraphDialog] = useState<{
+  // Word's Paragraph or Font dialog, for the selection it opened on.
+  const [wordDialog, setWordDialog] = useState<{
+    name: "paragraph" | "font";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
   useEffect(() => {
-    if (disabled) setParagraphDialog(null);
+    if (disabled) setWordDialog(null);
   }, [disabled]);
   // The note options dialog (from the notes menu).
   const [noteDialog, setNoteDialog] = useState<{ restore: HTMLElement | null } | null>(null);
@@ -2897,7 +2905,7 @@ export function FoliToolbar({
       controlDialog ||
       noteDialog ||
       columnDialog ||
-      paragraphDialog,
+      wordDialog,
   );
   // A dialog opens under the toolbar, where the More panel is: the panel closes for it.
   const anyDialog = builtInDialog || appDialog !== null;
@@ -2921,7 +2929,7 @@ export function FoliToolbar({
     controlDialog ??
     noteDialog ??
     columnDialog ??
-    paragraphDialog;
+    wordDialog;
   const lastRestore = useRef<HTMLElement | null | undefined>(undefined);
   useEffect(() => {
     const was = lastRestore.current;
@@ -2962,7 +2970,7 @@ export function FoliToolbar({
       }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
-      else if (name === "paragraph") setParagraphDialog({ restore, selection });
+      else if (name === "paragraph" || name === "font") setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });
       else if (name === "crossReference") setReferenceDialog({ restore, selection });
@@ -2979,7 +2987,7 @@ export function FoliToolbar({
     setControlDialog(null);
     setNoteDialog(null);
     setColumnDialog(null);
-    setParagraphDialog(null);
+    setWordDialog(null);
   }
 
   // Another tab: its items from the first, and nothing of the last tab's left open.
@@ -3824,13 +3832,29 @@ export function FoliToolbar({
           }}
         />
       )}
-      {paragraphDialog && !disabled && (
+      {wordDialog?.name === "paragraph" && !disabled && (
         <ParagraphDialog
           editor={editor}
           unit="in"
           onClose={(applied) => {
-            const { restore } = paragraphDialog;
-            setParagraphDialog(null);
+            const { restore } = wordDialog;
+            setWordDialog(null);
+            closed(applied, restore);
+          }}
+        />
+      )}
+      {wordDialog?.name === "font" && !disabled && (
+        <FontDialog
+          editor={editor}
+          fonts={fontOptions(editor.state).map((option) => option.value)}
+          sizes={SIZES}
+          colors={themeColors(editor.state).filter(
+            (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
+              c.shade === undefined && c.color !== null,
+          )}
+          onClose={(applied) => {
+            const { restore } = wordDialog;
+            setWordDialog(null);
             closed(applied, restore);
           }}
         />

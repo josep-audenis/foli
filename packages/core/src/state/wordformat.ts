@@ -1279,6 +1279,16 @@ export function toggleVerticalAlign(value: VerticalAlign): Command {
   };
 }
 
+/**
+ * Raises or lowers the selected text (or the text typed next), or puts it back on its baseline:
+ * Word's Font dialog's Superscript and Subscript boxes (not a toggle).
+ */
+export function setVerticalAlign(value: VerticalAlign | "baseline"): Command {
+  return setRunMark("verticalAlign", (_existing, inherited, type) =>
+    inherited.verticalAlign === value ? null : type.create({ value }),
+  );
+}
+
 /** Whether the selected text (or the text typed next) is raised or lowered, if all the same. */
 export function verticalAlignAt(state: EditorState): VerticalAlign | "baseline" | null {
   return runValueAt(state, (run) => run.verticalAlign);
@@ -1299,8 +1309,10 @@ export function setCharacterSpacing(points: number | null): Command {
   };
 }
 
-/** The on/off effects of Word's Font dialog. */
+/** The on/off effects of Word's Font dialog, and its Font style (bold, italic). */
 export interface RunEffects {
+  bold?: boolean | null;
+  italic?: boolean | null;
   strike?: boolean | null;
   doubleStrike?: boolean | null;
   caps?: boolean | null;
@@ -1321,7 +1333,8 @@ const EXCLUSIVE: Partial<Record<keyof RunEffects, keyof RunEffects>> = {
  * back the styles'. Strikethrough and double strikethrough exclude each other, as all caps and
  * small caps do: turning one on turns the other off unless it is given too. A value the styles
  * already give leaves no direct mark; one they do not is written, off included
- * (`<w:caps w:val="0"/>` over a style's caps). One transaction.
+ * (`<w:caps w:val="0"/>` over a style's caps). Bold and italic set Latin text's (`w:b`, `w:i`),
+ * complex scripts' staying. One transaction.
  */
 export function setRunEffects(effects: RunEffects): Command {
   const want: RunEffects = {};
@@ -1336,9 +1349,14 @@ export function setRunEffects(effects: RunEffects): Command {
       state,
       dispatch,
       (Object.entries(want) as [keyof RunEffects, boolean | null][]).map(([key, value]) =>
-        setRunMark(key, (_existing, inherited, type) =>
-          value === null || inherited[key] === value ? null : type.create({ value }),
-        ),
+        setRunMark(key, (existing, inherited, type) => {
+          // Bold's and italic's complex-script half (`w:bCs`, `w:iCs`) stays as it is.
+          const cs = (existing?.attrs.complexScript as boolean | null | undefined) ?? null;
+          const keep = cs === null ? {} : { complexScript: cs };
+          if (value === null || inherited[key] === value)
+            return cs === null ? null : type.create({ value: null, ...keep });
+          return type.create({ value, ...keep });
+        }),
       ),
     );
 }
@@ -1625,12 +1643,20 @@ export const UNDERLINE_STYLES = [
   "wave",
 ] as const;
 
-/** The selected text (or the text typed next) underlined in `style`; null removes it. */
-export function setUnderline(style: string | null): Command {
+/**
+ * The selected text (or the text typed next) underlined in `style`; null removes it. `color`
+ * (`#rrggbb`, null for automatic; left out: the text's own stays) is the underline's color, as
+ * Word's Font dialog sets it.
+ */
+export function setUnderline(style: string | null, color?: string | null): Command {
   return setRunMark("underline", (existing, inherited, type) => {
     if (style === null) return inherited.underline === null ? null : type.create({ style: "none" });
-    if (inherited.underline === style) return null;
-    return type.create({ style, color: existing?.attrs.color ?? null });
+    const want =
+      color === undefined
+        ? ((existing?.attrs.color as string | null) ?? null)
+        : color && word(color);
+    if (inherited.underline === style && want === (inherited.underlineColor ?? null)) return null;
+    return type.create({ style, color: want });
   });
 }
 

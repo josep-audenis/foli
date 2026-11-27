@@ -716,8 +716,7 @@ Details in the [package README](../packages/docx/README.md).
 - The status bar has no document language (Foli does not keep `w:lang`) and no line count;
   `countWords` counts no text boxes (they are opaque). A large selection is counted again at
   each move.
-- The right-click menu has no Font or Paragraph entries (no such dialogs yet), and its Paste
-  goes through the Clipboard API, which the browser may refuse or ask about first; a browser
+- The right-click menu's Paste goes through the Clipboard API, which the browser may refuse or ask about first; a browser
   that ignores a synthetic paste event's data pastes nothing (not seen; not checked in WebKit).
   Shift+right-click keeps the browser's menu (its spelling suggestions); the page cannot tell
   where the browser saw a misspelling. In read-only and comment-only documents an app's own
@@ -731,11 +730,16 @@ Details in the [package README](../packages/docx/README.md).
 
 ## Word's dialogs (Phase 30)
 
-- The Paragraph dialog is the toolbar's: `openDialog` and the right-click menu's Paragraph…
-  open nothing without a toolbar on the editor (the entry still shows), nor on a comment-only
-  toolbar.
+- The Font and Paragraph dialogs are the toolbar's: `openDialog`, Ctrl+D and the right-click
+  menu's Font… and Paragraph… open nothing without a toolbar on the editor (the entries still
+  show), nor on a comment-only toolbar.
 - Paragraphs with different special indents (first line on one, hanging on another, or the same
   kind by different amounts) show Special blank: pick First line or Hanging to set By for all.
+- The Font dialog has no Scale box (the model has no `w:w`), no Position (raised or lowered by
+  points, `w:position`), no kerning and no OpenType features; Font color and Underline color
+  list Automatic, the theme's colors and Word's standard ones (no shades, no custom picker:
+  the toolbar's color menu has those); Hidden text is shown as other text (the view does not
+  hide it).
 - The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
   Suppress line numbers, Don't hyphenate or the Asian Typography tab.
 

@@ -381,6 +381,20 @@
   overflow: hidden;
 }
 
+.foli-font-dialog .foli-dialog-section .foli-setup-check {
+  flex: 0 1 14em;
+}
+
+.foli-font-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 4em;
+  max-width: none;
+  font: 11pt / 1.2 serif;
+  white-space: nowrap;
+}
+
 .foli-dialog-preview p {
   margin: 0 0 3px;
 }

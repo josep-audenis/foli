@@ -138,3 +138,90 @@ describe("a comment-only toolbar", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
+
+describe("Font dialog", () => {
+  const open = (...content: object[]) => {
+    const editor = createEditor({ document: documentOf(...content) });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    return editor;
+  };
+  const dialog = () => screen.getByRole("dialog", { name: "Font" });
+  const field = (name: string) => within(dialog()).getByLabelText(name) as HTMLInputElement;
+  const submit = () => fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+  const marksOf = (editor: ReturnType<typeof open>) =>
+    editor.state.doc.child(0).firstChild?.marks.map((m) => m.toJSON());
+
+  it("opens from the Font group's launcher and sets what was changed, in one undo step", () => {
+    const editor = open(paragraph("abc"));
+    editor.select(1, 4);
+    fireEvent.click(screen.getByRole("button", { name: "Font settings" }));
+    expect(field("Size").value).toBe("11");
+    expect(field("Font style").value).toBe("regular");
+    fireEvent.change(field("Font style"), { target: { value: "boldItalic" } });
+    fireEvent.change(field("Size"), { target: { value: "14" } });
+    fireEvent.change(field("Font color"), { target: { value: "#ff0000" } });
+    fireEvent.change(field("Underline style"), { target: { value: "double" } });
+    fireEvent.click(field("Small caps"));
+    fireEvent.click(screen.getByRole("tab", { name: "Advanced" }));
+    fireEvent.change(field("Spacing"), { target: { value: "expanded" } });
+    fireEvent.change(field("By"), { target: { value: "2" } });
+    submit();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      marksOf(editor)
+        ?.map((m) => m.type)
+        .sort(),
+    ).toEqual([
+      "bold",
+      "characterSpacing",
+      "color",
+      "fontSize",
+      "italic",
+      "smallCaps",
+      "underline",
+    ]);
+    editor.run(undo);
+    expect(marksOf(editor)).toEqual([]);
+  });
+
+  it("checks one of a pair, clears the other; mixed effects stay as they are", () => {
+    const editor = open({
+      type: "paragraph",
+      content: [
+        { type: "text", text: "ab", marks: [{ type: "caps" }] },
+        {
+          type: "text",
+          text: "cd",
+          marks: [{ type: "verticalAlign", attrs: { value: "subscript" } }],
+        },
+      ],
+    });
+    editor.select(1, 5);
+    act(() => {
+      editor.run(openDialog("font"));
+    });
+    expect(field("All caps").indeterminate).toBe(true);
+    expect(field("Size").value).toBe("11");
+    fireEvent.click(field("Superscript"));
+    expect(field("Subscript").checked).toBe(false);
+    submit();
+    const runs = editor.state.doc
+      .child(0)
+      .content.content.map((n) => n.marks.map((m) => [m.type.name, m.attrs.value]));
+    expect(runs).toEqual([
+      [
+        ["caps", true],
+        ["verticalAlign", "superscript"],
+      ],
+      [["verticalAlign", "superscript"]],
+    ]);
+  });
+
+  it("marks a wrong size", () => {
+    open(paragraph("abc"));
+    fireEvent.click(screen.getByRole("button", { name: "Font settings" }));
+    fireEvent.change(field("Size"), { target: { value: "0" } });
+    submit();
+    expect(screen.getByRole("alert").textContent).toBe("Check this value: Size.");
+  });
+});

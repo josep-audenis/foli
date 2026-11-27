@@ -369,6 +369,7 @@ export {
   setParagraphStyle,
   setRunEffects,
   setUnderline,
+  setVerticalAlign,
   stepFontSize,
   stopFormatPainter,
   type TextCase,

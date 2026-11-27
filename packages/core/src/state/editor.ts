@@ -260,7 +260,7 @@ export interface BuiltInCommands {
    * editor): one undo step, tracked when tracking is on. False when none could take it.
    */
   setControlValue(target: string, value: ControlValueInput): boolean;
-  /** Asks the toolbar to open Word's Paragraph dialog (`openDialog`). */
+  /** Asks the toolbar to open Word's Font or Paragraph dialog (`openDialog`). */
   openDialog(name: DialogName): boolean;
 }
 

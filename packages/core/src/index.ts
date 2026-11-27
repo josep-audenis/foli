@@ -337,6 +337,7 @@ export {
   setTextColor,
   setTrackChanges,
   setUnderline,
+  setVerticalAlign,
   sinkListItem,
   splitBlock,
   splitCell,

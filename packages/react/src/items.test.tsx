@@ -145,6 +145,7 @@ const NAMES = {
   formattingMarks: 1,
   styleGallery: 1,
   paragraphSettings: 1,
+  fontSettings: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */
