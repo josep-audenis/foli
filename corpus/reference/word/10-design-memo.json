@@ -1,0 +1,134 @@
+{
+    "document":  "10-design-memo.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "comments":  0,
+    "revisionsAccepted":  0,
+    "pages":  1,
+    "paragraphs":  [
+                       {
+                           "text":  "Design review memo",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Summary of the changes agreed at the review.",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Decision: the summary moves to page one from the next issue.",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Reviewed by the editorial board.",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+
+                 ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+
+               ],
+    "bookmarks":  [
+
+                  ],
+    "controls":  [
+
+                 ]
+}

@@ -214,3 +214,39 @@ describe("documents saved before schema 9 (review of 32.5)", () => {
     expect(await main(await exportDocx(saved, read.package))).toBe(await main(bytes));
   });
 });
+
+describe("the corpus's design memo (Word 16, 32.6)", () => {
+  const file = new URL("../../../corpus/word/10-design-memo.docx", import.meta.url);
+
+  it("reads its page color, page borders, line numbers, paragraph borders and watermark", async () => {
+    const { readFileSync } = await import("node:fs");
+    const bytes = new Uint8Array(readFileSync(file));
+    const read = await importDocx(bytes);
+    const doc = read.document;
+    expect(doc.schemaVersion).toBe(9);
+    expect(doc.settings?.background?.color).toBe("DDEBF7");
+    expect(doc.section.pageBorders).toMatchObject({
+      offsetFrom: "page",
+      top: { style: "double", size: 6, space: 24, color: "7030A0" },
+    });
+    expect(doc.section.lineNumbers).toEqual({ countBy: 5 });
+    const paragraphs = doc.content.content ?? [];
+    expect(
+      paragraphs.some((p) => Object.hasOwn((p.attrs?.borders as object | null) ?? {}, "bottom")),
+    ).toBe(true);
+    expect(
+      paragraphs.some((p) => (p.attrs?.shading as { fill?: string } | null)?.fill === "E6E6E6"),
+    ).toBe(true);
+    const marks = Object.values(doc.stories ?? {}).flatMap((story) =>
+      JSON.stringify(story.content).includes('"watermark"') ? [story] : [],
+    );
+    expect(marks).toHaveLength(1);
+    expect(JSON.stringify(marks[0]?.content)).toContain('"text":"CONFIDENTIAL"');
+    // Written back unchanged, part for part.
+    const out = await readPackage(await exportDocx(doc, read.package));
+    const original = await readPackage(bytes);
+    for (const part of original.parts)
+      if (part.contentType.endsWith("xml"))
+        expect(out.text(part.name), part.name).toBe(original.text(part.name));
+  });
+});

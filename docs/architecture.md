@@ -1452,6 +1452,26 @@ since 1.0.0):
   one transaction a drag or a key. `FoliEditor` draws both while `rulerShown` (unless
   `ruler={false}`).
 
+### Page decoration (Phase 32, ADR-0015)
+
+- `@folijs/core` (schema 9): the page color (`settings.background`), a section's page borders
+  and line numbers (`pageBorders`, `lineNumbers`), a paragraph's `suppressLineNumbers`, and a
+  header's watermark (an opaque run's `watermark`). Commands: `setPageColor`, `setPageBorders`,
+  `setWatermark` (every header the pages show), `setParagraphBorder` and friends,
+  `setSectionSetup({ lineNumbers })`. Parsing a schema 8 document adopts what its `ext` kept.
+- `@folijs/docx`: `background.ts` (the main part's `w:background`, before the body),
+  `watermark.ts` (Word's VML watermarks, verbatim while unchanged), the section and paragraph
+  properties as their other parts.
+- `@folijs/view` (`word/decoration.ts`), shared by the editing view and `renderDocument` (so
+  print and `exportPdf`): the color as each page's background (printed: `print-color-adjust:
+  exact`, set where each renderer gives the page its color),
+  the borders and watermarks as elements over and under the page's content (`aria-hidden`,
+  `contenteditable=false`, no pointer events, `PAGE_DECORATION_ATTR`), and line numbers
+  measured from the laid-out lines once the pages hold their blocks (only where a section has
+  them), beside each column.
+- `@folijs/react`: the Design tab (Watermark, Page Color, Page Borders), Home's Shading and
+  Borders, Layout's Line Numbers, and their dialogs (`DesignDialogs.tsx`).
+
 ## Styling
 
 Plain CSS with custom properties (`--foli-*`) declared on `:root` and `:host` (page, canvas
