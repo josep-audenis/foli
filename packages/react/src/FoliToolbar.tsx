@@ -90,6 +90,7 @@ import {
   rulerShown,
   type SectionJSON,
   type SectionSetup,
+  type ShapeLook,
   type StorySide,
   sectionAt,
   selectedObject,
@@ -122,6 +123,7 @@ import {
   setPictureSize,
   setReviewView,
   setSectionSetup,
+  setShapeLook,
   setStoryLinked,
   setTableStyle,
   setTextColor,
@@ -1093,6 +1095,169 @@ const ALIGN_OBJECT_ACTIONS: readonly Action[] = (
 /** Whether a picture or text box is selected and its layout can change (not while tracking). */
 const objectLayoutEnabled = (state: EditorState) =>
   !!selectedObject(state) && trackState(state)?.on !== true;
+
+// ---------- Shape Format (34.5): fill, outline, styles of a selected shape or text box ----------
+
+/** The selected shape or text box that can change, and where it is. */
+const selectedDrawing = (state: EditorState) => {
+  const object = selectedObject(state);
+  const name = object?.node.type.name;
+  return object && (name === "shape" || name === "textBox") && trackState(state)?.on !== true
+    ? object
+    : null;
+};
+const drawingSelected = (state: EditorState) => selectedDrawing(state) !== null;
+/** A selected shape (not a text box): what has dashes, ends, styles. */
+const shapeSelected = (state: EditorState) => selectedDrawing(state)?.node.type.name === "shape";
+/** Lines Word gives arrow ends (Shape Outline ▸ Arrows). */
+const LINE_SHAPES = new Set(["line", "straightConnector1", "bentConnector3", "curvedConnector3"]);
+const lineSelected = (state: EditorState) =>
+  LINE_SHAPES.has(String(selectedDrawing(state)?.node.attrs.geometry));
+
+/** `look` applied to the selected shape or text box. */
+const looks =
+  (look: ShapeLook): Command =>
+  (state, dispatch) => {
+    const object = selectedDrawing(state);
+    return !!object && setShapeLook(object.pos, look)(state, dispatch);
+  };
+const outlineOf = (state: EditorState) =>
+  selectedDrawing(state)?.node.attrs.outline as
+    | { color?: string; width?: number; dash?: string; head?: unknown; tail?: unknown }
+    | null
+    | undefined;
+const hex = (color: string | null) => (color ? color.slice(1).toUpperCase() : null);
+
+const SHAPE_FILLS = (state: EditorState): readonly ToolbarColor[] => [
+  { name: "No Fill", color: null },
+  ...themeColors(state),
+];
+const SHAPE_OUTLINES = (state: EditorState): readonly ToolbarColor[] => [
+  { name: "No Outline", color: null },
+  ...themeColors(state),
+];
+
+/** Shape Outline ▸ Weight: Word's widths, in points. */
+const WEIGHT_ACTIONS: readonly Action[] = (
+  [
+    { points: 0.25, label: "0.25 pt" },
+    { points: 0.5, label: "0.5 pt" },
+    { points: 0.75, label: "0.75 pt" },
+    { points: 1, label: "1 pt" },
+    { points: 1.5, label: "1.5 pt" },
+    { points: 2.25, label: "2.25 pt" },
+    { points: 3, label: "3 pt" },
+    { points: 4.5, label: "4.5 pt" },
+    { points: 6, label: "6 pt" },
+  ] as const
+).map(({ points, label }) => ({
+  key: `weight-${points}`,
+  label,
+  checked: (state) => outlineOf(state)?.width === Math.round(points * 12_700),
+  command: looks({ outline: { width: Math.round(points * 12_700) } }),
+}));
+
+/** Shape Outline ▸ Dashes: Word's, by name (`a:prstDash`). */
+const DASH_ACTIONS: readonly Action[] = (
+  [
+    { dash: "solid", label: "Solid" },
+    { dash: "sysDot", label: "Round Dot" },
+    { dash: "sysDash", label: "Square Dot" },
+    { dash: "dash", label: "Dash" },
+    { dash: "dashDot", label: "Dash Dot" },
+    { dash: "lgDash", label: "Long Dash" },
+    { dash: "lgDashDot", label: "Long Dash Dot" },
+    { dash: "lgDashDotDot", label: "Long Dash Dot Dot" },
+  ] as const
+).map(({ dash, label }) => ({
+  key: `dash-${dash}`,
+  label,
+  checked: (state) => (outlineOf(state)?.dash ?? "solid") === dash,
+  command: (state, dispatch) =>
+    shapeSelected(state) && looks({ outline: { dash } })(state, dispatch),
+}));
+
+/** Shape Outline ▸ Arrows: a line's ends. */
+const ARROW = { type: "triangle" } as const;
+const ARROW_ACTIONS: readonly Action[] = (
+  [
+    { key: "arrowsNone", label: "No Arrows", head: null, tail: null },
+    { key: "arrowEnd", label: "Arrow at End", head: null, tail: ARROW },
+    { key: "arrowStart", label: "Arrow at Start", head: ARROW, tail: null },
+    { key: "arrowsBoth", label: "Arrows at Both Ends", head: ARROW, tail: ARROW },
+  ] as const
+).map(({ key, label, head, tail }) => ({
+  key,
+  label,
+  checked: (state) => {
+    const outline = outlineOf(state);
+    return !!outline?.head === !!head && !!outline?.tail === !!tail;
+  },
+  command: (state, dispatch) =>
+    lineSelected(state) && looks({ outline: { head, tail } })(state, dispatch),
+}));
+
+/** `hex`'s channels times `factor` (a darker shade, as a style's line). */
+const darker = (color: string, factor: number) =>
+  [0, 2, 4]
+    .map((i) =>
+      Math.floor(Number.parseInt(color.slice(i, i + 2), 16) * factor)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")
+    .toUpperCase();
+
+/**
+ * Shape Styles: Word's gallery's first rows for the theme's dark text and six accents: Colored
+ * Outline (white, the color's line, dark text) and Colored Fill (the color, its dark shade's line,
+ * white text).
+ */
+const themeColor = (state: EditorState, slot: string) => {
+  const value = wordContext(state)?.envelope.theme?.colors?.[slot];
+  return (
+    value && /^[0-9a-f]{6}$/i.test(value) ? value : (OFFICE_THEME[slot] as string)
+  ).toUpperCase();
+};
+const STYLE_ACTIONS: readonly Action[] = (
+  [
+    { kind: "outline", slot: "dk1", label: "Colored Outline - Black, Dark 1" },
+    { kind: "outline", slot: "accent1", label: "Colored Outline - Accent 1" },
+    { kind: "outline", slot: "accent2", label: "Colored Outline - Accent 2" },
+    { kind: "outline", slot: "accent3", label: "Colored Outline - Accent 3" },
+    { kind: "outline", slot: "accent4", label: "Colored Outline - Accent 4" },
+    { kind: "outline", slot: "accent5", label: "Colored Outline - Accent 5" },
+    { kind: "outline", slot: "accent6", label: "Colored Outline - Accent 6" },
+    { kind: "fill", slot: "dk1", label: "Colored Fill - Black, Dark 1" },
+    { kind: "fill", slot: "accent1", label: "Colored Fill - Accent 1" },
+    { kind: "fill", slot: "accent2", label: "Colored Fill - Accent 2" },
+    { kind: "fill", slot: "accent3", label: "Colored Fill - Accent 3" },
+    { kind: "fill", slot: "accent4", label: "Colored Fill - Accent 4" },
+    { kind: "fill", slot: "accent5", label: "Colored Fill - Accent 5" },
+    { kind: "fill", slot: "accent6", label: "Colored Fill - Accent 6" },
+  ] as const
+).map(
+  ({ kind, slot, label }): Action => ({
+    key: `style-${kind}-${slot}`,
+    label,
+    command: (state, dispatch) => {
+      const color = themeColor(state, slot);
+      return looks(
+        kind === "outline"
+          ? {
+              fill: "FFFFFF",
+              outline: { color, width: 12_700, dash: "solid" },
+              textColor: themeColor(state, "dk1"),
+            }
+          : {
+              fill: color,
+              outline: { color: darker(color, 0.5), width: 12_700, dash: "solid" },
+              textColor: "FFFFFF",
+            },
+      )(state, dispatch);
+    },
+  }),
+);
 
 /** Whether a floating picture or text box is selected and can change. */
 const floatingObjectSelected = (state: EditorState) =>
@@ -2290,6 +2455,68 @@ const RIBBON_ITEMS: readonly Item[] = [
     label: "Navigation pane",
     command: () => false,
   }),
+  // Shape Format (34.5): a selected shape's or text box's fill, line and style.
+  {
+    key: "shapeStyles",
+    label: "Shape styles",
+    text: "Shape Styles",
+    // Not a line's (Word fills none).
+    enabled: (state) => shapeSelected(state) && !lineSelected(state),
+    actions: STYLE_ACTIONS,
+  },
+  {
+    key: "shapeFill",
+    label: "Shape fill",
+    text: "Shape Fill",
+    enabled: (state) => drawingSelected(state) && !lineSelected(state),
+    colors: {
+      options: SHAPE_FILLS,
+      columns: 10,
+      custom: true,
+      value: (state) => {
+        const fill = selectedDrawing(state)?.node.attrs.fill;
+        return typeof fill === "string" ? `#${fill.toLowerCase()}` : null;
+      },
+      pick: (color) => looks({ fill: hex(color) }),
+    },
+  },
+  {
+    key: "shapeOutline",
+    label: "Shape outline",
+    text: "Shape Outline",
+    enabled: drawingSelected,
+    colors: {
+      options: SHAPE_OUTLINES,
+      columns: 10,
+      custom: true,
+      value: (state) => {
+        const color = outlineOf(state)?.color;
+        return color ? `#${color.toLowerCase()}` : null;
+      },
+      pick: (color) => looks({ outline: color ? { color: hex(color) as string } : null }),
+    },
+  },
+  {
+    key: "outlineWeight",
+    label: "Outline weight",
+    text: "Weight",
+    enabled: (state) => drawingSelected(state) && !!outlineOf(state),
+    actions: WEIGHT_ACTIONS,
+  },
+  {
+    key: "outlineDashes",
+    label: "Outline dashes",
+    text: "Dashes",
+    enabled: (state) => shapeSelected(state) && !!outlineOf(state),
+    actions: DASH_ACTIONS,
+  },
+  {
+    key: "outlineArrows",
+    label: "Arrows",
+    text: "Arrows",
+    enabled: (state) => lineSelected(state) && !!outlineOf(state),
+    actions: ARROW_ACTIONS,
+  },
   {
     key: "wrapText",
     label: "Wrap Text",
@@ -2640,6 +2867,12 @@ export type ToolbarItemName =
   | "controlProperties"
   | "textBox"
   | "shapes"
+  | "shapeStyles"
+  | "shapeFill"
+  | "shapeOutline"
+  | "outlineWeight"
+  | "outlineDashes"
+  | "outlineArrows"
   | "footnote"
   | "endnote"
   | "goToNote"
@@ -3048,8 +3281,22 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "shapeFormat",
       label: "Shape Format",
       contextual: true,
-      visible: (state: EditorState) => selectedTextBox(state) !== null,
+      // A text box (33.6) or a shape (34.5).
+      visible: (state: EditorState) => {
+        const name = selectedObject(state)?.node.type.name;
+        return name === "textBox" || name === "shape";
+      },
       items: [
+        group("Insert Shapes", large(t.shapes)),
+        group(
+          "Shape Styles",
+          large(t.shapeStyles),
+          t.shapeFill,
+          t.shapeOutline,
+          t.outlineWeight,
+          t.outlineDashes,
+          t.outlineArrows,
+        ),
         group(
           "Arrange",
           large(t.position),

@@ -192,14 +192,17 @@ function shapeLine(
   if (fill === "unknown") return "unknown";
   if (!fill.fill) return null;
   const width = emu(plain(ln, "w")) ?? emu(plain(themed, "w")) ?? 9525;
-  const dash = plain(kid(ln, A, "prstDash") ?? kid(themed, A, "prstDash"), "val");
-  // A custom dash (`a:custDash`) is drawn solid, kept in `ext`.
+  // A custom dash (`a:custDash`): `custom`, drawn solid, written back as the file has it.
+  const custom = kid(ln, A, "custDash") ?? (ln ? undefined : kid(themed, A, "custDash"));
+  const dash = custom
+    ? "custom"
+    : plain(kid(ln, A, "prstDash") ?? kid(themed, A, "prstDash"), "val");
   const head = lineEnd(kid(ln, A, "headEnd") ?? kid(themed, A, "headEnd"));
   const tail = lineEnd(kid(ln, A, "tailEnd") ?? kid(themed, A, "tailEnd"));
   return {
     color: fill.fill,
     width,
-    ...(dash && dash !== "solid" && DASHES.has(dash) ? { dash } : {}),
+    ...(dash && dash !== "solid" && (DASHES.has(dash) || dash === "custom") ? { dash } : {}),
     ...(head ? { head } : {}),
     ...(tail ? { tail } : {}),
   };

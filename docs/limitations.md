@@ -307,7 +307,13 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   typing on it, writes there (the first character typed is undone apart from the text made for
   it: two steps). Moving, turning, adjusting and giving a shape text are refused while tracking
   (Word records none of them). Adjustment handles have no keyboard way; turning has the Layout
-  dialog's Size tab.
+  dialog's Size tab. Shape Format (34.5) offers Word's first two rows of shape styles (Colored
+  Outline, Colored Fill) for the theme's dark color and six accents, plain fill and outline colors,
+  Word's line weights and dashes, and arrows for lines; gradients, pictures, textures, patterns,
+  effects (shadow, glow, 3-D), WordArt styles and the Format Shape pane are not offered (a
+  file's gradient is kept until another fill is chosen). A style's text color is written into
+  the shape's style (`a:fontRef`) as a plain color, the theme link lost; a shape without text
+  reads none, so a style chosen for it writes its color at each save.
   Insert ▸ Shapes (34.3) offers the shapes Foli draws (Word's
   gallery has more), named in English whatever the toolbar's language, and puts a shape in the
   body only (shortcut, as text boxes), anchored at the start of the paragraph pressed; drawn from

@@ -7,7 +7,7 @@ import { A } from "../import/ooxml.js";
 import { WP } from "../import/pictures.js";
 import { DEFAULT_INSET, kid, WPS } from "../import/textboxes.js";
 import type { XmlElement } from "../xml.js";
-import { positionXml, wrapXml } from "./frames.js";
+import { type Edit, positionXml, wrapXml } from "./frames.js";
 import type { Media } from "./pictures.js";
 import { escapeAttribute } from "./xmlout.js";
 
@@ -138,14 +138,16 @@ export function lnXml(
     const len = typeof e.length === "string" ? ` len="${q(e.length)}"` : "";
     return `<${p}:${local} type="${q(e.type)}"${w}${len}/>`;
   };
-  // A file's custom dash stays while the model says none (Foli draws it solid).
+  // A file's custom dash stays while the model says `custom`; no dash replaces any the line had.
   const custom = kid(was, A, "custDash");
   const dash =
-    typeof outline.dash === "string"
-      ? `<${p}:prstDash val="${q(outline.dash)}"/>`
-      : custom && source
+    outline.dash === "custom"
+      ? custom && source
         ? source.slice(custom.start, custom.end)
-        : kid(was, A, "prstDash")
+        : ""
+      : typeof outline.dash === "string"
+        ? `<${p}:prstDash val="${q(outline.dash)}"/>`
+        : custom || kid(was, A, "prstDash")
           ? `<${p}:prstDash val="solid"/>`
           : "";
   return (
@@ -214,10 +216,58 @@ export function freshShapeXml(attrs: Json, inner: string | undefined, media: Med
     `<wp:cNvGraphicFramePr/><a:graphic xmlns:a="${A}"><a:graphicData uri="${WPS}"><wps:wsp xmlns:wps="${WPS}">` +
     `${connector ? "<wps:cNvCnPr/>" : "<wps:cNvSpPr/>"}<wps:spPr>${xfrmXml(attrs, "a")}${geometryXml(attrs, "a")}` +
     `${fillXml(attrs, "a")}${lnXml(attrs.outline as Json | null | undefined, "a")}</wps:spPr>` +
+    `${text && typeof attrs.textColor === "string" ? styleXml(attrs.textColor, "wps", "a") : ""}` +
     `${text ? `<wps:txbx><w:txbxContent>${inner}</w:txbxContent></wps:txbx>` : ""}` +
     `<wps:bodyPr rot="0" vert="horz" wrap="square" lIns="${inset.left}" tIns="${inset.top}" ` +
     `rIns="${inset.right}" bIns="${inset.bottom}" anchor="${anchor}" anchorCtr="0">` +
     `${attrs.autoFit ? "<a:spAutoFit/>" : "<a:noAutofit/>"}</wps:bodyPr></wps:wsp></a:graphicData></a:graphic>` +
     `${close}</w:drawing>`
   );
+}
+
+/**
+ * A style (`wps:style`) whose references draw nothing (index 0) but its text's color: what a new
+ * shape, or one without a style, says its text color with.
+ */
+const styleXml = (color: string, p: string, a: string) =>
+  `<${p}:style><${a}:lnRef idx="0"><${a}:scrgbClr r="0" g="0" b="0"/></${a}:lnRef>` +
+  `<${a}:fillRef idx="0"><${a}:scrgbClr r="0" g="0" b="0"/></${a}:fillRef>` +
+  `<${a}:effectRef idx="0"><${a}:scrgbClr r="0" g="0" b="0"/></${a}:effectRef>` +
+  `<${a}:fontRef idx="minor"><${a}:srgbClr val="${q(color)}"/></${a}:fontRef></${p}:style>`;
+
+/**
+ * The edits making shape `wsp`'s text color `color` (RRGGBB): its style's `a:fontRef` color
+ * replaced, or a style that draws nothing else added after `spPr`. None given: left as it is.
+ * @internal
+ */
+export function textColorEdits(
+  source: string,
+  wsp: XmlElement,
+  spPr: XmlElement,
+  color: unknown,
+  edits: Edit[],
+): void {
+  if (typeof color !== "string") return;
+  const style = kid(wsp, WPS, "style");
+  const font = kid(style, A, "fontRef");
+  if (font) {
+    const a = font.prefix || "a";
+    const text = `<${a}:srgbClr val="${q(color)}"/>`;
+    const current = font.children.find((c): c is XmlElement => c.kind === "element");
+    if (current) edits.push({ from: current.start, to: current.end, text });
+    else if (source[font.openEnd - 2] === "/")
+      edits.push({
+        from: font.start,
+        to: font.end,
+        text: `${source.slice(font.start, font.openEnd - 2)}>${text}</${font.name}>`,
+      });
+    else edits.push({ from: font.openEnd, to: font.openEnd, text });
+    return;
+  }
+  if (!style)
+    edits.push({
+      from: spPr.end,
+      to: spPr.end,
+      text: styleXml(color, wsp.prefix || "wps", kid(spPr, A, "xfrm")?.prefix || "a"),
+    });
 }

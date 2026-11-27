@@ -17,7 +17,16 @@ import type { XmlElement } from "../xml.js";
 import { applyEdits, attrOf, type Edit, frameEdits, setAttr } from "./frames.js";
 import type { Media } from "./pictures.js";
 import { same } from "./properties.js";
-import { fillXml, frameOpen, freshShapeXml, geometryXml, lnXml, solid, xfrmXml } from "./shapes.js";
+import {
+  fillXml,
+  frameOpen,
+  freshShapeXml,
+  geometryXml,
+  lnXml,
+  solid,
+  textColorEdits,
+  xfrmXml,
+} from "./shapes.js";
 import { escapeAttribute, fragment, type Namespaces } from "./xmlout.js";
 
 type Json = Record<string, unknown>;
@@ -63,6 +72,7 @@ const SHAPE_LOOK = [
   "flipH",
   "flipV",
   "gradient",
+  "textColor",
 ];
 const look = (attrs: Json, keys = LOOK) =>
   Object.fromEntries(
@@ -158,6 +168,9 @@ export function textBoxXml(
   const spPr = kid(shape, WPS, "spPr");
   const bodyPr = kid(shape, WPS, "bodyPr");
   if (changed && spPr) lookEdits(source, spPr, bodyPr, read.attrs, attrs, edits);
+  // A shape's text color (a style's: Shape Format ▸ Shape Styles) in its `a:fontRef`.
+  if (isShape && shape && spPr && (read.attrs.textColor ?? null) !== (attrs.textColor ?? null))
+    textColorEdits(source, shape, spPr, attrs.textColor, edits);
   // Text given to a shape that had none: its `wps:txbx` before `wps:bodyPr`.
   // A connector holds no text (Word's `wps:cNvCnPr`): it is not given any.
   if (addsText && bodyPr && !kid(shape, WPS, "cNvCnPr")) {

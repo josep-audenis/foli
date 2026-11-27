@@ -4793,7 +4793,15 @@ paths; text in shapes through Phase 33's stories.
   it, a press in its text opening it (its story opened as a text box's). `shapes.test.ts`
   (core), `handles.test.ts` (view), `word-shapes.spec.ts` (move, nudge, undo, Shift-turn,
   adjust, typing, Escape, axe; three engines).
-- [ ] 34.5 Shape Format tab: fill, outline, styles, size, arrange (shared with 33.6).
+- [x] 34.5 Shape Format tab: fill, outline, styles, size, arrange (shared with 33.6). Built: core's
+  `setShapeLook` (fill, line by parts, text color; text boxes too); React's Shape Format tab for a
+  selected shape or text box (styles, dashes and arrows a shape's; no fill for a line): Insert
+  Shapes, Shape Styles (Word's Colored Outline and Colored
+  Fill rows for the theme), Shape Fill and Shape Outline (theme grids, More Colors), Weight,
+  Dashes, Arrows (lines), Arrange and Size as 33.6's; export writes a style's text color into
+  the shape's `a:fontRef` (or a style that draws nothing else). `shapes.test.ts` (core, docx),
+  `word-shapes.spec.ts` (fill, weight, dashes, arrows disabled off a line, outline, style, undo,
+  axe; three engines).
 - [ ] 34.6 Corpus run on files with shapes; e2e; docs; changesets.
 
 ### Acceptance

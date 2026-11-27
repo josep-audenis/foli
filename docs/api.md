@@ -1046,6 +1046,14 @@ moves it by (`step`, Word's 0.08"; `fine`, a pixel with Ctrl); `setShapeAdjust(p
 sets adjust values; `addShapeText(pos)` gives a shape a story (centered, in white), as typing on
 a selected shape does; `setObjectSize(pos, width, height, rotation)` turns it. One undo step
 each; moving and adjusting are refused while tracking.
+Shape Format (34.5): `setShapeLook(pos, { fill?, outline?, textColor? })` sets a shape's or text
+box's fill (RRGGBB or null; a gradient goes), line (null for none, else what changes of it:
+`color`, `width`, `dash`, `head`, `tail`, each null to remove; a text box's has a color and a width
+only) and a shape's text color (null: as the file has it), one undo step, refused while
+tracking. `toolbarItems` has
+`shapeStyles` (Colored Outline and Colored Fill for the theme's dark and six accents),
+`shapeFill`, `shapeOutline`, `outlineWeight`, `outlineDashes` and `outlineArrows`, in the Shape
+Format tab with Insert Shapes, Arrange and Size.
 
 Layout Options (33.4) for a picture or text box: `selectedObject(state)` gives the selected one
 and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `topAndBottom`,

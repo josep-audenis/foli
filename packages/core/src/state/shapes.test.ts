@@ -5,7 +5,7 @@ import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
 import { moveObject, selectedObject, setObjectSize } from "./layout.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
-import { addShapeText, insertShape, setShapeAdjust } from "./shapes.js";
+import { addShapeText, insertShape, setShapeAdjust, setShapeLook } from "./shapes.js";
 import { StoryStep, wordContext } from "./word.js";
 import { copiedDefinitions, fitPaste } from "./wordclip.js";
 
@@ -275,5 +275,55 @@ describe("shapes (schema 11)", () => {
     expect(addShapeText(selectedObject(editor.state)?.pos as number)(editor.state)).toBe(false);
     const inline = 1 + "Before ".length;
     expect(moveObject(inline, 9525, 0)(editor.state)).toBe(false);
+  });
+
+  it("sets a shape's or text box's fill, line and text color, one undo step each (34.5)", () => {
+    const editor = createEditor({ document: shaped() });
+    const pos = 1 + "Before ".length;
+    const attrs = () => editor.state.doc.nodeAt(pos)?.attrs as Record<string, unknown>;
+    editor.dispatch(
+      editor.state.tr.setNodeMarkup(pos, editor.state.schema.nodes.shape as never, {
+        ...attrs(),
+        gradient: {
+          stops: [
+            { position: 0, color: "FFFFFF" },
+            { position: 100_000, color: "000000" },
+          ],
+        },
+      }),
+    );
+    expect(editor.run(setShapeLook(pos, { fill: "FF0000" }))).toBe(true);
+    expect(attrs()).toMatchObject({ fill: "FF0000", gradient: null });
+    // A line made where there was none: black, 0.75 pt, then what is said of it.
+    expect(editor.run(setShapeLook(pos, { outline: { dash: "dash" } }))).toBe(true);
+    expect(attrs().outline).toEqual({ color: "000000", width: 9525, dash: "dash" });
+    expect(
+      editor.run(setShapeLook(pos, { outline: { dash: null, tail: { type: "triangle" } } })),
+    ).toBe(true);
+    expect(attrs().outline).toEqual({ color: "000000", width: 9525, tail: { type: "triangle" } });
+    expect(editor.run(setShapeLook(pos, { outline: null, textColor: "00FF00" }))).toBe(true);
+    expect(attrs()).toMatchObject({ outline: null, textColor: "00FF00" });
+    // The same again: no step.
+    expect(setShapeLook(pos, { outline: null })(editor.state)).toBe(false);
+    editor.run(undo);
+    expect(attrs().outline).toEqual({ color: "000000", width: 9525, tail: { type: "triangle" } });
+    // A text box's line has a color and a width only.
+    const boxed = createEditor({
+      document: parseDocument({
+        ...createDocument({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "textBox", attrs: { story: "textbox:1", width: 1, height: 1 } }],
+            },
+          ],
+        }),
+        schemaVersion: 10,
+        stories: { "textbox:1": story("x") },
+      }),
+    });
+    expect(boxed.run(setShapeLook(1, { outline: { color: "0000FF", dash: "dash" } }))).toBe(true);
+    expect(boxed.state.doc.nodeAt(1)?.attrs.outline).toEqual({ color: "0000FF", width: 9525 });
   });
 });
