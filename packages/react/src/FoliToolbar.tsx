@@ -5,6 +5,7 @@ import {
   addComment,
   addRepeatingItem,
   alignAt,
+  alignObject,
   CellSelection,
   type Command,
   type ControlJSON,
@@ -106,6 +107,7 @@ import {
   setLink,
   setNoteProperties,
   setObjectMovesWithText,
+  setObjectOrder,
   setObjectPosition,
   setObjectWrap,
   setPageColor,
@@ -194,6 +196,7 @@ import { defaultUnit, formatLength, type LengthUnit, parseLength } from "./units
 import {
   FontDialog,
   LayoutDialog,
+  ObjectSizeBox,
   ParagraphBox,
   ParagraphDialog,
   TabsDialog,
@@ -994,9 +997,104 @@ function positionActions(editor: Editor): readonly Action[] {
   ];
 }
 
+/** Bring Forward (Picture Format ▸ Arrange, 33.6): Word's three entries. */
+function forwardActions(editor: Editor): readonly Action[] {
+  return [
+    ...(
+      [
+        { key: "bringForward", label: "Bring Forward", order: "forward" },
+        { key: "bringToFront", label: "Bring to Front", order: "front" },
+      ] as const
+    ).map(
+      ({ key, label, order }): Action => ({
+        key,
+        label,
+        command: (state, dispatch) => {
+          const object = selectedObject(state);
+          return !!object && setObjectOrder(object.pos, order)(state, dispatch);
+        },
+      }),
+    ),
+    {
+      key: "bringInFront",
+      label: "Bring in Front of Text",
+      command: (state, dispatch) => {
+        const object = selectedObject(state);
+        if (!object || objectWrap(object.node) === "inFront") return false;
+        if (!dispatch) return setObjectWrap(object.pos, "inFront")(state);
+        return setObjectWrap(
+          object.pos,
+          "inFront",
+          placementOf(editor, object.pos),
+        )(state, dispatch);
+      },
+    },
+  ];
+}
+
+/** Send Backward (Picture Format ▸ Arrange, 33.6): Word's three entries. */
+function backwardActions(editor: Editor): readonly Action[] {
+  return [
+    ...(
+      [
+        { key: "sendBackward", label: "Send Backward", order: "backward" },
+        { key: "sendToBack", label: "Send to Back", order: "back" },
+      ] as const
+    ).map(
+      ({ key, label, order }): Action => ({
+        key,
+        label,
+        command: (state, dispatch) => {
+          const object = selectedObject(state);
+          return !!object && setObjectOrder(object.pos, order)(state, dispatch);
+        },
+      }),
+    ),
+    {
+      key: "sendBehind",
+      label: "Send Behind Text",
+      command: (state, dispatch) => {
+        const object = selectedObject(state);
+        if (!object || objectWrap(object.node) === "behind") return false;
+        if (!dispatch) return setObjectWrap(object.pos, "behind")(state);
+        return setObjectWrap(
+          object.pos,
+          "behind",
+          placementOf(editor, object.pos),
+        )(state, dispatch);
+      },
+    },
+  ];
+}
+
+/** Align (Picture Format ▸ Arrange, 33.6): the object in the margins. */
+const ALIGN_OBJECT_ACTIONS: readonly Action[] = (
+  [
+    { key: "alignObjectLeft", label: "Align Left", align: "left" },
+    { key: "alignObjectCenter", label: "Align Center", align: "center" },
+    { key: "alignObjectRight", label: "Align Right", align: "right" },
+    { key: "alignObjectTop", label: "Align Top", align: "top" },
+    { key: "alignObjectMiddle", label: "Align Middle", align: "middle" },
+    { key: "alignObjectBottom", label: "Align Bottom", align: "bottom" },
+  ] as const
+).map(
+  ({ key, label, align }): Action => ({
+    key,
+    label,
+    command: (state, dispatch) => {
+      const object = selectedObject(state);
+      return !!object && alignObject(object.pos, align)(state, dispatch);
+    },
+  }),
+);
+
 /** Whether a picture or text box is selected and its layout can change (not while tracking). */
 const objectLayoutEnabled = (state: EditorState) =>
   !!selectedObject(state) && trackState(state)?.on !== true;
+
+/** Whether a floating picture or text box is selected and can change. */
+const floatingObjectSelected = (state: EditorState) =>
+  objectLayoutEnabled(state) && !!selectedObject(state)?.node.attrs.float;
 
 /** Layout ▸ Line Numbers: Word's menu for the caret's section and paragraph. */
 const LINE_NUMBER_ACTIONS: readonly Action[] = [
@@ -2211,6 +2309,39 @@ const RIBBON_ITEMS: readonly Item[] = [
     actions: positionActions,
   },
   {
+    key: "objectHeight",
+    label: "Shape height",
+    enabled: objectLayoutEnabled,
+    render: (props) => <ObjectSizeBox {...props} side="height" label="Height" />,
+  },
+  {
+    key: "objectWidth",
+    label: "Shape width",
+    enabled: objectLayoutEnabled,
+    render: (props) => <ObjectSizeBox {...props} side="width" label="Width" />,
+  },
+  {
+    key: "bringForward",
+    label: "Bring Forward",
+    text: "Bring Forward",
+    enabled: floatingObjectSelected,
+    actions: forwardActions,
+  },
+  {
+    key: "sendBackward",
+    label: "Send Backward",
+    text: "Send Backward",
+    enabled: floatingObjectSelected,
+    actions: backwardActions,
+  },
+  {
+    key: "alignObject",
+    label: "Align",
+    text: "Align",
+    enabled: floatingObjectSelected,
+    actions: ALIGN_OBJECT_ACTIONS,
+  },
+  {
     key: "crop",
     label: "Crop",
     text: "Crop",
@@ -2510,6 +2641,11 @@ export type ToolbarItemName =
   | "navigationPane"
   | "crop"
   | "objectSize"
+  | "objectHeight"
+  | "objectWidth"
+  | "bringForward"
+  | "sendBackward"
+  | "alignObject"
   | "wrapText"
   | "layoutOptions"
   | "position"
@@ -2883,8 +3019,34 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       visible: pictureSelected,
       items: [
         group("Picture", t.picture),
-        { ...group("Size", large(t.crop)), launcher: t.objectSize },
-        group("Arrange", large(t.position), large(t.wrapText), t.rotateLeft, t.rotateRight),
+        group(
+          "Arrange",
+          large(t.position),
+          large(t.wrapText),
+          t.bringForward,
+          t.sendBackward,
+          t.alignObject,
+          t.rotateLeft,
+          t.rotateRight,
+        ),
+        { ...group("Size", large(t.crop), t.objectHeight, t.objectWidth), launcher: t.objectSize },
+      ],
+    },
+    {
+      key: "shapeFormat",
+      label: "Shape Format",
+      contextual: true,
+      visible: (state: EditorState) => selectedTextBox(state) !== null,
+      items: [
+        group(
+          "Arrange",
+          large(t.position),
+          large(t.wrapText),
+          t.bringForward,
+          t.sendBackward,
+          t.alignObject,
+        ),
+        { ...group("Size", t.objectHeight, t.objectWidth), launcher: t.objectSize },
       ],
     },
   ].map(drawIcons);

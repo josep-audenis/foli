@@ -440,6 +440,7 @@ export function floatElements(
     wrap: string;
     side?: string;
     distance?: { top?: number; bottom?: number; left?: number; right?: number };
+    zOrder?: number;
   };
   const width = Number(attrs.width) / EMU_PER_PX;
   const height = Number(attrs.height) / EMU_PER_PX;
@@ -454,14 +455,30 @@ export function floatElements(
   style.display = "block";
   const x = floatLeft(float.horizontal, width, geometry);
   const top = floatTop(float.vertical, height, geometry);
+  // Its place front to back (33.6): ranks in Word's `relativeHeight` steps, behind text below 0.
+  const z =
+    typeof float.zOrder === "number"
+      ? Math.min(Math.max(Math.floor(float.zOrder / 1024) - 245_760 + 1000, 1), 1_000_000)
+      : null;
   if (float.wrap === "behind" || float.wrap === "inFront") {
     style.position = "absolute";
-    style.zIndex = float.wrap === "behind" ? "-1" : "1";
+    style.zIndex =
+      float.wrap === "behind"
+        ? z === null
+          ? "-1"
+          : String(z - 1_000_001)
+        : z === null
+          ? "1"
+          : String(z);
     style.left = `${geometry.marginLeft + x}px`;
     // Against the paragraph: where it would be (its static position), moved by its offset.
     if (top.page !== undefined) style.top = `${top.page}px`;
     else style.marginTop = `${top.paragraph}px`;
     return { nodes: [holder], holder };
+  }
+  if (z !== null) {
+    style.position = "relative";
+    style.zIndex = String(z);
   }
   // Its distance from the text above and below as its margins: lines there go around it too.
   const above = distance("top");

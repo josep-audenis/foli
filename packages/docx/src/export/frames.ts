@@ -199,7 +199,7 @@ export function frameEdits(
       text:
         `<${p}:anchor distT="${distance(float, "top")}" distB="${distance(float, "bottom")}" ` +
         `distL="${distance(float, "left")}" distR="${distance(float, "right")}" simplePos="0" ` +
-        `relativeHeight="${z}" behindDoc="${float.wrap === "behind" ? 1 : 0}" locked="0" ` +
+        `relativeHeight="${typeof float.zOrder === "number" ? float.zOrder : z}" behindDoc="${float.wrap === "behind" ? 1 : 0}" locked="0" ` +
         `layoutInCell="${flag(float.layoutInCell)}" allowOverlap="${flag(float.allowOverlap)}">` +
         `<${p}:simplePos x="0" y="0"/>${positionXml("H", float.horizontal as Json, p)}` +
         `${positionXml("V", float.vertical as Json, p)}${sized(child("extent"))}${child("effectExtent")}` +
@@ -212,8 +212,12 @@ export function frameEdits(
     setAttr(source, extent, "cy", height, edits);
   }
   if (frame.local !== "anchor" || !float) return;
+  // Its place front to back (33.6), when the model says one.
+  if (typeof float.zOrder === "number")
+    setAttr(source, frame, "relativeHeight", String(float.zOrder), edits);
   const read = floatOf(frame);
-  if (read && same(read, float)) return;
+  const { zOrder: _z, ...rest } = float;
+  if (read && same(read, rest)) return;
   for (const [local, side] of [
     ["distT", "top"],
     ["distB", "bottom"],

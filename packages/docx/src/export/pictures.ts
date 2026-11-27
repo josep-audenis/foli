@@ -359,7 +359,7 @@ export function drawingXml(
   // Namespaces declared where used: a part that has no pictures yet may not declare them.
   const open = float
     ? `<wp:anchor xmlns:wp="${WP}" distT="${dist("top")}" distB="${dist("bottom")}" ` +
-      `distL="${dist("left")}" distR="${dist("right")}" simplePos="0" relativeHeight="251658240" ` +
+      `distL="${dist("left")}" distR="${dist("right")}" simplePos="0" relativeHeight="${typeof float.zOrder === "number" ? float.zOrder : 251658240}" ` +
       `behindDoc="${float.wrap === "behind" ? 1 : 0}" locked="0" ` +
       `layoutInCell="${flag(float.layoutInCell)}" allowOverlap="${flag(float.allowOverlap)}">` +
       `<wp:simplePos x="0" y="0"/>${positionXml("H", float.horizontal as Json)}` +

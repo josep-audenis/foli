@@ -258,7 +258,7 @@ function freshXml(attrs: Json, inner: string, media: Media): string {
   const extent = `<wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>`;
   const open = float
     ? `<wp:anchor xmlns:wp="${WP}" distT="${dist("top")}" distB="${dist("bottom")}" ` +
-      `distL="${dist("left")}" distR="${dist("right")}" simplePos="0" relativeHeight="251659264" ` +
+      `distL="${dist("left")}" distR="${dist("right")}" simplePos="0" relativeHeight="${typeof float.zOrder === "number" ? float.zOrder : 251659264}" ` +
       `behindDoc="${float.wrap === "behind" ? 1 : 0}" locked="0" ` +
       `layoutInCell="${flag(float.layoutInCell)}" allowOverlap="${flag(float.allowOverlap)}">` +
       `<wp:simplePos x="0" y="0"/>${positionXml("H", float.horizontal as Json)}` +

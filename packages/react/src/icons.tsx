@@ -343,6 +343,22 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["path", { d: "M12 3H3v18h18v-9" }],
     ["path", { d: "M16 3h5v5" }],
   ],
+  bringForward: /* bring-to-front */ [
+    ["rect", { x: "8", y: "8", width: "8", height: "8", rx: "2" }],
+    ["path", { d: "M4 10a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2" }],
+    ["path", { d: "M14 20a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2" }],
+  ],
+  sendBackward: /* send-to-back */ [
+    ["rect", { x: "14", y: "14", width: "8", height: "8", rx: "2" }],
+    ["rect", { x: "2", y: "2", width: "8", height: "8", rx: "2" }],
+    ["path", { d: "M7 14v1a2 2 0 0 0 2 2h1" }],
+    ["path", { d: "M14 7h1a2 2 0 0 1 2 2v1" }],
+  ],
+  alignObject: /* align-horizontal-justify-start */ [
+    ["rect", { width: "6", height: "14", x: "6", y: "5", rx: "2" }],
+    ["rect", { width: "6", height: "10", x: "16", y: "7", rx: "2" }],
+    ["path", { d: "M2 2v20" }],
+  ],
   crop: /* crop */ [
     ["path", { d: "M6 2v14a2 2 0 0 0 2 2h14" }],
     ["path", { d: "M18 22V8a2 2 0 0 0-2-2H2" }],
