@@ -15,7 +15,7 @@ param([string]$PdfDir = "", [string]$Only = "")
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
 $wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
-$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09")
+$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10")
 foreach ($number in $wanted) {
   if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
 }
@@ -840,6 +840,64 @@ try {
   $header.Collapse(0)
   $doc.Fields.Add($header, $FIELD_EMPTY, "PAGE", $false) | Out-Null
   Save-Doc $doc "09-pump-test-memo.docx"
+  }
+  # ---------------------------------------------------------------------------------------
+  # 10: Design review memo (Phase 32). A page color, a page border (double line from the page's
+  # edge), Word's CONFIDENTIAL 1 watermark from its gallery, a paragraph with a bottom border and
+  # shading, a boxed paragraph, line numbers counted by 5 continuously (Word's automation refuses
+  # SuppressLineNumbers: unit tests cover it).
+  if (Want "10") {
+  Set-Author "Design" "DS"
+  $doc = New-Doc
+  $text = "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. "
+  Add-Para $doc "Design review memo" $S_TITLE | Out-Null
+  $ruled = Add-Para $doc "Summary of the changes agreed at the review."
+  $ruled.Borders.Item(-3).LineStyle = 1        # wdBorderBottom, wdLineStyleSingle
+  $ruled.Borders.Item(-3).LineWidth = 6        # wdLineWidth075pt
+  $ruled.Shading.BackgroundPatternColor = $COLOR_LIGHT_GRAY
+  Add-Para $doc ($text * 4) | Out-Null
+  $boxed = Add-Para $doc "Decision: the summary moves to page one from the next issue."
+  $boxed.Borders.Enable = $true
+  Add-Para $doc ($text * 3) | Out-Null
+  Add-Para $doc "Reviewed by the editorial board." | Out-Null
+  Add-Para $doc ($text * 2) | Out-Null
+  # Page color: Design > Page Color (a pale blue).
+  $doc.Background.Fill.ForeColor.RGB = 16247773   # RGB(221, 235, 247) as BGR
+  $doc.Background.Fill.Visible = -1
+  $doc.Background.Fill.Solid()
+  # Page border: a double line 24 pt from the page's edge, on every page.
+  $borders = $doc.Sections.Item(1).Borders
+  $borders.DistanceFrom = 1                       # wdBorderDistanceFromPageEdge
+  foreach ($side in @(-1, -2, -3, -4)) {          # top, left, bottom, right
+    $b = $borders.Item($side)
+    $b.LineStyle = 7                              # wdLineStyleDouble
+    $b.LineWidth = 6
+    $b.Color = 10498160                           # RGB(112, 48, 160) as BGR
+  }
+  $borders.DistanceFromTop = 24; $borders.DistanceFromBottom = 24
+  $borders.DistanceFromLeft = 24; $borders.DistanceFromRight = 24
+  # Line numbers: every fifth line, continuous.
+  $numbering = $doc.Sections.Item(1).PageSetup.LineNumbering
+  $numbering.Active = $true
+  $numbering.CountBy = 5
+  $numbering.RestartMode = 2                      # wdRestartContinuous
+  # Set once lines are numbered (Word refuses it before).
+  # Watermark: CONFIDENTIAL 1 from Word's gallery (building blocks, type 8), in the header.
+  $word.Templates.LoadBuildingBlocks()
+  $mark = $null
+  foreach ($t in $word.Templates) {
+    if ($mark) { break }
+    try { $type = $t.BuildingBlockTypes.Item(8) } catch { continue }
+    for ($c = 1; $c -le $type.Categories.Count -and -not $mark; $c++) {
+      $cat = $type.Categories.Item($c)
+      for ($i = 1; $i -le $cat.BuildingBlocks.Count; $i++) {
+        if ($cat.BuildingBlocks.Item($i).Name -eq "CONFIDENTIAL 1") { $mark = $cat.BuildingBlocks.Item($i); break }
+      }
+    }
+  }
+  if (-not $mark) { throw "Word's CONFIDENTIAL 1 watermark is not in its building blocks" }
+  $mark.Insert($doc.Sections.Item(1).Headers.Item($HF_PRIMARY).Range, $true) | Out-Null
+  Save-Doc $doc "10-design-memo.docx"
   }
 }
 finally {

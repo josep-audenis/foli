@@ -4564,8 +4564,18 @@ XML.
   paragraphs not counted; `toolbarItems.lineNumbers` (Word's menu and `LineNumbersDialog`) in
   Layout's Page Setup group. `decoration.test.ts` (core, docx), `linenumbers.spec.ts` in three
   engines (axe); checked by a screenshot. The ribbon's screenshots updated for the Design tab.
-- [ ] 32.6 Design tab in `wordRibbonTabs`; e2e, corpus files with watermarks and borders
-  through import, export and compare; docs; changesets.
+- [x] 32.6 Design tab in `wordRibbonTabs`; e2e, corpus files with watermarks and borders
+  through import, export and compare; docs; changesets. Built: the Design tab (Page Background:
+  Watermark, Page Color, Page Borders; KeyTip G) came with 32.2–32.3. `corpus/word/10-design-
+  memo.docx`, written by Word 16 through `build-word-corpus.ps1` (`-Only 10`): a page color, a
+  double page border from the page's edge, the CONFIDENTIAL 1 watermark from Word's gallery, a
+  paragraph's bottom border and shading, a boxed paragraph, line numbers every fifth line; its
+  Word reference data (`reference/word`, `reference/review`). The corpus suites (import,
+  export byte for byte, review, fields, resolve) take it with the nine; `decoration.test.ts`
+  checks what it reads and that every XML part comes back unchanged; `word-design.spec.ts` in
+  three engines draws it (color, border, watermark, numbers 5, 10…, axe). Word's automation
+  refuses `SuppressLineNumbers` there (unit tests cover it). It has no Strict twin. Docs:
+  architecture.md ("Page decoration"), the corpus README.
 
 ### Acceptance
 

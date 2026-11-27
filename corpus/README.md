@@ -21,6 +21,7 @@ not exist.
 | `07-picture-report.docx`              | Phase 10: inline pictures at the end of their paragraphs, with and without alt text; floating pictures wrapped square and top-and-bottom beside body text, one behind the text                                                                                                                                                                                   |
 | `08-newsletter.docx`                  | Phase 11: five sections: one column, two balanced columns with a line between them (continuous), one column (continuous), three columns of set widths with a column break on a new page with a header of its own, a landscape section starting on an odd page after a blank page; even and odd headers and footers, a different first page, `PAGE` in the footer |
 | `09-pump-test-memo.docx`              | Phase 11: footnotes, one longer than a page so it continues on the next, endnotes, a bookmark with `REF` and `PAGEREF` to it, a locked `DATE` field (Word recomputes an unlocked one on opening), numbered captions (`SEQ`), `PAGE` in the header                                                                                                                |
+| `10-design-memo.docx`                 | Phase 32: a page color, a double page border 24 pt from the page's edge, Word's CONFIDENTIAL 1 watermark from its gallery (in a Watermarks building-block control), a paragraph with a bottom border and gray shading, a boxed paragraph, line numbers every fifth line (continuous)                                                                             |
 
 Page fields in headers and footers (`PAGE`, `NUMPAGES`) keep the result Word cached when it
 last updated them ("Page 1 of 1" in a 2-page document): Word computes them per page when it
@@ -46,7 +47,7 @@ symbol): after regenerating, check the files for anything personal before commit
 
 ## Strict Open XML twins (`word/strict/`)
 
-The nine saved again by Word, from the same open document, as Strict Open XML
+The first nine saved again by Word, from the same open document, as Strict Open XML
 (`<name>.strict.docx`, `wdFormatStrictOpenXMLDocument`) and as Transitional
 (`<name>.transitional.docx`), so the two differ only in the format Word wrote
 ([ADR-0014](../docs/decisions/ADR-0014-strict-open-xml.md)). Written by

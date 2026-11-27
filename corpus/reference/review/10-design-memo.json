@@ -1,0 +1,72 @@
+{
+    "document":  "10-design-memo.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+
+                  ],
+    "comments":  [
+
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "Design review memo",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Summary of the changes agreed at the review.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Decision: the summary moves to page one from the next issue.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Reviewed by the editorial board.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "Design review memo",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Summary of the changes agreed at the review.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Decision: the summary moves to page one from the next issue.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Reviewed by the editorial board.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. The new layout keeps the margins of the previous issue and moves the summary to the first page, where readers look for it first. Figures follow the text they illustrate. ",
+                         "inTable":  false
+                     }
+                 ]
+}
