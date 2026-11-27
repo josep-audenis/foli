@@ -13,6 +13,9 @@
  */
 export {};
 
+// background.d.ts
+export {};
+
 // custom.d.ts
 export {};
 

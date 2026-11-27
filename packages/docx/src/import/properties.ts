@@ -458,15 +458,7 @@ export function paragraphProperties(
   const pBdr = at("pBdr");
   if (pBdr) {
     const borders: Record<string, unknown> = {};
-    for (const side of elements(pBdr)) {
-      borders[side.local] = compact({
-        style: attr(side, "val"),
-        size: whole(side, "sz", context),
-        space: whole(side, "space", context),
-        color: attr(side, "color"),
-        themeColor: attr(side, "themeColor"),
-      });
-    }
+    for (const side of elements(pBdr)) borders[side.local] = borderOf(side, context);
     set("borders", compact(borders), "pBdr");
   }
   const shd = at("shd");
@@ -541,6 +533,44 @@ function sectionColumns(cols: XmlElement | undefined, context: Context) {
   });
 }
 
+/** A border element (`w:top`, `w:pgBorders/w:left`…) as a border, by its attributes. */
+function borderOf(side: XmlElement, context: Context) {
+  return compact({
+    style: attr(side, "val"),
+    size: whole(side, "sz", context),
+    space: whole(side, "space", context),
+    color: attr(side, "color"),
+    themeColor: attr(side, "themeColor"),
+  });
+}
+
+/** `w:pgBorders`: the sides it has and how they are placed (undefined when it says nothing). */
+function pageBorders(element: XmlElement | undefined, context: Context) {
+  if (!element) return undefined;
+  const sides: Record<string, unknown> = {};
+  for (const side of elements(element))
+    if (side.ns === W && ["top", "left", "bottom", "right"].includes(side.local))
+      sides[side.local] = borderOf(side, context);
+  return compact({
+    ...sides,
+    offsetFrom: attr(element, "offsetFrom"),
+    display: attr(element, "display"),
+    zOrder: attr(element, "zOrder"),
+  });
+}
+
+/** `w:lnNumType`: lines numbered, only with `countBy` (without it Word numbers none; kept verbatim). */
+function lineNumbers(element: XmlElement | undefined, context: Context) {
+  const countBy = element && whole(element, "countBy", context);
+  if (!element || !countBy) return undefined;
+  return compact({
+    countBy,
+    start: whole(element, "start", context),
+    distance: whole(element, "distance", context),
+    restart: attr(element, "restart"),
+  });
+}
+
 /** `w:sectPrChange`: who changed the section's setup, and the setup before (`w:sectPr`). */
 function sectionChange(element: XmlElement | undefined, context: Context) {
   if (!element) return undefined;
@@ -595,6 +625,8 @@ export function section(sectPr: XmlElement, context: Context): Record<string, un
     headers: references("headerReference"),
     footers: references("footerReference"),
     columns: sectionColumns(child(sectPr, "cols"), context),
+    pageBorders: pageBorders(child(sectPr, "pgBorders"), context),
+    lineNumbers: lineNumbers(child(sectPr, "lnNumType"), context),
     pageNumbers:
       pgNumType &&
       compact({ start: whole(pgNumType, "start", context), format: attr(pgNumType, "fmt") }),

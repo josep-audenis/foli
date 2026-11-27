@@ -195,6 +195,26 @@ const sectionShape: Check = shape(
     }),
     /** `w:pgNumType` (schema v5). */
     pageNumbers: shape({ start: ID, format: token }),
+    /** `w:pgBorders` (schema 9). */
+    pageBorders: shape({
+      top: border,
+      left: border,
+      bottom: border,
+      right: border,
+      offsetFrom: oneOf(["text", "page"]),
+      display: oneOf(["allPages", "firstPage", "notFirstPage"]),
+      zOrder: oneOf(["front", "back"]),
+    }),
+    /** `w:lnNumType` (schema 9). */
+    lineNumbers: shape(
+      {
+        countBy: int(1, 32_767),
+        start: int(0, 32_767),
+        distance: positiveTwips,
+        restart: oneOf(["newPage", "newSection", "continuous"]),
+      },
+      ["countBy"],
+    ),
     footnotes: checkNoteProperties,
     endnotes: checkNoteProperties,
     /** `w:sectPrChange`: a tracked change of the page setup, and the setup before it. */

@@ -4499,8 +4499,28 @@ XML.
 
 ### Tasks
 
-- [ ] 32.1 Decisions; import and export of `w:background` and `w:pgBorders` into the model,
-  schema bump with migration; drawn by the view, print and `exportPdf`.
+- [x] 32.1 Decisions; import and export of `w:background` and `w:pgBorders` into the model,
+  schema bump with migration; drawn by the view, print and `exportPdf`. Decided (ADR-0015):
+  - Page color: `settings.background` (`color`, `themeColor`, `themeTint`, `themeShade`, `ext`
+    verbatim), not a key of its own in the envelope: it is the document's, and settings already
+    change through `EnvelopeStep`s. Written back verbatim while its values match (Fill Effects
+    kept), else as Word's Page Color writes it; with `w:displayBackgroundShape` turned on.
+  - Page borders: `section.pageBorders` (sides as `BorderJSON`, `offsetFrom`, `display`,
+    `zOrder`), and line numbers with them, `section.lineNumbers` (`countBy` required, `start`,
+    `distance`, `restart`), section parts as the others: no more kept XML only.
+  - Schema 9 for any of them (v8 → v9: the version only); 32.3 and 32.5 add the watermark node
+    and a paragraph's `suppressLineNumbers` to v9 before it is released.
+  - Watermark: as proposed, a `watermark` inline node for Word's VML text and picture watermarks
+    (`PowerPlusWaterMarkObject`, `WordPictureWatermark`) with the dialog's values and the run
+    verbatim; any other shape stays opaque (32.3).
+
+  Built: the model and its checks (`PageBordersJSON`, `LineNumbersJSON`, `PageBackgroundJSON`;
+  `schemaVersionOf` counts the envelope's section, a paragraph's and a tracked change's
+  recorded setup), `@folijs/docx` reads and writes `w:background` (`background.ts`, in the main
+  part's head), `w:pgBorders` and `w:lnNumType`, the untouched parts byte-identical; the view
+  and `renderDocument` draw the color and the borders on each page (`word/decoration.ts`,
+  printed and in `exportPdf`). A v9 format fixture. `decoration.test.ts` in core, docx and
+  view. document-model.md, limitations.md ("Page decoration").
 - [ ] 32.2 Page Color (theme and standard colors, No Color) and Page Borders dialog (setting,
   style, color, width, which sides, apply to section or document).
 - [ ] 32.3 Watermark: read Word's text and picture watermarks from headers, draw them on every

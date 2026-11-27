@@ -15,6 +15,7 @@ import {
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
+import { backgroundXml, withBackground } from "../background.js";
 import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
@@ -487,7 +488,12 @@ async function intoPackage(
   const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
   const added = word.declare(content);
   const empty = body.openEnd === body.end;
-  const open = main.source.slice(0, empty ? body.end - 2 : body.openEnd - 1);
+  const open = withBackground(
+    main.source.slice(0, empty ? body.end - 2 : body.openEnd - 1),
+    main.root,
+    body,
+    doc.settings?.background,
+  );
   const documentXml = `${open}${added}>${content}${empty ? `</${body.name}>${main.source.slice(body.end)}` : main.source.slice(body.closeStart)}`;
 
   const replace = new Map<string, Uint8Array>();
@@ -723,7 +729,9 @@ async function newPackage(
 ): Promise<Uint8Array<ArrayBuffer>> {
   const rels = new Relationships([]);
   const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
-  const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
+  const { ext: _ext, ...color } = doc.settings?.background ?? {};
+  const background = doc.settings?.background ? backgroundXml("w:", color) : "";
+  const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}>${background}<w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
   const parts: { name: string; text: string; contentType: string }[] = [
     { name: "/word/document.xml", text: main, contentType: CT.main },
   ];

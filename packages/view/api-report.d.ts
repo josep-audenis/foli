@@ -605,6 +605,8 @@ export declare class EditorView {
      * there, and nested tables whole (where their first block goes).
      */
     private cellContent;
+    /** Gives `page` the element of its section's page borders (none: null), made when they change. */
+    private drawPageBorders;
     private createPage;
     /** The last section's page setup (the envelope's), for an empty document. */
     private lastSheet;
@@ -953,6 +955,9 @@ export type { ReviewView } from "@folijs/core";
 export {};
 
 // word/controls.d.ts
+export {};
+
+// word/decoration.d.ts
 export {};
 
 // word/edit.d.ts

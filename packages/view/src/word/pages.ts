@@ -4,6 +4,7 @@
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
+
 import {
   type Extension,
   type FieldLayout,
@@ -40,6 +41,7 @@ import {
   type WordBlock,
 } from "./blocks.js";
 import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
+import { pageBordersElement, pageColor } from "./decoration.js";
 import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
@@ -517,11 +519,24 @@ export function renderDocument(
   const pageSetups: Section[] = [];
   for (let p = count - 1; p >= 0; p--)
     pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
+  const color = pageColor(document.settings);
   const created = pageSetups.map((section, p) => {
     const made = createPage(doc, section.geometry);
     made.page.setAttribute(SHEET_ATTR, String(section.flow.index ?? 0));
     made.page.setAttribute(OUTPUT_ATTR, output);
     const page = facts[p];
+    if (color) {
+      made.page.style.background = color;
+      made.page.style.setProperty("print-color-adjust", "exact");
+      made.page.style.setProperty("-webkit-print-color-adjust", "exact");
+    }
+    const frame = pageBordersElement(
+      doc,
+      section.setup.pageBorders,
+      section.geometry,
+      !!page?.first,
+    );
+    if (frame) made.page.append(frame);
     // Word's blank page before an even or odd page section has no header or footer (its PDF).
     if (!page?.sectionPages) return made;
     const { top, bottom } = regions.margins(page.section, page);

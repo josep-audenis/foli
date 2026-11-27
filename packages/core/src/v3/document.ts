@@ -43,9 +43,10 @@ import {
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
  * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
- * formatting, Phase 23 task 23.2).
+ * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
+ * and line numbers, ADR-0015).
  */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -74,12 +75,43 @@ export interface SectionJSON {
   };
   /** `w:pgNumType` (v5). */
   pageNumbers?: { start?: number; format?: string };
+  /** `w:pgBorders` (v9): borders around the section's pages. */
+  pageBorders?: PageBordersJSON;
+  /** `w:lnNumType` (v9): the section's lines numbered in the margin. */
+  lineNumbers?: LineNumbersJSON;
   footnotes?: NotePropertiesJSON;
   endnotes?: NotePropertiesJSON;
   /** `w:sectPrChange`: who changed the page setup while tracking, and what it was. */
   change?: { id: number; author: string; date?: string | null; previous: SectionJSON };
   /** The `w:sectPr` this was read from, verbatim. */
   ext?: string;
+}
+
+/** A section's page borders (`w:pgBorders`, schema 9). */
+export interface PageBordersJSON {
+  top?: BorderJSON;
+  left?: BorderJSON;
+  bottom?: BorderJSON;
+  right?: BorderJSON;
+  /** What each border's `space` (points) is measured from: the text (Word's default) or the page's edge. */
+  offsetFrom?: "text" | "page";
+  /** Which pages show them: every page (the default), the section's first, or all but its first. */
+  display?: "allPages" | "firstPage" | "notFirstPage";
+  /** In front of the text (the default) or behind it. */
+  zOrder?: "front" | "back";
+}
+
+/**
+ * A section's line numbers (`w:lnNumType`, schema 9), as Word writes them: every `countBy`th line
+ * numbered (an element without it numbers none, and stays in the section's `ext`), from `start` + 1 (Word's "Start at" less one), `distance` twips from
+ * the text (left out: Word's automatic distance), restarting on each page (the default), section,
+ * or not at all.
+ */
+export interface LineNumbersJSON {
+  countBy: number;
+  start?: number;
+  distance?: number;
+  restart?: "newPage" | "newSection" | "continuous";
 }
 
 /** How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`). */
@@ -389,6 +421,23 @@ export interface WordSettingsJSON {
    * never said (an editor tracks when told to; `exportDocx` keeps the package's).
    */
   trackRevisions?: boolean;
+  /**
+   * The page color (schema 9): the main document's `w:background` (it lives in `document.xml`, not
+   * in the settings part). `color` is RRGGBB; a theme color also gives its tint or shade, as Word
+   * writes them (two hex digits). What else the element holds (Fill Effects) is kept while the
+   * color stays.
+   */
+  background?: PageBackgroundJSON;
+}
+
+/** The page color (`w:background`, schema 9). */
+export interface PageBackgroundJSON {
+  color?: string;
+  themeColor?: string;
+  themeTint?: string;
+  themeShade?: string;
+  /** The `w:background` this was read from, verbatim. */
+  ext?: string;
 }
 
 /** A document in the Word model: the content tree and what Word keeps beside it. */
@@ -397,7 +446,7 @@ export interface FoliDocument {
    * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
    * added (6: a picture's rotation or crop, 1.4).
    */
-  schemaVersion: 5 | 6 | 7 | typeof SCHEMA_VERSION;
+  schemaVersion: 5 | 6 | 7 | 8 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -444,13 +493,15 @@ export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
 
 /**
  * The lowest schema `doc`'s content needs (ADR-0008: a document is saved with it, so an older
- * 1.x reads it when it can): 8 for a table's, row's or cell's recorded formatting, 7 for the
- * tracking switch in the settings, 6 for a picture rotated or cropped, else 5.
+ * 1.x reads it when it can): 9 for page decoration (the page color, a section's page borders or
+ * line numbers), 8 for a table's, row's or cell's recorded formatting, 7 for the tracking switch
+ * in the settings, 6 for a picture rotated or cropped, else 5.
  * @internal
  */
 export function schemaVersionOf(
   doc: Pick<FoliDocument, "content" | "comments" | "stories"> & {
     settings?: WordSettingsJSON | undefined;
+    section?: SectionJSON | undefined;
   },
 ): FoliDocument["schemaVersion"] {
   const trees = [
@@ -458,6 +509,12 @@ export function schemaVersionOf(
     ...doc.comments.map((c) => ({ content: c.content })),
     ...Object.values(doc.stories ?? {}).map((s) => s.content),
   ];
+  if (
+    doc.settings?.background !== undefined ||
+    V9_SECTION_KEYS.some((key) => inSection(doc.section, key)) ||
+    trees.some((tree) => laterNode(tree, 8))
+  )
+    return 9;
   if (trees.some((tree) => laterNode(tree, 7))) return 8;
   if (doc.settings?.trackRevisions !== undefined) return 7;
   return trees.some((tree) => laterNode(tree, 5)) ? 6 : 5;
@@ -518,7 +575,14 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   if (version === 1 || version === 2) {
     return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))), options);
   }
-  if (version === 3 || version === 4 || version === 5 || version === 6 || version === 7) {
+  if (
+    version === 3 ||
+    version === 4 ||
+    version === 5 ||
+    version === 6 ||
+    version === 7 ||
+    version === 8
+  ) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
     if (version < 5)
@@ -530,6 +594,11 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
     if (version < 7 && doc.settings?.trackRevisions !== undefined)
       fail("settings.trackRevisions", `is of schema 7 (the document says schema ${version})`);
+    if (doc.settings?.background !== undefined)
+      fail("settings.background", `is of schema 9 (the document says schema ${version})`);
+    const decorated = V9_SECTION_KEYS.find((key) => inSection(doc.section, key));
+    if (decorated)
+      fail("section", `${decorated} is of schema 9 (the document says schema ${version})`);
     for (const [path, content] of [
       ["content", doc.content],
       ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
@@ -760,6 +829,16 @@ function laterSection(section: unknown): string | undefined {
 
 const TABLE_NODES = new Set(["table", "tableRow", "tableCell"]);
 
+/** The parts of a section that schema 9 added. */
+const V9_SECTION_KEYS = ["pageBorders", "lineNumbers"];
+
+/** Whether `section`, or the setup its tracked change recorded, has `key`. */
+function inSection(section: unknown, key: string): boolean {
+  if (!isRecord(section)) return false;
+  if (Object.hasOwn(section, key)) return true;
+  return isRecord(section.change) && inSection(section.change.previous, key);
+}
+
 /**
  * The first thing in validated content JSON that a schema after `version` added, if any: a node
  * type, a block's `controls`, a part of a section.
@@ -783,6 +862,9 @@ function laterNode(
       return { name: "a picture's rotation or crop", schema: 6 };
     if (version < 8 && TABLE_NODES.has(name) && attrs.formatChange != null)
       return { name: `a ${name} with a formatChange`, schema: 8 };
+    const decorated =
+      version < 9 ? V9_SECTION_KEYS.find((key) => inSection(attrs.section, key)) : undefined;
+    if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;
@@ -1064,6 +1146,10 @@ export const checkControl: Check = shape(
 );
 const checkControls = recordOf(checkControl, "control");
 
+/** A theme color's tint or shade: two hex digits, as Word writes them. */
+const hexByte: Check = (v) =>
+  typeof v === "string" && /^[0-9A-Fa-f]{2}$/.test(v) ? undefined : "must be two hex digits";
+
 const checkSettings: Check = shape(
   {
     doNotUseHTMLParagraphAutoSpacing: bool,
@@ -1071,6 +1157,13 @@ const checkSettings: Check = shape(
     footnotes: checkNoteProperties,
     endnotes: checkNoteProperties,
     trackRevisions: bool,
+    background: shape({
+      color,
+      themeColor: token,
+      themeTint: hexByte,
+      themeShade: hexByte,
+      ext: xml,
+    }),
   },
   [],
   true,

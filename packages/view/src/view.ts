@@ -48,6 +48,7 @@ import {
   noteProperties,
   noteTexts,
   type OpenStory,
+  type PageBordersJSON,
   pageVariant,
   parseContentV2,
   parseFieldInstruction,
@@ -159,6 +160,7 @@ import {
   CONTROL_UI_ATTR,
   ControlChrome,
 } from "./word/controls.js";
+import { pageBordersElement, pageBordersKey, pageColor } from "./word/decoration.js";
 import {
   FLOAT_ANCHORS,
   spacing,
@@ -382,6 +384,10 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
+/** The page color each page element was last given. */
+const pageColors = new WeakMap<HTMLElement, string>();
+/** Each page element's borders (Phase 32), as last drawn, and what they were drawn from. */
+const pageFrames = new WeakMap<HTMLElement, { key: string; element: HTMLElement | null }>();
 /** The margins a header or footer gave each page element, as last written. */
 const pagePads = new WeakMap<HTMLElement, string>();
 /** What a view without pages gives its one flow of content. */
@@ -3282,15 +3288,32 @@ export class EditorView {
         sheets[p - 1] ?? (layout[0] as BlockLayout | undefined)?.sheet ?? this.lastSheet();
     this.sheets = sheets.slice(0, count);
     while (this.pages.length < count) this.pages.push(this.createPage());
+    const context = this.paged ? wordContext(this.state) : null;
+    const color = pageColor(context?.envelope.settings) ?? "";
+    const setups = context ? this.sections() : [];
     this.sheets.forEach((sheet, p) => {
       const page = this.pages[p] as HTMLElement;
       const key = `${sheet.index} ${sheet.css}`;
       if (pageSheets.get(page) !== key) {
         pageSheets.set(page, key);
         pagePads.delete(page);
+        pageColors.delete(page);
         page.style.cssText = sheet.css;
         page.setAttribute(SHEET_ATTR, String(sheet.index));
       }
+      if ((pageColors.get(page) ?? "") !== color) {
+        pageColors.set(page, color);
+        page.style.backgroundColor = color;
+        // Printed as drawn: a browser leaves backgrounds out of print otherwise.
+        page.style.setProperty("print-color-adjust", color ? "exact" : "");
+        page.style.setProperty("-webkit-print-color-adjust", color ? "exact" : "");
+      }
+      this.drawPageBorders(
+        page,
+        setups[this.facts[p]?.section ?? -1]?.pageBorders,
+        sheet,
+        !!this.facts[p]?.first,
+      );
       const { top = "", bottom = "" } = this.pageMargins[p] ?? {};
       const pads = `${top} ${bottom}`;
       if ((pagePads.get(page) ?? " ") !== pads) {
@@ -3315,8 +3338,10 @@ export class EditorView {
       const notes = this.pageNotes[p];
       /** What follows the text of a column: its endnotes. */
       const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
-      /** A page's children: its header, what it holds, its notes, its footer. */
+      const frame = pageFrames.get(page)?.element;
+      /** A page's children: its borders, its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
+        ...(frame ? [frame] : []),
         ...(header ? [header.element] : []),
         ...list,
         ...(notes?.foot ?? []),
@@ -3409,6 +3434,29 @@ export class EditorView {
       });
     }
     return out;
+  }
+
+  /** Gives `page` the element of its section's page borders (none: null), made when they change. */
+  private drawPageBorders(
+    page: HTMLElement,
+    borders: PageBordersJSON | undefined,
+    sheet: Sheet,
+    first: boolean,
+  ): void {
+    const { pageSize, margins } = sheet.settings;
+    const px = (mm: number) => (mm * 96) / 25.4;
+    const box = {
+      width: px(pageSize.width),
+      height: px(pageSize.height),
+      top: px(margins.top),
+      right: px(margins.right),
+      bottom: px(margins.bottom),
+      left: px(margins.left),
+    };
+    const key = pageBordersKey(borders, box, first);
+    if (pageFrames.get(page)?.key === key) return;
+    const element = key ? pageBordersElement(this.host.ownerDocument, borders, box, first) : null;
+    pageFrames.set(page, { key, element });
   }
 
   private createPage(): HTMLElement {

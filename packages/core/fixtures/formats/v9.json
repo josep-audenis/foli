@@ -1,0 +1,574 @@
+{
+  "schemaVersion": 9,
+  "section": {
+    "pageSize": {
+      "width": 11906,
+      "height": 16838
+    },
+    "margins": {
+      "top": 1440,
+      "right": 1440,
+      "bottom": 1440,
+      "left": 1440
+    },
+    "pageBorders": {
+      "offsetFrom": "page",
+      "top": {
+        "style": "double",
+        "size": 6,
+        "space": 24,
+        "color": "1F4E79"
+      },
+      "left": {
+        "style": "double",
+        "size": 6,
+        "space": 24,
+        "color": "1F4E79"
+      },
+      "bottom": {
+        "style": "double",
+        "size": 6,
+        "space": 24,
+        "color": "1F4E79"
+      },
+      "right": {
+        "style": "double",
+        "size": 6,
+        "space": 24,
+        "color": "1F4E79"
+      }
+    },
+    "lineNumbers": {
+      "countBy": 5,
+      "restart": "newSection"
+    }
+  },
+  "defaults": {
+    "paragraph": {
+      "spacing": {
+        "after": 220,
+        "line": 360,
+        "lineRule": "auto"
+      }
+    },
+    "run": [
+      {
+        "type": "font",
+        "attrs": {
+          "ascii": "Georgia",
+          "hAnsi": "Georgia",
+          "cs": "Georgia"
+        }
+      },
+      {
+        "type": "fontSize",
+        "attrs": {
+          "value": 22,
+          "complexScript": 22
+        }
+      }
+    ]
+  },
+  "styles": [
+    {
+      "id": "Normal",
+      "type": "paragraph",
+      "name": "Normal",
+      "isDefault": true
+    },
+    {
+      "id": "Heading1",
+      "type": "paragraph",
+      "name": "heading 1",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 0,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 32
+          }
+        }
+      ]
+    },
+    {
+      "id": "Heading2",
+      "type": "paragraph",
+      "name": "heading 2",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 1,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 28
+          }
+        }
+      ]
+    },
+    {
+      "id": "Heading3",
+      "type": "paragraph",
+      "name": "heading 3",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 2,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 26
+          }
+        }
+      ]
+    },
+    {
+      "id": "Heading4",
+      "type": "paragraph",
+      "name": "heading 4",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 3,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 24
+          }
+        }
+      ]
+    },
+    {
+      "id": "Heading5",
+      "type": "paragraph",
+      "name": "heading 5",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 4,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 22
+          }
+        }
+      ]
+    },
+    {
+      "id": "Heading6",
+      "type": "paragraph",
+      "name": "heading 6",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 5,
+        "spacing": {
+          "before": 240,
+          "after": 120
+        }
+      },
+      "run": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 22
+          }
+        }
+      ]
+    },
+    {
+      "id": "ListParagraph",
+      "type": "paragraph",
+      "name": "List Paragraph",
+      "basedOn": "Normal",
+      "paragraph": {
+        "indent": {
+          "left": 720
+        },
+        "contextualSpacing": true
+      }
+    },
+    {
+      "id": "DefaultParagraphFont",
+      "type": "character",
+      "name": "Default Paragraph Font",
+      "isDefault": true
+    },
+    {
+      "id": "Hyperlink",
+      "type": "character",
+      "name": "Hyperlink",
+      "basedOn": "DefaultParagraphFont",
+      "run": [
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0563C1",
+            "themeColor": "hyperlink"
+          }
+        },
+        {
+          "type": "underline"
+        }
+      ]
+    }
+  ],
+  "numbering": {
+    "abstracts": [
+      {
+        "id": 0,
+        "multiLevelType": "hybridMultilevel",
+        "levels": [
+          {
+            "level": 0,
+            "start": 1,
+            "format": "bullet",
+            "text": "•",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 720,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 1,
+            "start": 1,
+            "format": "bullet",
+            "text": "◦",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 1440,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 2,
+            "start": 1,
+            "format": "bullet",
+            "text": "▪",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 2160,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 3,
+            "start": 1,
+            "format": "bullet",
+            "text": "•",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 2880,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 4,
+            "start": 1,
+            "format": "bullet",
+            "text": "◦",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 3600,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 5,
+            "start": 1,
+            "format": "bullet",
+            "text": "▪",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 4320,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 6,
+            "start": 1,
+            "format": "bullet",
+            "text": "•",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 5040,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 7,
+            "start": 1,
+            "format": "bullet",
+            "text": "◦",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 5760,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 8,
+            "start": 1,
+            "format": "bullet",
+            "text": "▪",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 6480,
+                "hanging": 360
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 1,
+        "multiLevelType": "hybridMultilevel",
+        "levels": [
+          {
+            "level": 0,
+            "start": 1,
+            "format": "decimal",
+            "text": "%1.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 720,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 1,
+            "start": 1,
+            "format": "decimal",
+            "text": "%2.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 1440,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 2,
+            "start": 1,
+            "format": "decimal",
+            "text": "%3.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 2160,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 3,
+            "start": 1,
+            "format": "decimal",
+            "text": "%4.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 2880,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 4,
+            "start": 1,
+            "format": "decimal",
+            "text": "%5.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 3600,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 5,
+            "start": 1,
+            "format": "decimal",
+            "text": "%6.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 4320,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 6,
+            "start": 1,
+            "format": "decimal",
+            "text": "%7.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 5040,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 7,
+            "start": 1,
+            "format": "decimal",
+            "text": "%8.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 5760,
+                "hanging": 360
+              }
+            }
+          },
+          {
+            "level": 8,
+            "start": 1,
+            "format": "decimal",
+            "text": "%9.",
+            "justification": "left",
+            "paragraph": {
+              "indent": {
+                "left": 6480,
+                "hanging": 360
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "instances": []
+  },
+  "comments": [],
+  "resources": {
+    "foli-picture-1": {
+      "contentType": "image/png",
+      "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    }
+  },
+  "settings": {
+    "trackRevisions": true,
+    "background": {
+      "color": "FFF2CC",
+      "themeColor": "accent4",
+      "themeTint": "33"
+    }
+  },
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A rotated, cropped picture: "
+          },
+          {
+            "type": "picture",
+            "attrs": {
+              "resource": "foli-picture-1",
+              "width": 731520,
+              "height": 411480,
+              "alt": "A dot",
+              "rotation": 5400000,
+              "crop": {
+                "left": 10000,
+                "top": 5000,
+                "right": 10000,
+                "bottom": 5000
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
