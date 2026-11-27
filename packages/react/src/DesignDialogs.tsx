@@ -4,10 +4,15 @@
  */
 
 import {
+  type Command,
+  chainCommands,
   type Editor,
   type EditorState,
+  paragraphBordersAt,
   sectionAt,
   setPageBorders,
+  setParagraphBorders,
+  setParagraphShading,
   setWatermark,
   type WatermarkJSON,
   watermarkOf,
@@ -444,7 +449,10 @@ export function WatermarkDialog({
   const t = useT();
   const id = useId();
   const [initial] = useState(() => watermarkOf(editor.state));
-  const [kind, setKind] = useState<"none" | "picture" | "text">(initial?.kind ?? "text");
+  // Word's opens on what the document has: none, a picture or a text.
+  const [kind, setKind] = useState<"none" | "picture" | "text">(initial?.kind ?? "none");
+  // The text's box stays as it is unless its text, size or layout change.
+  const [boxChanged, setBoxChanged] = useState(false);
   const [text, setText] = useState(
     initial?.kind === "text" ? (initial.text ?? "") : "CONFIDENTIAL",
   );
@@ -475,7 +483,7 @@ export function WatermarkDialog({
     if (kind === "none") return onClose(editor.run(setWatermark(null)));
     if (kind === "text") {
       if (!text.trim()) return setError("Text");
-      const watermark = textWatermark(editor.state, {
+      const made = textWatermark(editor.state, {
         text,
         font,
         size: size === "auto" ? undefined : Number(size),
@@ -483,6 +491,10 @@ export function WatermarkDialog({
         semitransparent,
         layout,
       });
+      const watermark =
+        initial?.kind === "text" && !boxChanged
+          ? { ...made, width: initial.width, height: initial.height }
+          : made;
       return onClose(editor.run(setWatermark(watermark)));
     }
     if (!file) {
@@ -493,7 +505,7 @@ export function WatermarkDialog({
     if (!upload || !file.type.startsWith("image/")) return setError("Select picture…");
     setBusy(true);
     try {
-      const measured = await measureImageFile(file, document);
+      const measured = await measureImageFile(file, first.current?.ownerDocument ?? document);
       const answer = measured ? await upload(file) : null;
       const src = typeof answer === "string" ? answer : answer?.src;
       if (!open.current) return;
@@ -598,6 +610,7 @@ export function WatermarkDialog({
                 aria-invalid={error === "Text" || undefined}
                 onChange={(e) => {
                   setText(e.target.value);
+                  setBoxChanged(true);
                   setError(null);
                 }}
               />
@@ -618,7 +631,14 @@ export function WatermarkDialog({
               </select>
             </Field>
             <Field id={`${id}-size`} label={t("Size")}>
-              <select id={`${id}-size`} value={size} onChange={(e) => setSize(e.target.value)}>
+              <select
+                id={`${id}-size`}
+                value={size}
+                onChange={(e) => {
+                  setSize(e.target.value);
+                  setBoxChanged(true);
+                }}
+              >
                 <option value="auto">{t("Auto")}</option>
                 {WATERMARK_SIZES.map((s) => (
                   <option key={s} value={String(s)}>
@@ -657,7 +677,10 @@ export function WatermarkDialog({
                     type="radio"
                     name={`${id}-layout`}
                     checked={layout === value}
-                    onChange={() => setLayout(value)}
+                    onChange={() => {
+                      setLayout(value);
+                      setBoxChanged(true);
+                    }}
                   />
                   <label htmlFor={`${id}-layout-${value}`}>{t(label)}</label>
                 </div>
@@ -678,6 +701,319 @@ export function WatermarkDialog({
             {t("Check this value: {field}.", { field: t(error) })}
           </p>
         )}
+      </form>
+    </div>
+  );
+}
+
+// ---------- Home ▸ Borders and Shading (32.4) ----------
+
+const PARAGRAPH_SIDES = ["top", "bottom", "left", "right", "between"] as const;
+type ParagraphSide = (typeof PARAGRAPH_SIDES)[number];
+const PARAGRAPH_SIDE_NAMES = Object.fromEntries([
+  ["top", "Top border"],
+  ["bottom", "Bottom border"],
+  ["left", "Left border"],
+  ["right", "Right border"],
+  ["between", "Border between paragraphs"],
+] as const) as Record<ParagraphSide, ToolbarMessage>;
+/** Word's shading patterns (`w:shd/@w:val`) the dialog offers. */
+const PATTERN_NAMES = [
+  ["clear", "Clear"],
+  ["solid", "Solid (100%)"],
+  ["pct5", "5%"],
+  ["pct10", "10%"],
+  ["pct20", "20%"],
+  ["pct25", "25%"],
+  ["pct50", "50%"],
+  ["pct75", "75%"],
+  ["horzStripe", "Dark horizontal"],
+  ["vertStripe", "Dark vertical"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+/**
+ * Word's Borders and Shading dialog for the selected paragraphs: their borders (None, Box or
+ * Custom; the line's style, color and width; which sides, the one between paragraphs too) and
+ * shading (fill, pattern and its color). OK sets what was changed, in one undo step; tracked as
+ * paragraph formatting.
+ * shortcut: no preview, no Page Border tab (Design ▸ Page Borders), no Shadow or 3-D setting.
+ * @internal
+ */
+export function BordersShadingDialog({
+  editor,
+  colors,
+  onClose,
+}: {
+  editor: Editor;
+  colors: readonly { name: ToolbarMessage; color: string }[];
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [initial] = useState(() => {
+    const at = paragraphBordersAt(editor.state);
+    const borders = at?.borders ?? null;
+    const present = PARAGRAPH_SIDES.filter((side) => isLine(borders?.[side]?.style));
+    const line = present[0] ? borders?.[present[0]] : undefined;
+    const outside = ["top", "bottom", "left", "right"] as const;
+    const box =
+      present.length === 4 &&
+      outside.every((side) => {
+        const b = borders?.[side];
+        return b?.style === line?.style && b?.size === line?.size && b?.color === line?.color;
+      });
+    const shading = at?.shading ?? null;
+    const hex = (value: string | undefined) =>
+      value && value !== "auto" ? `#${value.toLowerCase()}` : "auto";
+    return {
+      borders,
+      setting: (!present.length ? "none" : box ? "box" : "custom") as Setting,
+      style: line?.style ?? "single",
+      color: hex(line?.color),
+      width: line?.size ?? 4,
+      sides: Object.fromEntries(
+        PARAGRAPH_SIDES.map((side) => [side, present.includes(side)]),
+      ) as Record<ParagraphSide, boolean>,
+      fill: hex(shading?.fill),
+      pattern: shading?.pattern ?? "clear",
+      patternColor: hex(shading?.color),
+    };
+  });
+  const [setting, setSetting] = useState<Setting>(initial.setting);
+  const [style, setStyle] = useState<string>(initial.style);
+  const [color, setColor] = useState(initial.color);
+  const [width, setWidth] = useState<number>(initial.width);
+  const [sides, setSides] = useState(initial.sides);
+  const [fill, setFill] = useState(initial.fill);
+  const [pattern, setPattern] = useState<string>(initial.pattern);
+  const [patternColor, setPatternColor] = useState(initial.patternColor);
+  const [bordersChanged, setBordersChanged] = useState(false);
+  const [lineChanged, setLineChanged] = useState(false);
+  const [shadingChanged, setShadingChanged] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+
+  const rgb = (value: string) => (value === "auto" ? "auto" : value.slice(1).toUpperCase());
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    const commands: Command[] = [];
+    if (bordersChanged) {
+      const line = { style, size: width, space: 1, color: rgb(color) };
+      const own = initial.borders;
+      const shown =
+        setting === "box"
+          ? (["top", "bottom", "left", "right"] as const)
+          : PARAGRAPH_SIDES.filter((side) => sides[side]);
+      commands.push(
+        setParagraphBorders(
+          setting === "none" || !shown.length
+            ? null
+            : Object.fromEntries(
+                shown.map((side) => {
+                  const kept = own?.[side];
+                  if (!lineChanged && kept && isLine(kept.style)) return [side, kept];
+                  return [side, side === "left" || side === "right" ? { ...line, space: 4 } : line];
+                }),
+              ),
+        ),
+      );
+    }
+    if (shadingChanged)
+      commands.push(
+        setParagraphShading(
+          fill === "auto" && pattern === "clear"
+            ? null
+            : { pattern, color: rgb(patternColor), fill: rgb(fill) },
+        ),
+      );
+    if (!commands.length) return onClose(false);
+    onClose(editor.run(chainCommands(commands)));
+  };
+
+  const colorOptions = (value: string, automatic: ToolbarMessage) => (
+    <>
+      <option value="auto">{t(automatic)}</option>
+      {colors.map((c) => (
+        <option key={c.name} value={c.color}>
+          {t(c.name)}
+        </option>
+      ))}
+      {value !== "auto" && !colors.some((c) => c.color === value) && (
+        <option value={value}>{t("Other color {color}", { color: value })}</option>
+      )}
+    </>
+  );
+  const borders = () => {
+    setBordersChanged(true);
+  };
+  const lines = () => {
+    setBordersChanged(true);
+    setLineChanged(true);
+  };
+  const off = setting === "none";
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Borders and Shading")}
+      className="foli-link-dialog foli-word-dialog foli-borders-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <fieldset className="foli-dialog-section">
+            <legend>{t("Borders")}</legend>
+            {SETTING_NAMES.map(([value, label]) => (
+              <div key={value} className="foli-setup-field foli-setup-check">
+                <input
+                  ref={value === initial.setting ? first : undefined}
+                  id={`${id}-setting-${value}`}
+                  type="radio"
+                  name={`${id}-setting`}
+                  checked={setting === value}
+                  onChange={() => {
+                    setSetting(value);
+                    borders();
+                  }}
+                />
+                <label htmlFor={`${id}-setting-${value}`}>{t(label)}</label>
+              </div>
+            ))}
+          </fieldset>
+          <fieldset className="foli-dialog-section" disabled={off}>
+            <legend>{t("Line")}</legend>
+            <Field id={`${id}-style`} label={t("Style")}>
+              <select
+                id={`${id}-style`}
+                value={style}
+                onChange={(e) => {
+                  setStyle(e.target.value);
+                  lines();
+                }}
+              >
+                {!BORDER_STYLE_NAMES.some(([value]) => value === style) && (
+                  <option value={style}>{style}</option>
+                )}
+                {BORDER_STYLE_NAMES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {t(label)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id={`${id}-color`} label={t("Color")}>
+              <select
+                id={`${id}-color`}
+                value={color}
+                onChange={(e) => {
+                  setColor(e.target.value);
+                  lines();
+                }}
+              >
+                {colorOptions(color, "Automatic")}
+              </select>
+            </Field>
+            <Field id={`${id}-width`} label={t("Width")}>
+              <select
+                id={`${id}-width`}
+                value={String(width)}
+                onChange={(e) => {
+                  setWidth(Number(e.target.value));
+                  lines();
+                }}
+              >
+                {!(BORDER_WIDTHS as readonly number[]).includes(width) && (
+                  <option value={String(width)}>{`${width / 8} pt`}</option>
+                )}
+                {BORDER_WIDTHS.map((w) => (
+                  <option key={w} value={String(w)}>{`${w / 8} pt`}</option>
+                ))}
+              </select>
+            </Field>
+          </fieldset>
+          <fieldset className="foli-dialog-section" disabled={off}>
+            <legend>{t("Sides")}</legend>
+            {PARAGRAPH_SIDES.map((side) => (
+              <div key={side} className="foli-setup-field foli-setup-check">
+                <input
+                  id={`${id}-side-${side}`}
+                  type="checkbox"
+                  checked={(setting === "box" && side !== "between") || sides[side]}
+                  onChange={(e) => {
+                    const all = setting === "box";
+                    setSides((now) => ({
+                      top: all || now.top,
+                      bottom: all || now.bottom,
+                      left: all || now.left,
+                      right: all || now.right,
+                      between: now.between,
+                      [side]: e.target.checked,
+                    }));
+                    setSetting("custom");
+                    borders();
+                  }}
+                />
+                <label htmlFor={`${id}-side-${side}`}>{t(PARAGRAPH_SIDE_NAMES[side])}</label>
+              </div>
+            ))}
+          </fieldset>
+          <fieldset className="foli-dialog-section">
+            <legend>{t("Shading")}</legend>
+            <Field id={`${id}-fill`} label={t("Fill")}>
+              <select
+                id={`${id}-fill`}
+                value={fill}
+                onChange={(e) => {
+                  setFill(e.target.value);
+                  setShadingChanged(true);
+                }}
+              >
+                {colorOptions(fill, "No Color")}
+              </select>
+            </Field>
+            <Field id={`${id}-pattern`} label={t("Pattern style")}>
+              <select
+                id={`${id}-pattern`}
+                value={pattern}
+                onChange={(e) => {
+                  setPattern(e.target.value);
+                  setShadingChanged(true);
+                }}
+              >
+                {!PATTERN_NAMES.some(([value]) => value === pattern) && (
+                  <option value={pattern}>{pattern}</option>
+                )}
+                {PATTERN_NAMES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {t(label)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id={`${id}-pattern-color`} label={t("Pattern color")}>
+              <select
+                id={`${id}-pattern-color`}
+                value={patternColor}
+                disabled={pattern === "clear"}
+                onChange={(e) => {
+                  setPatternColor(e.target.value);
+                  setShadingChanged(true);
+                }}
+              >
+                {colorOptions(patternColor, "Automatic")}
+              </select>
+            </Field>
+          </fieldset>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
       </form>
     </div>
   );

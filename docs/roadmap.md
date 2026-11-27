@@ -4543,9 +4543,17 @@ XML.
   watermark… opening `WatermarkDialog`, Remove) in the Design tab. `watermark.test.ts` (docx),
   `pagedesign.test.ts`, `watermark.spec.ts` in three engines (axe on the page and the dialog);
   checked by a screenshot. limitations.md.
-- [ ] 32.4 Borders and Shading for paragraphs: Home's Borders menu (bottom, top, left, right,
+- [x] 32.4 Borders and Shading for paragraphs: Home's Borders menu (bottom, top, left, right,
   none, all, outside, horizontal line), the Borders and Shading dialog (style, color, width,
-  shading fill and pattern), tracked as paragraph formatting.
+  shading fill and pattern), tracked as paragraph formatting. Built: `setParagraphBorder`
+  (Word's menu presets, a side toggled), `setParagraphBorders`, `setParagraphShading`,
+  `paragraphBordersAt` in core (paragraph attributes, so tracked as paragraph formatting and
+  written to `w:pBdr`, `w:shd` as before); `toolbarItems.borders` (the menu, Horizontal line,
+  Borders and Shading… opening `BordersShadingDialog`) and `shading` in Home's Paragraph group.
+  The Watermark dialog opens on what the document has (No watermark when none) and keeps a text
+  watermark's box unless its text, size or layout change (32.3's review). `borders.test.ts`,
+  `design.test.tsx`, `borders.spec.ts` in three engines (axe on the dialog). limitations.md
+  (boxes not joined, patterns not drawn).
 - [ ] 32.5 Line numbers (Layout ▸ Line Numbers: none, continuous, restart each page or section,
   suppress for paragraph) drawn in the margin, from `w:lnNumType`.
 - [ ] 32.6 Design tab in `wordRibbonTabs`; e2e, corpus files with watermarks and borders

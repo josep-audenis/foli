@@ -158,3 +158,55 @@ describe("Page Borders dialog keeps what it does not show", () => {
     });
   });
 });
+
+describe("Home ▸ Borders and Shading (32.4)", () => {
+  const home = () => {
+    const editor = createEditor({ document: documentOf() });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    return editor;
+  };
+  const attrs = (editor: ReturnType<typeof home>, i = 0) =>
+    editor.state.doc.child(i).attrs as Record<string, unknown>;
+
+  it("Borders' menu toggles a side; Shading fills the paragraph", () => {
+    const editor = home();
+    editor.select(2);
+    fireEvent.click(screen.getByRole("button", { name: /^Borders/ }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Bottom border" }));
+    expect(attrs(editor).borders).toEqual({
+      bottom: { style: "single", size: 4, space: 1, color: "auto" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Shading/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Accent 1" }));
+    expect(attrs(editor).shading).toMatchObject({ pattern: "clear", color: "auto" });
+  });
+
+  it("the dialog sets borders and shading in one undo step, and OK untouched changes nothing", () => {
+    const editor = home();
+    editor.select(2);
+    const before = editor.state;
+    const openDialog = () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Borders/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Borders and Shading…" }));
+      return within(screen.getByRole("dialog", { name: "Borders and Shading" }));
+    };
+    let box = openDialog();
+    fireEvent.submit(box.getByRole("button", { name: "OK" }).closest("form") as HTMLFormElement);
+    expect(editor.state).toBe(before);
+    box = openDialog();
+    fireEvent.click(box.getByLabelText("Box"));
+    fireEvent.change(box.getByLabelText("Style"), { target: { value: "double" } });
+    fireEvent.change(box.getByLabelText("Pattern style"), { target: { value: "pct10" } });
+    fireEvent.submit(box.getByRole("button", { name: "OK" }).closest("form") as HTMLFormElement);
+    expect(Object.keys(attrs(editor).borders as object).sort()).toEqual([
+      "bottom",
+      "left",
+      "right",
+      "top",
+    ]);
+    expect(attrs(editor).shading).toEqual({ pattern: "pct10", color: "auto", fill: "auto" });
+    editor.run(undo);
+    expect(attrs(editor).borders).toBeNull();
+    expect(attrs(editor).shading).toBeNull();
+  });
+});

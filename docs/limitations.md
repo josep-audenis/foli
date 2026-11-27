@@ -825,6 +825,12 @@ Details in the [package README](../packages/docx/README.md).
   presets (Custom watermark… has Horizontal). A picture watermark needs the toolbar's `upload`;
   with no new file picked the dialog keeps the picture, its washout changed, and its Scale
   applies to a new picture only.
+- Paragraph borders are drawn on each paragraph alone: Word joins the boxes of neighbouring
+  paragraphs with the same borders (one box, the border between them drawn only when set), and
+  draws the border between paragraphs; Foli draws each box, and no border between. Shading is
+  drawn as its fill color: a pattern (10%, stripes…) and its color are kept and written, not
+  drawn. The Borders and Shading dialog has no preview, no Shadow or 3-D setting, and no Page
+  Border tab (Design ▸ Page Borders has it); Shading in Home's menu sets a clear fill.
 - Line numbers (`w:lnNumType`) are read and written but not drawn yet (32.5); an element without
   `countBy` numbers no line in Word and stays in the section's verbatim XML.
 - On a dark page color, text in Automatic color stays black (Word draws it white).

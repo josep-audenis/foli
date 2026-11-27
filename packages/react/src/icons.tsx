@@ -259,6 +259,16 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["path", { d: "M21 9H3" }],
     ["path", { d: "M21 15H3" }],
   ],
+  shading: /* paint-roller */ [
+    ["rect", { width: "16", height: "6", x: "2", y: "2", rx: "2" }],
+    ["path", { d: "M10 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }],
+    ["rect", { width: "4", height: "6", x: "8", y: "16", rx: "1" }],
+  ],
+  borders: /* square-dashed-bottom */ [
+    ["path", { d: "M5 21a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2" }],
+    ["path", { d: "M9 21h1" }],
+    ["path", { d: "M14 21h1" }],
+  ],
   watermark: /* stamp */ [
     ["path", { d: "M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13" }],
     [
