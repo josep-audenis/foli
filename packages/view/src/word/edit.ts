@@ -62,9 +62,40 @@ import {
   styleParagraph,
   styleRun,
   tagOf,
+  textBoxElement,
   WORD_COLUMN_BREAK_ATTR,
   WORD_PAGE_BREAK_ATTR,
 } from "./blocks.js";
+
+/** A number per story tree, new for each tree: what a block's key holds of its text boxes. */
+const serials = new WeakMap<object, number>();
+let nextSerial = 0;
+const storySerial = (tree: object | undefined): number => {
+  if (!tree) return -1;
+  let found = serials.get(tree);
+  if (found === undefined) {
+    found = ++nextSerial;
+    serials.set(tree, found);
+  }
+  return found;
+};
+
+const boxesOf = new WeakMap<ModelNode, string[]>();
+
+/** The stories of the text boxes in a block, in order (read once per node). */
+function textBoxesIn(node: ModelNode): string[] {
+  let ids = boxesOf.get(node);
+  if (!ids) {
+    const found: string[] = [];
+    node.descendants((child) => {
+      if (child.type.name === "textBox") found.push(String(child.attrs.story));
+      return true;
+    });
+    ids = found;
+    boxesOf.set(node, ids);
+  }
+  return ids;
+}
 
 /** Inline nodes with nothing to show: a line holding only these is still an empty line. */
 const NOT_IN_LINE = new Set([
@@ -176,6 +207,8 @@ export class WordRenderer {
   #noteMark = "";
   /** The numbers each block shows. */
   #noteKeys: string[] = [];
+  /** The text box stories each block draws, as keys: a story edited draws its block again. */
+  #boxKeys: string[] = [];
   /** Node and mark views (`ViewExtension`), none on the clipboard. */
   views: Views | null = null;
   /** Where node views' drawings are recorded, for their `destroy` (the view's list). */
@@ -260,6 +293,7 @@ export class WordRenderer {
     this.#markers = this.#context.resolver.markers(attrs);
     this.#comments = comments;
     this.#fields = fieldDisplay(blocks.map(childTypes), this.#codes);
+    this.#boxKeys = blocks.map((node) => this.#boxKey(node));
     this.#noteKeys = this.#notes.size
       ? blocks.map((node) =>
           referencesIn(node)
@@ -267,6 +301,14 @@ export class WordRenderer {
             .join(" "),
         )
       : [];
+  }
+
+  /** The versions of the text box stories `node` holds ("" for none). */
+  #boxKey(node: ModelNode): string {
+    const ids = textBoxesIn(node);
+    if (!ids.length) return "";
+    const { stories } = this.#context;
+    return ids.map((id) => storySerial(stories.get(id)?.doc)).join(",");
   }
 
   /** Whether the block at `index` (of those prepared) shows a list number. */
@@ -283,7 +325,8 @@ export class WordRenderer {
     const fields = field?.hidden.size || field?.gone ? `|${[...field.hidden]}${field.gone}` : "";
     const notes = this.#noteKeys[index] ? `|${this.#noteKeys[index]}` : "";
     const decorations = this.#decorationKeys[index] ? `|${this.#decorationKeys[index]}` : "";
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}${notes}|${this.#noteMark}${decorations}`;
+    const boxes = this.#boxKeys[index] ? `|boxes:${this.#boxKeys[index]}` : "";
+    return `${boxes}${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}${notes}|${this.#noteMark}${decorations}`;
   }
 
   /** A block; `cell` is the format of the table cell it is in, if any. */
@@ -415,6 +458,35 @@ export class WordRenderer {
             const fragment = fragmentAt(offset);
             floats.set(fragment, [...(floats.get(fragment) ?? []), ...nodes]);
           } else span.append(pictureElement(child.attrs, doc, this.#image));
+          leafElement(span);
+          return;
+        }
+        case "textBox": {
+          // A text box (33.2): its story drawn read-only, one position in the text, placed as
+          // a picture is.
+          const span = doc.createElement("span");
+          span.setAttribute("contenteditable", "false");
+          // On the clipboard nothing: its paragraphs in the line's would break the HTML (Foli's
+          // own format carries the box and its text).
+          if (this.#clipboard) {
+            leafElement(span);
+            return;
+          }
+          const box = textBoxElement(child.attrs, this.#context.envelope, doc, {
+            resolver: this.#context.resolver,
+            review: this.#review,
+            fieldCodes: codes,
+            lineRatio: this.#ratio,
+            image: this.#image,
+          });
+          if (child.attrs.float && !this.#clipboard && !hidden) {
+            geometry ??= floatGeometry(this.#context.envelope.section);
+            const { nodes, holder } = floatElements(child.attrs, doc, this.#image, geometry, box);
+            for (const node of nodes) node.setAttribute("contenteditable", "false");
+            FLOAT_ANCHORS.set(holder, span);
+            const fragment = fragmentAt(offset);
+            floats.set(fragment, [...(floats.get(fragment) ?? []), ...nodes]);
+          } else span.append(box);
           leafElement(span);
           return;
         }

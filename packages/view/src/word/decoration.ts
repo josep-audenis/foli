@@ -9,7 +9,13 @@ import type {
   WatermarkJSON,
   WordSettingsJSON,
 } from "@folijs/core";
-import { borderJsonCss, FLOAT_ATTR, type ImageSource, PX_PER_TWIP } from "./blocks.js";
+import {
+  borderJsonCss,
+  FLOAT_ATTR,
+  type ImageSource,
+  PX_PER_TWIP,
+  TEXT_BOX_ATTR,
+} from "./blocks.js";
 
 /**
  * Marks the element holding a page's borders.
@@ -248,7 +254,7 @@ function linesOf(
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const inFloat = (
       node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element)
-    )?.closest(`[${FLOAT_ATTR}]`);
+    )?.closest(`[${FLOAT_ATTR}],[${TEXT_BOX_ATTR}]`);
     if (inFloat && element.contains(inFloat)) continue;
     if (node.nodeType === Node.TEXT_NODE) {
       if (!node.textContent) continue;

@@ -42,6 +42,8 @@ export interface CustomDrawing {
 let drawing: CustomDrawing | undefined;
 /** The resolved comments of that call's document: their text is not shaded (same shortcut). */
 let resolved: ReadonlySet<number> = new Set();
+/** That call's document and options: what a text box draws its story with (same shortcut). */
+let rendering: { document: FoliDocument; options: BlockOptions } | null = null;
 
 /**
  * Marks the <br> of an explicit page break (the page flow ends the page after its line).
@@ -200,6 +202,111 @@ function cropOf(
 }
 
 /**
+ * On a drawn text box (33.2): its story's id.
+ * @internal
+ */
+export const TEXT_BOX_ATTR = "data-foli-text-box";
+
+/**
+ * A text box (33.2, ADR-0016) as shown: a box of its size with its fill and line, its story's
+ * blocks inside, read-only, laid out in the box's width less its insets, cut off at its height
+ * unless it grows to fit its text. `document` holds the story, `options` how to draw it.
+ * @internal
+ */
+export function textBoxElement(
+  attrs: Record<string, unknown>,
+  document: Omit<FoliDocument, "content">,
+  doc: Document,
+  options: BlockOptions,
+): HTMLElement {
+  const id = String(attrs.story ?? "");
+  const box = doc.createElement("span");
+  box.setAttribute(TEXT_BOX_ATTR, id);
+  box.setAttribute("role", "group");
+  const alt = typeof attrs.alt === "string" && attrs.alt ? attrs.alt : "Text box";
+  box.setAttribute("aria-label", alt);
+  if (attrs.title) box.title = String(attrs.title);
+  const { style } = box;
+  style.display = "inline-block";
+  // Its bottom on the line's baseline, as Word sets a shape in line with text.
+  style.verticalAlign = "baseline";
+  style.position = "relative";
+  style.boxSizing = "border-box";
+  style.width = `${Number(attrs.width) / EMU_PER_PX}px`;
+  const height = `${Number(attrs.height) / EMU_PER_PX}px`;
+  if (attrs.autoFit === true) style.minHeight = height;
+  else style.height = height;
+  // Cut off at its height; and so its baseline is its bottom edge, in line as Word sets it.
+  style.overflow = "hidden";
+  style.textIndent = "0";
+  style.textAlign = "left";
+  style.whiteSpace = "normal";
+  if (typeof attrs.fill === "string") style.backgroundColor = `#${attrs.fill}`;
+  const outline = attrs.outline as { color?: string; width?: number } | null | undefined;
+  if (outline?.color) {
+    // Word draws the line on the box's edge, half of it outside.
+    const width = Math.max((outline.width ?? 9525) / EMU_PER_PX, 0.5);
+    style.outline = `${width}px solid #${outline.color}`;
+    style.outlineOffset = `${-width / 2}px`;
+  }
+  const inset = (attrs.inset ?? {}) as Record<string, number | undefined>;
+  const pad = (side: string, fallback: number) => `${(inset[side] ?? fallback) / EMU_PER_PX}px`;
+  const inner = doc.createElement("span");
+  const own = inner.style;
+  own.display = "flex";
+  own.flexDirection = "column";
+  own.boxSizing = "border-box";
+  own.minHeight = "100%";
+  own.height = attrs.autoFit === true ? "auto" : "100%";
+  own.padding = `${pad("top", 45_720)} ${pad("right", 91_440)} ${pad("bottom", 45_720)} ${pad("left", 91_440)}`;
+  own.justifyContent =
+    attrs.verticalAlign === "center"
+      ? "center"
+      : attrs.verticalAlign === "bottom"
+        ? "flex-end"
+        : "flex-start";
+  box.append(inner);
+  const stories = document.stories;
+  const story = stories && Object.hasOwn(stories, id) ? stories[id] : undefined;
+  if (story?.kind === "textBox") {
+    const content = doc.createElement("span");
+    content.style.display = "block";
+    content.className = TEXT_BOX_CONTENT_CLASS;
+    const { notes: _notes, ...rest } = options;
+    const blocks = renderBlocks({ ...document, content: story.content } as FoliDocument, doc, rest);
+    stack(blocks, content, !!options.resolver?.addsParagraphSpacing);
+    inner.append(content);
+  }
+  return box;
+}
+
+/**
+ * The element holding a drawn text box's blocks (what a story opened in it replaces).
+ * @internal
+ */
+export const TEXT_BOX_CONTENT_CLASS = "foli-text-box-content";
+
+/**
+ * Lays `blocks` out as a story: spacing as between the paragraphs of a page.
+ * @internal
+ */
+export function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
+  let previous = 0;
+  blocks.forEach((block, i) => {
+    const gap = !i
+      ? block.before
+      : adds
+        ? previous + block.before
+        : Math.max(previous, block.before);
+    block.element.style.marginTop = `${gap}px`;
+    block.element.style.marginBottom = "0";
+    previous = block.after;
+    parent.append(block.element);
+  });
+  return previous;
+}
+
+/**
  * Marks the element holding a floating picture (its wrapping), drawn at its paragraph's start.
  * @internal
  */
@@ -324,6 +431,8 @@ export function floatElements(
   doc: Document,
   image: ImageSource | undefined,
   geometry: FloatGeometry,
+  /** What floats (a text box's drawing); the picture by default. */
+  drawn?: HTMLElement,
 ): { nodes: HTMLElement[]; holder: HTMLElement } {
   const float = attrs.float as {
     horizontal: FloatPosition;
@@ -336,7 +445,7 @@ export function floatElements(
   const height = Number(attrs.height) / EMU_PER_PX;
   const distance = (side: "top" | "bottom" | "left" | "right") =>
     (float.distance?.[side] ?? 0) / EMU_PER_PX;
-  const picture = pictureElement(attrs, doc, image);
+  const picture = drawn ?? pictureElement(attrs, doc, image);
   picture.style.display = "block";
   const holder = doc.createElement("span");
   holder.setAttribute(FLOAT_ATTR, float.wrap);
@@ -472,6 +581,8 @@ export interface BlockOptions {
   notes?: { references?: ReadonlyMap<string, string>; mark?: string };
   /** Custom nodes and marks drawn by extensions (19.3). */
   custom?: CustomDrawing | undefined;
+  /** Where pictures' images come from, when the caller has it already (`resource` unused). */
+  image?: ImageSource | undefined;
 }
 
 /**
@@ -797,6 +908,7 @@ export function renderBlocks(
 ): WordBlock[] {
   const outer = drawing;
   const outerResolved = resolved;
+  const outerRendering = rendering;
   drawing = options.custom;
   resolved = resolvedCommentIds(document.comments ?? []);
   try {
@@ -804,6 +916,7 @@ export function renderBlocks(
   } finally {
     drawing = outer;
     resolved = outerResolved;
+    rendering = outerRendering;
   }
 }
 
@@ -824,7 +937,8 @@ function renderBlocksNow(
     return value;
   };
   const resolver = options.resolver ?? new Resolver(document);
-  const image = imageSource(document.resources, options.resource);
+  const image = options.image ?? imageSource(document.resources, options.resource);
+  rendering = { document, options: { ...options, resolver, image } };
   // shortcut: floating pictures are placed against the last section's page.
   const geometry = floatGeometry(document.section);
   const content = document.content.content ?? [];
@@ -1178,6 +1292,15 @@ function renderInline(
         if (attrs.float) floats.push(...floatElements(attrs, doc, image, context.geometry).nodes);
         else parent.append(pictureElement(attrs, doc, image));
         continue;
+      case "textBox": {
+        const now = rendering;
+        if (!now) continue;
+        const box = textBoxElement(attrs, now.document, doc, now.options);
+        if (attrs.float)
+          floats.push(...floatElements(attrs, doc, image, context.geometry, box).nodes);
+        else parent.append(box);
+        continue;
+      }
       case "hardBreak":
         parent.append(doc.createElement("br"));
         continue;

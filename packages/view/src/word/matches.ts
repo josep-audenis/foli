@@ -5,6 +5,7 @@
  * scrolled to on Next); draw boxes if one that matters lacks it.
  */
 import { type FindOptions, findInText } from "@folijs/core";
+import { TEXT_BOX_ATTR } from "./blocks.js";
 import { PAGE_FIELD_ATTR } from "./regions.js";
 
 const ALL = "foli-find";
@@ -77,7 +78,7 @@ export function rangesInText(root: Element, query: string, options: FindOptions)
   const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const block = node.parentElement?.closest("p,h1,h2,h3,h4,h5,h6");
-    if (!block) continue;
+    if (!block || inBox(block, root)) continue;
     const list = groups.get(block);
     if (list) list.push(node as Text);
     else groups.set(block, [node as Text]);
@@ -145,7 +146,7 @@ export function rangesInCopy(
   spans: readonly { block: number; from: number; to: number }[],
 ): Range[] {
   const doc = root.ownerDocument;
-  const blocks = root.querySelectorAll("p,h1,h2,h3,h4,h5,h6");
+  const blocks = [...root.querySelectorAll("p,h1,h2,h3,h4,h5,h6")].filter((b) => !inBox(b, root));
   const out: Range[] = [];
   for (const { block, from, to } of spans) {
     const element = blocks[block];
@@ -172,4 +173,10 @@ export function rangesInCopy(
     }
   }
   return out;
+}
+
+/** Whether `element` is in a text box drawn inside `root`: a story of its own, not root's text. */
+function inBox(element: Element, root: Element): boolean {
+  const box = element.closest(`[${TEXT_BOX_ATTR}]`);
+  return !!box && box !== root && root.contains(box);
 }
