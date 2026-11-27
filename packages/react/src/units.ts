@@ -1,4 +1,4 @@
-/** A length unit Word's dialogs show: inches or centimetres. */
+/** A length unit Word's dialogs show: inches or centimetres. @internal */
 export type LengthUnit = "in" | "cm";
 
 /** Twips per unit a box takes typed after a number (Word's: `2 cm`, `1"`, `12 pt`). */
@@ -10,7 +10,7 @@ const TWIPS: Readonly<Record<string, number>> = {
   pt: 20,
 };
 
-/** `twips` in `unit`, as Word shows it: `0.5"`, `1.27 cm`, `6 pt` (two decimals at most). */
+/** `twips` in `unit`, as Word shows it: `0.5"`, `1.27 cm`, `6 pt` (two decimals at most). @internal */
 export function formatLength(twips: number, unit: LengthUnit | "pt"): string {
   const value = Number((twips / (TWIPS[unit] as number)).toFixed(2));
   return unit === "in" ? `${value}"` : `${value} ${unit}`;
@@ -19,6 +19,7 @@ export function formatLength(twips: number, unit: LengthUnit | "pt"): string {
 /**
  * A length typed in a box as twips: a number (a decimal comma too) in `unit`, or with a unit of
  * its own after it (`in`, `"`, `cm`, `mm`, `pt`). Null when it is none.
+ * @internal
  */
 export function parseLength(text: string, unit: LengthUnit | "pt"): number | null {
   const match = /^(-?\d*(?:[.,]\d+)?)\s*(in|"|cm|mm|pt)?$/i.exec(text.trim());

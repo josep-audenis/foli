@@ -758,20 +758,7 @@ export {};
  * the selection shows fills them, a value the selection differs in is blank (a checkbox mixed),
  * and OK applies only what was changed, in one transaction (one undo step).
  */
-import { type Editor } from "@folijs/core";
-import { type LengthUnit } from "./units.js";
-/**
- * Word's Paragraph dialog for the selected paragraphs: Indents and Spacing (alignment, outline
- * level, left and right indents, the special first line or hanging indent, space before and
- * after, line spacing, no space between paragraphs of the same style) and Line and Page Breaks
- * (widow control, keep with next, keep lines together, page break before), with a preview.
- */
-export declare function ParagraphDialog({ editor, unit, onClose, }: {
-    editor: Editor;
-    unit: LengthUnit;
-    /** `applied`: the paragraphs changed (the focus may go to the document). */
-    onClose: (applied: boolean) => void;
-}): import("react").JSX.Element;
+export {};
 
 // editor.d.ts
 import { type Command, type Editor, type EditorDocument, type EditorState, type Extension, type FoliCommands, type Plugin, type ReviewView } from "@folijs/core";
@@ -899,12 +886,4 @@ export type ToolbarMessages = Partial<Readonly<Record<ToolbarMessage, string>>>;
 export {};
 
 // units.d.ts
-/** A length unit Word's dialogs show: inches or centimetres. */
-export type LengthUnit = "in" | "cm";
-/** `twips` in `unit`, as Word shows it: `0.5"`, `1.27 cm`, `6 pt` (two decimals at most). */
-export declare function formatLength(twips: number, unit: LengthUnit | "pt"): string;
-/**
- * A length typed in a box as twips: a number (a decimal comma too) in `unit`, or with a unit of
- * its own after it (`in`, `"`, `cm`, `mm`, `pt`). Null when it is none.
- */
-export declare function parseLength(text: string, unit: LengthUnit | "pt"): number | null;
+export {};

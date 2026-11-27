@@ -182,6 +182,7 @@ const MAX_LENGTH = 31_680;
  * level, left and right indents, the special first line or hanging indent, space before and
  * after, line spacing, no space between paragraphs of the same style) and Line and Page Breaks
  * (widow control, keep with next, keep lines together, page break before), with a preview.
+ * @internal
  */
 export function ParagraphDialog({
   editor,
