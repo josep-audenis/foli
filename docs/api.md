@@ -102,7 +102,8 @@ Word's mini toolbar (1.11): a `FoliToolbar` of one row named "Mini toolbar" in
 or the selection is gone. It takes no focus, as Word's: the keyboard has the ribbon. Its
 `miniToolbarItems` are font, size, grow and shrink, bold, italic, underline, text color,
 highlight, styles and New comment, with the ribbon's icons. Props: `editor`, `at`, `items`,
-`messages` (the toolbar's), `commentOnly`, `onClose`, `onClickCommand`. `FoliEditor`'s
+`messages` (the toolbar's), `units` (of the dialogs it opens, 1.11), `commentOnly`, `onClose`,
+`onClickCommand`. `FoliEditor`'s
 `miniToolbar` shows it after a pointer selection in the document (not in a read-only one).
 
 ### `<FoliContextMenu>`

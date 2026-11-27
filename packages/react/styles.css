@@ -1316,3 +1316,13 @@
   color: inherit;
   font: inherit;
 }
+
+/* Not printed: the status bar, right-click menu and mini toolbar (after their own rules, which
+   set the first two's display). */
+@media print {
+  .foli-status-bar,
+  .foli-context-menu,
+  .foli-mini-toolbar {
+    display: none;
+  }
+}

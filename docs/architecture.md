@@ -1424,6 +1424,21 @@ since 1.0.0):
   `FoliMiniToolbar` (a second `FoliToolbar`); the Styles gallery as a custom item; all opt-in
   through `FoliEditor` (`statusBar`, `contextMenu`, `miniToolbar`).
 
+### Word's dialogs (Phase 30)
+
+- `@folijs/core`: the dialogs' commands (`setIndent`, `setParagraphFlags`, `setOutlineLevel`,
+  `setLineSpacing` with a rule, `setCharacterSpacing`, `setRunEffects`, `setVerticalAlign`,
+  `setUnderline`'s color, `setTabStops`), each writing a value directly only where the style does
+  not give it; `paragraphFormatAt` and `runFormatAt` (what the selection shows, mixed values left
+  out); `chainCommands` (one transaction, one undo step); `openDialog`, a request carried by a
+  transaction that changes nothing, as `openLinkEditor`'s.
+- `@folijs/react`: the Paragraph, Font and Tabs dialogs (`WordDialogs.tsx`) as the toolbar's
+  built-in dialogs, opened by launchers, the right-click menu, `openDialog` (one toolbar per
+  editor takes the request, as for the link dialog) and the Paragraph dialog's Tabs…; the Layout
+  tab's page menus (`setSectionSetup`, unequal columns scaled to a new text width) and Indent and
+  Spacing boxes (custom items); lengths in `units` (`units.ts`, the locale's by default), given to
+  custom items by a context.
+
 ## Styling
 
 Plain CSS with custom properties (`--foli-*`) declared on `:root` and `:host` (page, canvas

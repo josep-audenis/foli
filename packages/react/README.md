@@ -51,7 +51,9 @@ the selection, large buttons, dialog launchers, a ribbon that collapses, KeyTips
 and a Styles gallery). `useCommand("undo")` takes a command's name too. Word's status bar (page,
 words, tracking, zoom), right-click menu and mini toolbar: `statusBar`, `contextMenu` and
 `miniToolbar` on `FoliEditor`, or `FoliStatusBar`, `FoliContextMenu` and `FoliMiniToolbar` in
-your own layout.
+your own layout. Word's Font and Paragraph dialogs open from the ribbon's launchers, the
+right-click menu and `openDialog`, the Tabs dialog from the Paragraph dialog's Tabs…; the Layout tab has Word's Margins, Orientation, Size, Columns
+and Breaks menus; lengths show in `units` (inches or centimetres, the locale's by default).
 
 Roles: `readOnly` reads (select, copy, find); `commentOnly` comments and changes nothing else (a
 read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin refusing

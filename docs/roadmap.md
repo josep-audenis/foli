@@ -4336,8 +4336,18 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   Tabs dialogs, Layout's Indent boxes, Page setup and the column width dialog all show and take
   it. Page setup's and the column width dialog's labels lose "(cm)" (new strings, in the
   changeset). `dialogs.test.tsx` (inches and centimetres), the 19.4 test in centimetres.
-- [ ] 30.7 e2e in three engines with axe for each dialog and menu; docs (api.md, keyboard.md,
-  limitations.md); changesets.
+- [x] 30.7 e2e in three engines with axe for each dialog and menu; docs (api.md, keyboard.md,
+  limitations.md); changesets. Built: `dialogs.spec.ts` (Paragraph,
+  Font, Tabs, the right-click entries) and `layout.spec.ts` (the page menus, Custom margins…,
+  Breaks, the boxes) in Chromium, Firefox and WebKit, axe on each dialog's tabs and an open menu
+  (with each task); `docx/src/dialogs.test.ts` round-trips what the dialogs set through `.docx` (each
+  paragraph and run property, and an effect turned off over a style); api.md, keyboard.md, styling.md, limitations.md ("Word's dialogs"), architecture.md
+  and the React README; a changeset per task. Found on the way and fixed: the status bar, the
+  right-click menu and the mini toolbar printed (Phase 29: no print rule hid them, or theirs came
+  after it), which broke 7 of `pdf.spec.ts`'s print comparisons. Not fixed (on `main` before
+  this phase too): `04-board-report` and `08-newsletter`, which end in landscape, print one
+  blank page more than `exportPdf` gives. Axe runs on each dialog's tabs, on the Layout tab's
+  Margins menu and (`contextmenu.spec.ts`) on the right-click menu with its new entries.
 
 ### Acceptance
 
