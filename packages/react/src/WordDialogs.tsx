@@ -34,9 +34,11 @@ import {
 } from "@folijs/core";
 import {
   type CSSProperties,
+  createContext,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -46,6 +48,9 @@ import { useEditorState } from "./editor.js";
 import type { ToolbarCustomProps } from "./FoliToolbar.js";
 import { type ToolbarMessage, useT } from "./messages.js";
 import { formatLength, type LengthUnit, parseLength } from "./units.js";
+
+/** The toolbar's unit (`FoliToolbarProps.units`), for its custom items. @internal */
+export const UnitContext = createContext<LengthUnit>("in");
 
 /** A checkbox that can show mixed (null): a click turns it on, then off and on again. */
 function TriCheck({
@@ -1311,9 +1316,9 @@ export function ParagraphBox({
   onFocus,
   field,
   label,
-  unit,
-}: ToolbarCustomProps & { field: BoxField; label: ToolbarMessage; unit: LengthUnit }) {
+}: ToolbarCustomProps & { field: BoxField; label: ToolbarMessage }) {
   const t = useT();
+  const unit = useContext(UnitContext);
   const indent = field === "left" || field === "right";
   const to = indent ? unit : "pt";
   const twips = useEditorState(

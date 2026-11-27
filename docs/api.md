@@ -52,7 +52,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `reviewView`      | `ReviewView`                                                                                             | `"markup"`    | Read once: how tracked changes show (the toolbar changes it).                                                                                                        |
 | `onChange`        | `(change: FoliChange) => void`                                                                           | —             | After every content change made through transactions. Not for selection changes or `setDocument`.                                                                    |
 | `toolbar`         | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`        | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs` or `wordRibbonTabs`). |
-| `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                                       |
+| `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`, `units`.                                              |
 | `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
 | `statusBar`       | `boolean \| FoliStatusBarProps`                                                                          | `false`       | Word's status bar under the pages (1.11, `FoliStatusBar`); the zoom is then the editor's own unless `zoom` is given.                                                 |
 | `contextMenu`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's right-click menu on the document (1.11, `FoliContextMenu`); Shift+right-click keeps the browser's.                                                            |
@@ -195,7 +195,11 @@ Word's controls: paragraph style (with Word's Heading 1 to 3 when the document h
 them yet), font and size boxes (the font box: the document's theme fonts, about thirty common
 ones, and, in Chromium browsers, the fonts installed on the machine: opening the box the first
 time asks the browser's permission to read them, `queryLocalFonts`; once allowed they are
-listed at once on later visits; `localFonts={false}` never asks) · bold, italic, underline, strikethrough, link, text color,
+listed at once on later visits; `localFonts={false}` never asks; `units` (1.11, `LengthUnit`:
+`"in"` or `"cm"`) is the unit of the dialogs' and Layout's boxes' lengths: Page setup, column
+width, Paragraph, Tabs, Indent; by default the locale's, as Word's: inches where
+`navigator.language` is in the United States, Liberia or Myanmar, centimetres elsewhere and on
+the server; points stay points where Word shows them) · bold, italic, underline, strikethrough, link, text color,
 highlight · align left, center, align right, justify, line spacing · bulleted list, numbered
 list (pressed inside one), decrease and increase indent (list levels, else half-inch stops) ·
 New comment (with `comments`: on the selection, written in the pane), Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),
@@ -237,7 +241,8 @@ the selection closes it. This is also the keyboard way to resize a picture.
 Section is a menu button of the same kind: Page setup…, section breaks (next page, continuous,
 even page, odd page), Remove section break, Column break. Page setup… opens a dialog under the
 toolbar (`.foli-setup-dialog`, `role="dialog"`, "Page setup") for the caret's section: how it
-starts, orientation (swapping width and height), page size and margins in centimetres, columns,
+starts, orientation (swapping width and height), page size and margins in the toolbar's unit
+(`units`, below), columns,
 the space between them, a line between them and set widths. Only what changed is applied; a wrong
 value marks its field with an announced message; Apply (Enter), Cancel (Escape).
 
@@ -880,8 +885,8 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   keep lines together, page break before) shows what all the selected paragraphs share, blank
   (a checkbox mixed) where they differ; OK applies only what was changed, in one undo step
   (`chainCommands(commands)`: commands run one after another as one transaction). Lengths are
-  in inches for now (30.6 adds centimetres); a box also takes `cm`, `mm`, `pt` or `"` after the
-  number. `openDialog("font")` (Ctrl+D in `wordKeymap()`) opens the Font dialog the same way:
+  in the toolbar's unit (`units`: inches or centimetres, the locale's by default); a box also
+  takes `cm`, `mm`, `pt` or `"` after the number. `openDialog("font")` (Ctrl+D in `wordKeymap()`) opens the Font dialog the same way:
   Font (font, font style, size, font color, underline style and color, the effects
   strikethrough, double strikethrough, superscript, subscript, small caps, all caps, hidden) and
   Advanced (character spacing: Normal, Expanded or Condensed by points), with a preview of the

@@ -37,9 +37,9 @@ const document3: FoliDocument = {
   },
 };
 
-function setup() {
+function setup(units?: "in" | "cm") {
   const editor = createEditor({ document: document3 });
-  render(<FoliToolbar editor={editor} />);
+  render(<FoliToolbar editor={editor} units={units} />);
   return editor;
 }
 const select = (name: string) => screen.getByRole("combobox", { name }) as HTMLSelectElement;
@@ -383,7 +383,7 @@ describe("FoliToolbar's table menu", () => {
   });
 
   it("sets the caret's column width from the keyboard, in one undo step (19.4)", () => {
-    const editor = setup();
+    const editor = setup("cm");
     act(() => {
       editor.select(6);
       editor.run(insertTable(1, 2));
@@ -391,9 +391,12 @@ describe("FoliToolbar's table menu", () => {
     const before = tableIn(editor)?.attrs?.grid as number[];
     openMenu();
     fireEvent.click(item("Column width…"));
-    const field = screen.getByLabelText("Column width (cm)") as HTMLInputElement;
+    const field = screen.getByRole("textbox", { name: "Column width" }) as HTMLInputElement;
     expect(document.activeElement).toBe(field);
-    expect(Number(field.value)).toBeCloseTo((before[0] as number) / (1440 / 2.54), 1);
+    expect(Number(field.value.replace(" cm", ""))).toBeCloseTo(
+      (before[0] as number) / (1440 / 2.54),
+      1,
+    );
     const depth = undoDepth(editor.state);
     // Unchanged: closes without touching the table.
     fireEvent.submit(field.closest("form") as HTMLFormElement);
@@ -401,13 +404,13 @@ describe("FoliToolbar's table menu", () => {
     expect(undoDepth(editor.state)).toBe(depth);
     openMenu();
     fireEvent.click(item("Column width…"));
-    const again = screen.getByLabelText("Column width (cm)") as HTMLInputElement;
+    const again = screen.getByRole("textbox", { name: "Column width" }) as HTMLInputElement;
     fireEvent.change(again, { target: { value: "x" } });
     fireEvent.submit(again.closest("form") as HTMLFormElement);
     // The range this column may take: the next one keeps 0.1 inch.
     const max = ((before[0] as number) + (before[1] as number) - 144) / (1440 / 2.54);
     expect(screen.getByRole("alert").textContent).toBe(
-      `Enter a width in cm from 0.26 to ${Math.floor(max * 100) / 100}.`,
+      `Enter a width from 0.26 cm to ${Math.floor(max * 100) / 100} cm.`,
     );
     fireEvent.change(again, { target: { value: "50" } });
     fireEvent.submit(again.closest("form") as HTMLFormElement);
