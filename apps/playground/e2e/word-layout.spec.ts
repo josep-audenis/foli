@@ -116,7 +116,7 @@ test("the Layout dialog sets wrapping, distance and position in one step", async
   await expect(dialog.getByLabel("Tight")).toBeChecked();
   const results = await new AxeBuilder({ page }).include(".foli-layout-dialog").analyze();
   expect(results.violations).toEqual([]);
-  await dialog.getByLabel("Behind text").check();
+  await dialog.getByLabel("Square").check();
   await dialog.getByLabel("Left", { exact: true }).fill("0.5");
   await dialog.getByRole("tab", { name: "Position" }).click();
   await dialog.locator("input[id$='-horizontal-offset-value']").fill("1");
@@ -132,10 +132,10 @@ test("the Layout dialog sets wrapping, distance and position in one step", async
       ).foliEdit.editor.getDocument().content,
   );
   const json = JSON.stringify(float);
-  expect(json).toContain('"wrap":"behind"');
+  expect(json).toContain('"wrap":"square"');
   expect(json).toContain('"horizontal":{"relativeTo":"page","offset":914400}');
   expect(json).toContain('"left":457200');
-  await expect.poll(() => wrapOf(page)).toBe("behind");
+  await expect.poll(() => wrapOf(page)).toBe("square");
   // One undo takes it all back.
   await page.keyboard.press("ControlOrMeta+z");
   await expect.poll(() => wrapOf(page)).toBe("tight");
@@ -182,4 +182,26 @@ test("pictures wrapped tight and through are where Word puts them, lines around 
     for (const line of beside)
       expect(line.right <= at.box.left + 1 || line.left >= at.box.right - 1).toBe(true);
   }
+});
+
+test("OK with nothing changed changes nothing (no rounding through the unit)", async ({ page }) => {
+  await open(page);
+  await logo(page).click();
+  const before = await page.evaluate(() =>
+    JSON.stringify(
+      (window as unknown as { foliEdit: { editor: { state: { doc: unknown } } } }).foliEdit.editor
+        .state.doc,
+    ),
+  );
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByRole("button", { name: "Position" }).click();
+  await page.getByRole("menuitem", { name: "More Layout Options…" }).click();
+  await page.getByRole("dialog", { name: "Layout" }).getByRole("button", { name: "OK" }).click();
+  const after = await page.evaluate(() =>
+    JSON.stringify(
+      (window as unknown as { foliEdit: { editor: { state: { doc: unknown } } } }).foliEdit.editor
+        .state.doc,
+    ),
+  );
+  expect(after).toBe(before);
 });

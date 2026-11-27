@@ -1442,12 +1442,16 @@ const HORIZONTAL_ALIGN = [
   ["left", "Left"],
   ["center", "Centered"],
   ["right", "Right"],
+  ["inside", "Inside"],
+  ["outside", "Outside"],
 ] as const satisfies readonly (readonly [string, ToolbarMessage])[];
 
 const VERTICAL_ALIGN = [
   ["top", "Top"],
   ["center", "Centered"],
   ["bottom", "Bottom"],
+  ["inside", "Inside"],
+  ["outside", "Outside"],
 ] as const satisfies readonly (readonly [string, ToolbarMessage])[];
 
 const WRAP_STYLES = [
@@ -1550,6 +1554,9 @@ export function LayoutDialog({
       ]),
     ),
   );
+  // What the dialog opened with: a value whose text is unchanged is written back as it was (its
+  // text rounds it to the unit's hundredths).
+  const [opened] = useState(() => ({ horizontal, vertical, distance }));
   const [overlap, setOverlap] = useState(float?.allowOverlap ?? true);
   const [inCell, setInCell] = useState(float?.layoutInCell ?? true);
   const [error, setError] = useState<ToolbarMessage | null>(null);
@@ -1562,8 +1569,15 @@ export function LayoutDialog({
     event.preventDefault();
     if (!object) return onClose(false);
     if (!floating) return onClose(editor.run(setObjectFloat(object.pos, null)));
-    const axis = (form: AxisForm, field: ToolbarMessage): ObjectAxis | null => {
+    const axis = (
+      form: AxisForm,
+      field: ToolbarMessage,
+      was: AxisForm,
+      own: ObjectAxis | undefined,
+    ): ObjectAxis | null => {
       if (form.mode === "align") return { relativeTo: form.from, align: form.align };
+      if (form.offset === was.offset && was.mode === "offset" && typeof own?.offset === "number")
+        return { relativeTo: form.from, offset: own.offset };
       const twips = parseLength(form.offset, unit);
       if (twips === null || Math.abs(twips) > 31_680) {
         setError(field);
@@ -1571,13 +1585,21 @@ export function LayoutDialog({
       }
       return { relativeTo: form.from, offset: twips * EMU_PER_TWIP };
     };
-    const h = axis(horizontal, AXES.horizontal.label);
-    const v = axis(vertical, AXES.vertical.label);
-    if (!h || !v) return;
+    const h = axis(horizontal, AXES.horizontal.label, opened.horizontal, float?.horizontal);
+    const v = axis(vertical, AXES.vertical.label, opened.vertical, float?.vertical);
+    if (!h || !v) return setTab("position");
     const gaps: Record<string, number> = {};
     for (const [key, label] of DISTANCES) {
+      const own = float?.distance?.[key];
+      if (distance[key] === opened.distance[key] && typeof own === "number") {
+        gaps[key] = own;
+        continue;
+      }
       const twips = parseLength(distance[key] ?? "", unit);
-      if (twips === null || twips < 0 || twips > 31_680) return setError(label);
+      if (twips === null || twips < 0 || twips > 31_680) {
+        setTab("wrapping");
+        return setError(label);
+      }
       gaps[key] = twips * EMU_PER_TWIP;
     }
     onClose(
@@ -1601,7 +1623,13 @@ export function LayoutDialog({
     set: (form: AxisForm) => void,
   ) => {
     const aligns = key === "horizontal" ? HORIZONTAL_ALIGN : VERTICAL_ALIGN;
-    const froms = key === "horizontal" ? HORIZONTAL_FROM : VERTICAL_FROM;
+    // Word aligns vertically against the margins or the page, not a paragraph or a line.
+    const froms =
+      key === "horizontal"
+        ? HORIZONTAL_FROM
+        : form.mode === "align"
+          ? VERTICAL_FROM.filter(([value]) => value !== "paragraph" && value !== "line")
+          : VERTICAL_FROM;
     const label: ToolbarMessage = AXES[key].label;
     const fromSelect = (mode: AxisForm["mode"], text: string) => (
       <Field id={`${id}-${key}-${mode}-from`} label={text}>
@@ -1628,7 +1656,14 @@ export function LayoutDialog({
             type="radio"
             name={`${id}-${key}`}
             checked={form.mode === "align"}
-            onChange={() => set({ ...form, mode: "align" })}
+            onChange={() =>
+              set({
+                ...form,
+                mode: "align",
+                // A paragraph or line cannot align: against the margin then.
+                from: form.from === "paragraph" || form.from === "line" ? "margin" : form.from,
+              })
+            }
           />
           <label htmlFor={`${id}-${key}-align`}>{t("Alignment")}</label>
         </div>
@@ -1665,6 +1700,7 @@ export function LayoutDialog({
             value={form.offset}
             disabled={form.mode !== "offset"}
             aria-invalid={error === label || undefined}
+            aria-describedby={error === label ? `${id}-error` : undefined}
             onChange={(e) => {
               set({ ...form, offset: e.target.value });
               setError(null);
@@ -1681,11 +1717,13 @@ export function LayoutDialog({
     label: ToolbarMessage,
     value: boolean,
     set: (value: boolean) => void,
+    off = false,
   ) => (
     <div className="foli-setup-field foli-setup-check">
       <input
         id={`${id}-${key}`}
         type="checkbox"
+        disabled={off}
         checked={value}
         onChange={(e) => set(e.target.checked)}
       />
@@ -1700,8 +1738,22 @@ export function LayoutDialog({
       {axisFields("vertical", vertical, setVertical)}
       <fieldset className="foli-dialog-section" disabled={!floating}>
         <legend>{t("Options")}</legend>
-        {check(...OPTIONS[0], moves, (on) =>
-          setVertical({ ...vertical, mode: "offset", from: on ? "paragraph" : "page" }),
+        {check(
+          ...OPTIONS[0],
+          moves,
+          (on) => {
+            // Where it is drawn stays: its offset from the paragraph or from the page.
+            const at = object ? editor.storyView?.objectPlacement?.(object.pos) : null;
+            const px = at ? (on ? at.top - at.paragraphTop : at.top) : null;
+            setVertical({
+              ...vertical,
+              from: on ? "paragraph" : "page",
+              ...(px === null
+                ? {}
+                : { offset: formatLength(Math.round((px * 9525) / EMU_PER_TWIP), unit) }),
+            });
+          },
+          vertical.mode === "align",
         )}
         {check(...OPTIONS[1], overlap, setOverlap)}
         {check(...OPTIONS[2], inCell, setInCell)}
@@ -1740,7 +1792,10 @@ export function LayoutDialog({
           </div>
         ))}
       </fieldset>
-      <fieldset className="foli-dialog-section" disabled={!floating}>
+      <fieldset
+        className="foli-dialog-section"
+        disabled={!floating || wrap === "behind" || wrap === "inFront"}
+      >
         <legend>{t("Distance from text")}</legend>
         {DISTANCES.map(([key, label]) => (
           <Field key={key} id={`${id}-distance-${key}`} label={t(label)}>
@@ -1748,8 +1803,14 @@ export function LayoutDialog({
               id={`${id}-distance-${key}`}
               type="text"
               inputMode="decimal"
+              // As Word's: square all four, tight and through the sides, top and bottom those.
+              disabled={
+                ((wrap === "tight" || wrap === "through") && (key === "top" || key === "bottom")) ||
+                (wrap === "topAndBottom" && (key === "left" || key === "right"))
+              }
               value={distance[key] ?? ""}
               aria-invalid={error === label || undefined}
+              aria-describedby={error === label ? `${id}-error` : undefined}
               onChange={(e) => {
                 setDistance({ ...distance, [key]: e.target.value });
                 setError(null);
@@ -1790,7 +1851,7 @@ export function LayoutDialog({
           </button>
         </div>
         {error && (
-          <p className="foli-link-error" role="alert">
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
             {t("Check this value: {field}.", { field: t(error) })}
           </p>
         )}
