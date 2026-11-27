@@ -163,12 +163,15 @@ export {
   undoDepth,
 } from "./history.js";
 export {
+  alignObject,
   croppingAt,
   OBJECT_POSITIONS,
   OBJECT_WRAPS,
+  type ObjectAlign,
   type ObjectAxis,
   type ObjectFloat,
   type ObjectLayout,
+  type ObjectOrder,
   type ObjectPlacement,
   type ObjectPosition,
   type ObjectWrap,
@@ -179,6 +182,7 @@ export {
   setObjectFloat,
   setObjectLayout,
   setObjectMovesWithText,
+  setObjectOrder,
   setObjectPosition,
   setObjectSize,
   setObjectWrap,

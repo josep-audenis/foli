@@ -300,6 +300,16 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   Position moves it sideways only on the page; behind and in front of text it goes where
   Word puts it. Not while tracking changes (Foli does not record a layout change, nor Word
   in a way Foli reads).
+- Bring Forward and Send Backward (33.6) put the body's floating objects in an order and store it
+  on every one of them (`zOrder`, written as `relativeHeight`). Before the first move a file's
+  own `relativeHeight` is not read: its objects count in document order, so that first move
+  starts from document order, not from how the file stacked them. Objects behind text and in
+  front of it share the one order, as in Word; a header's objects are not in it. An object added
+  after a move (inserted, pasted) has no place yet and is drawn under the ordered ones until the
+  next move. Word's
+  Align aligns an object in the margins only (not to the page, nor several objects to each
+  other: Foli selects one object at a time). A text box's contextual tab is a Shape Format tab
+  with Arrange and Size only (Phase 34 adds the rest).
 - A picture or text box behind text cannot be clicked where text covers it (select it with the
   keyboard). A picture or box in an open header, footer or text box changes its layout without
   being measured: made floating, it starts at its paragraph's top left; fixed on the page, it

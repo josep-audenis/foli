@@ -27,6 +27,7 @@ import {
   setIndent,
   setLineSpacing,
   setObjectFloat,
+  setObjectSize,
   setOutlineLevel,
   setParagraphFlags,
   setParagraphSpacing,
@@ -2008,5 +2009,106 @@ export function LayoutDialog({
         )}
       </form>
     </div>
+  );
+}
+
+/**
+ * The selected picture's or text box's height or width in the ribbon (Picture Format and Shape
+ * Format ▸ Size, 33.6): Enter sets it, a picture keeping its ratio as Word's locked one; arrows
+ * step it a tenth of an inch.
+ * @internal
+ */
+export function ObjectSizeBox({
+  editor,
+  disabled,
+  tabIndex,
+  ref,
+  onFocus,
+  side,
+  label,
+}: ToolbarCustomProps & { side: "height" | "width"; label: ToolbarMessage }) {
+  const t = useT();
+  const unit = useContext(UnitContext);
+  const size = useEditorState(
+    (state) => {
+      const object = selectedObject(state);
+      return object
+        ? {
+            pos: object.pos,
+            picture: object.node.type.name === "picture",
+            width: Number(object.node.attrs.width),
+            height: Number(object.node.attrs.height),
+          }
+        : null;
+    },
+    {
+      editor,
+      isEqual: (a, b) =>
+        a === b || (!!a && !!b && a.pos === b.pos && a.width === b.width && a.height === b.height),
+    },
+  );
+  const emu = size ? size[side] : null;
+  const shown = emu === null ? "" : formatLength(Math.round(emu / EMU_PER_TWIP), unit);
+  const [text, setText] = useState<string | null>(null);
+  const commit = (twips: number) => {
+    if (!size) return;
+    const value = Math.max(1, Math.min(31_680, twips)) * EMU_PER_TWIP;
+    const other = side === "height" ? "width" : "height";
+    const scaled = size.picture ? Math.round((size[other] * value) / size[side]) : size[other];
+    editor.run(
+      setObjectSize(
+        size.pos,
+        side === "width" ? value : Math.max(1, scaled),
+        side === "height" ? value : Math.max(1, scaled),
+      ),
+    );
+  };
+  const set = () => {
+    if (text === null) return;
+    const twips = parseLength(text, unit);
+    setText(null);
+    // The value shown, typed again: nothing changes (no rounding through the unit).
+    if (text.trim() === shown) return;
+    if (twips !== null && twips > 0) commit(twips);
+  };
+  const off = disabled || !size || !size.width || !size.height;
+  return (
+    <span className={`foli-toolbar-box foli-toolbar-object-${side}-box`}>
+      <span className="foli-toolbar-box-label" aria-hidden="true">
+        {t(label)}
+      </span>
+      <input
+        ref={ref}
+        type="text"
+        role="spinbutton"
+        inputMode="decimal"
+        tabIndex={tabIndex}
+        aria-label={t(label)}
+        aria-valuetext={shown}
+        aria-disabled={off || undefined}
+        readOnly={off}
+        value={text ?? shown}
+        onFocus={onFocus}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={() => setText(null)}
+        onKeyDown={(event) => {
+          if (off) return;
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+            event.stopPropagation();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            set();
+          } else if (event.key === "Escape") setText(null);
+          else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && emu !== null) {
+            event.preventDefault();
+            const typed = text === null ? null : parseLength(text, unit);
+            setText(null);
+            commit(
+              (typed ?? Math.round(emu / EMU_PER_TWIP)) + (event.key === "ArrowUp" ? 144 : -144),
+            );
+          }
+        }}
+      />
+    </span>
   );
 }

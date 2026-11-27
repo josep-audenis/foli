@@ -4678,8 +4678,16 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   too (free, Shift keeps the ratio; pictures keep theirs); React's Crop button and Size…
   launcher (Picture Format ▸ Size) and the Layout dialog's Size tab (height, width, scale, lock
   aspect ratio, rotation). `layout.test.ts` (core), `word-crop-size.spec.ts` (three engines, axe).
-- [ ] 33.6 Picture Format tab as Word's (Size group boxes, Arrange: wrap, position, bring
-  forward, send backward, align); corpus run; e2e; docs; changesets.
+- [x] 33.6 Picture Format tab as Word's (Size group boxes, Arrange: wrap, position, bring
+  forward, send backward, align); corpus run; e2e; docs; changesets. Built: core's
+  `setObjectOrder` (forward, front, backward, back: a float's `zOrder`, Word's `relativeHeight`,
+  schema 10, written to the anchor; the view stacks floats by it) and `alignObject` (in the
+  margins); React's Picture Format tab (Picture; Arrange: Position, Wrap Text, Bring Forward and
+  Send Backward with Word's three entries each, Align, rotate; Size: Crop, Height and Width boxes,
+  Size…) and a Shape Format tab for a selected text box (Arrange and Size, until 34.5's). Corpus
+  run with Word 16 (`textbox-roundtrip.mjs`, `picture-roundtrip.mjs`: corpus/README.md). Tests:
+  `layout.test.ts` (core), `textboxes.test.ts` (docx), `word-picture-format.spec.ts` (three
+  engines, axe).
 
 ### Acceptance
 

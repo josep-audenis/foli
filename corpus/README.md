@@ -116,7 +116,11 @@ text boxes back unchanged and edited (every box's text, the first box moved, wid
 tight, refilled; a new box), `word-reference.ps1` records what Word makes of them (its
 `textBoxes`), and `check` compares: on 2026-11-27 Word 16 opened both without repair, the
 unchanged one as the original, the edited one's boxes with Foli's text, size, position and
-wrapping.
+wrapping. Phase 33's close (33.6) ran it again with `picture-roundtrip.mjs` (whose moved
+floating pictures are now edited in their own drawing, not written anew): every file opened
+without repair and matched, but 07's unchanged export, whose two inline pictures Word 16.0.20625
+places 0.3 pt lower than the stored reference says, as it does the original file today (a newer
+Word build than the reference's, not the export).
 
 ```bash
 node scripts/corpus/textbox-roundtrip.mjs make <folder>

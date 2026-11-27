@@ -176,6 +176,17 @@ describe("text boxes (Phase 33)", () => {
     expect(xml).toContain('<a:ext cx="1800000" cy="1397000"/>');
   });
 
+  it("writes a box's place front to back as its relativeHeight (33.6)", async () => {
+    const { document, package: pkg } = await importDocx(corpus("11-text-box-flyer.docx"));
+    const programme = boxes(document)[0] as Record<string, Record<string, unknown>>;
+    const out = await exportDocx(
+      patched(document, "textbox:1", { float: { ...programme.float, zOrder: 251_700_000 } }),
+      pkg,
+    );
+    const xml = (await readPackage(out)).text("/word/document.xml");
+    expect(xml).toContain('relativeHeight="251700000"');
+  });
+
   it("puts a floating box in line and back", async () => {
     const { document, package: pkg } = await importDocx(corpus("11-text-box-flyer.docx"));
     const inline = await importDocx(

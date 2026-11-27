@@ -396,6 +396,11 @@ const checkFloat: Check = shape(
     distance: shape({ top: emu, bottom: emu, left: emu, right: emu }),
     allowOverlap: bool,
     layoutInCell: bool,
+    /**
+     * Its place among the floating objects, front to back as the number grows (`relativeHeight`;
+     * schema 10, 33.6): set by Bring Forward and Send Backward; left out, as the file has it.
+     */
+    zOrder: int(0, 2_147_483_647),
   },
   ["horizontal", "vertical", "wrap"],
 );

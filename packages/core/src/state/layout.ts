@@ -417,3 +417,87 @@ export function cropPlugin(): Plugin {
     },
   });
 }
+
+/** Word's first `relativeHeight`, and the gap between new ones. */
+const Z_BASE = 251_658_240;
+const Z_STEP = 1024;
+
+/** The floating objects of the body in document order, with where each is front to back. */
+function stacking(state: EditorState): { pos: number; z: number }[] {
+  const out: { pos: number; z: number }[] = [];
+  state.doc.descendants((node, pos) => {
+    const float = node.attrs.float as { zOrder?: number } | null | undefined;
+    if ((node.type.name === "picture" || node.type.name === "textBox") && float)
+      out.push({ pos, z: float.zOrder ?? Z_BASE + out.length * Z_STEP });
+    return true;
+  });
+  return out;
+}
+
+/** How Bring Forward and Send Backward move an object. */
+export type ObjectOrder = "forward" | "front" | "backward" | "back";
+
+/**
+ * Word's Bring Forward, Bring to Front, Send Backward and Send to Back for the floating object at
+ * `pos` (33.6). The body's floating objects are put in order, back to front (by `float.zOrder`;
+ * one without counts where it stands in the document, among those without, ties by place), the
+ * object moved in that order, and every one given its rank as its `zOrder` (Word's
+ * `relativeHeight` steps): what is drawn and written is then always the order shown. One undo
+ * step; not while tracking; false where it would not move.
+ */
+export function setObjectOrder(pos: number, order: ObjectOrder): Command {
+  return (state, dispatch) => {
+    const node = objectAt(state, pos);
+    if (!node?.attrs.float || trackState(state)?.on === true) return false;
+    const stack = stacking(state)
+      .map((o, i) => ({ ...o, i }))
+      .sort((a, b) => a.z - b.z || a.i - b.i);
+    const at = stack.findIndex((o) => o.pos === pos);
+    if (at < 0) return false;
+    const to =
+      order === "front"
+        ? stack.length - 1
+        : order === "back"
+          ? 0
+          : order === "forward"
+            ? Math.min(at + 1, stack.length - 1)
+            : Math.max(at - 1, 0);
+    if (to === at) return false;
+    const [moved] = stack.splice(at, 1);
+    stack.splice(to, 0, moved as (typeof stack)[number]);
+    return attempt(state, dispatch, (tr) => {
+      tr.setMeta(closeHistory, true);
+      stack.forEach((o, rank) => {
+        const n = tr.doc.nodeAt(o.pos) as Node;
+        const float = n.attrs.float as Record<string, unknown>;
+        const zOrder = Z_BASE + rank * Z_STEP;
+        if (float.zOrder !== zOrder)
+          tr.setNodeMarkup(o.pos, n.type, { ...n.attrs, float: { ...float, zOrder } });
+      });
+      if (state.selection instanceof NodeSelection && state.selection.from === pos)
+        tr.setSelection(NodeSelection.create(tr.doc, pos));
+    });
+  };
+}
+
+/** Word's Align for one object: against the margins. */
+export type ObjectAlign = "left" | "center" | "right" | "top" | "middle" | "bottom";
+
+/**
+ * Word's Align (Align Left … Align Bottom) for the floating object at `pos` (33.6): aligned in
+ * the margins on that axis, the other axis kept. One undo step; not while tracking.
+ */
+export function alignObject(pos: number, align: ObjectAlign): Command {
+  return (state, dispatch) => {
+    const node = objectAt(state, pos);
+    if (!node?.attrs.float) return false;
+    const across = align === "left" || align === "center" || align === "right";
+    return setFloat(pos, (n) => ({
+      ...(n.attrs.float as Record<string, unknown>),
+      [across ? "horizontal" : "vertical"]: {
+        relativeTo: "margin",
+        align: align === "middle" ? "center" : align,
+      },
+    }))(state, dispatch);
+  };
+}

@@ -3,6 +3,7 @@ import { createDocument, parseDocument } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
 import { undo } from "./history.js";
 import {
+  alignObject,
   croppingAt,
   objectMovesWithText,
   objectPosition,
@@ -11,6 +12,7 @@ import {
   setObjectFloat,
   setObjectLayout,
   setObjectMovesWithText,
+  setObjectOrder,
   setObjectPosition,
   setObjectSize,
   setObjectWrap,
@@ -193,5 +195,50 @@ describe("Layout Options (33.4)", () => {
     editor.run(setObjectSize(2, 952_500, 952_500, 5_400_000));
     expect(croppingAt(editor.state)).toBeNull();
     expect(toggleCrop(editor.state)).toBe(false);
+  });
+
+  it("brings an object forward and sends it back among the floating ones (33.6)", () => {
+    const float = (offset: number) => ({
+      horizontal: { relativeTo: "column", offset },
+      vertical: { relativeTo: "paragraph", offset: 0 },
+      wrap: "inFront",
+    });
+    const pic = (offset: number) => ({
+      type: "picture",
+      attrs: { resource: "img", width: 9525, height: 9525, float: float(offset) },
+    });
+    const editor = createEditor({
+      document: parseDocument({
+        ...createDocument({
+          type: "doc",
+          content: [{ type: "paragraph", content: [pic(0), pic(10), pic(20)] }],
+        }),
+        resources: { img: { contentType: "image/png", url: "https://example.com/a.png" } },
+      }),
+    });
+    const z = (pos: number) =>
+      (editor.state.doc.nodeAt(pos)?.attrs.float as { zOrder?: number } | undefined)?.zOrder;
+    const order = () => [1, 2, 3].sort((a, b) => (z(a) as number) - (z(b) as number));
+    // In document order the first is at the back: forward puts it between the other two.
+    expect(editor.run(setObjectOrder(1, "forward"))).toBe(true);
+    expect(order()).toEqual([2, 1, 3]);
+    expect(editor.run(setObjectOrder(1, "front"))).toBe(true);
+    expect(order()).toEqual([2, 3, 1]);
+    expect(editor.run(setObjectOrder(1, "front"))).toBe(false);
+    expect(editor.run(setObjectOrder(1, "back"))).toBe(true);
+    expect(order()).toEqual([1, 2, 3]);
+    expect(editor.run(setObjectOrder(1, "backward"))).toBe(false);
+    // Every float carries its rank: one undo step takes the whole move back.
+    editor.run(setObjectOrder(3, "backward"));
+    expect(order()).toEqual([1, 3, 2]);
+    editor.run(undo);
+    expect(order()).toEqual([1, 2, 3]);
+    // Saved, it needs schema 10.
+    expect(editor.getDocument().schemaVersion).toBe(10);
+    editor.run(alignObject(2, "middle"));
+    expect(editor.state.doc.nodeAt(2)?.attrs.float).toMatchObject({
+      vertical: { relativeTo: "margin", align: "center" },
+      horizontal: { relativeTo: "column", offset: 10 },
+    });
   });
 });

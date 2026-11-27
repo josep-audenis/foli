@@ -216,6 +216,8 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   line with text), `fill` (RRGGBB, null none), `outline` (`color`, `width` in EMU; null none),
   `inset` (`left`, `top`, `right`, `bottom` in EMU; null Word's 0.1" and 0.05"),
   `verticalAlign` (top, center, bottom), `autoFit` (the box grows to its text), `alt`, `title`,
+  and (pictures too) `float.zOrder`, its place front to back (Word's `relativeHeight`, set by
+  Bring Forward and Send Backward; left out, the file's is kept),
   and `ext`, the run content it was read from (`mc:AlternateContent`, `w:drawing` or `w:pict`).
   Theme colors are read as RRGGBB. A story of kind `textBox` is `textbox:<n>`, or
   `textbox:<relationship id>/<n>` for a header's or footer's box; it holds what a note may and no

@@ -954,6 +954,8 @@ function laterNode(
       version < 9 ? V9_SECTION_KEYS.find((key) => inSection(attrs.section, key)) : undefined;
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
     if (version < 10 && name === "textBox") return { name, schema: 10 };
+    if (version < 10 && isRecord(attrs.float) && attrs.float.zOrder != null)
+      return { name: `a ${name}'s zOrder`, schema: 10 };
     if (version < 9 && name === "opaqueInline" && attrs.watermark != null)
       return { name: "a watermark", schema: 9 };
     const previous = isRecord(attrs.formatChange) ? attrs.formatChange.previous : undefined;

@@ -41,6 +41,7 @@ describe("wordRibbonTabs", () => {
       "Table Design",
       "Table Layout",
       "Picture Format",
+      "Shape Format",
     ]);
     const groups = wordRibbonTabs.flatMap((tab) => tab.items);
     for (const group of groups) expect(Array.isArray(group)).toBe(false);
@@ -172,6 +173,7 @@ describe("wordRibbonTabs", () => {
       ...["style", "font", "size", "lineSpacing", "reviewView", "tableStyle"],
       "styleGallery",
       ...["indentLeft", "indentRight", "spaceBefore", "spaceAfter"],
+      ...["objectHeight", "objectWidth"],
     ]);
     for (const item of Object.values(toolbarItems))
       expect(boxes.has(item.key) || item.key in toolbarIcons, item.key).toBe(true);

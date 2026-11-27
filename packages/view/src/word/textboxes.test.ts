@@ -107,6 +107,22 @@ describe("a text box's drawing", () => {
     expect(block?.element.firstElementChild?.nextElementSibling).toBe(holder);
   });
 
+  it("is stacked by its zOrder, one rank per Word relativeHeight step (33.6)", () => {
+    const front = { ...FLOAT, wrap: "inFront", zOrder: 251_658_240 + 2048 };
+    const back = { ...FLOAT, wrap: "inFront", zOrder: 251_658_240 + 1024 };
+    const zOf = (float: unknown) =>
+      Number(
+        (
+          (
+            renderBlocks(boxed({ float }), document)[0] as { element: HTMLElement }
+          ).element.querySelector("[data-foli-float]") as HTMLElement
+        ).style.zIndex,
+      );
+    expect(zOf(front)).toBeGreaterThan(zOf(back));
+    expect(zOf(back)).toBeGreaterThan(1);
+    expect(zOf({ ...back, wrap: "behind" })).toBeLessThan(0);
+  });
+
   it("is drawn by renderDocument, for print and exportPdf", () => {
     const container = document.createElement("div");
     document.body.append(container);
