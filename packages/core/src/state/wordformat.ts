@@ -1877,32 +1877,61 @@ export const pasteFormat: Command = (state, dispatch) => {
 
 // ---------- formatting marks ----------
 
-const marksKey = new PluginKey<boolean>("formattingMarks");
-
-/** @internal Whether formatting marks show (built in; a story asks its body's). */
-export function formattingMarksPlugin(): Plugin<boolean> {
-  return new Plugin<boolean>({
-    key: marksKey,
-    state: {
-      init: () => false,
-      apply: (tr, value) => (tr.getMeta(marksKey) as boolean | undefined) ?? value,
-    },
-  });
+/**
+ * A switch of what shows, kept in the body's state (a story asks its body's): formatting marks,
+ * the ruler. Nothing of it is in the document, and switching it is no undo step.
+ */
+function viewSwitch(name: string) {
+  const key = new PluginKey<boolean>(name);
+  const plugin = (): Plugin<boolean> =>
+    new Plugin<boolean>({
+      key,
+      state: {
+        init: () => false,
+        apply: (tr, value) => (tr.getMeta(key) as boolean | undefined) ?? value,
+      },
+    });
+  const shown = (state: EditorState): boolean =>
+    key.getState(storyBody(state)?.state ?? state) === true;
+  const set =
+    (on: boolean | null): Command =>
+    (state, dispatch) => {
+      const body = storyBody(state);
+      if (body) return dispatch ? body.run(set(on)) : body.can(set(on));
+      const value = key.getState(state);
+      if (value === undefined) return false;
+      dispatch?.(state.tr.setMeta(key, on ?? !value));
+      return true;
+    };
+  return { plugin, shown, set };
 }
 
+const marks = viewSwitch("formattingMarks");
+const ruler = viewSwitch("ruler");
+
+/** @internal Whether formatting marks show (built in; a story asks its body's). */
+export const formattingMarksPlugin = marks.plugin;
+
 /** Whether the view shows formatting marks: Word's Show/Hide ¶ (the body's setting, in a story). */
-export const formattingMarksShown = (state: EditorState): boolean =>
-  marksKey.getState(storyBody(state)?.state ?? state) === true;
+export const formattingMarksShown = marks.shown;
+
+/** @internal Whether the ruler shows (built in; a story asks its body's). */
+export const rulerPlugin = ruler.plugin;
+
+/**
+ * Whether the app shows Word's rulers: the View tab's Ruler (`toggleRuler`). The editor only
+ * keeps the switch; `FoliEditor`'s `ruler` (or the app's own `FoliRuler`) draws them.
+ */
+export const rulerShown = ruler.shown;
+
+/** Word's View tab's Ruler: the rulers show, or stop (`rulerShown`). */
+export const toggleRuler: Command = ruler.set(null);
+
+/** Shows (true) or hides the rulers (`rulerShown`). */
+export const setRulerShown = (on: boolean): Command => ruler.set(on);
 
 /**
  * Word's Show/Hide ¶ (Ctrl+Shift+8 with `wordKeymap()`): the view draws paragraph marks, spaces,
  * tabs and breaks over the text, or stops. Nothing of them is in the document.
  */
-export const toggleFormattingMarks: Command = (state, dispatch) => {
-  const body = storyBody(state);
-  if (body) return dispatch ? body.run(toggleFormattingMarks) : body.can(toggleFormattingMarks);
-  const shown = marksKey.getState(state);
-  if (shown === undefined) return false;
-  dispatch?.(state.tr.setMeta(marksKey, !shown));
-  return true;
-};
+export const toggleFormattingMarks: Command = marks.set(null);

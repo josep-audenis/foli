@@ -73,6 +73,7 @@ import {
   removeSectionBreak,
   requestedDialog,
   requestsLinkEditor,
+  rulerShown,
   type SectionJSON,
   type SectionSetup,
   type StorySide,
@@ -113,6 +114,7 @@ import {
   toggleHeaderRow,
   toggleList,
   toggleMark,
+  toggleRuler,
   toggleVerticalAlign,
   trackState,
   type UNDERLINE_STYLES,
@@ -1897,6 +1899,13 @@ const RIBBON_ITEMS: readonly Item[] = [
     command: toggleFormattingMarks,
   },
   {
+    key: "ruler",
+    label: "Ruler",
+    pressed: rulerShown,
+    enabled: isWord,
+    command: toggleRuler,
+  },
+  {
     key: "styleGallery",
     label: "Styles",
     enabled: hasTextblock,
@@ -2088,6 +2097,7 @@ export type ToolbarItemName =
   | "underlineStyle"
   | "formatPainter"
   | "formattingMarks"
+  | "ruler"
   | "styleGallery"
   | "paragraphSettings"
   | "fontSettings"
@@ -2397,7 +2407,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     {
       key: "view",
       label: "View",
-      items: [group("Show", t.navigationPane, t.fieldCodes, t.formattingMarks)],
+      items: [group("Show", t.ruler, t.navigationPane, t.fieldCodes, t.formattingMarks)],
     },
     {
       key: "tableDesign",

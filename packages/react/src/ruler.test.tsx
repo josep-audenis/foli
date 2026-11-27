@@ -5,13 +5,16 @@ import {
   type FoliDocument,
   type RulerGeometry,
   requestedDialog,
+  rulerShown,
   sectionAt,
+  setRulerShown,
   setTabStops,
   setTrackChanges,
+  toggleRuler,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { FoliRuler } from "./index.js";
+import { FoliEditor, FoliRuler, wordRibbonTabs } from "./index.js";
 
 afterEach(cleanup);
 
@@ -454,5 +457,38 @@ describe("FoliRuler", () => {
     cleanup();
     render(<FoliRuler editor={createEditor({ document: doc() })} />);
     expect(screen.getByRole("group", { name: "Horizontal ruler" }).childElementCount).toBe(0);
+  });
+});
+
+describe("the ruler's switch", () => {
+  it("is core state: toggleRuler and setRulerShown, no undo step", () => {
+    const editor = createEditor({ document: doc() });
+    expect(rulerShown(editor.state)).toBe(false);
+    editor.run(toggleRuler);
+    expect(rulerShown(editor.state)).toBe(true);
+    editor.run(setRulerShown(false));
+    expect(rulerShown(editor.state)).toBe(false);
+    expect(editor.commands.undo()).toBe(false);
+  });
+
+  it("FoliEditor's ruler draws both rulers while the View tab's Ruler is on", async () => {
+    const { container } = render(
+      <FoliEditor initialContent={doc()} ruler={{ units: "cm" }} toolbar={wordRibbonTabs} />,
+    );
+    expect(screen.getByRole("group", { name: "Horizontal ruler" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Vertical ruler" })).toBeTruthy();
+    expect(container.querySelector(".foli-editor-body > .foli-ruler-vertical")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "View" }));
+    const button = screen.getByRole("button", { name: "Ruler" });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.queryByRole("group", { name: /ruler$/ })).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Ruler" }));
+    await waitFor(() => expect(screen.getAllByRole("group", { name: /ruler$/ })).toHaveLength(2));
+  });
+
+  it("FoliEditor draws none without ruler", () => {
+    render(<FoliEditor initialContent={doc()} toolbar={false} />);
+    expect(screen.queryByRole("group", { name: /ruler$/ })).toBeNull();
   });
 });

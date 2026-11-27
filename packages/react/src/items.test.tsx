@@ -143,6 +143,7 @@ const NAMES = {
   underlineStyle: 1,
   formatPainter: 1,
   formattingMarks: 1,
+  ruler: 1,
   styleGallery: 1,
   paragraphSettings: 1,
   fontSettings: 1,

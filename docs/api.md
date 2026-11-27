@@ -55,6 +55,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `toolbarProps`    | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —             | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`, `units`.                                              |
 | `comments`        | `boolean \| "auto"`                                                                                      | `"auto"`      | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                                       |
 | `statusBar`       | `boolean \| FoliStatusBarProps`                                                                          | `false`       | Word's status bar under the pages (1.11, `FoliStatusBar`); the zoom is then the editor's own unless `zoom` is given.                                                 |
+| `ruler` | `boolean \| Pick<FoliRulerProps, "units" \| "messages">` | `false` | Word's rulers (`FoliRuler`) above and beside the pages while the View tab's Ruler is on (`rulerShown`); `true` turns it on when the editor is made. |
 | `contextMenu`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's right-click menu on the document (1.11, `FoliContextMenu`); Shift+right-click keeps the browser's.                                                            |
 | `miniToolbar`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's mini toolbar above a selection made with the pointer (1.11, `FoliMiniToolbar`).                                                                               |
 | `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                       |
@@ -158,7 +159,8 @@ the pages' column beside it). Props:
 language's, as the toolbar's), `zoom` (pass the pages' zoom: the ruler reads them again when it
 changes), `disabled` (read-only or comment-only: nothing changes), `messages` (by the English
 text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler" (or "Vertical ruler"); each
-handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`).
+handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`). `FoliEditor`'s `ruler` puts both rulers around the pages (the horizontal one
+`.foli-editor-ruler`, sticky at the top while the page scrolls), shown while `rulerShown`.
 
 ### `<FoliStatusBar>`
 
@@ -881,6 +883,11 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   readers meet the text as it is. Drawn again after each change, scroll and resize. The ribbon
   has `toolbarItems.formattingMarks` in Home's Paragraph group and View's Show group;
   `wordKeymap()` gives it Ctrl+Shift+8.
+- The ruler's switch (31.6, built in): `toggleRuler`, `setRulerShown(on)` and
+  `rulerShown(state)`, Word's View tab's Ruler, a setting of the editor as formatting marks are
+  (no change, no undo step). The editor only keeps it: `FoliEditor`'s `ruler` draws the rulers
+  while it is on, or an app draws its own `FoliRuler` when `rulerShown` says. The ribbon has
+  `toolbarItems.ruler` in View's Show group.
 - Format painter (1.11, built in): `copyFormat(armed?)` copies the run formatting where the
   selection starts and its paragraph's properties; `armed` `"once"` gives them to the next
   selection made with the pointer (the view runs `pasteFormat` on mouseup and draws
