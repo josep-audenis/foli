@@ -845,7 +845,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   side's auto spacing off), `changeIndent(1 | -1)` (a list level for a numbered paragraph, only
   to a level its list defines, and a numbered heading takes that level's style; else the next
   half-inch stop), `canOutdent(state)`.
-  For Word's Paragraph and Font dialogs (1.12): `setLineSpacing(value, rule?)` takes Word's line
+  For Word's Paragraph and Font dialogs (1.11): `setLineSpacing(value, rule?)` takes Word's line
   rule (`LineRule`: `"auto"`, the default, a multiple; `"exact"` and `"atLeast"` in points);
   `setIndent({ left?, right?, firstLine?, hanging? })` in points (negative left and right go
   into the margin; a first line replaces a hanging indent and the other way round; null puts

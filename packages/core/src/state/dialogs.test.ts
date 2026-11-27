@@ -149,6 +149,22 @@ describe("paragraphFormatAt", () => {
     expect("left" in (format?.indent ?? {})).toBe(false);
     expect(format?.outlineLevel).toBeNull();
   });
+
+  it("takes what Word shows alike as the same value", () => {
+    const editor = editorOf([
+      p(
+        { justification: "left", outlineLevel: 9, spacing: { line: 240, lineRule: "auto" } },
+        text("a"),
+      ),
+      p({}, text("b")),
+    ]);
+    editor.select(1, 5);
+    expect(paragraphFormatAt(editor.state)).toMatchObject({
+      justification: "left",
+      outlineLevel: null,
+      spacing: { line: 240, lineRule: "auto" },
+    });
+  });
 });
 
 describe("setCharacterSpacing and setRunEffects", () => {
@@ -203,6 +219,12 @@ describe("setCharacterSpacing and setRunEffects", () => {
     editor.select(2);
     editor.run(setRunEffects({ smallCaps: true }));
     expect(runFormatAt(editor.state)?.smallCaps).toBe(true);
+  });
+
+  it("give the paragraph's where no text is selected", () => {
+    const editor = editorOf([p({}), p({})]);
+    editor.select(1, 3);
+    expect(runFormatAt(editor.state)).toMatchObject({ size: 22, caps: false });
   });
 
   it("leave out what mixed runs differ in", () => {

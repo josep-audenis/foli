@@ -947,17 +947,32 @@ function shared<T extends object>(formats: readonly T[], nested: readonly string
   return out;
 }
 
+/** One way of writing what Word shows alike: left, single spacing, Body Text. */
+const SAME_JUSTIFICATION: Record<string, string> = { start: "left", end: "right" };
+function normalized(format: ParagraphFormat): ParagraphFormat {
+  const { spacing, justification, outlineLevel } = format;
+  return {
+    ...format,
+    justification:
+      justification === null ? "left" : (SAME_JUSTIFICATION[justification] ?? justification),
+    outlineLevel: outlineLevel === 9 ? null : outlineLevel,
+    spacing: { ...spacing, line: spacing.line ?? (spacing.lineRule === "auto" ? 240 : null) },
+  };
+}
+
 /**
  * What every selected paragraph shows of Word's paragraph properties, as the Paragraph dialog
  * reads them: a property the paragraphs differ in is left out (Word's blank box); `indent` and
- * `spacing` part by part. Null outside a Word document.
+ * `spacing` part by part. Values Word shows alike come one way: `justification` `"left"` for
+ * none, `outlineLevel` null for Body Text (9 too), `spacing.line` 240 for single. Null outside
+ * a Word document.
  */
 export function paragraphFormatAt(state: EditorState): ParagraphFormatAt | null {
   const context = wordContext(state);
   const paragraphs = paragraphsIn(state);
   if (!context || !paragraphs.length) return null;
   return shared(
-    paragraphs.map(({ node }) => context.resolver.paragraph(node.attrs).paragraph),
+    paragraphs.map(({ node }) => normalized(context.resolver.paragraph(node.attrs).paragraph)),
     ["indent", "spacing"],
   ) as ParagraphFormatAt;
 }
@@ -1351,11 +1366,14 @@ export function runFormatAt(state: EditorState): Partial<RunFormat> | null {
   const context = wordContext(state);
   if (!context) return null;
   const { selection } = state;
-  if (selection.empty) {
+  const runs = selection.empty
+    ? []
+    : runsIn(state, state.schema.marks.font as MarkType).filter((r) => r.node.isText);
+  // A caret, or no text selected (empty paragraphs, a picture): what text typed there shows.
+  if (!runs.length) {
     const marks = state.storedMarks ?? marksAt(selection.$from);
     return runFormat(context, selection.$from.parent, marks);
   }
-  const runs = runsIn(state, state.schema.marks.font as MarkType).filter((r) => r.node.isText);
   return shared(runs.map((r) => runFormat(context, r.parent, r.node.marks)));
 }
 
