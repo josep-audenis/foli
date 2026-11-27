@@ -146,6 +146,15 @@ const NAMES = {
   styleGallery: 1,
   paragraphSettings: 1,
   fontSettings: 1,
+  margins: 1,
+  orientation: 1,
+  pageSize: 1,
+  columns: 1,
+  breaks: 1,
+  indentLeft: 1,
+  indentRight: 1,
+  spaceBefore: 1,
+  spaceAfter: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */

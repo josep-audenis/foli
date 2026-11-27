@@ -37,6 +37,7 @@ import {
   insertControl,
   insertCrossReference,
   insertDate,
+  insertHardBreak,
   insertHorizontalRule,
   insertNote,
   insertPageBreak,
@@ -156,7 +157,7 @@ import {
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
 import { StyleGallery } from "./StyleGallery.js";
-import { FontDialog, ParagraphDialog, TabsDialog } from "./WordDialogs.js";
+import { FontDialog, ParagraphBox, ParagraphDialog, TabsDialog } from "./WordDialogs.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -733,6 +734,245 @@ const SECTION_ACTIONS: readonly Action[] = [
   { key: "breakOdd", label: "Section break: odd page", command: insertSectionBreak("oddPage") },
   { key: "removeBreak", label: "Remove section break", command: removeSectionBreak },
   { key: "columnBreak", label: "Column break", command: insertColumnBreak },
+];
+
+// ---------- Word's Layout tab: Margins, Orientation, Size, Columns, Breaks (30.5) ----------
+
+/** The caret's section's page as Word measures it (Letter when the file gives none). */
+const pageOf = (state: EditorState) => {
+  const setup = sectionAt(state)?.setup ?? {};
+  const width = setup.pageSize?.width ?? 12_240;
+  const height = setup.pageSize?.height ?? 15_840;
+  const landscape =
+    (setup.pageSize?.orientation ?? (width > height ? "landscape" : "portrait")) === "landscape";
+  return { setup, width, height, landscape };
+};
+/** A command that sets the caret's section, checked where it already shows `shows`. */
+const sectionEntry = (
+  key: string,
+  label: string,
+  setup: (state: EditorState) => SectionSetup,
+  shows: (state: EditorState) => boolean,
+): ToolbarAction => ({
+  key,
+  label,
+  // The one already shown stays enabled (Word's menus pick it again): it changes nothing.
+  command: (state, dispatch) => {
+    const at = sectionAt(state);
+    if (!at) return false;
+    if (shows(state)) return true;
+    return setSectionSetup(refitted(at.setup, setup(state)))(state, dispatch);
+  },
+  checked: (state) => sectionAt(state) !== null && shows(state),
+});
+
+/** Word's margin presets, in twips: top, bottom, left, right. */
+const MARGINS = [
+  { key: "normal", label: "Normal", top: 1440, bottom: 1440, left: 1440, right: 1440 },
+  { key: "narrow", label: "Narrow", top: 720, bottom: 720, left: 720, right: 720 },
+  { key: "moderate", label: "Moderate", top: 1440, bottom: 1440, left: 1080, right: 1080 },
+  { key: "wide", label: "Wide", top: 1440, bottom: 1440, left: 2880, right: 2880 },
+] as const;
+const MARGIN_ACTIONS: readonly Action[] = [
+  ...MARGINS.map(({ key, label, top, bottom, left, right }) =>
+    sectionEntry(
+      `margins-${key}`,
+      label,
+      () => ({ margins: { top, bottom, left, right } }),
+      (state) => {
+        const m = pageOf(state).setup.margins ?? {};
+        return (
+          Math.abs(m.top ?? 1440) === top &&
+          Math.abs(m.bottom ?? 1440) === bottom &&
+          (m.left ?? 1440) === left &&
+          (m.right ?? 1440) === right
+        );
+      },
+    ),
+  ),
+  {
+    key: "customMargins",
+    label: "Custom margins…",
+    command: (state) => sectionAt(state) !== null,
+    dialog: "pageSetup",
+  },
+];
+
+const ORIENTATION_ACTIONS: readonly Action[] = (
+  [
+    ["portrait", "Portrait"],
+    ["landscape", "Landscape"],
+  ] as const
+).map(([orientation, label]) =>
+  sectionEntry(
+    orientation,
+    label,
+    (state) => {
+      const { width, height, landscape } = pageOf(state);
+      // The page turns: its sides swap when it changes orientation.
+      const turn = landscape !== (orientation === "landscape");
+      return {
+        pageSize: { width: turn ? height : width, height: turn ? width : height, orientation },
+      };
+    },
+    (state) => pageOf(state).landscape === (orientation === "landscape"),
+  ),
+);
+
+/** Word's paper sizes (portrait), in twips. */
+const PAPER = [
+  { key: "letter", label: "Letter", width: 12_240, height: 15_840 },
+  { key: "legal", label: "Legal", width: 12_240, height: 20_160 },
+  { key: "a3", label: "A3", width: 16_838, height: 23_811 },
+  { key: "a4", label: "A4", width: 11_906, height: 16_838 },
+  { key: "a5", label: "A5", width: 8_391, height: 11_906 },
+  { key: "executive", label: "Executive", width: 10_440, height: 15_120 },
+] as const;
+const SIZE_ACTIONS: readonly Action[] = [
+  ...PAPER.map(({ key, label, width, height }) =>
+    sectionEntry(
+      `size-${key}`,
+      label,
+      (state) => {
+        const { landscape } = pageOf(state);
+        return landscape
+          ? { pageSize: { width: height, height: width, orientation: "landscape" } }
+          : { pageSize: { width, height, orientation: "portrait" } };
+      },
+      (state) => {
+        const page = pageOf(state);
+        const short = Math.min(page.width, page.height);
+        const long = Math.max(page.width, page.height);
+        // Within a millimetre: files round A sizes differently.
+        return Math.abs(short - width) <= 57 && Math.abs(long - height) <= 57;
+      },
+    ),
+  ),
+  {
+    key: "morePaperSizes",
+    label: "More paper sizes…",
+    command: (state) => sectionAt(state) !== null,
+    dialog: "pageSetup",
+  },
+];
+
+/** Word's space between columns (half an inch) and its Left and Right columns' narrow share. */
+const COLUMN_SPACE = 720;
+const NARROW = 0.305;
+const COLUMN_ACTIONS: readonly Action[] = [
+  ...(
+    [
+      { key: "one", label: "One", count: 1 },
+      { key: "two", label: "Two", count: 2 },
+      { key: "three", label: "Three", count: 3 },
+    ] as const
+  ).map(({ key, label, count }) =>
+    sectionEntry(
+      `columns-${key}`,
+      label,
+      (state) => {
+        const separator = pageOf(state).setup.columns?.separator;
+        return {
+          columns:
+            count === 1
+              ? { count: 1, ...(separator ? { separator } : {}) }
+              : { count, space: COLUMN_SPACE, ...(separator ? { separator } : {}) },
+        };
+      },
+      (state) => {
+        const columns = pageOf(state).setup.columns;
+        return (columns?.count ?? 1) === count && columns?.equalWidth !== false;
+      },
+    ),
+  ),
+  ...(
+    [
+      ["left", "Left"],
+      ["right", "Right"],
+    ] as const
+  ).map(([side, label]) =>
+    sectionEntry(
+      `columns-${side}`,
+      label,
+      (state) => {
+        const { setup } = pageOf(state);
+        const usable = textWidthOf(setup) - COLUMN_SPACE;
+        const narrow = Math.round(usable * NARROW);
+        const wide = usable - narrow;
+        const [first, second] = side === "left" ? [narrow, wide] : [wide, narrow];
+        return {
+          columns: {
+            count: 2,
+            space: COLUMN_SPACE,
+            equalWidth: false,
+            widths: [{ width: first, space: COLUMN_SPACE }, { width: second }],
+            ...(setup.columns?.separator ? { separator: true } : {}),
+          },
+        };
+      },
+      (state) => {
+        const columns = pageOf(state).setup.columns;
+        const [a, b] = columns?.widths ?? [];
+        return (
+          columns?.equalWidth === false &&
+          columns.widths?.length === 2 &&
+          !!a &&
+          !!b &&
+          (side === "left" ? a.width < b.width : a.width > b.width)
+        );
+      },
+    ),
+  ),
+  {
+    key: "moreColumns",
+    label: "More columns…",
+    command: (state) => sectionAt(state) !== null,
+    dialog: "pageSetup",
+  },
+];
+
+/** The width between the side margins, in twips. */
+const textWidthOf = (setup: SectionJSON) =>
+  (setup.pageSize?.width ?? 12_240) -
+  (setup.margins?.left ?? 1440) -
+  (setup.margins?.right ?? 1440) -
+  (setup.margins?.gutter ?? 0);
+
+/**
+ * `change` with a section's unequal columns scaled to the text width it leaves, as Word does
+ * when the page or its margins change (their widths are absolute).
+ */
+function refitted(current: SectionJSON, change: SectionSetup): SectionSetup {
+  const columns = change.columns ?? current.columns;
+  if (change.columns || columns?.equalWidth !== false || !columns.widths?.length) return change;
+  const next: SectionJSON = {
+    ...current,
+    pageSize: { ...current.pageSize, ...change.pageSize },
+    margins: { ...current.margins, ...change.margins },
+  };
+  const before = textWidthOf(current);
+  const after = textWidthOf(next);
+  if (before <= 0 || after <= 0 || before === after) return change;
+  const scale = after / before;
+  const widths = columns.widths.map((c) => ({
+    // Rounded down: the columns and spaces still fit.
+    width: Math.max(1, Math.floor(c.width * scale)),
+    ...(c.space === undefined ? {} : { space: Math.floor(c.space * scale) }),
+  }));
+  // The columns' own space, for those without one, scales too.
+  const space = columns.space === undefined ? {} : { space: Math.floor(columns.space * scale) };
+  return { ...change, columns: { ...columns, ...space, widths } };
+}
+
+const BREAK_ACTIONS: readonly Action[] = [
+  { key: "pageBreak", label: "Page", command: insertPageBreak },
+  { key: "columnBreak", label: "Column", command: insertColumnBreak },
+  { key: "textWrapping", label: "Text wrapping", command: insertHardBreak },
+  { key: "breakNext", label: "Next page", command: insertSectionBreak("nextPage") },
+  { key: "breakContinuous", label: "Continuous", command: insertSectionBreak("continuous") },
+  { key: "breakEven", label: "Even page", command: insertSectionBreak("evenPage") },
+  { key: "breakOdd", label: "Odd page", command: insertSectionBreak("oddPage") },
+  { key: "removeBreak", label: "Remove section break", command: removeSectionBreak },
 ];
 
 /**
@@ -1647,6 +1887,42 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Word's Layout tab (30.5): its page menus and its Paragraph group's boxes.
+  { key: "margins", label: "Margins", text: "Margins", enabled: isWord, actions: MARGIN_ACTIONS },
+  {
+    key: "orientation",
+    label: "Orientation",
+    text: "Orientation",
+    enabled: isWord,
+    actions: ORIENTATION_ACTIONS,
+  },
+  { key: "pageSize", label: "Size", text: "Size", enabled: isWord, actions: SIZE_ACTIONS },
+  { key: "columns", label: "Columns", text: "Columns", enabled: isWord, actions: COLUMN_ACTIONS },
+  { key: "breaks", label: "Breaks", text: "Breaks", enabled: isWord, actions: BREAK_ACTIONS },
+  {
+    key: "indentLeft",
+    label: "Indent left",
+    enabled: isWord,
+    render: (props) => <ParagraphBox {...props} field="left" label="Indent left" unit="in" />,
+  },
+  {
+    key: "indentRight",
+    label: "Indent right",
+    enabled: isWord,
+    render: (props) => <ParagraphBox {...props} field="right" label="Indent right" unit="in" />,
+  },
+  {
+    key: "spaceBefore",
+    label: "Spacing before",
+    enabled: isWord,
+    render: (props) => <ParagraphBox {...props} field="before" label="Spacing before" unit="in" />,
+  },
+  {
+    key: "spaceAfter",
+    label: "Spacing after",
+    enabled: isWord,
+    render: (props) => <ParagraphBox {...props} field="after" label="Spacing after" unit="in" />,
+  },
   // Word's Font group (29.3).
   {
     key: "superscript",
@@ -1799,10 +2075,24 @@ export type ToolbarItemName =
   | "formattingMarks"
   | "styleGallery"
   | "paragraphSettings"
-  | "fontSettings";
+  | "fontSettings"
+  | "margins"
+  | "orientation"
+  | "pageSize"
+  | "columns"
+  | "breaks"
+  | "indentLeft"
+  | "indentRight"
+  | "spaceBefore"
+  | "spaceAfter";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "margins"
+  | "orientation"
+  | "pageSize"
+  | "columns"
+  | "breaks"
   | "changeCase"
   | "underlineStyle"
   | "table"
@@ -2033,9 +2323,29 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "layout",
       label: "Layout",
       items: [
-        { ...group("Page Setup", t.section), launcher: t.pageSetup },
         {
-          ...group("Paragraph", t.outdent, t.indent, t.lineSpacing),
+          ...group(
+            "Page Setup",
+            large(t.margins),
+            large(t.orientation),
+            large(t.pageSize),
+            large(t.columns),
+            t.breaks,
+          ),
+          launcher: t.pageSetup,
+        },
+        {
+          ...group(
+            "Paragraph",
+            t.indentLeft,
+            t.indentRight,
+            t.spaceBefore,
+            t.spaceAfter,
+            t.outdent,
+            t.indent,
+            t.lineSpacing,
+          ),
+          wrapBefore: "spaceBefore",
           launcher: t.paragraphSettings,
         },
       ],

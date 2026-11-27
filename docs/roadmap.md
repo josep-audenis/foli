@@ -4319,10 +4319,16 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   not in the model; `w:defaultTabStop` stays in the settings part as read), and the pages do not
   draw custom stops yet (limitations.md). `dialogs.test.tsx`, `dialogs.spec.ts` in Chromium,
   Firefox and WebKit with axe; checked by hand.
-- [ ] 30.5 Layout tab quick menus as Word's: Margins (Normal, Narrow, Moderate, Wide, Mirrored,
+- [x] 30.5 Layout tab quick menus as Word's: Margins (Normal, Narrow, Moderate, Wide, Mirrored,
   Custom… to Page setup), Orientation, Size (Letter, Legal, A3, A4, A5, Executive, Custom…),
   Columns (One to Three, Left, Right, More…), Breaks (page, column, text wrapping, the four
-  section breaks); Spacing and Indent boxes in Layout's Paragraph group.
+  section breaks); Spacing and Indent boxes in Layout's Paragraph group. Built:
+  `toolbarItems.margins`, `orientation`, `pageSize`, `columns`, `breaks` (menus, the current
+  entry checked) and `indentLeft`, `indentRight`, `spaceBefore`, `spaceAfter` (boxes); the
+  Layout tab's Page Setup group has them in place of the Section menu (still in `toolbarItems`
+  and the default toolbar). Changed: no Mirrored margins (no `w:mirrorMargins` in the model);
+  Breaks keeps Remove section break. `dialogs.test.tsx`, `layout.spec.ts` in Chromium, Firefox
+  and WebKit with axe; checked by hand.
 - [ ] 30.6 Units: inches or centimetres in every dialog (the locale's, `units` on the toolbar),
   the Page setup dialog included.
 - [ ] 30.7 e2e in three engines with axe for each dialog and menu; docs (api.md, keyboard.md,

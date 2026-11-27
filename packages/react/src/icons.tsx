@@ -421,6 +421,28 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["path", { d: "M17 4v16" }],
     ["path", { d: "M19 4H9.5a4.5 4.5 0 0 0 0 9H13" }],
   ],
+  margins: /* foli: a page and its text area */ [
+    ["rect", { x: "4", y: "2", width: "16", height: "20", rx: "2" }],
+    ["path", { d: "M8 6h8v12H8z" }],
+  ],
+  orientation: /* foli: a page turning */ [
+    ["rect", { x: "3", y: "8", width: "13", height: "13", rx: "2" }],
+    ["path", { d: "M8 4h9a4 4 0 0 1 4 4v9" }],
+    ["path", { d: "m18 14 3 3 3-3" }],
+  ],
+  pageSize: /* file */ [
+    ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
+    ["path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }],
+  ],
+  columns: /* columns-2 */ [
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+    ["path", { d: "M12 3v18" }],
+  ],
+  breaks: /* separator-horizontal */ [
+    ["path", { d: "M3 12h18" }],
+    ["path", { d: "m8 8 4-4 4 4" }],
+    ["path", { d: "m16 16-4 4-4-4" }],
+  ],
   fontSettings: /* settings-2 */ [
     ["path", { d: "M14 17H5" }],
     ["path", { d: "M19 7h-9" }],
