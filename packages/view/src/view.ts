@@ -191,6 +191,7 @@ import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { type PeerDrawing, PeerMarks } from "./word/presence.js";
 import { PageRegions, REGION_CLASS, REGION_CONTENT_CLASS } from "./word/regions.js";
+import { withOwnIds } from "./word/shapes.js";
 import {
   collect,
   drawnColumns,
@@ -2013,7 +2014,7 @@ export class EditorView {
           continue;
         }
         const element = regions.element(page.section, side);
-        element.append(drawing.content.content.cloneNode(true));
+        element.append(withOwnIds(drawing.content.content.cloneNode(true)));
         own[side] = { element, drawing: drawing.content, section: page.section, id: drawing.id };
       }
       return own;
@@ -3084,7 +3085,10 @@ export class EditorView {
     for (const box of this.host.querySelectorAll<HTMLElement>(
       `[${TEXT_BOX_ATTR}="${CSS.escape(id)}"]`,
     ))
-      if (!box.closest(`.${REGION_CLASS}`) && !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`))
+      if (
+        !box.closest(`.${REGION_CLASS}`) &&
+        !box.parentElement?.closest(`[${TEXT_BOX_ATTR}], [${SHAPE_ATTR}]`)
+      )
         return box;
     return null;
   }

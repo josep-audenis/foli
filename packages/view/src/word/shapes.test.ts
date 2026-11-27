@@ -11,7 +11,7 @@ import { EditorView, renderDocument } from "../index.js";
 import { FLOAT_ATTR, SHAPE_ATTR, TEXT_BOX_ATTR } from "./blocks.js";
 import { drawPaths, evaluate, guides, textRect } from "./geometry.js";
 import { PRESETS } from "./presets.js";
-import { shapeSvg } from "./shapes.js";
+import { shapeSvg, shapeTextRect, withOwnIds } from "./shapes.js";
 
 /** Shapes drawn (34.2, ADR-0017). */
 
@@ -116,6 +116,52 @@ describe("DrawingML geometry (34.2)", () => {
     expect(path?.d).toBe("M0 50A50 50 0 0 1 100 50");
   });
 
+  it("draws an arc in a path's own space before scaling it (a box of another shape)", () => {
+    const [path] = drawPaths(
+      {
+        paths: [
+          {
+            width: 100,
+            height: 100,
+            commands: [
+              { op: "M", args: ["100", "50"] },
+              { op: "A", args: ["50", "50", "0", "2700000"] },
+            ],
+          },
+        ],
+      },
+      200,
+      100,
+    );
+    expect(path?.d).toBe("M200 50A100 50 0 0 1 170.71 85.36");
+  });
+
+  it("reads a custom path without a size of its own in the shape's EMU", () => {
+    const svg = shapeSvg(
+      {
+        geometry: "custom",
+        width: 952_500,
+        height: 952_500,
+        fill: "000000",
+        custom: {
+          paths: [
+            {
+              commands: [
+                { op: "M", args: ["0", "0"] },
+                { op: "L", args: ["952500", "476250"] },
+                { op: "Z" },
+              ],
+            },
+          ],
+        },
+      },
+      document,
+    );
+    const filled = svg.querySelector("g path") as SVGPathElement;
+    expect(filled.getAttribute("d")).toBe("M0 0L100 50Z");
+    expect(filled.getAttribute("fill-rule")).toBe("evenodd");
+  });
+
   it("scales a path drawn in its own coordinates", () => {
     const [path] = drawPaths(
       {
@@ -160,7 +206,7 @@ describe("shapes drawn (34.2)", () => {
     expect(stroke.getAttribute("stroke")).toBe("#FF0000");
     expect(stroke.getAttribute("stroke-width")).toBe("2");
     expect(stroke.getAttribute("stroke-dasharray")).toBe("8 6");
-    expect(stroke.getAttribute("marker-start")).toMatch(/^url\(#foli-shape-\d+-h\)$/);
+    expect(stroke.getAttribute("marker-start")).toMatch(/^url\(#foli-shape-[a-z0-9]+-\d+-h\)$/);
     expect(svg.querySelectorAll("marker")).toHaveLength(2);
     expect(svg.querySelector("marker ellipse")).not.toBeNull();
   });
@@ -191,6 +237,31 @@ describe("shapes drawn (34.2)", () => {
       document,
     );
     expect(cloud.querySelector("g path")?.getAttribute("d")).toBe("M0 0L100 0L100 50L0 50Z");
+  });
+
+  it("moves the text rectangle with a flip, and gives a copy's definitions ids of its own", () => {
+    expect(shapeTextRect({ geometry: "rtTriangle", width: 1_143_000, height: 1_143_000 })).toEqual([
+      0, 70, 70, 40,
+    ]);
+    expect(
+      shapeTextRect({ geometry: "rtTriangle", width: 1_143_000, height: 1_143_000, flipH: true }),
+    ).toEqual([50, 70, 70, 40]);
+    const holder = document.createElement("div");
+    holder.append(
+      shapeSvg(
+        {
+          geometry: "line",
+          width: 952_500,
+          height: 0,
+          outline: { color: "000000", width: 9525, tail: { type: "triangle" } },
+        },
+        document,
+      ),
+    );
+    const copy = withOwnIds(holder.cloneNode(true) as HTMLElement);
+    const id = copy.querySelector("marker")?.id;
+    expect(id).not.toBe(holder.querySelector("marker")?.id);
+    expect(copy.querySelector("g path")?.getAttribute("marker-end")).toBe(`url(#${id})`);
   });
 
   it("draws a shape where its paragraph is, turned, its text inside, on read-only pages", () => {

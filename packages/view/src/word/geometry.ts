@@ -203,53 +203,59 @@ export function drawPaths(
   w: number,
   h: number,
   adjust?: Readonly<Record<string, number>> | null,
+  /** The space of a path without a size of its own (a custom geometry's: the shape's EMU). */
+  space?: readonly [number, number],
 ): DrawnPath[] {
   const values = guides(def, w, h, adjust);
   return def.paths.map((path) => {
-    // A path with its own size is drawn in it, its guides evaluated at that size.
-    const own = path.width !== undefined && path.height !== undefined;
-    const local = own ? guides(def, path.width ?? w, path.height ?? h, adjust) : values;
-    const sx = own && path.width ? w / path.width : 1;
-    const sy = own && path.height ? h / path.height : 1;
+    // A path with its own size (0 is none) is drawn in it, its guides evaluated at that size.
+    const pw = path.width || space?.[0] || 0;
+    const ph = path.height || space?.[1] || 0;
+    const own = pw > 0 && ph > 0;
+    const local = own ? guides(def, pw, ph, adjust) : values;
+    const sx = own ? w / pw : 1;
+    const sy = own ? h / ph : 1;
     const parts: string[] = [];
     let x = 0;
     let y = 0;
     let startX = 0;
     let startY = 0;
+    // Points are kept in the path's own space and scaled as they are written.
     const at = (args: readonly string[] | undefined, i: number): [number, number] => [
-      value(args?.[i], local) * sx,
-      value(args?.[i + 1], local) * sy,
+      value(args?.[i], local),
+      value(args?.[i + 1], local),
     ];
+    const p = (px: number, py: number) => `${n(px * sx)} ${n(py * sy)}`;
     for (const c of path.commands) {
       switch (c.op) {
         case "M":
           [x, y] = at(c.args, 0);
           [startX, startY] = [x, y];
-          parts.push(`M${n(x)} ${n(y)}`);
+          parts.push(`M${p(x, y)}`);
           break;
         case "L":
           [x, y] = at(c.args, 0);
-          parts.push(`L${n(x)} ${n(y)}`);
+          parts.push(`L${p(x, y)}`);
           break;
         case "C": {
           const [x1, y1] = at(c.args, 0);
           const [x2, y2] = at(c.args, 2);
           [x, y] = at(c.args, 4);
-          parts.push(`C${n(x1)} ${n(y1)} ${n(x2)} ${n(y2)} ${n(x)} ${n(y)}`);
+          parts.push(`C${p(x1, y1)} ${p(x2, y2)} ${p(x, y)}`);
           break;
         }
         case "Q": {
           const [x1, y1] = at(c.args, 0);
           [x, y] = at(c.args, 2);
-          parts.push(`Q${n(x1)} ${n(y1)} ${n(x)} ${n(y)}`);
+          parts.push(`Q${p(x1, y1)} ${p(x, y)}`);
           break;
         }
         case "A": {
-          const wR = value(c.args?.[0], local) * sx;
-          const hR = value(c.args?.[1], local) * sy;
+          const wR = value(c.args?.[0], local);
+          const hR = value(c.args?.[1], local);
           const start = value(c.args?.[2], local);
           const sweep = value(c.args?.[3], local);
-          [x, y] = arc(parts, x, y, wR, hR, start, sweep);
+          [x, y] = arc(parts, x, y, wR, hR, start, sweep, sx, sy);
           break;
         }
         case "Z":
@@ -279,11 +285,13 @@ function arc(
   hR: number,
   start: number,
   sweep: number,
+  sx = 1,
+  sy = 1,
 ): [number, number] {
   if (wR <= 0 || hR <= 0 || sweep === 0) return [x, y];
-  const [sx, sy] = onEllipse(wR, hR, start);
-  const cx = x - sx;
-  const cy = y - sy;
+  const [ox, oy] = onEllipse(wR, hR, start);
+  const cx = x - ox;
+  const cy = y - oy;
   // An SVG arc covers less than a turn: a long sweep is drawn in pieces of at most half a turn.
   const pieces = Math.ceil(Math.abs(sweep) / 10_800_000);
   let angle = start;
@@ -295,7 +303,8 @@ function arc(
     const [ex, ey] = onEllipse(wR, hR, angle);
     px = cx + ex;
     py = cy + ey;
-    parts.push(`A${n(wR)} ${n(hR)} 0 0 ${step > 0 ? 1 : 0} ${n(px)} ${n(py)}`);
+    // An axis-aligned ellipse scaled is one with scaled radii.
+    parts.push(`A${n(wR * sx)} ${n(hR * sy)} 0 0 ${step > 0 ? 1 : 0} ${n(px * sx)} ${n(py * sy)}`);
   }
   return [px, py];
 }
