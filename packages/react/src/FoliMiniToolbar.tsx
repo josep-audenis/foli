@@ -4,6 +4,7 @@ import { useActiveEditor, useIsomorphicLayoutEffect } from "./editor.js";
 import { FoliToolbar, type ToolbarItem, toolbarItems } from "./FoliToolbar.js";
 import { toolbarIcons } from "./icons.js";
 import type { ToolbarMessages } from "./messages.js";
+import type { LengthUnit } from "./units.js";
 
 const t = toolbarItems;
 /** With its icon, as the ribbon draws it. */
@@ -36,6 +37,8 @@ export interface FoliMiniToolbarProps {
   at: { x: number; y: number };
   items?: readonly ToolbarItem[] | undefined;
   messages?: ToolbarMessages | undefined;
+  /** The unit of the dialogs it opens (`FoliToolbarProps.units`; default: the locale's). */
+  units?: LengthUnit | undefined;
   /** Only comments change: its formatting is off (as the toolbar's). */
   commentOnly?: boolean | undefined;
   /** It goes: a key is typed, Escape, or the pointer moves far from it. */
@@ -58,6 +61,7 @@ export function FoliMiniToolbar({
   at,
   items = miniToolbarItems,
   messages,
+  units,
   commentOnly,
   onClose,
   onClickCommand,
@@ -120,6 +124,7 @@ export function FoliMiniToolbar({
         label="Mini toolbar"
         comments
         messages={messages}
+        units={units}
         commentOnly={commentOnly}
         onClickCommand={onClickCommand}
       />

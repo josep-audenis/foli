@@ -463,3 +463,27 @@ describe("units", () => {
     expect(editor.getDocument().section.margins?.left).toBe(1440);
   });
 });
+
+describe("units review cases", () => {
+  it("turns an A4 page in Page setup without rounding it, in inches", () => {
+    const editor = createEditor({
+      document: {
+        ...documentOf(paragraph("one")),
+        section: { pageSize: { width: 11906, height: 16838 } },
+      },
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" units="in" />);
+    editor.select(2);
+    fireEvent.click(screen.getByRole("button", { name: "Page setup…" }));
+    const setup = screen.getByRole("dialog", { name: "Page setup" });
+    fireEvent.change(within(setup).getByLabelText("Orientation"), {
+      target: { value: "landscape" },
+    });
+    fireEvent.submit(setup.querySelector("form") as HTMLFormElement);
+    expect(editor.getDocument().section.pageSize).toEqual({
+      width: 16838,
+      height: 11906,
+      orientation: "landscape",
+    });
+  });
+});

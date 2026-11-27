@@ -9,3 +9,6 @@ Myanmar, centimetres elsewhere. A box also takes a length typed with its unit. C
 Page setup's labels and the column width dialog's no longer say "(cm)" ("Page width", "Top
 margin"…, "Set column widths (separated by ;)", "Column width", "Enter a width from {min} to
 {max}.").
+Set column widths in Page setup are separated by `;` only (a width may be typed with its unit,
+`2 cm`), not by spaces. `FoliMiniToolbar` takes `units` too (`FoliEditor` passes its
+`toolbarProps.units`).

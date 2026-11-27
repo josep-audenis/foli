@@ -5405,6 +5405,8 @@ function PageSetupDialog({
       orientation: setup.pageSize?.orientation ?? (width > height ? "landscape" : "portrait"),
       separator: setup.columns?.separator === true,
       columns: setup.columns,
+      width,
+      height,
       fields: {
         width: formatLength(width, unit),
         height: formatLength(height, unit),
@@ -5439,6 +5441,12 @@ function PageSetupDialog({
     const lengths: Partial<Record<SetupField, number>> = {};
     for (const field of ["width", "height", "top", "bottom", "left", "right"] as const) {
       if (!changed(field)) continue;
+      // A side swapped by the orientation, untouched: its exact twips, not the rounded text.
+      const other = field === "width" ? "height" : field === "height" ? "width" : null;
+      if (other && fields[field] === initial.fields[other]) {
+        lengths[field] = other === "width" ? initial.width : initial.height;
+        continue;
+      }
       const twips = toTwips(fields[field], field === "width" || field === "height" ? 1 : 0, unit);
       if (twips === null) return wrong(field);
       lengths[field] = twips;

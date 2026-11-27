@@ -278,6 +278,7 @@ export declare const FoliEditor: import("react").ForwardRefExoticComponent<FoliE
 import type { Editor } from "@folijs/core";
 import { type ToolbarItem } from "./FoliToolbar.js";
 import type { ToolbarMessages } from "./messages.js";
+import type { LengthUnit } from "./units.js";
 /**
  * Word's mini toolbar: font, size, grow and shrink, bold, italic, underline, text color,
  * highlight, styles and New comment. Change it with `FoliMiniToolbar`'s `items`.
@@ -292,6 +293,8 @@ export interface FoliMiniToolbarProps {
     };
     items?: readonly ToolbarItem[] | undefined;
     messages?: ToolbarMessages | undefined;
+    /** The unit of the dialogs it opens (`FoliToolbarProps.units`; default: the locale's). */
+    units?: LengthUnit | undefined;
     /** Only comments change: its formatting is off (as the toolbar's). */
     commentOnly?: boolean | undefined;
     /** It goes: a key is typed, Escape, or the pointer moves far from it. */
@@ -305,7 +308,7 @@ export interface FoliMiniToolbarProps {
  * away or the selection is gone. A `FoliToolbar` of its own (one row of `items`); it does not
  * take the focus, as Word's: the keyboard has the ribbon.
  */
-export declare function FoliMiniToolbar({ editor, at, items, messages, commentOnly, onClose, onClickCommand, }: FoliMiniToolbarProps): import("react").JSX.Element;
+export declare function FoliMiniToolbar({ editor, at, items, messages, units, commentOnly, onClose, onClickCommand, }: FoliMiniToolbarProps): import("react").JSX.Element;
 
 // FoliNavigation.d.ts
 import { type Editor } from "@folijs/core";
