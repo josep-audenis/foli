@@ -3010,7 +3010,9 @@ export type ParagraphFormatAt = Partial<Omit<ParagraphFormat, "indent" | "spacin
 /**
  * What every selected paragraph shows of Word's paragraph properties, as the Paragraph dialog
  * reads them: a property the paragraphs differ in is left out (Word's blank box); `indent` and
- * `spacing` part by part. Null outside a Word document.
+ * `spacing` part by part. Values Word shows alike come one way: `justification` `"left"` for
+ * none, `outlineLevel` null for Body Text (9 too), `spacing.line` 240 for single. Null outside
+ * a Word document.
  */
 export declare function paragraphFormatAt(state: EditorState): ParagraphFormatAt | null;
 export type ListKind = "bulletList" | "orderedList";
