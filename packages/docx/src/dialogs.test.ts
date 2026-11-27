@@ -95,7 +95,7 @@ describe("Phase 30 dialogs through .docx, the rest", () => {
     editor.select(1, 5);
     editor.run(
       chainCommands([
-        setFontFamily("Georgia"),
+        setFontFamily("Arial"),
         setFontSize(13.5),
         setTextColor("#336699"),
         setRunEffects({ caps: true, strike: true }),
@@ -115,7 +115,13 @@ describe("Phase 30 dialogs through .docx, the rest", () => {
     bold.run(setRunEffects({ bold: false }));
     const paragraph = paragraphFormatAt(bold.state);
     const run = runFormatAt(bold.state);
-    expect(run).toMatchObject({ bold: false, caps: true, strike: true, size: 27 });
+    expect(run).toMatchObject({
+      bold: false,
+      caps: true,
+      strike: true,
+      size: 27,
+      font: { ascii: "Arial" },
+    });
     const { document } = await importDocx(await exportDocx(bold.getDocument()));
     const back = createEditor({ document });
     back.select(1, 5);
