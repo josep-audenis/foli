@@ -1183,6 +1183,83 @@
   background: transparent;
   cursor: ew-resize;
 }
+/* Tab stops (Word's marks: an L for left, reversed for right, an inverted T for center, with a
+   dot for decimal, a bar), and the tab selector at the ruler's start showing the kind to add. */
+.foli-ruler-tab {
+  top: 11px;
+  width: 8px;
+  height: 8px;
+  background: none;
+  color: var(--foli-ruler-color);
+}
+.foli-ruler-tab[data-foli-off] {
+  opacity: 0.35;
+}
+.foli-ruler-tab::before,
+.foli-ruler-tab::after,
+.foli-ruler-tab-glyph::before,
+.foli-ruler-tab-glyph::after {
+  content: "";
+  position: absolute;
+  background: currentcolor;
+}
+/* The stem (all but bar have the foot too). */
+.foli-ruler-tab::before,
+.foli-ruler-tab-glyph::before {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+}
+.foli-ruler-tab-left::after,
+.foli-ruler-tab-right::after,
+.foli-ruler-tab-center::after,
+.foli-ruler-tab-decimal::after {
+  bottom: 0;
+  height: 2px;
+}
+.foli-ruler-tab-left::after {
+  left: calc(50% - 1px);
+  right: 0;
+}
+.foli-ruler-tab-right::after {
+  left: 0;
+  right: calc(50% - 1px);
+}
+.foli-ruler-tab-center::after,
+.foli-ruler-tab-decimal::after {
+  left: 0;
+  right: 0;
+}
+/* The decimal point: a dot right of the stem. */
+.foli-ruler-tab-decimal {
+  background: radial-gradient(circle at 88% 35%, currentcolor 1px, transparent 1.6px);
+}
+.foli-ruler-tab-kind {
+  position: absolute;
+  top: 3px;
+  left: 2px;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 2px;
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  cursor: pointer;
+}
+.foli-ruler-tab-kind:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+.foli-ruler-tab-glyph {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+}
 .foli-ruler-value {
   position: absolute;
   bottom: 0;
@@ -1233,6 +1310,10 @@
   }
   .foli-ruler-margin {
     background: transparent;
+  }
+  .foli-ruler-tab {
+    background: transparent;
+    color: CanvasText;
   }
 }
 

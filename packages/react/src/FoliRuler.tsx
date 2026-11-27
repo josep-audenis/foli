@@ -1,9 +1,12 @@
 import {
   type Command,
   type Editor,
+  openDialog,
   type RulerGeometry,
   setIndent,
   setSectionSetup,
+  setTabStops,
+  type TabStop,
 } from "@folijs/core";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -27,6 +30,12 @@ export const rulerMessages = [
   "Right margin",
   "{position}, hanging {by}",
   "{position}, first line {by}",
+  "Left tab",
+  "Center tab",
+  "Right tab",
+  "Decimal tab",
+  "Bar tab",
+  "Tab stop to add: {kind}",
 ] as const;
 
 /** Translations of the ruler's strings, by their English text (`rulerMessages`). */
@@ -77,16 +86,34 @@ interface Handle {
   set: (value: number) => Command;
   /** The hanging marker's: where the first line is (twips from the same origin), which it keeps. */
   firstLine?: number;
+  /** A tab stop's: removes it (dragged off the ruler, Delete). */
+  remove?: () => Command;
 }
 
-/** A handle being dragged: its value as the pointer has it, and whether Alt is held. */
+/** A handle being dragged: its value as the pointer has it, whether Alt is held, whether off. */
 interface Drag {
   key: string;
   pointer: number;
   value: number;
   alt: boolean;
   moved: boolean;
+  /** A tab stop dragged off the ruler (up or down): let go there, it goes. */
+  off: boolean;
 }
+
+/** How far above or below the ruler a tab stop is let go to remove it (px). */
+const OFF = 16;
+
+type TabAlignment = TabStop["alignment"];
+/** The tab selector's order (Word's, without its indent entries). */
+const TAB_KINDS: readonly TabAlignment[] = ["left", "center", "right", "decimal", "bar"];
+const TAB_LABELS: Readonly<Record<TabAlignment, RulerMessage>> = {
+  left: "Left tab",
+  center: "Center tab",
+  right: "Right tab",
+  decimal: "Decimal tab",
+  bar: "Bar tab",
+};
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -256,6 +283,30 @@ function horizontalHandles(g: RulerGeometry): Handle[] {
   return handles;
 }
 
+/** The caret's paragraph's tab stops as handles: dragged along to move, off to remove. */
+function tabHandles(g: RulerGeometry): Handle[] {
+  const { paragraph, text, page, pxPerTwip: k } = g;
+  if (!paragraph) return [];
+  return paragraph.tabs.map(({ x: _x, ...stop }, index) => {
+    const value = Math.round(stop.position * 20);
+    return {
+      // By place, not position: a stop moved with the keyboard keeps its element and the focus.
+      key: `tab-${index}`,
+      label: TAB_LABELS[stop.alignment],
+      kind: `tab foli-ruler-tab-${stop.alignment}`,
+      origin: text.left,
+      sign: 1,
+      value,
+      min: Math.round((page.left - text.left) / k),
+      max: Math.round((page.right - text.left) / k),
+      grid: text.left,
+      set: (next) =>
+        setTabStops({ clear: [stop.position], set: [{ ...stop, position: next / 20 }] }),
+      remove: () => setTabStops({ clear: [stop.position] }),
+    };
+  });
+}
+
 /** The ticks and numbers between `from` and `to` (client px), counted from `zero`. */
 function scale(zero: number, from: number, to: number, k: number, unit: LengthUnit) {
   const { twips, ticks } = UNITS[unit];
@@ -318,7 +369,9 @@ export function FoliRuler({
     dragRef.current = next;
     setDragState(next);
   };
-  const handles = geometry ? horizontalHandles(geometry) : [];
+  const handles = geometry ? [...horizontalHandles(geometry), ...tabHandles(geometry)] : [];
+  // The tab selector: the kind a click on the ruler adds.
+  const [tabKind, setTabKind] = useState<TabAlignment>("left");
   const k = geometry?.pxPerTwip ?? 1;
   const local = (x: number) => x - rootLeft;
   const at = (handle: Handle, value: number) => handle.origin + handle.sign * value * k;
@@ -345,24 +398,54 @@ export function FoliRuler({
       value: handle.value,
       alt: event.altKey,
       moved: false,
+      off: false,
     });
+  };
+  /** Whether the pointer at `y` is off the ruler, for a handle that can be removed. */
+  const offAt = (handle: Handle, y: number) => {
+    const box = root.current?.getBoundingClientRect();
+    return !!handle.remove && !!box && (y < box.top - OFF || y > box.bottom + OFF);
   };
   const onPointerMove = (handle: Handle) => (event: ReactPointerEvent<HTMLElement>) => {
     const current = dragRef.current;
     if (!current || current.key !== handle.key || current.pointer !== event.pointerId) return;
     const value = valueAt(handle, event.clientX, event.altKey);
+    const off = offAt(handle, event.clientY);
     setDrag({
       ...current,
       value,
       alt: event.altKey,
-      moved: current.moved || value !== handle.value,
+      moved: current.moved || value !== handle.value || off,
+      off,
     });
   };
   const onPointerUp = (handle: Handle) => (event: ReactPointerEvent<HTMLElement>) => {
     const current = dragRef.current;
     if (!current || current.key !== handle.key || current.pointer !== event.pointerId) return;
     setDrag(null);
-    if (current.moved) apply(handle, valueAt(handle, event.clientX, event.altKey));
+    if (handle.remove && offAt(handle, event.clientY)) {
+      if (editor.run(handle.remove())) measureNow();
+    } else if (current.moved) apply(handle, valueAt(handle, event.clientX, event.altKey));
+  };
+  /** A press on the ruler's strip adds a tab stop of the selector's kind there (snapped). */
+  const onStripDown = (event: ReactPointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (disabled || event.button !== 0 || !geometry?.paragraph) return;
+    const { text, page } = geometry;
+    const strip: Handle = {
+      key: "new-tab",
+      label: TAB_LABELS[tabKind],
+      kind: "tab",
+      origin: text.left,
+      sign: 1,
+      value: 0,
+      min: Math.round((page.left - text.left) / k),
+      max: Math.round((page.right - text.left) / k),
+      grid: text.left,
+      set: () => setTabStops({}),
+    };
+    const position = valueAt(strip, event.clientX, event.altKey) / 20;
+    if (editor.run(setTabStops({ set: [{ position, alignment: tabKind }] }))) measureNow();
   };
   const cancel = () => setDrag(null);
   // Escape cancels a drag.
@@ -392,6 +475,11 @@ export function FoliRuler({
       PageUp: page,
       PageDown: -page,
     };
+    if ((event.key === "Delete" || event.key === "Backspace") && handle.remove) {
+      event.preventDefault();
+      if (editor.run(handle.remove())) measureNow();
+      return;
+    }
     const move = moves[event.key];
     if (move === undefined) return;
     event.preventDefault();
@@ -417,9 +505,24 @@ export function FoliRuler({
     >
       {geometry && (
         <>
+          <button
+            type="button"
+            className="foli-ruler-tab-kind"
+            aria-label={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
+            title={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() =>
+              setTabKind(TAB_KINDS[(TAB_KINDS.indexOf(tabKind) + 1) % TAB_KINDS.length] ?? "left")
+            }
+          >
+            <span className={`foli-ruler-tab-glyph foli-ruler-tab-${tabKind}`} aria-hidden="true" />
+          </button>
           <div
             className="foli-ruler-page"
             aria-hidden="true"
+            onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={onStripDown}
             style={{
               left: local(geometry.page.left),
               width: geometry.page.right - geometry.page.left,
@@ -458,6 +561,7 @@ export function FoliRuler({
                 aria-disabled={disabled || undefined}
                 className={`foli-ruler-handle foli-ruler-${handle.kind}`}
                 data-foli-ruler={handle.key}
+                data-foli-off={drag?.key === handle.key && drag.off ? "" : undefined}
                 style={{ left: local(at(handle, value)) }}
                 // Pointer events' preventDefault does not keep the focus in every engine.
                 onMouseDown={(event) => event.preventDefault()}
@@ -467,6 +571,8 @@ export function FoliRuler({
                 onPointerCancel={cancel}
                 onLostPointerCapture={cancel}
                 onKeyDown={onKeyDown(handle)}
+                // A tab stop's double-click opens the Tabs dialog (the toolbar's).
+                onDoubleClick={handle.remove ? () => editor.run(openDialog("tabs")) : undefined}
               />
             );
           })}
@@ -479,7 +585,7 @@ export function FoliRuler({
               {formatLength(drag.value, unit)}
             </span>
           )}
-          {drag?.moved && dragged && (
+          {drag?.moved && !drag.off && dragged && (
             <div
               className="foli-ruler-guide"
               aria-hidden="true"

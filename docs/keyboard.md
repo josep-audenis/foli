@@ -159,6 +159,7 @@ while one is dragged with the pointer). On a focused handle:
 | Right, Left           | moves it right or left by 1/16 inch or 0.25 cm (the unit's step)  |
 | Up, Down              | makes its value larger or smaller by that step                    |
 | Page Up, Page Down    | makes its value larger or smaller by half an inch or a centimetre |
+| Delete, Backspace     | removes a tab stop                                                |
 | Escape (while a drag) | cancels the drag: nothing changes                                 |
 
 Right and Left move a handle the way they point, so on a right-hand handle (the right indent,

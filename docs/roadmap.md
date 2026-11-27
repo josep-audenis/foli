@@ -4426,8 +4426,15 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   Chromium, Firefox and WebKit at 100% and 200% (each marker and the left margin dragged, under
   the pointer, one undo step each; keys; Escape; axe); checked by hand. limitations.md ("The
   ruler").
-- [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,
-  decimal, bar), drag to move, drag off to remove; double-click opens the Tabs dialog.
+- [x] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,
+  decimal, bar), drag to move, drag off to remove; double-click opens the Tabs dialog. Built:
+  in `FoliRuler`, each stop a slider ("Left tab"…) moved by dragging or the arrows (one
+  `setTabStops` each: clear and set), removed when let go 16 px off the ruler or with Delete;
+  a press on the ruler's strip adds a stop of the selector's kind, snapped as the indents are;
+  the selector is a button cycling the five kinds. The pages still do not draw custom stops
+  (limitations.md). `ruler.test.tsx`; `ruler.spec.ts` at 100% and 200% in three engines (add,
+  move under the pointer, undo, drag off, the Tabs dialog on a double-click, axe with a stop);
+  checked by a screenshot of the five marks.
 - [ ] 31.4 Table columns on the ruler in a table (drag a column edge, as dragging its border).
 - [ ] 31.5 Vertical ruler: top and bottom margins of the caret's page, dragged.
 - [ ] 31.6 View tab's Ruler toggle; `FoliEditor`'s `ruler`; keyboard (each handle a slider:

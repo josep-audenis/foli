@@ -4,7 +4,9 @@ import {
   type Editor,
   type FoliDocument,
   type RulerGeometry,
+  requestedDialog,
   sectionAt,
+  setTabStops,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -68,7 +70,16 @@ function fakeView(editor: Editor, story: { id: string | null } = { id: null }) {
           left,
           firstLine: left + ((indent.firstLine ?? 0) - (indent.hanging ?? 0)) * K,
           right: margins.right - (indent.right ?? 0) * K,
-          tabs: [],
+          tabs: (
+            (caret.state.selection.$head.parent.attrs.tabs ?? []) as {
+              position: number;
+              kind: "left" | "center";
+            }[]
+          ).map((tab) => ({
+            x: margins.left + tab.position * K,
+            position: tab.position / 20,
+            alignment: tab.kind,
+          })),
         },
         table: null,
       };
@@ -90,11 +101,11 @@ async function setup(indent?: Record<string, number>, disabled = false) {
 const indentOf = (editor: Editor) => editor.state.selection.$head.parent.attrs.indent;
 const slider = (name: string) => screen.getByRole("slider", { name });
 /** A drag from x `from` to `to` (client px) on a handle. */
-function drag(handle: HTMLElement, from: number, to: number, altKey = false) {
+function drag(handle: HTMLElement, from: number, to: number, altKey = false, clientY = 0) {
   fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: from, altKey });
-  fireEvent.pointerMove(handle, { pointerId: 1, clientX: (from + to) / 2, altKey });
-  fireEvent.pointerMove(handle, { pointerId: 1, clientX: to, altKey });
-  fireEvent.pointerUp(handle, { pointerId: 1, clientX: to, altKey });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: (from + to) / 2, altKey, clientY });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: to, altKey, clientY });
+  fireEvent.pointerUp(handle, { pointerId: 1, clientX: to, altKey, clientY });
 }
 
 describe("FoliRuler", () => {
@@ -216,6 +227,78 @@ describe("FoliRuler", () => {
     // A change goes to the header's paragraph.
     fireEvent.keyDown(slider("Left indent"), { key: "ArrowRight" });
     expect(header.state.selection.$head.parent.attrs.indent).toEqual({ left: 810 });
+  });
+
+  it("adds a tab stop of the selector's kind where the ruler is clicked", async () => {
+    const editor = await setup();
+    const strip = document.querySelector(".foli-ruler-page") as HTMLElement;
+    // 144 px from the left margin is 1440 twips: a left stop at 72 pt.
+    fireEvent.pointerDown(strip, { button: 0, pointerId: 1, clientX: 244 + 144 });
+    expect(editor.state.selection.$head.parent.attrs.tabs).toEqual([
+      { position: 1440, kind: "left" },
+    ]);
+    const selector = screen.getByRole("button", { name: "Tab stop to add: Left tab" });
+    fireEvent.click(selector);
+    expect(selector.getAttribute("aria-label")).toBe("Tab stop to add: Center tab");
+    fireEvent.pointerDown(strip, { button: 0, pointerId: 1, clientX: 244 + 288 });
+    expect(editor.state.selection.$head.parent.attrs.tabs).toEqual([
+      { position: 1440, kind: "left" },
+      { position: 2880, kind: "center" },
+    ]);
+    expect(screen.getAllByRole("slider", { name: /tab$/ }).map((s) => s.ariaLabel)).toEqual([
+      "Left tab",
+      "Center tab",
+    ]);
+  });
+
+  it("moves a tab stop by dragging it, removes it dragged off or with Delete", async () => {
+    const editor = await setup();
+    act(() => {
+      editor.run(
+        setTabStops({
+          set: [
+            { position: 72, alignment: "left" },
+            { position: 144, alignment: "center" },
+          ],
+        }),
+      );
+    });
+    const tabs = () => editor.state.selection.$head.parent.attrs.tabs;
+    await waitFor(() => expect(screen.getAllByRole("slider", { name: /tab$/ })).toHaveLength(2));
+    act(() => drag(slider("Left tab"), 388, 388 + 72));
+    expect(tabs()).toEqual([
+      { position: 2160, kind: "left" },
+      { position: 2880, kind: "center" },
+    ]);
+    // One undo step.
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(tabs()).toEqual([
+      { position: 1440, kind: "left" },
+      { position: 2880, kind: "center" },
+    ]);
+    await waitFor(() => expect(slider("Left tab").getAttribute("aria-valuenow")).toBe("1"));
+    // Let go 100 px below the ruler: gone.
+    act(() => drag(slider("Left tab"), 388, 388, false, 100));
+    expect(tabs()).toEqual([{ position: 2880, kind: "center" }]);
+    fireEvent.keyDown(slider("Center tab"), { key: "Delete" });
+    expect(tabs()).toBeNull();
+  });
+
+  it("opens the Tabs dialog on a tab stop's double-click", async () => {
+    const editor = await setup();
+    act(() => {
+      editor.run(setTabStops({ set: [{ position: 72, alignment: "left" }] }));
+    });
+    await waitFor(() => slider("Left tab"));
+    let asked: string | null = null;
+    const off = editor.subscribe((_state, trs) => {
+      for (const tr of trs) asked = requestedDialog(tr) ?? asked;
+    });
+    fireEvent.doubleClick(slider("Left tab"));
+    off();
+    expect(asked).toBe("tabs");
   });
 
   it("changes nothing when disabled, and is empty without a view", async () => {
