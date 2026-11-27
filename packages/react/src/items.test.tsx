@@ -122,6 +122,7 @@ const NAMES = {
   pageSetup: 1,
   controlProperties: 1,
   textBox: 1,
+  shapes: 1,
   footnote: 1,
   endnote: 1,
   goToNote: 1,

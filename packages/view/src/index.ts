@@ -23,3 +23,4 @@ export {
   renderDocument,
   WORD_PAGE_CLASS,
 } from "./word/pages.js";
+export { SHAPE_GALLERY, type ShapeGalleryGroup, shapePreview } from "./word/shapes.js";

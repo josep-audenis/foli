@@ -35,6 +35,7 @@ import {
   insertLink,
   insertNote,
   insertPicture,
+  insertShape,
   insertText,
   isSafeHref,
   joinHistory,
@@ -320,6 +321,18 @@ const zoomIn = (zoom: number) =>
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 /** On the span of a selected picture (it holds the resize handle). */
 const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
+/** Shapes drawn from corner to corner: Shift turns them by 45° (34.3). */
+const LINE_GEOMETRIES = new Set([
+  "line",
+  "straightConnector1",
+  "bentConnector3",
+  "curvedConnector3",
+]);
+/** An inch in layout px. */
+const INCH_PX = 96;
+/** Drawn objects: a picture, a text box, a shape (34.3; not a shape's text, which is in it). */
+const OBJECTS = `[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]:not([${SHAPE_ATTR}] > *), [${SHAPE_ATTR}]`;
+const OWN_OBJECTS = `:scope > [${PICTURE_ATTR}], :scope > [${TEXT_BOX_ATTR}], :scope > [${SHAPE_ATTR}]`;
 /** On what shows a field the selection is in: Word shades it. */
 const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 /** The smallest a picture gets by dragging its handle, in px. */
@@ -329,7 +342,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[data-foli-crop]{position:absolute;box-sizing:border-box;background:CanvasText;border:1px solid Canvas;touch-action:none;user-select:none;-webkit-user-select:none;forced-color-adjust:none}[data-foli-crop=left],[data-foli-crop=right]{top:50%;width:6px;height:22px;margin-top:-11px;cursor:ew-resize}[data-foli-crop=top],[data-foli-crop=bottom]{left:50%;width:22px;height:6px;margin-left:-11px;cursor:ns-resize}[data-foli-crop=left]{left:-3px}[data-foli-crop=right]{right:-3px}[data-foli-crop=top]{top:-3px}[data-foli-crop=bottom]{bottom:-3px}@media print{[data-foli-crop]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[data-foli-drawing] .foli-page,[data-foli-drawing] .foli-page *{cursor:crosshair}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[data-foli-crop]{position:absolute;box-sizing:border-box;background:CanvasText;border:1px solid Canvas;touch-action:none;user-select:none;-webkit-user-select:none;forced-color-adjust:none}[data-foli-crop=left],[data-foli-crop=right]{top:50%;width:6px;height:22px;margin-top:-11px;cursor:ew-resize}[data-foli-crop=top],[data-foli-crop=bottom]{left:50%;width:22px;height:6px;margin-left:-11px;cursor:ns-resize}[data-foli-crop=left]{left:-3px}[data-foli-crop=right]{right:-3px}[data-foli-crop=top]{top:-3px}[data-foli-crop=bottom]{bottom:-3px}@media print{[data-foli-crop]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -1085,6 +1098,7 @@ export class EditorView {
     this.endDrag();
     // The pointer on a column border, no drag: the cursor is the view's.
     if (this.resizeCursor) host.style.removeProperty("cursor");
+    this.stopDrawing();
     this.endResize();
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
@@ -2087,6 +2101,7 @@ export class EditorView {
     editTextBox: (id) => view.openTextBox(id),
     objectPlacement: (pos) => view.objectPlacement(pos),
     objectRect: (pos) => view.objectRect(pos),
+    drawShape: (geometry) => view.drawShape(geometry),
     toReference: () => view.toReference(),
     close: () => view.closeStory(),
     get fieldLayout() {
@@ -4011,10 +4026,7 @@ export class EditorView {
 
   /** The span of the picture a node selection selects, if it selects one. */
   private pictureSpan(pos: number): HTMLElement | null {
-    // A shape's text (34.2) is in its shape, not an object of its own.
-    for (const img of this.host.querySelectorAll(
-      `[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]:not([${SHAPE_ATTR}] > *)`,
-    )) {
+    for (const img of this.host.querySelectorAll(OBJECTS)) {
       // The body's own: not a picture in a box's or a header's drawing.
       if (img.parentElement?.closest(`[${TEXT_BOX_ATTR}], .${REGION_CLASS}`)) continue;
       const span = img.parentElement;
@@ -4030,7 +4042,7 @@ export class EditorView {
    */
   objectPlacement(pos: number): ObjectPlacement | null {
     const span = this.pictureSpan(pos);
-    const drawn = span?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`);
+    const drawn = span?.querySelector<HTMLElement>(OWN_OBJECTS);
     const page = span?.closest<HTMLElement>(".foli-page");
     const anchor = span && (FLOAT_ANCHORS.get(span) ?? span);
     const inText = span?.hasAttribute(FLOAT_ATTR) ? span.parentElement : anchor;
@@ -4054,21 +4066,230 @@ export class EditorView {
     };
   }
 
+  // ---------- Insert ▸ Shapes: drawing a new shape (34.3) ----------
+
+  /**
+   * The shape being drawn: its geometry, the press (from its page's corner, so a scroll during
+   * the drag keeps it; the position pressed), the outline shown, the listeners to remove.
+   */
+  private drawing: {
+    geometry: string;
+    start?: { page: Element; x: number; y: number; pointer: number; at: number | null };
+    outline?: HTMLElement;
+    end: () => void;
+  } | null = null;
+
+  /**
+   * Starts drawing a shape of DrawingML preset `geometry` (Insert ▸ Shapes, 34.3): the next press
+   * on a page and its drag give the shape's box (Shift: a square, a line at a multiple of 45°; a
+   * press without a drag: an inch square), inserted in front of the text in the paragraph pressed
+   * and selected. Escape, or a press outside the pages, stops without one (the focus back in the
+   * document). Whether it started.
+   */
+  drawShape(geometry: string): boolean {
+    this.stopDrawing();
+    // Whatever the selection (a cell selection too): the press chooses the paragraph.
+    const somewhere = Selection.atStart(this.state.doc).from;
+    if (
+      !this.editable ||
+      this.destroyed ||
+      this.mount ||
+      !insertShape(geometry, { pos: somewhere })(this.state)
+    )
+      return false;
+    const doc = this.host.ownerDocument;
+    const down = (event: PointerEvent) => this.onDrawDown(event);
+    const move = (event: PointerEvent) => this.onDrawMove(event);
+    const up = (event: PointerEvent) => this.onDrawUp(event);
+    const key = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.stopDrawing(true);
+    };
+    const blur = () => this.stopDrawing();
+    doc.addEventListener("pointerdown", down, true);
+    doc.addEventListener("pointermove", move, true);
+    doc.addEventListener("pointerup", up, true);
+    doc.addEventListener("pointercancel", up, true);
+    doc.addEventListener("keydown", key, true);
+    doc.defaultView?.addEventListener("blur", blur);
+    this.host.setAttribute("data-foli-drawing", geometry);
+    injectStyles(this.host);
+    this.drawing = {
+      geometry,
+      end: () => {
+        doc.removeEventListener("pointerdown", down, true);
+        doc.removeEventListener("pointermove", move, true);
+        doc.removeEventListener("pointerup", up, true);
+        doc.removeEventListener("pointercancel", up, true);
+        doc.removeEventListener("keydown", key, true);
+        doc.defaultView?.removeEventListener("blur", blur);
+      },
+    };
+    return true;
+  }
+
+  /** Stops drawing a shape, if one is being drawn; `refocus`: the focus back in the document. */
+  stopDrawing(refocus = false): void {
+    const drawing = this.drawing;
+    if (!drawing) return;
+    this.drawing = null;
+    drawing.end();
+    drawing.outline?.remove();
+    this.host.removeAttribute("data-foli-drawing");
+    // The gallery's menu that started it is gone: the focus would be nowhere.
+    if (refocus && !this.destroyed && !this.hasFocus()) this.host.focus({ preventScroll: true });
+  }
+
+  private onDrawDown(event: PointerEvent): void {
+    const drawing = this.drawing;
+    if (!drawing || !event.isPrimary || event.button !== 0) return;
+    const page = event.target instanceof Element ? event.target.closest(".foli-page") : null;
+    if (!page || !this.host.contains(page)) {
+      this.stopDrawing(true);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const corner = page.getBoundingClientRect();
+    drawing.start = {
+      page,
+      x: event.clientX - corner.left,
+      y: event.clientY - corner.top,
+      pointer: event.pointerId,
+      at: this.posAtPoint(event.clientX, event.clientY),
+    };
+    drawing.outline?.remove();
+    const outline = this.host.ownerDocument.createElement("div");
+    outline.setAttribute("aria-hidden", "true");
+    outline.setAttribute("data-foli-drawn-outline", "");
+    Object.assign(outline.style, {
+      position: "fixed",
+      left: `${event.clientX}px`,
+      top: `${event.clientY}px`,
+      width: "0",
+      height: "0",
+      border: "1px dashed Highlight",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+    });
+    this.host.ownerDocument.body.append(outline);
+    drawing.outline = outline;
+  }
+
+  /** Where the press is now on the screen (its page may have scrolled). */
+  private drawStart(): { x: number; y: number } {
+    const start = this.drawing?.start as NonNullable<NonNullable<EditorView["drawing"]>["start"]>;
+    const corner = start.page.getBoundingClientRect();
+    return { x: corner.left + start.x, y: corner.top + start.y };
+  }
+
+  /** The box the press and `event` make: Shift squares it (a line: at a multiple of 45°). */
+  private drawnBox(event: PointerEvent) {
+    const start = this.drawStart();
+    let dx = event.clientX - start.x;
+    let dy = event.clientY - start.y;
+    if (event.shiftKey) {
+      if (LINE_GEOMETRIES.has(this.drawing?.geometry ?? "")) {
+        const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+        const length = Math.hypot(dx, dy);
+        dx = Math.round(Math.cos(angle) * length);
+        dy = Math.round(Math.sin(angle) * length);
+      } else {
+        const side = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = Math.sign(dx || 1) * side;
+        dy = Math.sign(dy || 1) * side;
+      }
+    }
+    return {
+      start,
+      left: Math.min(start.x, start.x + dx),
+      top: Math.min(start.y, start.y + dy),
+      width: Math.abs(dx),
+      height: Math.abs(dy),
+      flipH: dx < 0,
+      flipV: dy < 0,
+    };
+  }
+
+  private onDrawMove(event: PointerEvent): void {
+    const drawing = this.drawing;
+    if (!drawing?.start || event.pointerId !== drawing.start.pointer || !drawing.outline) return;
+    event.preventDefault();
+    const box = this.drawnBox(event);
+    Object.assign(drawing.outline.style, {
+      left: `${box.left}px`,
+      top: `${box.top}px`,
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+    });
+  }
+
+  private onDrawUp(event: PointerEvent): void {
+    const drawing = this.drawing;
+    if (!drawing?.start || event.pointerId !== drawing.start.pointer) return;
+    event.preventDefault();
+    const { geometry } = drawing;
+    const pressed = drawing.start.at;
+    const box = this.drawnBox(event);
+    const { start } = box;
+    this.stopDrawing(event.type === "pointercancel");
+    if (event.type === "pointercancel") return;
+    const scale = this.scale();
+    // A press without a drag: Word's inch square (a line an inch long) where it was.
+    const clicked = box.width < 3 && box.height < 3;
+    const line = LINE_GEOMETRIES.has(geometry);
+    const width = clicked ? INCH_PX * scale : box.width;
+    const height = clicked ? (line ? 0 : INCH_PX * scale) : box.height;
+    const left = clicked ? start.x : box.left;
+    const top = clicked ? start.y : box.top;
+    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+    // The paragraph pressed, read again now (a remote edit may have moved it; else as pressed,
+    // else the selection's), its start the shape's anchor; not in one: the nearest.
+    const at = this.posAtPoint(start.x, start.y) ?? pressed ?? this.state.selection.to;
+    const $found = this.state.doc.resolve(Math.min(at, this.state.doc.content.size));
+    const $at = $found.parent.inlineContent ? $found : Selection.near($found).$to;
+    if (!$at.parent.inlineContent) return;
+    const anchor = $at.start();
+    const { node } = this.domFromPos(anchor);
+    const inText = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    const paragraph = inText?.closest<HTMLElement>("p, h1, h2, h3, h4, h5, h6");
+    const page = inText?.closest<HTMLElement>(".foli-page");
+    if (!paragraph || !page) return;
+    // shortcut: from the page's text, as the renderer places a column's float (not its column).
+    const margin =
+      page.getBoundingClientRect().left +
+      Number.parseFloat(getComputedStyle(page).paddingLeft) * scale;
+    const emu = (px: number) => Math.round((px / scale) * EMU_PER_PX);
+    // A line goes from its box's top left to its bottom right: drawn another way, flipped so
+    // that it starts where it was pressed (its end, an arrow's, where it was let go).
+    const options = {
+      pos: anchor,
+      width: emu(width),
+      height: emu(height),
+      horizontal: emu(left - margin),
+      vertical: emu(top - paragraph.getBoundingClientRect().top),
+      ...(line && !clicked && box.flipH ? { flipH: true } : {}),
+      ...(line && !clicked && box.flipV ? { flipV: true } : {}),
+    };
+    insertShape(geometry, options)(this.state, (tr) => this.editor.dispatch(tr));
+  }
+
   /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
   objectRect(pos: number): DOMRect | null {
     const span = this.pictureSpan(pos);
-    return (
-      span
-        ?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`)
-        ?.getBoundingClientRect() ?? null
-    );
+    return span?.querySelector<HTMLElement>(OWN_OBJECTS)?.getBoundingClientRect() ?? null;
   }
 
   /** Marks the selected picture and gives it a resize handle (when the document is editable). */
   private showSelectedPicture(): void {
     const { selection } = this.state;
     const name = selection instanceof NodeSelection ? selection.node.type.name : "";
-    const span = name === "picture" || name === "textBox" ? this.pictureSpan(selection.from) : null;
+    const span =
+      name === "picture" || name === "textBox" || name === "shape"
+        ? this.pictureSpan(selection.from)
+        : null;
     // Picture Format ▸ Crop (33.5): the edges' crop handles in place of the resize handle.
     const cropping = !!span && croppingAt(this.state) === selection.from;
     const handled = !!span?.querySelector("[data-foli-resize], [data-foli-crop]");
@@ -4597,8 +4818,8 @@ export class EditorView {
     )
       return false;
     const span =
-      target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize], [data-foli-crop]`)?.parentElement ??
-      null;
+      target?.closest?.(`[${PICTURE_ATTR}], [${SHAPE_ATTR}], [data-foli-resize], [data-foli-crop]`)
+        ?.parentElement ?? null;
     // A picture in a text box's or a header's drawing is not the body's to select.
     if (span?.parentElement?.closest(`[${TEXT_BOX_ATTR}]`)) return false;
     if (!span || !this.host.contains(span)) return false;
@@ -4610,9 +4831,7 @@ export class EditorView {
       this.dispatch(this.state.tr.setSelection(NodeSelection.create(this.state.doc, pos)));
     // Already selected: written again (the focus may have put a caret in the host).
     else this.writeSelection(true);
-    const img = span.querySelector(
-      `:scope > [${PICTURE_ATTR}], :scope > [${TEXT_BOX_ATTR}]`,
-    ) as HTMLElement | null;
+    const img = span.querySelector(OWN_OBJECTS) as HTMLElement | null;
     const cropSide = target?.closest("[data-foli-crop]")?.getAttribute("data-foli-crop") as
       | "left"
       | "top"
@@ -4635,15 +4854,16 @@ export class EditorView {
           : "mouse",
       pos,
       img,
-      free: img.hasAttribute(TEXT_BOX_ATTR),
+      free: img.hasAttribute(TEXT_BOX_ATTR) || img.hasAttribute(SHAPE_ATTR),
       crop: cropSide ?? undefined,
       width: rect.width,
       height: rect.height,
       scale,
       // A picture no wider than the page's text (layout px); a text box up to Word's 22 inches.
-      max: img.hasAttribute(TEXT_BOX_ATTR)
-        ? 2112
-        : Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
+      max:
+        img.hasAttribute(TEXT_BOX_ATTR) || img.hasAttribute(SHAPE_ATTR)
+          ? 2112
+          : Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
       x: event.clientX,
       y: event.clientY,
       style: img.getAttribute("style") ?? "",

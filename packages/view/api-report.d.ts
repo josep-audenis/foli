@@ -114,6 +114,7 @@ export type { Decoration, DecorationAttrs, MarkView, NodeView, NodeViewDOM, Plug
 export { EditorView, type EditorViewOptions, keyName, measureImageFile, textWidthEmu, } from "./view.js";
 export { EMU_PER_PX } from "./word/blocks.js";
 export { type DocumentPages, type RenderDocumentOptions, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
+export { SHAPE_GALLERY, type ShapeGalleryGroup, shapePreview } from "./word/shapes.js";
 
 // layout/flow.d.ts
 export {};
@@ -665,6 +666,28 @@ export declare class EditorView {
      * corner, its paragraph's top and its column's left edge; null when it is not drawn.
      */
     objectPlacement(pos: number): ObjectPlacement | null;
+    /**
+     * The shape being drawn: its geometry, the press (from its page's corner, so a scroll during
+     * the drag keeps it; the position pressed), the outline shown, the listeners to remove.
+     */
+    private drawing;
+    /**
+     * Starts drawing a shape of DrawingML preset `geometry` (Insert ▸ Shapes, 34.3): the next press
+     * on a page and its drag give the shape's box (Shift: a square, a line at a multiple of 45°; a
+     * press without a drag: an inch square), inserted in front of the text in the paragraph pressed
+     * and selected. Escape, or a press outside the pages, stops without one (the focus back in the
+     * document). Whether it started.
+     */
+    drawShape(geometry: string): boolean;
+    /** Stops drawing a shape, if one is being drawn; `refocus`: the focus back in the document. */
+    stopDrawing(refocus?: boolean): void;
+    private onDrawDown;
+    /** Where the press is now on the screen (its page may have scrolled). */
+    private drawStart;
+    /** The box the press and `event` make: Shift squares it (a line: at a multiple of 45°). */
+    private drawnBox;
+    private onDrawMove;
+    private onDrawUp;
     /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
     objectRect(pos: number): DOMRect | null;
     /** Marks the selected picture and gives it a resize handle (when the document is editable). */
@@ -1128,7 +1151,24 @@ export {};
  * with its color or gradient, stroked with its line (width, dash, ends), flipped as it says.
  * The box itself (size, turn, text) is `shapeElement`'s (`blocks.ts`).
  */
-export {};
+/** A group of Word's Shapes gallery: its name and its shapes (DrawingML preset, Word's name). */
+export interface ShapeGalleryGroup {
+    readonly name: string;
+    readonly shapes: readonly {
+        readonly geometry: string;
+        readonly name: string;
+    }[];
+}
+/** Word's Insert ▸ Shapes gallery, as far as Foli draws it (34.3), in Word's order. */
+export declare const SHAPE_GALLERY: readonly ShapeGalleryGroup[];
+/**
+ * The SVG path data of preset `geometry` drawn in a `size` px square (a gallery's icon): each
+ * path's `d`, whether it is filled. A line's box is the square's diagonal.
+ */
+export declare function shapePreview(geometry: string, size?: number): {
+    readonly d: string;
+    readonly filled: boolean;
+}[];
 
 // word/table.d.ts
 export {};

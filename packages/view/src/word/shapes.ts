@@ -291,3 +291,112 @@ export function shapeTextRect(attrs: Attrs): [number, number, number, number] {
   const top = attrs.flipV === true ? h - b : t;
   return [left, top, Math.max(r - l, 0), Math.max(b - t, 0)];
 }
+
+/** A group of Word's Shapes gallery: its name and its shapes (DrawingML preset, Word's name). */
+export interface ShapeGalleryGroup {
+  readonly name: string;
+  readonly shapes: readonly { readonly geometry: string; readonly name: string }[];
+}
+
+/** Word's Insert ▸ Shapes gallery, as far as Foli draws it (34.3), in Word's order. */
+export const SHAPE_GALLERY: readonly ShapeGalleryGroup[] = [
+  {
+    name: "Lines",
+    shapes: [
+      { geometry: "line", name: "Line" },
+      { geometry: "straightConnector1", name: "Line Arrow" },
+      { geometry: "bentConnector3", name: "Connector: Elbow" },
+      { geometry: "curvedConnector3", name: "Connector: Curved" },
+    ],
+  },
+  {
+    name: "Rectangles",
+    shapes: [
+      { geometry: "rect", name: "Rectangle" },
+      { geometry: "roundRect", name: "Rectangle: Rounded Corners" },
+      { geometry: "snip1Rect", name: "Rectangle: Single Corner Snipped" },
+      { geometry: "snip2SameRect", name: "Rectangle: Top Corners Snipped" },
+      { geometry: "round1Rect", name: "Rectangle: Single Corner Rounded" },
+      { geometry: "round2SameRect", name: "Rectangle: Top Corners Rounded" },
+    ],
+  },
+  {
+    name: "Basic Shapes",
+    shapes: [
+      { geometry: "ellipse", name: "Oval" },
+      { geometry: "triangle", name: "Isosceles Triangle" },
+      { geometry: "rtTriangle", name: "Right Triangle" },
+      { geometry: "parallelogram", name: "Parallelogram" },
+      { geometry: "trapezoid", name: "Trapezoid" },
+      { geometry: "diamond", name: "Diamond" },
+      { geometry: "pentagon", name: "Regular Pentagon" },
+      { geometry: "hexagon", name: "Hexagon" },
+      { geometry: "octagon", name: "Octagon" },
+      { geometry: "plus", name: "Cross" },
+      { geometry: "frame", name: "Frame" },
+      { geometry: "can", name: "Cylinder" },
+      { geometry: "cube", name: "Cube" },
+      { geometry: "donut", name: "Circle: Hollow" },
+      { geometry: "plaque", name: "Plaque" },
+      { geometry: "foldedCorner", name: "Rectangle: Folded Corner" },
+      { geometry: "smileyFace", name: "Smiley Face" },
+      { geometry: "heart", name: "Heart" },
+      { geometry: "lightningBolt", name: "Lightning Bolt" },
+    ],
+  },
+  {
+    name: "Block Arrows",
+    shapes: [
+      { geometry: "rightArrow", name: "Arrow: Right" },
+      { geometry: "leftArrow", name: "Arrow: Left" },
+      { geometry: "upArrow", name: "Arrow: Up" },
+      { geometry: "downArrow", name: "Arrow: Down" },
+      { geometry: "leftRightArrow", name: "Arrow: Left-Right" },
+      { geometry: "upDownArrow", name: "Arrow: Up-Down" },
+      { geometry: "quadArrow", name: "Arrow: Quad" },
+      { geometry: "stripedRightArrow", name: "Arrow: Striped Right" },
+      { geometry: "notchedRightArrow", name: "Arrow: Notched Right" },
+      { geometry: "homePlate", name: "Arrow: Pentagon" },
+      { geometry: "chevron", name: "Arrow: Chevron" },
+    ],
+  },
+  {
+    name: "Flowchart",
+    shapes: [
+      { geometry: "flowChartProcess", name: "Flowchart: Process" },
+      { geometry: "flowChartAlternateProcess", name: "Flowchart: Alternate Process" },
+      { geometry: "flowChartDecision", name: "Flowchart: Decision" },
+      { geometry: "flowChartTerminator", name: "Flowchart: Terminator" },
+      { geometry: "flowChartConnector", name: "Flowchart: Connector" },
+    ],
+  },
+  {
+    name: "Stars and Banners",
+    shapes: [
+      { geometry: "star4", name: "Star: 4 Points" },
+      { geometry: "star5", name: "Star: 5 Points" },
+      { geometry: "star6", name: "Star: 6 Points" },
+    ],
+  },
+  {
+    name: "Callouts",
+    shapes: [
+      { geometry: "wedgeRectCallout", name: "Speech Bubble: Rectangle" },
+      { geometry: "wedgeRoundRectCallout", name: "Speech Bubble: Rectangle with Corners Rounded" },
+      { geometry: "wedgeEllipseCallout", name: "Speech Bubble: Oval" },
+    ],
+  },
+];
+
+/**
+ * The SVG path data of preset `geometry` drawn in a `size` px square (a gallery's icon): each
+ * path's `d`, whether it is filled. A line's box is the square's diagonal.
+ */
+export function shapePreview(
+  geometry: string,
+  size = 20,
+): { readonly d: string; readonly filled: boolean }[] {
+  const def = definitionOf({ geometry });
+  if (!def) return [];
+  return drawPaths(def, size, size).map(({ d, fill }) => ({ d, filled: fill !== "none" }));
+}

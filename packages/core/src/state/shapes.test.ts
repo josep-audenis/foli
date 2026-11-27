@@ -5,6 +5,7 @@ import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
 import { selectedObject, setObjectSize } from "./layout.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
+import { insertShape } from "./shapes.js";
 import { StoryStep, wordContext } from "./word.js";
 import { copiedDefinitions, fitPaste } from "./wordclip.js";
 
@@ -195,5 +196,46 @@ describe("shapes (schema 11)", () => {
       "textbox:1",
       "textbox:2",
     ]);
+  });
+
+  it("inserts a shape in front of the text with the theme's accent, selected, one undo step", () => {
+    const editor = createEditor({ document: shaped() });
+    const before = editor.getDocument();
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    expect(
+      editor.run(
+        insertShape("star5", {
+          width: 914_400,
+          height: 457_200,
+          horizontal: 9525,
+          vertical: -19_050,
+        }),
+      ),
+    ).toBe(true);
+    const shape = selectedObject(editor.state)?.node;
+    expect(shape?.attrs).toMatchObject({
+      geometry: "star5",
+      width: 914_400,
+      height: 457_200,
+      fill: "156082",
+      outline: { color: "030E13", width: 12_700 },
+      float: {
+        wrap: "inFront",
+        horizontal: { relativeTo: "column", offset: 9525 },
+        vertical: { relativeTo: "paragraph", offset: -19_050 },
+      },
+    });
+    editor.run(undo);
+    expect(editor.getDocument()).toEqual(before);
+    // A line: no fill, the accent's line; an arrow with its end; mirrored when drawn backwards.
+    expect(editor.run(insertShape("straightConnector1", { flipH: true }))).toBe(true);
+    expect(selectedObject(editor.state)?.node.attrs).toMatchObject({
+      fill: null,
+      flipH: true,
+      outline: { color: "156082", width: 6350, tail: { type: "triangle" } },
+    });
+    // Not a DrawingML preset; not in a story.
+    expect(insertShape("circle")(editor.state)).toBe(false);
+    expect(insertShape("rect")((editor.story("textbox:1") as typeof editor).state)).toBe(false);
   });
 });

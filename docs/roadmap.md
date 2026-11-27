@@ -4773,7 +4773,16 @@ paths; text in shapes through Phase 33's stories.
   `apps/playground/word/shapes.word.ts` (`pnpm corpus:pages`): every one of the poster's 44
   drawn shapes against Word's PDF of it (`corpus/reference/word/12-shapes-poster.pdf`), ink
   agreement 0.988 to 1.0 (tolerance 0.9).
-- [ ] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions.
+- [x] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions. Built:
+  core's `insertShape` (in front of the text from its paragraph and column, the theme's accent
+  and its shade, lines without fill, one undo step, selected); the view's `drawShape` (the next
+  press and drag on a page give the box, Shift a square or a 45° line, a click an inch square,
+  Escape stops) and `stopDrawing`, `storyView.drawShape`; shapes selected and resized as pictures
+  and text boxes are (their box, Shift for the ratio); `SHAPE_GALLERY` and `shapePreview`
+  (view); React's `ShapeGallery` (`toolbarItems.shapes`, Insert ▸ Illustrations): Word's groups
+  and names as icons, a menu the arrow keys move in, Enter inserting an inch square at the
+  selection. `shapes.test.ts` (core), `word-shapes.spec.ts` (drag, Shift, undo, keyboard,
+  Escape, axe; three engines).
 - [ ] 34.4 Selected shape: move, resize, rotate handles, adjustment handles for the shapes that
   have them; arrow keys move; one undo step per gesture; text in a shape.
 - [ ] 34.5 Shape Format tab: fill, outline, styles, size, arrange (shared with 33.6).

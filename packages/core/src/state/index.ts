@@ -300,6 +300,7 @@ export {
   type SelectionJSON,
   TextSelection,
 } from "./selection.js";
+export { type InsertShapeOptions, insertShape } from "./shapes.js";
 export {
   type Command,
   EditorState,
