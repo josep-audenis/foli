@@ -1040,6 +1040,12 @@ press and drag on the pages give its box (Shift: a square, a line at 45°; a pre
 an inch square), Escape stopping it. `@folijs/view` exports `SHAPE_GALLERY` (Word's gallery's
 groups: each shape's preset and Word's name) and `shapePreview(geometry, size?)` (its paths in a
 square, for an icon); `toolbarItems.shapes` is Insert ▸ Shapes.
+A selected shape (34.4): `moveObject(pos, dx, dy, placement?)` moves any floating object by EMU
+(an aligned axis takes the offset `placement` says it is drawn at), `NUDGE` is what an arrow key
+moves it by (`step`, Word's 0.08"; `fine`, a pixel with Ctrl); `setShapeAdjust(pos, { adj: n })`
+sets adjust values; `addShapeText(pos)` gives a shape a story (centered, in white), as typing on
+a selected shape does; `setObjectSize(pos, width, height, rotation)` turns it. One undo step
+each; moving and adjusting are refused while tracking.
 
 Layout Options (33.4) for a picture or text box: `selectedObject(state)` gives the selected one
 and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `topAndBottom`,

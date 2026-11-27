@@ -108,6 +108,9 @@ project owner on Windows 11, 2026-11-04:
 - **E6 screen readers:** NVDA, VoiceOver. Whether a split paragraph is announced as one or two
   is still unknown.
 - macOS and mobile autocorrect.
+- **IME on a selected shape (Phase 34.4):** a composition started on a selected shape opens the
+  shape's text during the `Process` keydown and relies on the browser composing in the newly
+  focused editor; untested on real IMEs (deferred with the other manual checks).
 - Also untested: justified text, inline formatting and mixed fonts, RTL, very long words, images.
 
 Where they are re-run:

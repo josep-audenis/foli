@@ -812,6 +812,29 @@ export declare class EditorView {
     private onResizeCancel;
     /** Ends a resize (its listeners gone) and returns it. */
     private endResize;
+    /** A shape being moved, turned or adjusted: what it was, and where the press was. */
+    private shapeGesture;
+    private startShapeGesture;
+    private onShapeMove;
+    private onShapeEnd;
+    private onShapeKey;
+    private onShapeCancel;
+    /** A gesture's shape as it was before it. */
+    private restoreShape;
+    /** Ends a shape's gesture (its listeners gone) and returns it. */
+    private endShapeGesture;
+    /** A selected shape's rotate handle and adjustment handles (in it: they turn with it). */
+    private drawShapeHandles;
+    /**
+     * The arrow keys on a selected floating object move it (34.4, as Word's): by Word's 0.08" step,
+     * a pixel with Ctrl (Cmd); one undo step each.
+     */
+    private nudgeObject;
+    /**
+     * Typing on a selected shape writes in it (34.4, as Word's): its text made if it has none
+     * (centered, in the style's light color), opened, the character typed there.
+     */
+    private typeInShape;
     private textWidthEmu;
     /** Image files in a transfer (paste or drop), when the app takes uploads. */
     private imageFiles;
@@ -1019,6 +1042,14 @@ export {};
  * DrawingML geometry (Phase 34, ADR-0017): a shape's guides evaluated and its paths turned into
  * SVG path data. One interpreter for the presets (`presets.ts`, ECMA-376's definitions) and a
  * file's custom geometry (`a:custGeom`); 34.4's adjustment handles read the same guides.
+ */
+export {};
+
+// word/handles.d.ts
+/**
+ * A selected shape's adjustment handles (34.4, ADR-0017): where its geometry's handles (`a:ahXY`)
+ * are drawn, and the adjust values a handle dragged to a point gives, from the same guides the
+ * shape is drawn with.
  */
 export {};
 

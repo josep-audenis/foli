@@ -232,3 +232,124 @@ test("Insert ▸ Shapes from the keyboard: an inch square at the selection; Esca
   await page.mouse.click(box.x + 300, box.y + 500);
   expect((await drawn(page)).map((s) => s.geometry)).toEqual(["rect"]);
 });
+
+test("a selected shape is moved, nudged, turned, adjusted and written in, one undo each (34.4)", async ({
+  page,
+}) => {
+  await ribbon(page);
+  await page.getByRole("button", { name: "Shapes" }).click();
+  await page.getByRole("menuitem", { name: "Arrow: Right", exact: true }).click();
+  const box = (await page.locator("section.foli-page").first().boundingBox()) as {
+    x: number;
+    y: number;
+  };
+  await page.mouse.move(box.x + 200, box.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, box.y + 380, { steps: 4 });
+  await page.mouse.up();
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+  const shape = async () => (await drawn(page))[0] as Awaited<ReturnType<typeof drawn>>[number];
+  // Its handles: a rotate handle and the arrow's two yellow ones.
+  await expect(page.locator("[data-foli-rotate]")).toHaveCount(1);
+  await expect(page.locator("[data-foli-adjust]")).toHaveCount(2);
+  // Dragged by its body.
+  await page.mouse.move(box.x + 250, box.y + 340);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + 380, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => near((await shape()).left, 250) && near((await shape()).top, 340))
+    .toBe(true);
+  // An arrow key nudges it by Word's step (0.08", 7.68 px).
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => near((await shape()).left, 258)).toBe(true);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect.poll(async () => near((await shape()).left, 250)).toBe(true);
+  // Turned by its handle, Shift by 15°.
+  const handle = (await page.locator("[data-foli-rotate]").boundingBox()) as {
+    x: number;
+    y: number;
+  };
+  const turned = (await page.locator("[data-foli-shape]").boundingBox()) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  await page.mouse.move(handle.x + 6, handle.y + 6);
+  await page.mouse.down();
+  await page.keyboard.down("Shift");
+  await page.mouse.move(turned.x + turned.width + 100, turned.y + turned.height / 2 + 10, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (document.querySelector("[data-foli-shape]") as HTMLElement).style.transform,
+      ),
+    )
+    .toBe("rotate(90deg)");
+  await page.keyboard.press("ControlOrMeta+z");
+  // Adjusted by its yellow handle: the head made longer.
+  const yellow = (await page.locator("[data-foli-adjust]").nth(1).boundingBox()) as {
+    x: number;
+    y: number;
+  };
+  const before = await page.evaluate(() =>
+    document.querySelector("[data-foli-shape] g path")?.getAttribute("d"),
+  );
+  await page.mouse.move(yellow.x + 4, yellow.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(yellow.x - 50, yellow.y + 4, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.querySelector("[data-foli-shape] g path")?.getAttribute("d")),
+    )
+    .not.toBe(before);
+  // Typing on it writes in it; Escape leaves it selected.
+  await page.keyboard.type("Go");
+  await expect(page.locator("[data-foli-shape] [data-foli-text-box]")).toHaveText("Go");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await shape()).selected).toBe(true);
+  // Not selected, a press on its text selects it and drags it (Word's second press writes).
+  await page.mouse.click(box.x + 150, box.y + 150);
+  await expect.poll(async () => (await shape()).selected).toBe(false);
+  const at = await shape();
+  const middle = (await page.locator("[data-foli-shape] [data-foli-text-box]").boundingBox()) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(middle.x + middle.width / 2 + 40, middle.y + middle.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => near((await shape()).left, at.left + 40)).toBe(true);
+  // Centred on the page's text (aligned), a drag moves it by the drag, once.
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByRole("button", { name: "Position" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Top center" }).click();
+  const centred = await shape();
+  const body = (await page.locator("[data-foli-shape]").boundingBox()) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  // On the arrow's head, outside its text (a press in the selected shape's text writes).
+  const tip = { x: body.x + body.width - 12, y: body.y + body.height / 2 };
+  await page.mouse.move(tip.x, tip.y);
+  await page.mouse.down();
+  await page.mouse.move(tip.x + 50, tip.y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => near((await shape()).left, centred.left + 50)).toBe(true);
+  expect(
+    (await new AxeBuilder({ page }).include("section.foli-page").analyze()).violations,
+  ).toEqual([]);
+});

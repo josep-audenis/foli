@@ -165,6 +165,8 @@ export {
 export {
   alignObject,
   croppingAt,
+  moveObject,
+  NUDGE,
   OBJECT_POSITIONS,
   OBJECT_WRAPS,
   type ObjectAlign,
@@ -300,7 +302,7 @@ export {
   type SelectionJSON,
   TextSelection,
 } from "./selection.js";
-export { type InsertShapeOptions, insertShape } from "./shapes.js";
+export { addShapeText, type InsertShapeOptions, insertShape, setShapeAdjust } from "./shapes.js";
 export {
   type Command,
   EditorState,

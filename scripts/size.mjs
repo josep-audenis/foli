@@ -183,10 +183,13 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 150.0, 252.0, 252.0 and 114.0 allowed): shapes drawn (about 50 of DrawingML's preset
  * definitions, the guide formula interpreter, SVG fills, gradients, dashes and line ends), with
  * room for the Shapes gallery, handles and the Shape Format tab (34.3–34.5).
+ * View raised again in 34.4 (150.1 kB; 156.0 allowed): drawing shapes by dragging (34.3), a
+ * selected shape's move, turn and adjustment handles, the arrow keys' nudge and typing into a
+ * shape.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 110_592 },
-  { name: "@folijs/view", entry: dist("view"), budget: 153_600 },
+  { name: "@folijs/view", entry: dist("view"), budget: 159_744 },
   { name: "@folijs/react", entry: dist("react"), budget: 258_048 },
   { name: "FoliEditor only", entry: appEntry, budget: 258_048 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 86_016 },

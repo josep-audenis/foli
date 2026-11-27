@@ -1,5 +1,6 @@
 import {
   AllSelection,
+  addShapeText,
   arrowAcrossLeaf,
   autolinkHref,
   CellSelection,
@@ -42,9 +43,11 @@ import {
   listBookmarks,
   type Node as ModelNode,
   marksAt,
+  moveObject,
   type NavigationRequest,
   NodeSelection,
   type NoteNumber,
+  NUDGE,
   noteAtSelection,
   noteNumbers,
   noteProperties,
@@ -73,6 +76,7 @@ import {
   setLink,
   setObjectSize,
   setPictureCrop,
+  setShapeAdjust,
   splitBlock,
   stopFormatPainter,
   storyOfSection,
@@ -185,13 +189,14 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
+import { adjustAt, adjustHandles } from "./word/handles.js";
 import { FormattingMarks, MARK_TEXT, type MarkGlyph } from "./word/marks.js";
 import { HintMarks, MATCH_STYLES, MatchMarks, rangesInCopy, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { type PeerDrawing, PeerMarks } from "./word/presence.js";
 import { PageRegions, REGION_CLASS, REGION_CONTENT_CLASS } from "./word/regions.js";
-import { withOwnIds } from "./word/shapes.js";
+import { shapeSvg, withOwnIds } from "./word/shapes.js";
 import {
   collect,
   drawnColumns,
@@ -342,7 +347,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[data-foli-drawing] .foli-page,[data-foli-drawing] .foli-page *{cursor:crosshair}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[data-foli-crop]{position:absolute;box-sizing:border-box;background:CanvasText;border:1px solid Canvas;touch-action:none;user-select:none;-webkit-user-select:none;forced-color-adjust:none}[data-foli-crop=left],[data-foli-crop=right]{top:50%;width:6px;height:22px;margin-top:-11px;cursor:ew-resize}[data-foli-crop=top],[data-foli-crop=bottom]{left:50%;width:22px;height:6px;margin-left:-11px;cursor:ns-resize}[data-foli-crop=left]{left:-3px}[data-foli-crop=right]{right:-3px}[data-foli-crop=top]{top:-3px}[data-foli-crop=bottom]{bottom:-3px}@media print{[data-foli-crop]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[data-foli-drawing] .foli-page,[data-foli-drawing] .foli-page *{cursor:crosshair}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[data-foli-rotate]{position:absolute;left:50%;top:-24px;width:12px;height:12px;margin-left:-6px;box-sizing:border-box;border:1px solid Highlight;border-radius:50%;background:Canvas;cursor:grab;touch-action:none;forced-color-adjust:none}[data-foli-adjust]{position:absolute;width:9px;height:9px;margin:-5px 0 0 -5px;box-sizing:border-box;border:1px solid #806000;background:#ffd700;transform:rotate(45deg);cursor:pointer;touch-action:none;forced-color-adjust:none}@media print{[data-foli-rotate],[data-foli-adjust]{display:none}}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[data-foli-crop]{position:absolute;box-sizing:border-box;background:CanvasText;border:1px solid Canvas;touch-action:none;user-select:none;-webkit-user-select:none;forced-color-adjust:none}[data-foli-crop=left],[data-foli-crop=right]{top:50%;width:6px;height:22px;margin-top:-11px;cursor:ew-resize}[data-foli-crop=top],[data-foli-crop=bottom]{left:50%;width:22px;height:6px;margin-left:-11px;cursor:ns-resize}[data-foli-crop=left]{left:-3px}[data-foli-crop=right]{right:-3px}[data-foli-crop=top]{top:-3px}[data-foli-crop=bottom]{bottom:-3px}@media print{[data-foli-crop]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -1099,6 +1104,7 @@ export class EditorView {
     // The pointer on a column border, no drag: the cursor is the view's.
     if (this.resizeCursor) host.style.removeProperty("cursor");
     this.stopDrawing();
+    this.endShapeGesture();
     this.endResize();
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
@@ -3074,7 +3080,8 @@ export class EditorView {
     let found: number | null = null;
     this.state.doc.descendants((node, pos) => {
       if (found !== null) return false;
-      if (node.type.name === "textBox" && node.attrs.story === id) found = pos;
+      if ((node.type.name === "textBox" || node.type.name === "shape") && node.attrs.story === id)
+        found = pos;
       return true;
     });
     return found;
@@ -3085,10 +3092,7 @@ export class EditorView {
     for (const box of this.host.querySelectorAll<HTMLElement>(
       `[${TEXT_BOX_ATTR}="${CSS.escape(id)}"]`,
     ))
-      if (
-        !box.closest(`.${REGION_CLASS}`) &&
-        !box.parentElement?.closest(`[${TEXT_BOX_ATTR}], [${SHAPE_ATTR}]`)
-      )
+      if (!box.closest(`.${REGION_CLASS}`) && !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`))
         return box;
     return null;
   }
@@ -3324,7 +3328,14 @@ export class EditorView {
     const pressed = event.target instanceof Element ? event.target : null;
     const inBox = pressed?.closest(`[${TEXT_BOX_ATTR}]`);
     const pressedId = inBox?.getAttribute(TEXT_BOX_ATTR);
-    const boxId = pressedId && this.textBoxElement(pressedId) === inBox ? pressedId : null;
+    const shapeOf = inBox?.parentElement?.closest<HTMLElement>(`[${SHAPE_ATTR}]`);
+    // A shape's text (34.4): a press selects the shape (to drag it) unless it is selected already.
+    const shapeSelected =
+      !shapeOf ||
+      (this.state.selection instanceof NodeSelection &&
+        this.pictureSpan(this.state.selection.from)?.contains(shapeOf) === true);
+    const boxId =
+      pressedId && shapeSelected && this.textBoxElement(pressedId) === inBox ? pressedId : null;
     this.closeStory(false);
     if (boxId && event.button === 0 && !event.shiftKey && this.editable) {
       event.preventDefault();
@@ -4052,7 +4063,11 @@ export class EditorView {
     if (!drawn || !page || !block || !paragraph) return null;
     const scale = this.scale();
     const box = page.getBoundingClientRect();
+    // Its unturned box (a turned one's rect is its turned bounds).
+    const turned = drawn.style.transform;
+    drawn.style.transform = "";
     const at = drawn.getBoundingClientRect();
+    drawn.style.transform = turned;
     const column = (block.parentElement ?? page).getBoundingClientRect();
     const padding =
       block.parentElement === page
@@ -4300,7 +4315,7 @@ export class EditorView {
       return;
     this.selectedPicture?.removeAttribute(PICTURE_SELECTED_ATTR);
     for (const handle of this.selectedPicture?.querySelectorAll(
-      ":scope > [data-foli-resize], :scope > [data-foli-crop]",
+      ":scope > [data-foli-resize], :scope > [data-foli-crop], [data-foli-rotate], [data-foli-adjust]",
     ) ?? [])
       handle.remove();
     this.selectedPicture = span;
@@ -4321,6 +4336,7 @@ export class EditorView {
     handle.setAttribute("data-foli-resize", "");
     handle.setAttribute("aria-hidden", "true");
     span.append(handle);
+    if (name === "shape") this.drawShapeHandles(span);
   }
 
   /** Marks the cells of a cell selection (their table cell elements, on every page). */
@@ -4839,6 +4855,20 @@ export class EditorView {
       | "bottom"
       | null
       | undefined;
+    // A shape (34.4): a press on it moves it (floating), on its handles turns or adjusts it.
+    if (img?.hasAttribute(SHAPE_ATTR) && this.editable && !target?.closest("[data-foli-resize]")) {
+      const adjusting = target?.closest("[data-foli-adjust]");
+      const kind = target?.closest("[data-foli-rotate]") ? "rotate" : adjusting ? "adjust" : "move";
+      if (kind !== "move" || this.state.doc.nodeAt(pos)?.attrs.float)
+        this.startShapeGesture(
+          kind,
+          pos,
+          img,
+          event,
+          Number(adjusting?.getAttribute("data-foli-adjust") ?? 0),
+        );
+      return true;
+    }
     if (!img || !(target?.closest("[data-foli-resize]") || cropSide) || !this.editable) return true;
     // Its unrotated box (a rotated picture's rect is the rotated one's bounds).
     const turned = img.style.transform;
@@ -5040,6 +5070,264 @@ export class EditorView {
     doc.removeEventListener("keydown", this.onResizeKey, true);
     doc.defaultView?.removeEventListener("blur", this.onResizeCancel);
     return r;
+  }
+
+  // ---------- A selected shape's handles (34.4) ----------
+
+  /** A shape being moved, turned or adjusted: what it was, and where the press was. */
+  private shapeGesture: {
+    kind: "move" | "rotate" | "adjust";
+    pos: number;
+    img: HTMLElement;
+    /** The adjustment handle's index. */
+    handle: number;
+    x: number;
+    y: number;
+    /** Its center on the screen, and the layout scale. */
+    cx: number;
+    cy: number;
+    scale: number;
+    attrs: Record<string, unknown>;
+    node: ModelNode;
+    style: string;
+    svg: SVGSVGElement | null;
+    /** What the gesture gives on release. */
+    result?: { dx: number; dy: number } | { rotation: number } | { adjust: Record<string, number> };
+  } | null = null;
+
+  private startShapeGesture(
+    kind: "move" | "rotate" | "adjust",
+    pos: number,
+    img: HTMLElement,
+    event: MouseEvent,
+    handle: number,
+  ): void {
+    const node = this.state.doc.nodeAt(pos);
+    if (!node) return;
+    const rect = img.getBoundingClientRect();
+    this.shapeGesture = {
+      kind,
+      pos,
+      img,
+      handle,
+      x: event.clientX,
+      y: event.clientY,
+      cx: rect.left + rect.width / 2,
+      cy: rect.top + rect.height / 2,
+      scale: this.scale(),
+      attrs: node.attrs,
+      node,
+      style: img.getAttribute("style") ?? "",
+      svg: img.querySelector(":scope > svg"),
+    };
+    const doc = this.host.ownerDocument;
+    doc.addEventListener("pointermove", this.onShapeMove);
+    doc.addEventListener("pointerup", this.onShapeEnd);
+    doc.addEventListener("pointercancel", this.onShapeCancel);
+    doc.addEventListener("keydown", this.onShapeKey, true);
+    doc.defaultView?.addEventListener("blur", this.onShapeCancel);
+  }
+
+  private onShapeMove = (event: PointerEvent): void => {
+    const g = this.shapeGesture;
+    if (!g || !event.isPrimary) return;
+    event.preventDefault();
+    const dx = event.clientX - g.x;
+    const dy = event.clientY - g.y;
+    if (g.kind === "move") {
+      // A jiggle of a press is not a move.
+      if (!g.result && Math.hypot(dx, dy) < 3) return;
+      // In the page's own px (it may be zoomed).
+      g.img.style.translate = `${dx / (g.scale || 1)}px ${dy / (g.scale || 1)}px`;
+      g.result = { dx, dy };
+      return;
+    }
+    if (g.kind === "rotate") {
+      // The handle is above the middle: its angle from there, clockwise; Shift by 15°.
+      let degrees = (Math.atan2(event.clientY - g.cy, event.clientX - g.cx) * 180) / Math.PI + 90;
+      if (event.shiftKey) degrees = Math.round(degrees / 15) * 15;
+      degrees = ((Math.round(degrees) % 360) + 360) % 360;
+      g.img.style.transform = degrees ? `rotate(${degrees}deg)` : "";
+      g.result = { rotation: degrees * 60_000 };
+      return;
+    }
+    // The point in the shape's own (unturned) box, in layout px.
+    const turn = (((g.attrs.rotation as number | null) ?? 0) / 60_000) * (Math.PI / 180);
+    const px = event.clientX - g.cx;
+    const py = event.clientY - g.cy;
+    const ux = (px * Math.cos(-turn) - py * Math.sin(-turn)) / g.scale;
+    const uy = (px * Math.sin(-turn) + py * Math.cos(-turn)) / g.scale;
+    const w = Number(g.attrs.width) / EMU_PER_PX;
+    const h = Number(g.attrs.height) / EMU_PER_PX;
+    const adjust = adjustAt(g.attrs, g.handle, ux + w / 2, uy + h / 2);
+    if (!Object.keys(adjust).length) return;
+    const attrs = {
+      ...g.attrs,
+      adjust: { ...((g.attrs.adjust ?? {}) as Record<string, number>), ...adjust },
+    };
+    const drawn = shapeSvg(attrs, this.host.ownerDocument);
+    const now = g.img.querySelector(":scope > svg");
+    if (now) now.replaceWith(drawn);
+    g.result = { adjust };
+  };
+
+  private onShapeEnd = (event: PointerEvent): void => {
+    const g = this.endShapeGesture();
+    if (!g) return;
+    const result = g.result;
+    // The preview gone before the shape is measured (a move would count it twice).
+    g.img.style.translate = "";
+    // The shape changed or moved under the gesture (a remote edit): nothing applied.
+    if (this.state.doc.nodeAt(g.pos) !== g.node) {
+      this.restoreShape(g);
+      return;
+    }
+    let applied = false;
+    if (result && "dx" in result) {
+      const scale = g.scale || 1;
+      applied = this.run(
+        moveObject(
+          g.pos,
+          Math.round((result.dx / scale) * EMU_PER_PX),
+          Math.round((result.dy / scale) * EMU_PER_PX),
+          this.objectPlacement(g.pos) ?? undefined,
+        ),
+      );
+    } else if (result && "rotation" in result)
+      applied = this.run(
+        setObjectSize(g.pos, Number(g.attrs.width), Number(g.attrs.height), result.rotation),
+      );
+    else if (result && "adjust" in result) applied = this.run(setShapeAdjust(g.pos, result.adjust));
+    if (!applied) this.restoreShape(g);
+    else if (event.type === "pointerup") this.writeSelection(true);
+  };
+
+  private onShapeKey = (event: KeyboardEvent): void => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.onShapeCancel();
+  };
+
+  private onShapeCancel = (): void => {
+    const g = this.endShapeGesture();
+    if (g) this.restoreShape(g);
+  };
+
+  /** A gesture's shape as it was before it. */
+  private restoreShape(g: NonNullable<EditorView["shapeGesture"]>): void {
+    g.img.setAttribute("style", g.style);
+    const now = g.img.querySelector(":scope > svg");
+    if (g.svg && now && now !== g.svg) now.replaceWith(g.svg);
+  }
+
+  /** Ends a shape's gesture (its listeners gone) and returns it. */
+  private endShapeGesture(): NonNullable<EditorView["shapeGesture"]> | null {
+    const g = this.shapeGesture;
+    if (!g) return null;
+    this.shapeGesture = null;
+    const doc = this.host.ownerDocument;
+    doc.removeEventListener("pointermove", this.onShapeMove);
+    doc.removeEventListener("pointerup", this.onShapeEnd);
+    doc.removeEventListener("pointercancel", this.onShapeCancel);
+    doc.removeEventListener("keydown", this.onShapeKey, true);
+    doc.defaultView?.removeEventListener("blur", this.onShapeCancel);
+    return g;
+  }
+
+  /** A selected shape's rotate handle and adjustment handles (in it: they turn with it). */
+  private drawShapeHandles(span: HTMLElement): void {
+    const shape = span.querySelector<HTMLElement>(`:scope > [${SHAPE_ATTR}]`);
+    const pos = this.state.selection.from;
+    const node = this.state.doc.nodeAt(pos);
+    if (!shape || node?.type.name !== "shape") return;
+    const doc = this.host.ownerDocument;
+    const rotate = doc.createElement("span");
+    rotate.setAttribute("data-foli-rotate", "");
+    rotate.setAttribute("aria-hidden", "true");
+    shape.append(rotate);
+    adjustHandles(node.attrs).forEach(([x, y], i) => {
+      const handle = doc.createElement("span");
+      handle.setAttribute("data-foli-adjust", String(i));
+      handle.setAttribute("aria-hidden", "true");
+      handle.style.left = `${x}px`;
+      handle.style.top = `${y}px`;
+      shape.append(handle);
+    });
+  }
+
+  /**
+   * The arrow keys on a selected floating object move it (34.4, as Word's): by Word's 0.08" step,
+   * a pixel with Ctrl (Cmd); one undo step each.
+   */
+  private nudgeObject(event: KeyboardEvent): boolean {
+    const step = event.ctrlKey || event.metaKey ? NUDGE.fine : NUDGE.step;
+    const by: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    };
+    const move = by[event.key];
+    const { selection } = this.state;
+    if (
+      !move ||
+      event.shiftKey ||
+      event.altKey ||
+      !this.editable ||
+      !(selection instanceof NodeSelection) ||
+      !selection.node.attrs.float ||
+      !["picture", "textBox", "shape"].includes(selection.node.type.name)
+    )
+      return false;
+    const moved = this.run(
+      moveObject(
+        selection.from,
+        move[0],
+        move[1],
+        this.objectPlacement(selection.from) ?? undefined,
+      ),
+    );
+    if (moved) event.preventDefault();
+    return moved;
+  }
+
+  /**
+   * Typing on a selected shape writes in it (34.4, as Word's): its text made if it has none
+   * (centered, in the style's light color), opened, the character typed there.
+   */
+  private typeInShape(event: KeyboardEvent): boolean {
+    const { selection } = this.state;
+    const composing = event.key === "Process" || event.key === "Dead";
+    if (
+      ([...event.key].length !== 1 && !composing) ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      this.composing ||
+      !this.editable ||
+      !(selection instanceof NodeSelection) ||
+      selection.node.type.name !== "shape"
+    )
+      return false;
+    const pos = selection.from;
+    // No text can be made (a line, tracking): the key is not typed over the shape either.
+    if (!selection.node.attrs.story && !this.run(addShapeText(pos))) {
+      if (!composing) event.preventDefault();
+      return true;
+    }
+    const id = String(this.state.doc.nodeAt(pos)?.attrs.story ?? "");
+    // Never typed over the shape (which would replace it).
+    if (!id || !this.openTextBox(id)) {
+      if (!composing) event.preventDefault();
+      return true;
+    }
+    const view = this.mount?.view;
+    if (view) view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
+    if (composing) return true;
+    event.preventDefault();
+    view?.run(insertText(event.key));
+    return true;
   }
 
   private textWidthEmu(): number {
@@ -5457,6 +5745,8 @@ export class EditorView {
     }
     if (event.isComposing || this.composing) return;
     this.syncSelection();
+    // A selected floating object moves with the arrow keys; typing on a shape writes in it (34.4).
+    if (this.nudgeObject(event) || this.typeInShape(event)) return;
     if (this.crossFragmentEdge(event) || this.crossListNumber(event)) {
       event.preventDefault();
       return;
