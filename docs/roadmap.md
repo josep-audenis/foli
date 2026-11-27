@@ -44,7 +44,7 @@ place that says what is in progress; check it before starting work.
 | 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
 | 31 Ruler                      | In review                | `phase-31/ruler`          | 31.1–31.6 merged (#330–#335); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
-| 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 33 Text boxes & layout        | In progress              | `phase-33/textboxes`      | Started 2026-11-27 (the owner assigned it; Phase 29 is merged, its release pending)                                                                                                           |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 35 Insert extras              | Blocked by 29            | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4615,8 +4615,28 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
 
 ### Tasks
 
-- [ ] 33.1 ADR: text boxes as stories in floating anchors; schema bump with migration; import
-  and export of `wps:txbx` / VML text boxes, the rest of the drawing kept.
+- [x] 33.1 ADR: text boxes as stories in floating anchors; schema bump with migration; import
+  and export of `wps:txbx` / VML text boxes, the rest of the drawing kept. Decided (ADR-0016):
+  - A box's text is a story of kind `textBox` (`textbox:<n>`, a header's or footer's
+    `textbox:<relationship id>/<n>`), edited on its page by a nested view as a note is (33.3);
+    boxes only in the body, headers and footers, never one in another.
+  - The box is a `textBox` run atom with a picture's `width`, `height` and `float`, and what it
+    is drawn with (`fill`, `outline`, `inset`, `verticalAlign`, `autoFit`), `alt`, `title`, the
+    run content verbatim in `ext`; a box that goes takes its story in the same undo step.
+  - Tight and through: the frame's rectangle for now; a file's wrap polygon kept and written
+    back while the wrapping stays.
+  - Schema 10 (v9 → v10: the version only; an opaque box stays so until imported again).
+
+  Built: core's node, story kind, rules and `textBoxesPlugin`; `@folijs/docx` reads DrawingML
+  (`mc:AlternateContent` or a bare `w:drawing`) and VML text boxes (`import/textboxes.ts`) and
+  writes them back (`export/textboxes.ts`): unchanged byte for byte, edited text into the
+  DrawingML and its VML copy, a changed frame edited in place (`export/frames.ts`, which
+  pictures use too: a moved or rewrapped picture keeps its drawing now), a new box as DrawingML.
+  A corpus document with text boxes and tight and through pictures,
+  `11-text-box-flyer.docx`, Word's reference for it (`word-reference.ps1` records text boxes),
+  `textbox-roundtrip.mjs` (Word 16 opens the unchanged and the edited file without repair, the
+  boxes' text, size, position and wrapping as Foli wrote them). A v10 format fixture.
+  `textboxes.test.ts` in core and docx. document-model.md, limitations.md.
 - [ ] 33.2 Drawing: the box, its fill and outline, its text laid out inside, wrapped around as a
   picture is; read-only pages and `exportPdf` too.
 - [ ] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and

@@ -46,7 +46,7 @@ import {
  * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
  * and line numbers, ADR-0015).
  */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -354,10 +354,12 @@ export interface CommentJSON {
 
 /**
  * Content outside the body (schema v5, ADR-0007). `noteType` is a note's `w:type`: the separators
- * and the continuation notice have no reference and are not numbered.
+ * and the continuation notice have no reference and are not numbered. A text box's text is a
+ * story of kind `textBox` (schema 10, ADR-0016), its `textBox` node in the body or a header or
+ * footer.
  */
 export interface StoryJSON {
-  kind: "header" | "footer" | "footnote" | "endnote";
+  kind: "header" | "footer" | "footnote" | "endnote" | "textBox";
   noteType?: "normal" | "separator" | "continuationSeparator" | "continuationNotice";
   /** A `doc` of blocks. */
   content: NodeJSON;
@@ -465,9 +467,9 @@ export interface PageBackgroundJSON {
 export interface FoliDocument {
   /**
    * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
-   * added (6: a picture's rotation or crop, 1.4).
+   * added (6: a picture's rotation or crop, 1.4; 10: text boxes).
    */
-  schemaVersion: 5 | 6 | 7 | 8 | typeof SCHEMA_VERSION;
+  schemaVersion: 5 | 6 | 7 | 8 | 9 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -514,7 +516,7 @@ export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
 
 /**
  * The lowest schema `doc`'s content needs (ADR-0008: a document is saved with it, so an older
- * 1.x reads it when it can): 9 for page decoration (the page color, a section's page borders or
+ * 1.x reads it when it can): 10 for text boxes, 9 for page decoration (the page color, a section's page borders or
  * line numbers), 8 for a table's, row's or cell's recorded formatting, 7 for the tracking switch
  * in the settings, 6 for a picture rotated or cropped, else 5.
  * @internal
@@ -533,6 +535,11 @@ export function schemaVersionOf(
     ...doc.comments.map((c) => ({ content: c.content })),
     ...Object.values(doc.stories ?? {}).map((s) => s.content),
   ];
+  if (
+    Object.values(doc.stories ?? {}).some((s) => s.kind === "textBox") ||
+    trees.some((tree) => laterNode(tree, 9))
+  )
+    return 10;
   if (
     doc.settings?.background !== undefined ||
     V9_SECTION_KEYS.some((key) => inSection(doc.section, key)) ||
@@ -606,7 +613,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     version === 5 ||
     version === 6 ||
     version === 7 ||
-    version === 8
+    version === 8 ||
+    version === 9
   ) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
@@ -619,6 +627,23 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
     if (version < 7 && doc.settings?.trackRevisions !== undefined)
       fail("settings.trackRevisions", `is of schema 7 (the document says schema ${version})`);
+    const boxed = Object.entries(doc.stories ?? {}).find(([, s]) => s.kind === "textBox");
+    if (boxed)
+      fail(
+        `stories[${JSON.stringify(boxed[0])}]`,
+        `a text box is of schema 10 (the document says schema ${version})`,
+      );
+    if (version === 9) {
+      for (const [path, content] of contentTrees(doc)) {
+        const found = laterNode(content, 9);
+        if (found)
+          fail(
+            path,
+            `${found.name} is a schema ${found.schema} node (the document says schema ${version})`,
+          );
+      }
+      return doc;
+    }
     if (doc.settings?.background !== undefined)
       fail("settings.background", `is of schema 9 (the document says schema ${version})`);
     if (suppressesLineNumbers(doc))
@@ -629,13 +654,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     const decorated = V9_SECTION_KEYS.find((key) => inSection(doc.section, key));
     if (decorated)
       fail("section", `${decorated} is of schema 9 (the document says schema ${version})`);
-    for (const [path, content] of [
-      ["content", doc.content],
-      ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
-      ...Object.entries(doc.stories ?? {}).map(
-        ([id, s]) => [`stories[${JSON.stringify(id)}].content`, s.content] as const,
-      ),
-    ] as const) {
+    for (const [path, content] of contentTrees(doc)) {
       const found = laterNode(content, version);
       if (found)
         fail(
@@ -709,14 +728,30 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
 
   const schema = schemaWith(options.extensions);
   const content = parseContent(distinct.content, { schema });
+  const trees = new Map<string, Node>();
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
       const tree = parseContent(story.content, { path, schema });
       storyRules(tree, story.kind, path);
+      trees.set(id, tree);
       return [id, { ...structuredClone({ ...story, content: null }), content: copied(tree) }];
     },
   );
+  // A box's story, when there is one, is a text box's: no header or note drawn inside a box
+  // (which could hold the box again).
+  const given = (input.stories ?? {}) as Record<string, StoryJSON>;
+  const boxStories = (tree: Node, path: string) =>
+    tree.descendants((node) => {
+      const id = node.type.name === "textBox" ? String(node.attrs.story) : null;
+      if (id !== null && Object.hasOwn(given, id) && given[id]?.kind !== "textBox")
+        fail(path, `a text box's story must be of kind textBox (${JSON.stringify(id)} is not)`);
+      return true;
+    });
+  boxStories(content, "content");
+  for (const [id, story] of Object.entries(given))
+    if (story.kind === "header" || story.kind === "footer")
+      boxStories(trees.get(id) as Node, `stories[${JSON.stringify(id)}].content`);
   // A copy: the validated document must not change when the caller's input does.
   const envelope = structuredClone({
     section: input.section,
@@ -751,6 +786,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
         block.descendants((node) => {
           if (node.type.name === "noteReference")
             fail(`comments[${i}].content`, "a comment cannot hold a note reference");
+          if (node.type.name === "textBox")
+            fail(`comments[${i}].content`, "a comment cannot hold a text box");
           return true;
         });
         return copied(block);
@@ -765,6 +802,16 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   parsed.schemaVersion = schemaVersionOf(parsed);
   return parsed;
 }
+
+/** Each content tree of a validated document, with its path. */
+const contentTrees = (doc: FoliDocument) =>
+  [
+    ["content", doc.content],
+    ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
+    ...Object.entries(doc.stories ?? {}).map(
+      ([id, s]) => [`stories[${JSON.stringify(id)}].content`, s.content] as const,
+    ),
+  ] as const;
 
 /** A node's JSON sharing nothing with the input its attributes came from, foreign types written back. */
 const copied = (node: Node): NodeJSON => writeCustom(structuredClone(node.toJSON()));
@@ -829,10 +876,13 @@ export function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): v
     if (name === "noteReference") fail(path, "a story cannot hold a note reference");
     if (COMMENT_NODES.has(name)) fail(path, `a ${kind} cannot hold comments`);
     if (
-      (kind === "footnote" || kind === "endnote") &&
+      (kind === "footnote" || kind === "endnote" || kind === "textBox") &&
       (name === "pageBreak" || name === "columnBreak")
     )
-      fail(path, `a note cannot hold a ${name}`);
+      fail(path, `a ${kind === "textBox" ? "text box" : "note"} cannot hold a ${name}`);
+    // Word puts text boxes in the body, headers and footers only, never one in another.
+    if (name === "textBox" && kind !== "header" && kind !== "footer")
+      fail(path, `a ${kind === "textBox" ? "text box" : kind} cannot hold a text box`);
     return true;
   });
 }
@@ -903,6 +953,7 @@ function laterNode(
     const decorated =
       version < 9 ? V9_SECTION_KEYS.find((key) => inSection(attrs.section, key)) : undefined;
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
+    if (version < 10 && name === "textBox") return { name, schema: 10 };
     if (version < 9 && name === "opaqueInline" && attrs.watermark != null)
       return { name: "a watermark", schema: 9 };
     const previous = isRecord(attrs.formatChange) ? attrs.formatChange.previous : undefined;
@@ -1141,7 +1192,7 @@ const NOTE_KINDS = ["footnote", "endnote"];
 const checkStory: Check = (v) =>
   shape(
     {
-      kind: oneOf(["header", "footer", ...NOTE_KINDS]),
+      kind: oneOf(["header", "footer", ...NOTE_KINDS, "textBox"]),
       noteType: oneOf(["normal", "separator", "continuationSeparator", "continuationNotice"]),
       content: (c) => (isRecord(c) ? undefined : "must be an object"),
       ext: xml,

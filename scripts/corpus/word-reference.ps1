@@ -15,6 +15,9 @@
 #     size in points (an inline one from the page's corner; a floating one from what it is
 #     relative to, recorded, or its alignment when aligned), alt text, and a floating one's
 #     wrapping (WdWrapType);
+#   - textBoxes: each text box of the main text (Phase 33; msoTextBox shapes): page, anchor
+#     paragraph, position and size in points as for floating pictures, alt text, wrapping, and
+#     its text;
 #   - sections: each section's first page, column count, section start, different first page,
 #     and its headers and footers (default, first, even): whether they exist, are linked to the
 #     previous section, and their text as Word has it open (page fields recomputed, a picture
@@ -112,6 +115,7 @@ try {
       pages = $null
       paragraphs = @()
       pictures = @()
+      textBoxes = @()
       evenAndOddHeaders = $null
       pageSections = @()
       sections = @()
@@ -201,6 +205,29 @@ try {
           })
       }
       $result.pictures = $pictures.ToArray()
+      $boxes = New-Object System.Collections.Generic.List[object]
+      foreach ($s in $doc.Shapes) {
+        if ($s.Type -ne 17) { continue }   # msoTextBox
+        $left = [double]$s.Left; $top = [double]$s.Top
+        $anchorParagraph = $doc.Range(0, $s.Anchor.Start).Paragraphs.Count
+        if ($s.Anchor.Start -eq $doc.Paragraphs.Item($anchorParagraph).Range.End) { $anchorParagraph++ }
+        $boxes.Add([ordered]@{
+            page = [int]$s.Anchor.Information($INFO_PAGE)
+            paragraph = $anchorParagraph
+            left = if ($ALIGNED.ContainsKey([int]$left)) { $null } else { [math]::Round($left, 1) }
+            top = if ($ALIGNED.ContainsKey([int]$top)) { $null } else { [math]::Round($top, 1) }
+            horizontalAlign = $ALIGNED[[int]$left]
+            verticalAlign = $ALIGNED[[int]$top]
+            width = [math]::Round([double]$s.Width, 1)
+            height = [math]::Round([double]$s.Height, 1)
+            alt = [string]$s.AlternativeText
+            wrap = [int]$s.WrapFormat.Type
+            horizontalTo = [int]$s.RelativeHorizontalPosition
+            verticalTo = [int]$s.RelativeVerticalPosition
+            text = Clean ([string]$s.TextFrame.TextRange.Text).Replace("`r", "`n")
+          })
+      }
+      $result.textBoxes = $boxes.ToArray()
       $result.evenAndOddHeaders = [bool]$doc.PageSetup.OddAndEvenPagesHeaderFooter
       $pageSections = New-Object System.Collections.Generic.List[object]
       for ($n = 1; $n -le $result.pages; $n++) {

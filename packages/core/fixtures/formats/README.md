@@ -15,6 +15,7 @@ and compares them; `src/formats.test.ts` (docx) takes them through `.docx` too.
 | `v6.json`                                |      6 | 1.4.0      | A picture rotated and cropped by 1.4.0's commands (19.5), saved by its editor                 |
 | `v8.json`                                |      8 | 1.7.0      | A table's style, a header row and a cell's shading changed while tracking (23.2), dates fixed |
 | `v9.json`                                |      9 | (Phase 32) | v7's with a page color, page borders and line numbers (hand-made from v7 before the release)  |
+| `v10-11-text-box-flyer.json`             |     10 | (Phase 33) | The corpus's 11 as Phase 33's `@folijs/docx` read it: text boxes in the body and a header     |
 
 `migrated/v1.json` and `migrated/v2.json` are what 1.x saves from the v1 and v2 fixtures (the
 migration to Word's model), reviewed when recorded in 12.11: a change to them is a change to

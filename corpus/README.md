@@ -22,6 +22,7 @@ not exist.
 | `08-newsletter.docx`                  | Phase 11: five sections: one column, two balanced columns with a line between them (continuous), one column (continuous), three columns of set widths with a column break on a new page with a header of its own, a landscape section starting on an odd page after a blank page; even and odd headers and footers, a different first page, `PAGE` in the footer |
 | `09-pump-test-memo.docx`              | Phase 11: footnotes, one longer than a page so it continues on the next, endnotes, a bookmark with `REF` and `PAGEREF` to it, a locked `DATE` field (Word recomputes an unlocked one on opening), numbered captions (`SEQ`), `PAGE` in the header                                                                                                                |
 | `10-design-memo.docx`                 | Phase 32: a page color, a double page border 24 pt from the page's edge, Word's CONFIDENTIAL 1 watermark from its gallery (in a Watermarks building-block control), a paragraph with a bottom border and gray shading, a boxed paragraph, line numbers every fifth line                                                                                          |
+| `11-text-box-flyer.docx`              | Phase 33: text boxes (Word's DrawingML with its VML copy): one wrapped square with a fill and a line holding two paragraphs, a pull quote between paragraphs (top and bottom, no fill or line), a badge in front of the text fixed on the page, one in the header; pictures wrapped tight and through                                                            |
 
 Page fields in headers and footers (`PAGE`, `NUMPAGES`) keep the result Word cached when it
 last updated them ("Page 1 of 1" in a 2-page document): Word computes them per page when it
@@ -108,6 +109,19 @@ prompt; the 15 without edits match their reference exactly):
 ```bash
 node scripts/corpus/rewrite-corpus.mjs <folder>
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder> -Out <folder>
+```
+
+Text boxes (Phase 33): `scripts/corpus/textbox-roundtrip.mjs make` writes the documents with
+text boxes back unchanged and edited (every box's text, the first box moved, widened, wrapped
+tight, refilled; a new box), `word-reference.ps1` records what Word makes of them (its
+`textBoxes`), and `check` compares: on 2026-11-27 Word 16 opened both without repair, the
+unchanged one as the original, the edited one's boxes with Foli's text, size, position and
+wrapping.
+
+```bash
+node scripts/corpus/textbox-roundtrip.mjs make <folder>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder>/foli -Out <folder>/word
+node scripts/corpus/textbox-roundtrip.mjs check <folder>
 ```
 
 ## Review content with Word (`reference/review/`)

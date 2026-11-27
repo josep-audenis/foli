@@ -36,6 +36,11 @@ export interface WriteContext {
   readonly hyperlink: (href: string, id: string | undefined) => string;
   /** A picture's `w:drawing` (its image related to the part, its media part allocated). */
   readonly picture: (attrs: Record<string, unknown>) => string;
+  /**
+   * A text box's run content (Phase 33): its story's blocks written with `context` (the run's
+   * scope) into what it was read from, or a new one.
+   */
+  readonly textBox: (attrs: Record<string, unknown>, context: WriteContext) => string;
   /** A watermark's `w:pict`: as read while it says what it did, else written anew. */
   readonly watermark: (attrs: Record<string, unknown>) => string;
   /** The kind of note being written: what its `noteMark` is. */
@@ -356,6 +361,7 @@ function inRun(node: NodeJSON): boolean {
     "noteReference",
     "noteMark",
     "picture",
+    "textBox",
     "fieldStart",
     "fieldCode",
     "fieldSeparator",
@@ -496,6 +502,8 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return a.watermark ? context.watermark(a) : verbatim(a.xml, context);
     case "picture":
       return context.picture(a);
+    case "textBox":
+      return context.textBox(a, context);
     default:
       return notYet(node);
   }

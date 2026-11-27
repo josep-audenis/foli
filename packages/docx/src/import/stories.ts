@@ -35,12 +35,14 @@ const docOf = (content: StoryJSON["content"]["content"]): StoryJSON["content"] =
 });
 
 /**
- * Every story of the package, by id. `contextFor` gives the reading context of a part.
+ * Every story of the package, by id. `contextFor` gives the reading context of a part. The text
+ * boxes of a header or footer go into `boxes` (`textbox:<relationship id>/<n>`).
  * @internal
  */
 export function readStories(
   pkg: DocxPackage,
   contextFor: (part: string, source: string) => ContentContext,
+  boxes: Map<string, StoryJSON> = new Map(),
 ): Record<string, StoryJSON> {
   const stories: Record<string, StoryJSON> = {};
   const notesRead = new Set<string>();
@@ -72,9 +74,10 @@ export function readStories(
       const [kind, root] = headerOrFooter as ["header" | "footer", string];
       // An id the envelope cannot hold as a key: the part stays as it is.
       if (!isW(xml.root, root) || relationship.id === "__proto__") continue;
+      const textBoxes = { stories: boxes, prefix: `textbox:${relationship.id}/` };
       stories[relationship.id] = {
         kind,
-        content: docOf(blocks(xml.root.children, { ...context, story: kind })),
+        content: docOf(blocks(xml.root.children, { ...context, story: kind, textBoxes })),
       };
     } else if (note) {
       // One part per kind, of the right kind: any other stays as it is.
@@ -127,8 +130,30 @@ export function noteIds(pkg: DocxPackage): Set<string> {
 export function canonicalStories(
   pkg: DocxPackage,
   contextFor: (part: string, source: string) => ContentContext,
+  /** The body's text boxes too (read from the whole body, as import numbers them). */
+  body = false,
 ): Record<string, StoryJSON> {
-  const stories = readStories(pkg, contextFor);
+  const boxes = new Map<string, StoryJSON>();
+  if (body) {
+    const main = pkg.xml(pkg.mainDocument);
+    const content = elements(main.root).find((e) => isW(e, "body"));
+    const sectPr =
+      content &&
+      elements(content)
+        .filter((e) => isW(e, "sectPr"))
+        .at(-1);
+    if (content)
+      blocks(
+        content.children,
+        {
+          ...contextFor(pkg.mainDocument, main.source),
+          textBoxes: { stories: boxes, prefix: "textbox:" },
+        },
+        sectPr,
+      );
+  }
+  const stories = readStories(pkg, contextFor, boxes);
+  Object.assign(stories, Object.fromEntries(boxes));
   for (const story of Object.values(stories)) story.content = parseContent(story.content).toJSON();
   return stories;
 }

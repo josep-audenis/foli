@@ -211,6 +211,18 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   (`w:pict`) has `watermark` (`WatermarkJSON`): `kind` text or picture, `text`, `font`, `color`,
   `semitransparent`, `rotation` (315: Word's diagonal), `picture` (a key of `resources`),
   `washout`, and `width` and `height` in twips. `xml` is written back while it still says that.
+- **Text boxes** (v10, ADR-0016): a `textBox` is a run atom like a picture: `story` (its text,
+  `stories[story]` of kind `textBox`), `width` and `height` (EMU), `float` (a picture's: null in
+  line with text), `fill` (RRGGBB, null none), `outline` (`color`, `width` in EMU; null none),
+  `inset` (`left`, `top`, `right`, `bottom` in EMU; null Word's 0.1" and 0.05"),
+  `verticalAlign` (top, center, bottom), `autoFit` (the box grows to its text), `alt`, `title`,
+  and `ext`, the run content it was read from (`mc:AlternateContent`, `w:drawing` or `w:pict`).
+  Theme colors are read as RRGGBB. A story of kind `textBox` is `textbox:<n>`, or
+  `textbox:<relationship id>/<n>` for a header's or footer's box; it holds what a note may and no
+  page or column break; boxes are in the body, headers and footers only, never in a note, a
+  comment or a box. In the editor a box that goes takes its story with it (one undo step).
+  Export writes the story's text into `ext` (DrawingML and its VML copy) and a changed size,
+  position, wrapping or look into the DrawingML, the VML copy then left out.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.
@@ -505,7 +517,8 @@ Migrations never drop content. A published version never changes in place.
 | 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                            |
 | 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                           |
 | 8       | 1.7.0       | v8 → v9: what `ext` kept is adopted (a section's `w:pgBorders`, `w:lnNumType`, a paragraph's `w:suppressLineNumbers`) |
-| 9       | next minor  | — (the current version: page decoration, `settings.background`, a section's `pageBorders` and `lineNumbers`, 32.1)    |
+| 9       | next minor  | v9 → v10: only the version changes (a text box kept opaque stays so until its `.docx` is imported again)              |
+| 10      | next minor  | — (the current version: text boxes, the `textBox` node and stories of kind `textBox`, 33.1)                           |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
@@ -517,7 +530,9 @@ From 1.7.0 a table, row or cell with a recorded formatting change (`formatChange
 `w:tcPrChange`) needs 8, and a document that says 7 or less holding one is refused. From the
 minor after 1.9 (Phase 32) a page color (`settings.background`) or a section with `pageBorders`
 or `lineNumbers` (the envelope's, a paragraph's `section`, or the setup a tracked change
-recorded) needs 9, and a document that says 8 or less holding one is refused.
+recorded) needs 9, and a document that says 8 or less holding one is refused. From Phase 33 a
+text box (a `textBox` node, or a story of kind `textBox`) needs 10, and a document that says 9
+or less holding one is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.

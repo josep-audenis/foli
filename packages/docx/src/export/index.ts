@@ -39,6 +39,7 @@ import {
 } from "./parts.js";
 import { drawingXml, Media, pictureBytes } from "./pictures.js";
 import { same, sectionXml } from "./properties.js";
+import { textBoxXml } from "./textboxes.js";
 import {
   DEFAULT_NAMESPACES,
   declarationsOf,
@@ -189,6 +190,18 @@ function contextFor(
         namespaces,
         media,
       ),
+    textBox: (attrs, context) => {
+      const story = media.doc.stories?.[String(attrs.story)];
+      // A box whose story is missing writes the text its file had (none for a new one).
+      const blocks =
+        story && Object.hasOwn(media.doc.stories ?? {}, String(attrs.story))
+          ? (story.content.content ?? [])
+          : undefined;
+      const kept =
+        typeof attrs.ext === "string" && (!blocks || media.unchangedStory(String(attrs.story)));
+      const inner = kept ? undefined : blocksXml(blocks ?? [], context);
+      return textBoxXml(attrs, inner, context.namespaces, media);
+    },
     watermark: (attrs) => {
       const wanted = attrs.watermark as WatermarkJSON;
       const xml = String(attrs.xml ?? "");
@@ -301,16 +314,21 @@ export async function exportDocx(
   const referenced = noteReferences(doc);
   const read =
     original && (doc.stories || referenced.modeled.size)
-      ? packageStories(original)
+      ? packageStories(
+          original,
+          Object.keys(doc.stories ?? {}).some((id) => /^textbox:\d+$/.test(id)),
+        )
       : { stories: {}, controls: new Map<string, ControlJSON>() };
   const originals: Readonly<Record<string, StoryJSON>> = read.stories;
-  // A story is unchanged if its tree is, and the controls in it say what they said.
-  const unchanged = (id: string) =>
+  // A story is unchanged if its tree is, the controls in it say what they said, and so do the
+  // text boxes it holds (Phase 33).
+  const unchanged = (id: string): boolean =>
     Object.hasOwn(originals, id) &&
     same(doc.stories?.[id], originals[id]) &&
     [...controlsUsed(doc.stories?.[id])].every((c) =>
       same(doc.controls?.[c], read.controls.get(c)),
-    );
+    ) &&
+    [...boxesIn(doc.stories?.[id])].every((box) => box !== id && unchanged(box));
   // Notes the model does not hold (an unknown `w:type`) stay in their part: they count too.
   const inPart = original && referenced.modeled.size ? noteIds(original) : new Set<string>();
   for (const key of referenced.modeled)
@@ -333,6 +351,8 @@ export async function exportDocx(
     : [];
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
+  // A text box whose story is as read keeps the text its file has (Phase 33).
+  media.unchangedStory = unchanged;
   if (!original) return newPackage(doc, referenced.isReferenced, options, media);
   const written = await intoPackage(
     doc,
@@ -935,4 +955,16 @@ function packageReference(doc: FoliDocument): string | undefined {
 /** A part's text with an encoding declaration of UTF-8, the encoding it is written in. */
 function utf8Declaration(text: string): string {
   return text.replace(/^(<\?xml[^?]*?encoding=)(["'])[^"']*\2/, "$1$2UTF-8$2");
+}
+
+/** The stories of the text boxes in `content` (Phase 33). */
+function boxesIn(content: unknown): Set<string> {
+  const out = new Set<string>();
+  JSON.stringify(content, (_key, value) => {
+    const node = value as { type?: unknown; attrs?: { story?: unknown } } | null;
+    if (node?.type === "textBox" && typeof node.attrs?.story === "string")
+      out.add(node.attrs.story);
+    return value;
+  });
+  return out;
 }

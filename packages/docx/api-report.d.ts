@@ -32,6 +32,15 @@ export {};
 // export/controls.d.ts
 export {};
 
+// export/frames.d.ts
+/**
+ * A drawing's frame (`wp:inline`, `wp:anchor`) as the model's size and `float` say, edited in
+ * place: what the model does not hold (the wrap polygon of an unchanged wrapping, effect
+ * extents, z-order, locks, Word's ids) stays as the file has it. Shared by pictures and text
+ * boxes (Phase 33).
+ */
+export {};
+
 // export/index.d.ts
 /**
  * Schema v3 to `.docx` (ADR-0005): the parts the editor owns are written from the document
@@ -110,6 +119,18 @@ export {};
  * `w:tblGrid`, as paragraph properties are written: an element read from a file comes back
  * verbatim while its values are what import read from it; otherwise each child is decided on
  * its own, and children Foli does not model stay where Word requires them.
+ */
+export {};
+
+// export/textboxes.d.ts
+/**
+ * Text boxes back to WordprocessingML (Phase 33, ADR-0016). One read from a file is its run
+ * content as read (`mc:AlternateContent`, `w:drawing` or `w:pict`) with the story's text written
+ * into each `w:txbxContent` and only what the model changed written into the DrawingML (size,
+ * position, wrapping, fill, outline, alt text: the frame edited in place as a picture's is).
+ * Word's VML fallback copy gets the text too; once the box itself changed it is left out (Word
+ * 2010 and later read the DrawingML), as it is for a copy. A VML-only box that changed, and a
+ * new box, are written as a DrawingML text box.
  */
 export {};
 
@@ -237,6 +258,9 @@ export {};
  * `w:tblStylePr`) to schema v4 attributes. As for paragraphs, each value is checked on its own
  * against the schema: one the model cannot hold is reported and stays in the element's `ext`.
  */
+export {};
+
+// import/textboxes.d.ts
 export {};
 
 // index.d.ts

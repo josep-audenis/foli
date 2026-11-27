@@ -169,15 +169,18 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React, FoliEditor and `@folijs/pdf` raised in 32.5 (222.3 and 19.4 kB; 228.0 and 20.0 allowed):
  * the Borders and Shading, Watermark and Line Numbers dialogs, line numbers drawn, and schema
  * 8's kept decoration adopted on parse.
+ * Docx, agent, view and pdf's renderer raised in 33.1 (76.2, 104.3, 132.1 and 98.3 kB; 80.0,
+ * 106.0, 138.0 and 102.0 allowed): text boxes (schema 10's node and story checks; DrawingML and VML text boxes read and
+ * written, frames edited in place for pictures too), with room for 33.2's drawing and 33.4–33.6.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 104_448 },
-  { name: "@folijs/view", entry: dist("view"), budget: 135_168 },
+  { name: "@folijs/view", entry: dist("view"), budget: 141_312 },
   { name: "@folijs/react", entry: dist("react"), budget: 233_472 },
   { name: "FoliEditor only", entry: appEntry, budget: 233_472 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 72_704 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 81_920 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 20_480 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 108_544 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
@@ -185,7 +188,7 @@ const BUILT = [
   {
     name: "pdf's renderer",
     file: join(root, "packages", "pdf", "dist", "renderer.js"),
-    budget: 100_352,
+    budget: 104_448,
   },
 ];
 

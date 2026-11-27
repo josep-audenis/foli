@@ -4,7 +4,7 @@
  * for markers that have nothing to show: field characters, range ends).
  */
 
-import type { ControlJSON, MarkJSON, NodeJSON, ResourceJSON } from "@folijs/core";
+import type { ControlJSON, MarkJSON, NodeJSON, ResourceJSON, StoryJSON } from "@folijs/core";
 import { schema } from "@folijs/core/internal";
 import type { DocxPackage, Relationship } from "../package.js";
 import { readWatermark } from "../watermark.js";
@@ -23,6 +23,7 @@ import {
   sourceOf,
 } from "./properties.js";
 import { cellProperties, grid, rowProperties, tableProperties } from "./tables.js";
+import { textBoxOf } from "./textboxes.js";
 
 /** @internal */
 export interface ContentContext extends Context {
@@ -44,7 +45,9 @@ export interface ContentContext extends Context {
   /**
    * The kind of story being read (ADR-0007), or a comment: what one may not hold stays verbatim.
    */
-  readonly story?: "header" | "footer" | "footnote" | "endnote" | "comment";
+  readonly story?: "header" | "footer" | "footnote" | "endnote" | "comment" | "textBox";
+  /** Where the part's text boxes go (Phase 33), and their ids' prefix. */
+  readonly textBoxes?: { readonly stories: Map<string, StoryJSON>; readonly prefix: string };
   /** The package's notes (`footnote:<id>`, `endnote:<id>`): a reference to another stays verbatim. */
   readonly notes?: ReadonlySet<string>;
   /** Whether `xml:space="preserve"` applies to an element of the part, from it or an ancestor. */
@@ -639,7 +642,8 @@ function run(
   for (const el of r.children) {
     if (el.kind !== "element" || el === rPr) continue;
     if (!isW(el)) {
-      opaqueRun(el, el.local === "AlternateContent" ? "alternate content" : el.local);
+      if (!textBox(el))
+        opaqueRun(el, el.local === "AlternateContent" ? "alternate content" : el.local);
       continue;
     }
     switch (el.local) {
@@ -660,7 +664,11 @@ function run(
         break;
       case "br": {
         const type = attr(el, "type");
-        const inNote = context.story === "footnote" || context.story === "endnote";
+        // Word puts no page or column break in a note or a text box: kept as it is.
+        const inNote =
+          context.story === "footnote" ||
+          context.story === "endnote" ||
+          context.story === "textBox";
         if ((type === "page" || type === "column") && inNote) opaqueRun(el);
         else if (type === "page") out.push(node("pageBreak", marks));
         else if (type === "column") out.push(node("columnBreak", marks));
@@ -690,7 +698,7 @@ function run(
         );
         const leaf = attrs && valid(node("picture", marks, attrs), el, context);
         if (!leaf) {
-          opaqueRun(el);
+          if (!textBox(el)) opaqueRun(el);
           break;
         }
         out.push(leaf);
@@ -804,7 +812,7 @@ function run(
             context,
           );
         if (!leaf) {
-          opaqueRun(el);
+          if (!textBox(el)) opaqueRun(el);
           break;
         }
         out.push(leaf);
@@ -825,6 +833,21 @@ function run(
   }
   // A run with properties and nothing else shows nothing; Word drops those too.
   if (out.length === before) context.report.dropped("w:r (empty)");
+
+  /** A text box (Phase 33) read into `out`; false when `el` is none Foli models. */
+  function textBox(el: XmlElement): boolean {
+    const attrs = textBoxOf(el, context, (children) =>
+      blocks(children, { ...context, story: "textBox" }),
+    );
+    if (!attrs) return false;
+    const leaf = valid(node("textBox", marks, attrs), el, context);
+    if (!leaf) {
+      context.textBoxes?.stories.delete(String(attrs.story));
+      return false;
+    }
+    out.push(leaf);
+    return true;
+  }
 
   function opaqueRun(
     el: XmlElement,

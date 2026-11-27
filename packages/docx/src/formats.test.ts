@@ -38,7 +38,7 @@ describe("0.x formats through .docx", () => {
   for (const name of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
     it(`keeps the text of ${name}`, async () => {
       const loaded = parseDocument(JSON.parse(readFileSync(new URL(name, dir), "utf8")));
-      const source = name.match(/^v\d-(.+)\.json$/)?.[1];
+      const source = name.match(/^v\d+-(.+)\.json$/)?.[1];
       const original = source
         ? (await importDocx(new Uint8Array(readFileSync(new URL(`${source}.docx`, corpus)))))
             .package
