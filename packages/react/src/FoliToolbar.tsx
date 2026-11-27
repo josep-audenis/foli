@@ -47,6 +47,7 @@ import {
   insertPicture,
   insertRow,
   insertSectionBreak,
+  insertShape,
   insertTable,
   insertTableOfContents,
   insertTextBox,
@@ -2402,7 +2403,14 @@ const RIBBON_ITEMS: readonly Item[] = [
     render: StyleGallery,
   },
   // Insert ▸ Shapes (34.3): Word's gallery; a shape is drawn on the pages.
-  { key: "shapes", label: "Shapes", text: "Shapes", enabled: isWord, render: ShapeGallery },
+  {
+    key: "shapes",
+    label: "Shapes",
+    text: "Shapes",
+    // In the body only (a story's editor refuses one).
+    enabled: (state) => insertShape("rect")(state),
+    render: ShapeGallery,
+  },
   // Word's Design tab (Phase 32): its Page Background group.
   {
     key: "pageColor",

@@ -666,18 +666,24 @@ export declare class EditorView {
      * corner, its paragraph's top and its column's left edge; null when it is not drawn.
      */
     objectPlacement(pos: number): ObjectPlacement | null;
-    /** The shape being drawn: its geometry, the press, the outline shown, the listeners to remove. */
+    /**
+     * The shape being drawn: its geometry, the press (from its page's corner, so a scroll during
+     * the drag keeps it; the position pressed), the outline shown, the listeners to remove.
+     */
     private drawing;
     /**
      * Starts drawing a shape of DrawingML preset `geometry` (Insert ▸ Shapes, 34.3): the next press
      * on a page and its drag give the shape's box (Shift: a square, a line at a multiple of 45°; a
      * press without a drag: an inch square), inserted in front of the text in the paragraph pressed
-     * and selected. Escape, or a press outside the pages, stops without one. Whether it started.
+     * and selected. Escape, or a press outside the pages, stops without one (the focus back in the
+     * document). Whether it started.
      */
     drawShape(geometry: string): boolean;
-    /** Stops drawing a shape, if one is being drawn. */
-    stopDrawing(): void;
+    /** Stops drawing a shape, if one is being drawn; `refocus`: the focus back in the document. */
+    stopDrawing(refocus?: boolean): void;
     private onDrawDown;
+    /** Where the press is now on the screen (its page may have scrolled). */
+    private drawStart;
     /** The box the press and `event` make: Shift squares it (a line: at a multiple of 45°). */
     private drawnBox;
     private onDrawMove;

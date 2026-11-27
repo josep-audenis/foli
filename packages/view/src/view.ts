@@ -4068,10 +4068,13 @@ export class EditorView {
 
   // ---------- Insert ▸ Shapes: drawing a new shape (34.3) ----------
 
-  /** The shape being drawn: its geometry, the press, the outline shown, the listeners to remove. */
+  /**
+   * The shape being drawn: its geometry, the press (from its page's corner, so a scroll during
+   * the drag keeps it; the position pressed), the outline shown, the listeners to remove.
+   */
   private drawing: {
     geometry: string;
-    start?: { x: number; y: number; pointer: number };
+    start?: { page: Element; x: number; y: number; pointer: number; at: number | null };
     outline?: HTMLElement;
     end: () => void;
   } | null = null;
@@ -4080,11 +4083,19 @@ export class EditorView {
    * Starts drawing a shape of DrawingML preset `geometry` (Insert ▸ Shapes, 34.3): the next press
    * on a page and its drag give the shape's box (Shift: a square, a line at a multiple of 45°; a
    * press without a drag: an inch square), inserted in front of the text in the paragraph pressed
-   * and selected. Escape, or a press outside the pages, stops without one. Whether it started.
+   * and selected. Escape, or a press outside the pages, stops without one (the focus back in the
+   * document). Whether it started.
    */
   drawShape(geometry: string): boolean {
     this.stopDrawing();
-    if (!this.editable || this.destroyed || this.mount || !insertShape(geometry)(this.state))
+    // Whatever the selection (a cell selection too): the press chooses the paragraph.
+    const somewhere = Selection.atStart(this.state.doc).from;
+    if (
+      !this.editable ||
+      this.destroyed ||
+      this.mount ||
+      !insertShape(geometry, { pos: somewhere })(this.state)
+    )
       return false;
     const doc = this.host.ownerDocument;
     const down = (event: PointerEvent) => this.onDrawDown(event);
@@ -4094,13 +4105,15 @@ export class EditorView {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      this.stopDrawing();
+      this.stopDrawing(true);
     };
+    const blur = () => this.stopDrawing();
     doc.addEventListener("pointerdown", down, true);
     doc.addEventListener("pointermove", move, true);
     doc.addEventListener("pointerup", up, true);
     doc.addEventListener("pointercancel", up, true);
     doc.addEventListener("keydown", key, true);
+    doc.defaultView?.addEventListener("blur", blur);
     this.host.setAttribute("data-foli-drawing", geometry);
     injectStyles(this.host);
     this.drawing = {
@@ -4111,19 +4124,22 @@ export class EditorView {
         doc.removeEventListener("pointerup", up, true);
         doc.removeEventListener("pointercancel", up, true);
         doc.removeEventListener("keydown", key, true);
+        doc.defaultView?.removeEventListener("blur", blur);
       },
     };
     return true;
   }
 
-  /** Stops drawing a shape, if one is being drawn. */
-  stopDrawing(): void {
+  /** Stops drawing a shape, if one is being drawn; `refocus`: the focus back in the document. */
+  stopDrawing(refocus = false): void {
     const drawing = this.drawing;
     if (!drawing) return;
     this.drawing = null;
     drawing.end();
     drawing.outline?.remove();
     this.host.removeAttribute("data-foli-drawing");
+    // The gallery's menu that started it is gone: the focus would be nowhere.
+    if (refocus && !this.destroyed && !this.hasFocus()) this.host.focus({ preventScroll: true });
   }
 
   private onDrawDown(event: PointerEvent): void {
@@ -4131,12 +4147,20 @@ export class EditorView {
     if (!drawing || !event.isPrimary || event.button !== 0) return;
     const page = event.target instanceof Element ? event.target.closest(".foli-page") : null;
     if (!page || !this.host.contains(page)) {
-      this.stopDrawing();
+      this.stopDrawing(true);
       return;
     }
     event.preventDefault();
     event.stopPropagation();
-    drawing.start = { x: event.clientX, y: event.clientY, pointer: event.pointerId };
+    const corner = page.getBoundingClientRect();
+    drawing.start = {
+      page,
+      x: event.clientX - corner.left,
+      y: event.clientY - corner.top,
+      pointer: event.pointerId,
+      at: this.posAtPoint(event.clientX, event.clientY),
+    };
+    drawing.outline?.remove();
     const outline = this.host.ownerDocument.createElement("div");
     outline.setAttribute("aria-hidden", "true");
     outline.setAttribute("data-foli-drawn-outline", "");
@@ -4154,9 +4178,16 @@ export class EditorView {
     drawing.outline = outline;
   }
 
+  /** Where the press is now on the screen (its page may have scrolled). */
+  private drawStart(): { x: number; y: number } {
+    const start = this.drawing?.start as NonNullable<NonNullable<EditorView["drawing"]>["start"]>;
+    const corner = start.page.getBoundingClientRect();
+    return { x: corner.left + start.x, y: corner.top + start.y };
+  }
+
   /** The box the press and `event` make: Shift squares it (a line: at a multiple of 45°). */
   private drawnBox(event: PointerEvent) {
-    const start = this.drawing?.start as { x: number; y: number };
+    const start = this.drawStart();
     let dx = event.clientX - start.x;
     let dy = event.clientY - start.y;
     if (event.shiftKey) {
@@ -4172,6 +4203,7 @@ export class EditorView {
       }
     }
     return {
+      start,
       left: Math.min(start.x, start.x + dx),
       top: Math.min(start.y, start.y + dy),
       width: Math.abs(dx),
@@ -4198,9 +4230,11 @@ export class EditorView {
     const drawing = this.drawing;
     if (!drawing?.start || event.pointerId !== drawing.start.pointer) return;
     event.preventDefault();
-    const { geometry, start } = drawing;
+    const { geometry } = drawing;
+    const pressed = drawing.start.at;
     const box = this.drawnBox(event);
-    this.stopDrawing();
+    const { start } = box;
+    this.stopDrawing(event.type === "pointercancel");
     if (event.type === "pointercancel") return;
     const scale = this.scale();
     // A press without a drag: Word's inch square (a line an inch long) where it was.
@@ -4211,31 +4245,30 @@ export class EditorView {
     const left = clicked ? start.x : box.left;
     const top = clicked ? start.y : box.top;
     // The paragraph pressed (or the selection's), its start the shape's anchor.
-    const at = this.posAtPoint(start.x, start.y) ?? this.state.selection.to;
-    const $at = this.state.doc.resolve(at);
+    const at = pressed ?? this.state.selection.to;
+    const $at = this.state.doc.resolve(Math.min(at, this.state.doc.content.size));
     if (!$at.parent.inlineContent) return;
     const anchor = $at.start();
     const { node } = this.domFromPos(anchor);
     const inText = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
     const paragraph = inText?.closest<HTMLElement>("p, h1, h2, h3, h4, h5, h6");
-    const block = inText?.closest<HTMLElement>(".foli-page > *, .foli-column > *");
     const page = inText?.closest<HTMLElement>(".foli-page");
-    if (!paragraph || !block || !page) return;
-    const column = (block.parentElement ?? page).getBoundingClientRect();
-    const padding =
-      block.parentElement === page
-        ? Number.parseFloat(getComputedStyle(page).paddingLeft) * scale
-        : 0;
+    if (!paragraph || !page) return;
+    // shortcut: from the page's text, as the renderer places a column's float (not its column).
+    const margin =
+      page.getBoundingClientRect().left +
+      Number.parseFloat(getComputedStyle(page).paddingLeft) * scale;
     const emu = (px: number) => Math.round((px / scale) * EMU_PER_PX);
-    // A line goes from its box's top left to its bottom right: drawn the other way, mirrored.
-    const mirrored = line && !clicked && box.flipH !== box.flipV;
+    // A line goes from its box's top left to its bottom right: drawn another way, flipped so
+    // that it starts where it was pressed (its end, an arrow's, where it was let go).
     const options = {
       pos: anchor,
       width: emu(width),
       height: emu(height),
-      horizontal: emu(left - (column.left + padding)),
+      horizontal: emu(left - margin),
       vertical: emu(top - paragraph.getBoundingClientRect().top),
-      ...(mirrored ? { flipH: true } : {}),
+      ...(line && !clicked && box.flipH ? { flipH: true } : {}),
+      ...(line && !clicked && box.flipV ? { flipV: true } : {}),
     };
     if (!this.hasFocus()) this.host.focus({ preventScroll: true });
     insertShape(geometry, options)(this.state, (tr) => this.editor.dispatch(tr));

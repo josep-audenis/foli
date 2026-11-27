@@ -180,6 +180,23 @@ test("Insert ▸ Shapes: a shape drawn by dragging on the page, Shift for a squa
   await page.mouse.up();
   await page.keyboard.up("Shift");
   await expect.poll(async () => (await drawn(page))[0]).toMatchObject({ width: 130, height: 130 });
+  // A Line Arrow drawn up and to the right: its arrow where the drag ended (flipped up).
+  await page.keyboard.press("ControlOrMeta+z");
+  await page.getByRole("button", { name: "Shapes" }).click();
+  await page.getByRole("menuitem", { name: "Line Arrow", exact: true }).click();
+  await page.mouse.move(box.x + 200, box.y + 400);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + 340, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        document
+          .querySelector('[data-foli-shape="straightConnector1"] svg g')
+          ?.getAttribute("transform"),
+      ),
+    )
+    .toMatch(/scale\(1 -1\)/);
 });
 
 test("Insert ▸ Shapes from the keyboard: an inch square at the selection; Escape stops drawing", async ({

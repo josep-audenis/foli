@@ -5,7 +5,7 @@
  */
 
 import { closeHistory } from "./history.js";
-import { NodeSelection } from "./selection.js";
+import { NodeSelection, Selection } from "./selection.js";
 import type { Command } from "./state.js";
 import { storyBody, wordContext } from "./word.js";
 
@@ -51,7 +51,9 @@ export function insertShape(geometry: string, options: InsertShapeOptions = {}):
     if (!wordContext(state) || storyBody(state)) return false;
     const pos = options.pos ?? state.selection.to;
     if (pos < 0 || pos > state.doc.content.size) return false;
-    const $pos = state.doc.resolve(pos);
+    // Not in a paragraph (a cell selection's end): the nearest one.
+    const $at = state.doc.resolve(pos);
+    const $pos = $at.parent.inlineContent ? $at : Selection.near($at).$to;
     if (!$pos.parent.inlineContent) return false;
     const width = Math.max(0, Math.round(options.width ?? INCH));
     const height = Math.max(0, Math.round(options.height ?? INCH));
@@ -86,8 +88,8 @@ export function insertShape(geometry: string, options: InsertShapeOptions = {}):
     }
     if (!dispatch) return true;
     const tr = state.tr.setMeta(closeHistory, true);
-    tr.insert(pos, node);
-    tr.setSelection(NodeSelection.create(tr.doc, pos));
+    tr.insert($pos.pos, node);
+    tr.setSelection(NodeSelection.create(tr.doc, $pos.pos));
     dispatch(tr);
     return true;
   };
