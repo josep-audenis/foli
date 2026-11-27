@@ -159,8 +159,9 @@ the pages' column beside it). Props:
 language's, as the toolbar's), `zoom` (pass the pages' zoom: the ruler reads them again when it
 changes), `disabled` (read-only or comment-only: nothing changes), `messages` (by the English
 text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler" (or "Vertical ruler"); each
-handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`). `FoliEditor`'s `ruler` puts both rulers around the pages (the horizontal one
-`.foli-editor-ruler`, sticky at the top while the page scrolls), shown while `rulerShown`.
+handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`). `FoliEditor` puts both rulers around the pages while `rulerShown` (the horizontal one
+`.foli-editor-ruler`, sticky at the top while the page scrolls; its `ruler` turns the switch on
+at first, `ruler={false}` draws none).
 
 ### `<FoliStatusBar>`
 

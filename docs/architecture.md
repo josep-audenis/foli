@@ -1449,7 +1449,8 @@ since 1.0.0):
 - `@folijs/react`: `FoliRuler` (horizontal, or `orientation="vertical"`) reads the geometry in
   the next frame after a change, scroll, resize or zoom, and changes the document only through
   core's commands on release (`setIndent`, `setTabStops`, `setSectionSetup`, `setColumnWidth`):
-  one transaction a drag or a key. `FoliEditor`'s `ruler` draws both while `rulerShown`.
+  one transaction a drag or a key. `FoliEditor` draws both while `rulerShown` (unless
+  `ruler={false}`).
 
 ## Styling
 

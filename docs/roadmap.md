@@ -42,7 +42,7 @@ place that says what is in progress; check it before starting work.
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
 | 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
-| 31 Ruler                      | In progress              | `phase-31/ruler`          | Assigned by the owner; 30 is merged on `main` and waits only for its release                                                                                                                  |
+| 31 Ruler                      | In review                | `phase-31/ruler`          | 31.1–31.6 merged (#330–#335); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 32 Page decoration            | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4462,6 +4462,17 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   Chromium, Firefox and WebKit, the View tab's Ruler, axe on both rulers); api.md, keyboard.md,
   styling.md, limitations.md ("The ruler"), architecture.md, the React README; a changeset per
   task.
+
+Closed 2026-11-27: 31.1–31.6 merged (#330–#335), each reviewed by a subagent and fixed before
+merging. `pnpm bench --engines chromium` (2026-11-27, `main` after #335) on a busy machine (other
+sessions' browsers running): typing and Enter p95 and the 200-section Enter handler past their
+thresholds, but `main` before this phase (27655a9), run back to back on the same machine, is past
+the same thresholds by as much (typePaintP95 100: 26.5 before, 21.7 after; enterHandlerP50 200:
+29.1 and 29.3; layout, reflow, find and `exportPdf` within their ranges): no change from this
+phase, whose view work runs only when the ruler asks. Firefox and WebKit not benched; a quiet
+machine's run is still owed. Not done (limitations.md, "The ruler"): right-to-left paragraphs,
+custom tab stops drawn on the pages (Phase 30's limit), nested tables' columns, a section's
+columns on the ruler, header and footer distances on the vertical ruler.
 
 ### Acceptance
 
