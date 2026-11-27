@@ -5,6 +5,7 @@ import { chainCommands, openDialog, requestedDialog } from "./dialogs.js";
 import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
 import {
+  fontSizeAt,
   paragraphFormatAt,
   runFormatAt,
   setCharacterSpacing,
@@ -337,5 +338,28 @@ describe("the Font dialog's commands", () => {
     editor.select(1);
     expect(editor.handleKey("Mod-d")).toBe(true);
     expect(asked).toBe("font");
+  });
+});
+
+describe("Font dialog review cases", () => {
+  it("keeps a style's underline color when only the style changes", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    const document = editor.getDocument();
+    document.styles = document.styles.map((s) =>
+      s.id === "Normal" ? { ...s, run: [{ type: "underline", attrs: { color: "FF0000" } }] } : s,
+    );
+    const styled = createEditor({ document });
+    styled.select(1, 4);
+    styled.run(setUnderline("double"));
+    expect(runFormatAt(styled.state)).toMatchObject({
+      underline: "double",
+      underlineColor: "FF0000",
+    });
+  });
+
+  it("reads the size and font of empty paragraphs as the caret's", () => {
+    const editor = editorOf([p({}), p({})]);
+    editor.select(1, 3);
+    expect(fontSizeAt(editor.state)).toBe(11);
   });
 });

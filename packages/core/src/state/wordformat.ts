@@ -450,15 +450,15 @@ function runValueAt<T>(state: EditorState, read: (run: RunFormat) => T): T | nul
   const context = wordContext(state);
   if (!context) return null;
   const { selection } = state;
-  if (selection.empty) {
+  const runs = selection.empty
+    ? []
+    : runsIn(state, state.schema.marks.font as MarkType).filter((r) => r.node.isText);
+  // A caret, or no text selected (empty paragraphs, a picture): what text typed there shows.
+  if (!runs.length) {
     const marks = state.storedMarks ?? marksAt(selection.$from);
     return read(runFormat(context, selection.$from.parent, marks));
   }
-  return common(
-    runsIn(state, state.schema.marks.font as MarkType)
-      .filter((r) => r.node.isText)
-      .map((r) => read(runFormat(context, r.parent, r.node.marks))),
-  );
+  return common(runs.map((r) => read(runFormat(context, r.parent, r.node.marks))));
 }
 
 /** The font name Latin text shows. */
@@ -1651,9 +1651,10 @@ export const UNDERLINE_STYLES = [
 export function setUnderline(style: string | null, color?: string | null): Command {
   return setRunMark("underline", (existing, inherited, type) => {
     if (style === null) return inherited.underline === null ? null : type.create({ style: "none" });
+    // Left out: the color the text shows now, its own or its style's.
     const want =
       color === undefined
-        ? ((existing?.attrs.color as string | null) ?? null)
+        ? ((existing?.attrs.color as string | null) ?? inherited.underlineColor ?? null)
         : color && word(color);
     if (inherited.underline === style && want === (inherited.underlineColor ?? null)) return null;
     return type.create({ style, color: want });

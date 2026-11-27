@@ -738,8 +738,9 @@ Details in the [package README](../packages/docx/README.md).
 - The Font dialog has no Scale box (the model has no `w:w`), no Position (raised or lowered by
   points, `w:position`), no kerning and no OpenType features; Font color and Underline color
   list Automatic, the theme's colors and Word's standard ones (no shades, no custom picker:
-  the toolbar's color menu has those); Hidden text is shown as other text (the view does not
-  hide it).
+  the toolbar's color menu has those). With no text selected (empty paragraphs only), the
+  dialog shows the paragraph's formatting but OK changes nothing: Word would format the
+  paragraph marks, which Foli keeps (`markFormat`) but does not set from the dialog.
 - The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
   Suppress line numbers, Don't hyphenate or the Asian Typography tab.
 

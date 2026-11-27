@@ -626,7 +626,11 @@ const PAIRED: Partial<Record<Effect, Effect>> = {
 
 /** A color's value in a box: `#rrggbb`, "auto" for Word's Automatic, "" when mixed. */
 const colorValue = (rrggbb: string | null | undefined) =>
-  rrggbb === undefined ? "" : rrggbb === null ? "auto" : `#${rrggbb.toLowerCase()}`;
+  rrggbb === undefined
+    ? ""
+    : rrggbb === null || rrggbb.toLowerCase() === "auto"
+      ? "auto"
+      : `#${rrggbb.toLowerCase()}`;
 
 type FontField = "font" | "size" | "by";
 
@@ -886,6 +890,12 @@ export function FontDialog({
                 {t(label)}
               </option>
             ))}
+            {/* A style Word has that the list does not name (dashLong, wavyDouble…). */}
+            {initial.underline &&
+              initial.underline !== "none" &&
+              !UNDERLINE_NAMES.some(([value]) => value === initial.underline) && (
+                <option value={initial.underline}>{initial.underline}</option>
+              )}
           </select>
         </Field>
         <Field id={`${id}-underlineColor`} label={t("Underline color")}>
