@@ -145,6 +145,7 @@ const status = createRoot(document.getElementById("status") as HTMLElement);
 // Word's ruler (31.x); `?ruler` shows it.
 const showsRuler = new URLSearchParams(location.search).has("ruler");
 const ruler = createRoot(document.getElementById("ruler") as HTMLElement);
+const verticalRuler = createRoot(document.getElementById("vruler") as HTMLElement);
 // A page wider than the window (a large zoom) scrolls under the ruler, which stays in view.
 if (showsRuler) (document.getElementById("body") as HTMLElement).style.overflowX = "auto";
 // Word's mini toolbar (29.9) above a selection made with the pointer.
@@ -195,6 +196,11 @@ const showStatus = () => {
     />,
   );
   ruler.render(showsRuler ? <FoliRuler editor={editor} zoom={zoom} disabled={commenting} /> : null);
+  verticalRuler.render(
+    showsRuler ? (
+      <FoliRuler editor={editor} zoom={zoom} disabled={commenting} orientation="vertical" />
+    ) : null,
+  );
 };
 /**
  * The formatting toolbar for the current editor (a click puts the focus back in the document)

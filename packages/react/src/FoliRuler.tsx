@@ -3,6 +3,7 @@ import {
   type Editor,
   openDialog,
   type RulerGeometry,
+  sectionAt,
   setColumnWidth,
   setIndent,
   setSectionSetup,
@@ -24,6 +25,9 @@ import { defaultUnit, formatLength, type LengthUnit } from "./units.js";
 /** Every string the ruler shows or announces, in English; each is its own key in `messages`. */
 export const rulerMessages = [
   "Horizontal ruler",
+  "Vertical ruler",
+  "Top margin",
+  "Bottom margin",
   "First line indent",
   "Hanging indent",
   "Left indent",
@@ -46,6 +50,11 @@ export type RulerMessages = Partial<Readonly<Record<(typeof rulerMessages)[numbe
 type RulerMessage = (typeof rulerMessages)[number];
 
 export interface FoliRulerProps {
+  /**
+   * The ruler above the pages (indents, tab stops, a table's columns, the left and right margins)
+   * or, `"vertical"`, beside them (the caret's page's top and bottom margins). Default horizontal.
+   */
+  orientation?: "horizontal" | "vertical" | undefined;
   /** Default: the editor of the nearest `FoliEditorProvider`. */
   editor?: Editor | undefined;
   /** Inches or centimetres; by default the browser's language's (Word's rule, as the toolbar's). */
@@ -128,6 +137,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 interface Read {
   geometry: RulerGeometry | null;
   left: number;
+  top: number;
 }
 
 /**
@@ -140,12 +150,13 @@ function useGeometry(
   root: React.RefObject<HTMLElement | null>,
   zoom: number,
 ) {
-  const [read, setRead] = useState<Read>({ geometry: null, left: 0 });
+  const [read, setRead] = useState<Read>({ geometry: null, left: 0, top: 0 });
   const measureNow = useCallback(
     () =>
       setRead({
         geometry: editor.storyView?.rulerGeometry?.() ?? null,
         left: root.current?.getBoundingClientRect().left ?? 0,
+        top: root.current?.getBoundingClientRect().top ?? 0,
       }),
     [editor, root],
   );
@@ -189,6 +200,46 @@ function useGeometry(
   }, [editor, active, measureNow, root, zoom]);
   // Read again at once after the ruler's own change: the next key or drag starts from it.
   return { ...read, measureNow };
+}
+
+/** The vertical ruler's handles: the caret's page's top and bottom margins. */
+function verticalHandles(g: RulerGeometry): Handle[] {
+  const k = g.pxPerTwip;
+  const twips = (px: number) => Math.round(px / k);
+  const { page, margins } = g;
+  /** A margin as the section has it: Word's negative one (exact, not pushed) keeps its sign. */
+  const margin =
+    (side: "top" | "bottom", value: number): Command =>
+    (state, dispatch) => {
+      const was = sectionAt(state)?.setup.margins?.[side] ?? 0;
+      return setSectionSetup({ margins: { [side]: was < 0 ? -value : value } })(state, dispatch);
+    };
+  return [
+    {
+      key: "margin-top",
+      label: "Top margin",
+      kind: "margin",
+      origin: page.top,
+      sign: 1,
+      value: twips(margins.top - page.top),
+      min: 0,
+      max: twips(margins.bottom - page.top) - ROOM,
+      grid: page.top,
+      set: (value) => margin("top", value),
+    },
+    {
+      key: "margin-bottom",
+      label: "Bottom margin",
+      kind: "margin",
+      origin: page.bottom,
+      sign: -1,
+      value: twips(page.bottom - margins.bottom),
+      min: 0,
+      max: twips(page.bottom - margins.top) - ROOM,
+      grid: page.bottom,
+      set: (value) => margin("bottom", value),
+    },
+  ];
 }
 
 /** The indent and margin handles of the horizontal ruler. */
@@ -378,6 +429,7 @@ function scale(zero: number, from: number, to: number, k: number, unit: LengthUn
  */
 export function FoliRuler({
   editor: given,
+  orientation = "horizontal",
   units,
   zoom = 1,
   disabled = false,
@@ -405,7 +457,18 @@ export function FoliRuler({
     );
   };
   const root = useRef<HTMLDivElement>(null);
-  const { geometry, left: rootLeft, measureNow } = useGeometry(body, editor, root, zoom);
+  const {
+    geometry,
+    left: rootLeft,
+    top: rootTop,
+    measureNow,
+  } = useGeometry(body, editor, root, zoom);
+  const vertical = orientation === "vertical";
+  /** Where a pointer event is along the ruler. */
+  const along = (event: { clientX: number; clientY: number }) =>
+    vertical ? event.clientY : event.clientX;
+  /** CSS placing something at `at` along the ruler (client px), against the ruler's own edge. */
+  const place = (at: number) => (vertical ? { top: at - rootTop } : { left: at - rootLeft });
   const [drag, setDragState] = useState<Drag | null>(null);
   // Read by the pointer's events at once: they may come before a render.
   const dragRef = useRef<Drag | null>(null);
@@ -413,19 +476,20 @@ export function FoliRuler({
     dragRef.current = next;
     setDragState(next);
   };
-  const handles = geometry
-    ? [
-        ...horizontalHandles(geometry),
-        ...columnHandles(geometry, trackState(editor.state)?.on ?? false),
-        ...tabHandles(geometry),
-      ]
-    : [];
+  const handles = !geometry
+    ? []
+    : vertical
+      ? verticalHandles(geometry)
+      : [
+          ...horizontalHandles(geometry),
+          ...columnHandles(geometry, trackState(editor.state)?.on ?? false),
+          ...tabHandles(geometry),
+        ];
   /** A tab stop to focus after the next render (its value), or the document. */
   const refocus = useRef<number | "document" | null>(null);
   // The tab selector: the kind a click on the ruler adds.
   const [tabKind, setTabKind] = useState<TabAlignment>("left");
   const k = geometry?.pxPerTwip ?? 1;
-  const local = (x: number) => x - rootLeft;
   const at = (handle: Handle, value: number) => handle.origin + handle.sign * value * k;
 
   /** The value the pointer at `x` gives `handle`: snapped to the ruler's grid unless `exact`. */
@@ -461,7 +525,7 @@ export function FoliRuler({
   const onPointerMove = (handle: Handle) => (event: ReactPointerEvent<HTMLElement>) => {
     const current = dragRef.current;
     if (!current || current.key !== handle.key || current.pointer !== event.pointerId) return;
-    const value = valueAt(handle, event.clientX, event.altKey);
+    const value = valueAt(handle, along(event), event.altKey);
     const off = offAt(handle, event.clientY);
     setDrag({
       ...current,
@@ -477,12 +541,12 @@ export function FoliRuler({
     setDrag(null);
     if (handle.remove && offAt(handle, event.clientY)) {
       if (editor.run(handle.remove())) measureNow();
-    } else if (current.moved) apply(handle, valueAt(handle, event.clientX, event.altKey));
+    } else if (current.moved) apply(handle, valueAt(handle, along(event), event.altKey));
   };
   /** A press on the ruler's strip adds a tab stop of the selector's kind there (snapped). */
   const onStripDown = (event: ReactPointerEvent<HTMLElement>) => {
     event.preventDefault();
-    if (disabled || event.button !== 0 || !geometry?.paragraph) return;
+    if (disabled || vertical || event.button !== 0 || !geometry?.paragraph) return;
     const { text, page } = geometry;
     const strip: Handle = {
       key: "new-tab",
@@ -519,14 +583,24 @@ export function FoliRuler({
     const { snap, page } = UNITS[unit];
     // Left and Right move the handle the way they point (a right-side value grows to the left);
     // Up and Page Up make its value larger, Down and Page Down smaller, as a slider's.
-    const moves: Record<string, number> = {
-      ArrowRight: handle.sign * snap,
-      ArrowLeft: -handle.sign * snap,
-      ArrowUp: snap,
-      ArrowDown: -snap,
-      PageUp: page,
-      PageDown: -page,
-    };
+    // On the vertical ruler Down and Up move it the way they point, Right and Left change the value.
+    const moves: Record<string, number> = vertical
+      ? {
+          ArrowDown: handle.sign * snap,
+          ArrowUp: -handle.sign * snap,
+          ArrowRight: snap,
+          ArrowLeft: -snap,
+          PageUp: page,
+          PageDown: -page,
+        }
+      : {
+          ArrowRight: handle.sign * snap,
+          ArrowLeft: -handle.sign * snap,
+          ArrowUp: snap,
+          ArrowDown: -snap,
+          PageUp: page,
+          PageDown: -page,
+        };
     if ((event.key === "Delete" || event.key === "Backspace") && handle.remove) {
       event.preventDefault();
       // The focus goes to the stop before it, else the document.
@@ -572,56 +646,69 @@ export function FoliRuler({
     drag?.key === handle.key ? drag.value : clamp(handle.value, handle.min, handle.max);
   const dragged = handles.find((h) => h.key === drag?.key);
   const number = (twips: number) => Math.round((twips / UNITS[unit].twips) * 100) / 100;
-  const marks = geometry
-    ? scale(geometry.margins.left, geometry.page.left, geometry.page.right, k, unit)
-    : [];
+  const marks = !geometry
+    ? []
+    : vertical
+      ? scale(geometry.margins.top, geometry.page.top, geometry.page.bottom, k, unit)
+      : scale(geometry.margins.left, geometry.page.left, geometry.page.right, k, unit);
+  /** The page's start along the ruler, and its text area's, both in client px. */
+  const start = geometry ? (vertical ? geometry.page.top : geometry.page.left) : 0;
+  const pageSpan = geometry
+    ? vertical
+      ? geometry.page.bottom - geometry.page.top
+      : geometry.page.right - geometry.page.left
+    : 0;
+  const textFrom = geometry ? (vertical ? geometry.margins.top : geometry.margins.left) : 0;
+  const textTo = geometry ? (vertical ? geometry.margins.bottom : geometry.margins.right) : 0;
 
   return (
     // biome-ignore lint/a11y/useSemanticElements: a fieldset is for form controls, not a ruler.
     <div
       ref={root}
       role="group"
-      aria-label={t("Horizontal ruler")}
-      className={className ? `foli-ruler ${className}` : "foli-ruler"}
+      aria-label={t(vertical ? "Vertical ruler" : "Horizontal ruler")}
+      className={`foli-ruler${vertical ? " foli-ruler-vertical" : ""}${className ? ` ${className}` : ""}`}
       data-foli-dragging={drag ? "" : undefined}
     >
       {geometry && (
         <>
-          <button
-            type="button"
-            className="foli-ruler-tab-kind"
-            aria-label={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
-            title={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
-            disabled={disabled}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() =>
-              setTabKind(TAB_KINDS[(TAB_KINDS.indexOf(tabKind) + 1) % TAB_KINDS.length] ?? "left")
-            }
-          >
-            <span className={`foli-ruler-tab-glyph foli-ruler-tab-${tabKind}`} aria-hidden="true" />
-          </button>
+          {!vertical && (
+            <button
+              type="button"
+              className="foli-ruler-tab-kind"
+              aria-label={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
+              title={t("Tab stop to add: {kind}", { kind: t(TAB_LABELS[tabKind]) })}
+              disabled={disabled}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() =>
+                setTabKind(TAB_KINDS[(TAB_KINDS.indexOf(tabKind) + 1) % TAB_KINDS.length] ?? "left")
+              }
+            >
+              <span
+                className={`foli-ruler-tab-glyph foli-ruler-tab-${tabKind}`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
           <div
             className="foli-ruler-page"
             aria-hidden="true"
             onMouseDown={(event) => event.preventDefault()}
             onPointerDown={onStripDown}
-            style={{
-              left: local(geometry.page.left),
-              width: geometry.page.right - geometry.page.left,
-            }}
+            style={{ ...place(start), [vertical ? "height" : "width"]: pageSpan }}
           >
             <div
               className="foli-ruler-text"
               style={{
-                left: geometry.margins.left - geometry.page.left,
-                width: Math.max(geometry.margins.right - geometry.margins.left, 0),
+                [vertical ? "top" : "left"]: textFrom - start,
+                [vertical ? "height" : "width"]: Math.max(textTo - textFrom, 0),
               }}
             />
             {marks.map((mark) => (
               <span
                 key={mark.at}
                 className={`foli-ruler-${mark.size}`}
-                style={{ left: mark.at - geometry.page.left }}
+                style={{ [vertical ? "top" : "left"]: mark.at - start }}
               >
                 {mark.label}
               </span>
@@ -638,7 +725,7 @@ export function FoliRuler({
                   handle.label,
                   handle.number === undefined ? undefined : { number: String(handle.number) },
                 )}
-                aria-orientation="horizontal"
+                aria-orientation={vertical ? "vertical" : "horizontal"}
                 aria-valuenow={number(value)}
                 aria-valuemin={number(handle.min)}
                 aria-valuemax={number(Math.max(handle.min, handle.max))}
@@ -647,7 +734,7 @@ export function FoliRuler({
                 className={`foli-ruler-handle foli-ruler-${handle.kind}`}
                 data-foli-ruler={handle.key}
                 data-foli-off={drag?.key === handle.key && drag.off ? "" : undefined}
-                style={{ left: local(at(handle, value)) }}
+                style={place(at(handle, value))}
                 // Pointer events' preventDefault does not keep the focus in every engine.
                 onMouseDown={(event) => event.preventDefault()}
                 onPointerDown={onPointerDown(handle)}
@@ -667,20 +754,28 @@ export function FoliRuler({
             <span
               className="foli-ruler-value"
               aria-hidden="true"
-              style={{ left: local(at(dragged, drag.value)) }}
+              style={place(at(dragged, drag.value))}
             >
               {formatLength(drag.value, unit)}
             </span>
           )}
           {drag?.moved && !drag.off && dragged && (
             <div
-              className="foli-ruler-guide"
+              className={vertical ? "foli-ruler-guide foli-ruler-guide-across" : "foli-ruler-guide"}
               aria-hidden="true"
-              style={{
-                left: at(dragged, drag.value),
-                top: geometry.page.top,
-                height: geometry.page.bottom - geometry.page.top,
-              }}
+              style={
+                vertical
+                  ? {
+                      top: at(dragged, drag.value),
+                      left: geometry.page.left,
+                      width: geometry.page.right - geometry.page.left,
+                    }
+                  : {
+                      left: at(dragged, drag.value),
+                      top: geometry.page.top,
+                      height: geometry.page.bottom - geometry.page.top,
+                    }
+              }
             />
           )}
         </>

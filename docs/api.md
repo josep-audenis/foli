@@ -142,16 +142,22 @@ is a slider too ("Column 2 border", its value the column's width): dragged or mo
 keys it sets the width as dragging the border in the table does (`setColumnWidth`: the next
 column gives or takes the difference; the last one widens the table). A drag shows a guide line down the page and changes the
 document once on release (`setIndent`, `setSectionSetup({ margins })` on the caret's section,
-the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin unless
+the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin (a right or bottom margin from its own page edge) unless
 Alt is held, which shows the exact value as it moves; Escape or a lost pointer cancels. The
-arrow keys move a focused handle by that step (Up always makes its value larger), Page Up
+arrow keys move a focused handle by that step (on the horizontal ruler Up always makes its value larger), Page Up
 and Page Down by half an inch or a centimetre (keyboard.md). Positions come from `editor.storyView.rulerGeometry()` (the view's),
 read again after each change, scroll, resize and `zoom` change, so the ruler lines up at any
 zoom (it is not zoomed itself); without a view it is empty. Changes go to the story open on its
-page, else the editor. Props: `editor`, `units` (`"in"` or `"cm"`; default the browser
+page, else the editor. `orientation="vertical"` (31.5) is Word's vertical ruler, placed beside
+the pages: the caret's page from its top, its top and bottom margins shaded and as sliders
+("Top margin", "Bottom margin"; `setSectionSetup`, a negative, exact margin keeping its sign),
+numbers counted from the top margin; it has none of the horizontal ruler's other parts. All its
+parts are placed absolutely: give it a height, or a parent that stretches it (a flex row, as
+the pages' column beside it). Props:
+`editor`, `orientation`, `units` (`"in"` or `"cm"`; default the browser
 language's, as the toolbar's), `zoom` (pass the pages' zoom: the ruler reads them again when it
 changes), `disabled` (read-only or comment-only: nothing changes), `messages` (by the English
-text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler"; each
+text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler" (or "Vertical ruler"); each
 handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`).
 
 ### `<FoliStatusBar>`

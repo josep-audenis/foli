@@ -16,6 +16,7 @@
       #navigation { display: contents; }
       #status { position: sticky; bottom: 0; z-index: 2; }
       #ruler { position: sticky; top: 0; z-index: 2; }
+      #vruler { display: flex; align-self: stretch; position: sticky; left: 0; z-index: 1; }
     </style>
   </head>
   <body>
@@ -26,6 +27,7 @@
     <div id="toolbar"></div>
     <div id="ruler"></div>
     <div id="body">
+      <div id="vruler"></div>
       <div id="navigation"></div>
       <main id="editor" aria-label="Document"></main>
       <div id="comments"></div>

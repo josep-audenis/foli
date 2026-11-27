@@ -4442,7 +4442,14 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   columns as drawn). Top-level body tables only; refused while tracking, as the border drag.
   `ruler.test.tsx`; `ruler.spec.ts` at 100% and 200% in three engines (under the pointer, the
   table's width kept, undo).
-- [ ] 31.5 Vertical ruler: top and bottom margins of the caret's page, dragged.
+- [x] 31.5 Vertical ruler: top and bottom margins of the caret's page, dragged. Built:
+  `FoliRuler`'s `orientation="vertical"`: the caret's page's top and bottom margins shaded and
+  as sliders (`aria-orientation="vertical"`), dragged or moved with the keys through
+  `setSectionSetup` (one undo step; a negative, exact margin keeps its sign), numbers from the
+  top margin. Decided (from 31.1): the margins as the section sets them, not where a taller
+  header pushes the text (Word's ruler shows the margin's setting too). The playground's
+  `?ruler` puts it beside the pages. `ruler.test.tsx`; `ruler.spec.ts` at 100% and 200% in three
+  engines (under the pointer, undo, axe).
 - [ ] 31.6 View tab's Ruler toggle; `FoliEditor`'s `ruler`; keyboard (each handle a slider:
   arrows move by a step); e2e in three engines at 100% and 200% zoom; docs; changesets.
 

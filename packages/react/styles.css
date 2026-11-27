@@ -1271,6 +1271,79 @@
   box-sizing: border-box;
   cursor: ew-resize;
 }
+.foli-ruler-column[aria-disabled="true"] {
+  cursor: default;
+}
+/* The vertical ruler (orientation="vertical"): the same parts turned, beside the pages. */
+.foli-ruler-vertical {
+  width: 24px;
+  height: auto;
+  min-height: 100%;
+  border-bottom: 0;
+  border-right: 1px solid var(--foli-border-color);
+}
+.foli-ruler-vertical .foli-ruler-page {
+  top: auto;
+  left: 4px;
+  width: 16px;
+  height: auto;
+}
+.foli-ruler-vertical .foli-ruler-text {
+  top: auto;
+  bottom: auto;
+  left: 0;
+  right: 0;
+}
+.foli-ruler-vertical .foli-ruler-number,
+.foli-ruler-vertical .foli-ruler-half,
+.foli-ruler-vertical .foli-ruler-tick {
+  transform: translateY(-50%);
+}
+.foli-ruler-vertical .foli-ruler-number {
+  top: auto;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+.foli-ruler-vertical .foli-ruler-half,
+.foli-ruler-vertical .foli-ruler-tick {
+  width: auto;
+  height: 1px;
+}
+.foli-ruler-vertical .foli-ruler-half {
+  top: auto;
+  left: 5px;
+  right: 5px;
+}
+.foli-ruler-vertical .foli-ruler-tick {
+  top: auto;
+  left: 7px;
+  right: 7px;
+}
+.foli-ruler-vertical .foli-ruler-margin {
+  top: auto;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 7px;
+  transform: translateY(-50%);
+  cursor: ns-resize;
+}
+/* Inside the narrow ruler, the value reads along it. */
+.foli-ruler-vertical .foli-ruler-value {
+  bottom: auto;
+  left: 2px;
+  padding: 3px 1px;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+}
+.foli-ruler-guide.foli-ruler-guide-across {
+  width: auto;
+  height: 0;
+  border-left: 0;
+  border-top: 1px dashed GrayText;
+}
 .foli-ruler-value {
   position: absolute;
   bottom: 0;
