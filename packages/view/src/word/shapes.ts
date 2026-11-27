@@ -39,7 +39,34 @@ const DASHES: Record<string, number[]> = {
 /** A line end's size, in line widths. */
 const END_SIZE: Record<string, number> = { sm: 2, med: 3, lg: 5 };
 
+/** Ids of SVG definitions: unique in the page, whatever bundles share it. */
 let unique = 0;
+const PREFIX = `foli-shape-${Math.random().toString(36).slice(2, 8)}-`;
+
+/**
+ * `copy` (a drawing cloned for another page: a header's) with its shapes' SVG ids made its own,
+ * and what points at them: a gradient or line end otherwise names the first copy's, which may be
+ * hidden (a header open on its page).
+ * @internal
+ */
+export function withOwnIds<T extends Node>(copy: T): T {
+  if (!(copy instanceof Element || copy instanceof DocumentFragment)) return copy;
+  const renamed = new Map<string, string>();
+  for (const element of copy.querySelectorAll(`[id^="${PREFIX}"]`)) {
+    const id = `${PREFIX}${++unique}`;
+    renamed.set(element.id, id);
+    element.id = id;
+  }
+  if (!renamed.size) return copy;
+  for (const element of copy.querySelectorAll("[fill^='url(#'], [marker-start], [marker-end]"))
+    for (const name of ["fill", "marker-start", "marker-end"]) {
+      const value = element.getAttribute(name);
+      const id = value?.match(/^url\(#(.+)\)$/)?.[1];
+      const to = id && renamed.get(id);
+      if (to) element.setAttribute(name, `url(#${to})`);
+    }
+  return copy;
+}
 
 const el = (doc: Document, name: string, attrs: Record<string, string | number> = {}) => {
   const e = doc.createElementNS(SVG, name);
@@ -120,7 +147,7 @@ function markerElement(
       // Open: two strokes of the line's width.
       marker.append(
         el(doc, "path", {
-          d: "M1 1L9 5L1 9",
+          d: "M1 1L10 5L1 9",
           fill: "none",
           stroke: `#${color}`,
           "stroke-width": (10 * lineWidth) / Math.max(width, length),
@@ -166,9 +193,14 @@ export function shapeSvg(attrs: Attrs, doc: Document): SVGSVGElement {
   svg.style.pointerEvents = "none";
   const def = definitionOf(attrs) ?? definitionOf({ geometry: "rect" });
   const adjust = attrs.adjust as Record<string, number> | null | undefined;
-  const paths = def ? drawPaths(def, w, h, adjust) : [];
+  // A custom path without a size of its own is in the shape's EMU (`a:path` w and h).
+  const space =
+    attrs.geometry === "custom"
+      ? ([Number(attrs.width), Number(attrs.height)] as [number, number])
+      : undefined;
+  const paths = def ? drawPaths(def, w, h, adjust, space) : [];
   const defs = el(doc, "defs");
-  const id = `foli-shape-${++unique}`;
+  const id = `${PREFIX}${++unique}`;
   const gradient = attrs.gradient as Gradient | null | undefined;
   let paint = typeof attrs.fill === "string" ? `#${attrs.fill}` : "none";
   if (gradient?.stops?.length) {
@@ -197,7 +229,14 @@ export function shapeSvg(attrs: Attrs, doc: Document): SVGSVGElement {
     );
   for (const path of paths) {
     if (path.fill !== "none" && paint !== "none") {
-      group.append(el(doc, "path", { d: path.d, fill: paint, stroke: "none" }));
+      group.append(
+        el(doc, "path", {
+          d: path.d,
+          fill: paint,
+          stroke: "none",
+          ...(attrs.geometry === "custom" ? { "fill-rule": "evenodd" } : {}),
+        }),
+      );
       const overlay = OVERLAY[path.fill];
       if (overlay)
         group.append(
@@ -242,5 +281,7 @@ export function shapeTextRect(attrs: Attrs): [number, number, number, number] {
   const [l, t, r, b] = def
     ? textRect(def, w, h, attrs.adjust as Record<string, number> | null)
     : [0, 0, w, h];
-  return [l, t, Math.max(r - l, 0), Math.max(b - t, 0)];
+  const left = attrs.flipH === true ? w - r : l;
+  const top = attrs.flipV === true ? h - b : t;
+  return [left, top, Math.max(r - l, 0), Math.max(b - t, 0)];
 }

@@ -148,6 +148,7 @@ import {
   PICTURE_ATTR,
   PICTURE_IMAGE_ATTR,
   PX_PER_TWIP,
+  SHAPE_ATTR,
   TEXT_BOX_ATTR,
   TEXT_BOX_CONTENT_CLASS,
   WORD_COLUMN_BREAK_ATTR,
@@ -189,6 +190,7 @@ import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { type PeerDrawing, PeerMarks } from "./word/presence.js";
 import { PageRegions, REGION_CLASS, REGION_CONTENT_CLASS } from "./word/regions.js";
+import { withOwnIds } from "./word/shapes.js";
 import {
   collect,
   drawnColumns,
@@ -1998,7 +2000,7 @@ export class EditorView {
           continue;
         }
         const element = regions.element(page.section, side);
-        element.append(drawing.content.content.cloneNode(true));
+        element.append(withOwnIds(drawing.content.content.cloneNode(true)));
         own[side] = { element, drawing: drawing.content, section: page.section, id: drawing.id };
       }
       return own;
@@ -3068,7 +3070,10 @@ export class EditorView {
     for (const box of this.host.querySelectorAll<HTMLElement>(
       `[${TEXT_BOX_ATTR}="${CSS.escape(id)}"]`,
     ))
-      if (!box.closest(`.${REGION_CLASS}`) && !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`))
+      if (
+        !box.closest(`.${REGION_CLASS}`) &&
+        !box.parentElement?.closest(`[${TEXT_BOX_ATTR}], [${SHAPE_ATTR}]`)
+      )
         return box;
     return null;
   }
@@ -4006,7 +4011,10 @@ export class EditorView {
 
   /** The span of the picture a node selection selects, if it selects one. */
   private pictureSpan(pos: number): HTMLElement | null {
-    for (const img of this.host.querySelectorAll(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`)) {
+    // A shape's text (34.2) is in its shape, not an object of its own.
+    for (const img of this.host.querySelectorAll(
+      `[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]:not([${SHAPE_ATTR}] > *)`,
+    )) {
       // The body's own: not a picture in a box's or a header's drawing.
       if (img.parentElement?.closest(`[${TEXT_BOX_ATTR}], .${REGION_CLASS}`)) continue;
       const span = img.parentElement;

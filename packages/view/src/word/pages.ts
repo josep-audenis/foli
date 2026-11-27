@@ -49,6 +49,7 @@ import {
 } from "./decoration.js";
 import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
+import { withOwnIds } from "./shapes.js";
 
 export type { ReviewView } from "./blocks.js";
 
@@ -555,7 +556,7 @@ export function renderDocument(
       const drawing = regions.drawing(page.section, side, page);
       if (!drawing) continue;
       const region = regions.element(page.section, side);
-      region.append(drawing.content.content.cloneNode(true));
+      region.append(withOwnIds(drawing.content.content.cloneNode(true)));
       made.page.append(region);
     }
     return made;
