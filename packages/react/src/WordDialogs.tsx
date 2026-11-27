@@ -1299,8 +1299,8 @@ const BOX_STEP: Record<BoxField, number> = { left: 144, right: 144, before: 120,
 
 /**
  * One of the Layout tab's Indent (Left, Right) and Spacing (Before, After) boxes: the selected
- * paragraphs' value (blank when they differ); Enter or leaving the box sets what was typed,
- * ArrowUp and ArrowDown step it (a tenth of an inch, 6 pt), Escape puts it back.
+ * paragraphs' value (blank when they differ); Enter sets what was typed, ArrowUp and ArrowDown
+ * step it (a tenth of an inch, 6 pt), Escape or leaving the box puts it back.
  * @internal
  */
 export function ParagraphBox({
@@ -1359,7 +1359,8 @@ export function ParagraphBox({
         value={text ?? shown}
         onFocus={onFocus}
         onChange={(event) => setText(event.target.value)}
-        onBlur={set}
+        // Leaving drops what was typed: a click elsewhere may have moved the selection first.
+        onBlur={() => setText(null)}
         onKeyDown={(event) => {
           if (disabled) return;
           // The caret moves in the box: the toolbar's arrows do not take it away.
@@ -1373,8 +1374,10 @@ export function ParagraphBox({
           } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
             event.preventDefault();
             const step = BOX_STEP[field] * (event.key === "ArrowUp" ? 1 : -1);
+            // From what was typed, if it is a length; else from the value shown.
+            const typed = text === null ? null : parseLength(text, to);
             setText(null);
-            commit((twips ?? 0) + step);
+            commit((typed ?? twips ?? 0) + step);
           }
         }}
       />

@@ -743,7 +743,7 @@ Details in the [package README](../packages/docx/README.md).
   paragraph marks, which Foli keeps (`markFormat`) but does not set from the dialog.
 - The Layout tab's Margins menu has no Mirrored preset (Foli does not keep `w:mirrorMargins` in
   the model) and no Last Custom Setting; Orientation swaps the page's sides but leaves the
-  margins as they are; Size checks an entry within a millimetre of its paper. Breaks has Remove
+  margins as they are (Word turns them with the page); Size checks an entry within a millimetre of its paper. Breaks has Remove
   section break, which Word's has not, for the Section menu it replaces in the ribbon.
 - Tab stops set in the Tabs dialog are kept and saved, but the pages lay text out with the
   default stops every half inch (custom stops are not drawn yet, see architecture.md). The

@@ -757,8 +757,12 @@ const sectionEntry = (
   key,
   label,
   // The one already shown stays enabled (Word's menus pick it again): it changes nothing.
-  command: (state, dispatch) =>
-    sectionAt(state) !== null && (shows(state) || setSectionSetup(setup(state))(state, dispatch)),
+  command: (state, dispatch) => {
+    const at = sectionAt(state);
+    if (!at) return false;
+    if (shows(state)) return true;
+    return setSectionSetup(refitted(at.setup, setup(state)))(state, dispatch);
+  },
   checked: (state) => sectionAt(state) !== null && shows(state),
 });
 
@@ -931,7 +935,32 @@ const COLUMN_ACTIONS: readonly Action[] = [
 const textWidthOf = (setup: SectionJSON) =>
   (setup.pageSize?.width ?? 12_240) -
   (setup.margins?.left ?? 1440) -
-  (setup.margins?.right ?? 1440);
+  (setup.margins?.right ?? 1440) -
+  (setup.margins?.gutter ?? 0);
+
+/**
+ * `change` with a section's unequal columns scaled to the text width it leaves, as Word does
+ * when the page or its margins change (their widths are absolute).
+ */
+function refitted(current: SectionJSON, change: SectionSetup): SectionSetup {
+  const columns = change.columns ?? current.columns;
+  if (change.columns || columns?.equalWidth !== false || !columns.widths?.length) return change;
+  const next: SectionJSON = {
+    ...current,
+    pageSize: { ...current.pageSize, ...change.pageSize },
+    margins: { ...current.margins, ...change.margins },
+  };
+  const before = textWidthOf(current);
+  const after = textWidthOf(next);
+  if (before <= 0 || after <= 0 || before === after) return change;
+  const scale = after / before;
+  const widths = columns.widths.map((c) => ({
+    // Rounded down: the columns and spaces still fit.
+    width: Math.max(1, Math.floor(c.width * scale)),
+    ...(c.space === undefined ? {} : { space: Math.floor(c.space * scale) }),
+  }));
+  return { ...change, columns: { ...columns, widths } };
+}
 
 const BREAK_ACTIONS: readonly Action[] = [
   { key: "pageBreak", label: "Page", command: insertPageBreak },

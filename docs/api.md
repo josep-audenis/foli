@@ -298,11 +298,12 @@ Font dialog, the Font group's launcher on Home); Word's Layout tab (1.11): the m
 (Normal, Narrow, Moderate, Wide, Custom margins… to Page setup), `orientation` (Portrait,
 Landscape: the page's sides swap), `pageSize` (Letter, Legal, A3, A4, A5, Executive, More paper
 sizes…), `columns` (One, Two, Three, Left, Right, More columns…) and `breaks` (Page, Column,
-Text wrapping, the four section breaks, Remove section break), each entry checked where the
-caret's section already has it and set with `setSectionSetup` (one undo step, tracked as page
+Text wrapping, the four section breaks, Remove section break), the page menus' entries checked
+where the caret's section already has them; set columns of unequal widths are scaled to the new
+text width when the page or its margins change and set with `setSectionSetup` (one undo step, tracked as page
 setup is); and the boxes `indentLeft`, `indentRight`, `spaceBefore`, `spaceAfter` (custom items:
-the selected paragraphs' value, blank when they differ; Enter or leaving sets it, ArrowUp and
-ArrowDown step a tenth of an inch or 6 pt, Escape puts it back), which `wordRibbonTabs`' Layout
+the selected paragraphs' value, blank when they differ; Enter sets it, ArrowUp and ArrowDown
+step a tenth of an inch or 6 pt, Escape or leaving the box puts it back), which `wordRibbonTabs`' Layout
 tab has in its Page Setup and Paragraph groups in place of the Section menu; `footnote`, `endnote` and `goToNote` (as the Notes menu: the
 caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `date` and
 `fieldCodes` (a toggle), as the Fields menu; `navigationPane` (the outline of

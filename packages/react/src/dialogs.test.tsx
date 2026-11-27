@@ -385,3 +385,41 @@ describe("Layout tab", () => {
     expect(after.value).toBe("6 pt");
   });
 });
+
+describe("Layout tab review cases", () => {
+  const pick = (menu: string, entry: string) => {
+    fireEvent.click(screen.getByRole("button", { name: menu }));
+    const item = [...document.querySelectorAll('[role^="menuitem"]')].find(
+      (m) => m.textContent === entry,
+    );
+    fireEvent.click(item as HTMLElement);
+  };
+
+  it("sets Left columns on a section with a gutter, and scales them when the margins change", () => {
+    const editor = createEditor({
+      document: { ...documentOf(paragraph("one")), section: { margins: { gutter: 720 } } },
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" />);
+    editor.select(2);
+    pick("Columns", "Left");
+    const widths = () => editor.getDocument().section.columns?.widths ?? [];
+    expect(widths()).toHaveLength(2);
+    const total = () => widths().reduce((sum, c) => sum + c.width + (c.space ?? 0), 0);
+    expect(total()).toBe(12240 - 2880 - 720);
+    pick("Margins", "Wide");
+    expect(editor.getDocument().section.margins).toMatchObject({ left: 2880, right: 2880 });
+    expect(total()).toBeLessThanOrEqual(12240 - 5760 - 720);
+    expect(widths()[0]?.width).toBeLessThan(widths()[1]?.width ?? 0);
+  });
+
+  it("drops what was typed in a box when the focus leaves it", () => {
+    const editor = createEditor({ document: documentOf(paragraph("one")) });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" />);
+    editor.select(2);
+    const left = screen.getByRole("textbox", { name: "Indent left" }) as HTMLInputElement;
+    fireEvent.change(left, { target: { value: "2" } });
+    fireEvent.blur(left);
+    expect(left.value).toBe('0"');
+    expect(editor.state.doc.child(0).attrs.indent).toBeNull();
+  });
+});
