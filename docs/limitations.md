@@ -729,6 +729,16 @@ Details in the [package README](../packages/docx/README.md).
   `w:uiPriority` as the file has them.
 - The ribbon's icons are Lucide's, not Word's.
 
+## Word's dialogs (Phase 30)
+
+- The Paragraph dialog is the toolbar's: `openDialog` and the right-click menu's Paragraph…
+  open nothing without a toolbar on the editor (the entry still shows), nor on a comment-only
+  toolbar.
+- Paragraphs with different special indents (first line on one, hanging on another, or the same
+  kind by different amounts) show Special blank: pick First line or Hanging to set By for all.
+- The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
+  Suppress line numbers, Don't hyphenate or the Asian Typography tab.
+
 ## Docs and tooling
 
 - The docs site's search matches headings and API names, not body text. The API pages show

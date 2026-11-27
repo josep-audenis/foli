@@ -438,7 +438,7 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
  * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"` (Word's Paragraph
- * dialog for the selected paragraphs, 1.12).
+ * dialog for the selected paragraphs, 1.11).
  */
 export type ToolbarDialogName =
   | "paragraph"
@@ -2232,6 +2232,8 @@ const linkOwners = new WeakMap<Editor, LinkOwner[]>();
 type LinkOwner = {
   holds: (node: Node | null) => boolean;
   disabled: boolean;
+  /** Comment-only: it opens no formatting dialog (`openDialog`). */
+  commentOnly: boolean;
   /** Its link dialog is open. */
   open: boolean;
   /** Its own button is asking for the link dialog now. */
@@ -2665,10 +2667,12 @@ export function FoliToolbar({
   const linkOwner = useRef<LinkOwner>({
     holds: (node: Node | null) => !!(ribbon.current ?? bar.current)?.contains(node),
     disabled,
+    commentOnly,
     open: false,
     here: false,
   });
   linkOwner.current.disabled = disabled;
+  linkOwner.current.commentOnly = commentOnly;
   linkOwner.current.open = dialog !== null;
   const runHere = (command: Command) => {
     linkOwner.current.here = true;
@@ -2698,7 +2702,9 @@ export function FoliToolbar({
         const asked = transactions.map(requestedDialog).find((name) => name !== null);
         if (asked === "paragraph") {
           const active = typeof document === "undefined" ? null : document.activeElement;
-          const owners = (linkOwners.get(editor) ?? []).filter((owner) => !owner.disabled);
+          const owners = (linkOwners.get(editor) ?? []).filter(
+            (owner) => !owner.disabled && !owner.commentOnly,
+          );
           const owner =
             owners.find((o) => o.here) ?? owners.find((o) => o.holds(active)) ?? owners[0];
           if (owner === linkOwner.current)

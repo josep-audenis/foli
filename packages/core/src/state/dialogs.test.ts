@@ -261,9 +261,8 @@ describe("openDialog and chainCommands", () => {
       for (const tr of transactions) asked.push(requestedDialog(tr));
     });
     expect(editor.commands.openDialog("paragraph")).toBe(true);
-    expect(editor.run(openDialog("font"))).toBe(true);
-    expect(asked).toEqual(["paragraph", "font"]);
-    expect(editor.run(openDialog("nope" as "font"))).toBe(false);
+    expect(asked).toEqual(["paragraph"]);
+    expect(editor.run(openDialog("nope" as "paragraph"))).toBe(false);
   });
 
   it("runs commands as one transaction, one undo step", () => {

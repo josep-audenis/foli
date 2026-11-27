@@ -126,3 +126,15 @@ describe("Paragraph dialog", () => {
     ).toBe(true);
   });
 });
+
+describe("a comment-only toolbar", () => {
+  it("opens no Paragraph dialog", () => {
+    const editor = createEditor({ document: documentOf(paragraph("one")) });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} commentOnly />);
+    editor.select(2);
+    act(() => {
+      editor.run(openDialog("paragraph"));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});

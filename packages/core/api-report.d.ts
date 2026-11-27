@@ -1130,11 +1130,11 @@ export declare function countWords(state: EditorState, options?: CountOptions): 
  */
 import type { Command, Transaction } from "./state.js";
 /** The formatting dialogs a UI opens on request (the React toolbar's built-in ones). */
-export type DialogName = "font" | "paragraph" | "tabs";
+export type DialogName = "paragraph";
 /** Transaction metadata set by `openDialog`: the dialog's name. */
 export declare const dialogRequest = "dialogRequest";
 /**
- * Asks the UI to open Word's Font, Paragraph or Tabs dialog for the selection, with a
+ * Asks the UI to open Word's Paragraph dialog for the selection, with a
  * transaction that changes nothing and carries `dialogRequest`. Applies in a Word document where the selection has a paragraph; without such
  * a UI nothing opens.
  */
@@ -1327,7 +1327,7 @@ export interface BuiltInCommands {
      * editor): one undo step, tracked when tracking is on. False when none could take it.
      */
     setControlValue(target: string, value: ControlValueInput): boolean;
-    /** Asks the toolbar to open Word's Font, Paragraph or Tabs dialog (`openDialog`). */
+    /** Asks the toolbar to open Word's Paragraph dialog (`openDialog`). */
     openDialog(name: DialogName): boolean;
 }
 /**

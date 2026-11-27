@@ -626,7 +626,7 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
  * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"` (Word's Paragraph
- * dialog for the selected paragraphs, 1.12).
+ * dialog for the selected paragraphs, 1.11).
  */
 export type ToolbarDialogName = "paragraph" | "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions" | "columnWidth";
 /** What an app's dialog gets. */
