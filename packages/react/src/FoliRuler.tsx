@@ -8,6 +8,7 @@ import {
   setSectionSetup,
   setTabStops,
   type TabStop,
+  trackState,
 } from "@folijs/core";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -92,6 +93,8 @@ interface Handle {
   remove?: () => Command;
   /** What fills `{number}` in its label (a table column's, from 1). */
   number?: number;
+  /** It cannot change now (a table column while changes are tracked). */
+  off?: boolean;
 }
 
 /** A handle being dragged: its value as the pointer has it, whether Alt is held, whether off. */
@@ -318,25 +321,30 @@ const MIN_COLUMN = 144;
  * The right border of each grid column of the table the caret is in, as a handle: its value the
  * column's width, as dragging the border in the table does (`setColumnWidth`).
  */
-function columnHandles(g: RulerGeometry): Handle[] {
+function columnHandles(g: RulerGeometry, tracking: boolean): Handle[] {
   const { table, page, margins, pxPerTwip: k } = g;
   if (!table) return [];
   return table.columns.map((column, i) => {
     const next = table.columns[i + 1];
+    // From the column's drawn left edge: the border before it, or the table's.
+    const left = i ? (table.columns[i - 1] as { right: number }).right : table.left;
     return {
       key: `column-${i}`,
       label: "Column {number} border",
       number: i + 1,
       kind: "column",
-      // Measured from the column's left edge.
-      origin: column.right - column.width * k,
+      origin: left,
       sign: 1,
       value: column.width,
-      min: MIN_COLUMN,
+      // A column already narrower than the least shows where it is (core keeps the least).
+      min: Math.min(MIN_COLUMN, column.width),
       // The next column keeps its least; the last one's border stops at the page's edge.
-      max: next
-        ? column.width + next.width - MIN_COLUMN
-        : Math.round((page.right - (column.right - column.width * k)) / k),
+      max: Math.max(
+        column.width,
+        next ? column.width + next.width - MIN_COLUMN : Math.round((page.right - left) / k),
+      ),
+      // Column widths do not change while changes are tracked (as the border in the table).
+      off: tracking,
       grid: margins.left,
       set: (width) => setColumnWidth(table.pos, i, width),
     };
@@ -406,7 +414,11 @@ export function FoliRuler({
     setDragState(next);
   };
   const handles = geometry
-    ? [...horizontalHandles(geometry), ...columnHandles(geometry), ...tabHandles(geometry)]
+    ? [
+        ...horizontalHandles(geometry),
+        ...columnHandles(geometry, trackState(editor.state)?.on ?? false),
+        ...tabHandles(geometry),
+      ]
     : [];
   /** A tab stop to focus after the next render (its value), or the document. */
   const refocus = useRef<number | "document" | null>(null);
@@ -430,7 +442,7 @@ export function FoliRuler({
   const onPointerDown = (handle: Handle) => (event: ReactPointerEvent<HTMLElement>) => {
     // The document keeps the focus and its selection (also when nothing can change).
     event.preventDefault();
-    if (disabled || event.button !== 0) return;
+    if (disabled || handle.off || event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDrag({
       key: handle.key,
@@ -503,7 +515,7 @@ export function FoliRuler({
   }, [drag]);
 
   const onKeyDown = (handle: Handle) => (event: ReactKeyboardEvent<HTMLElement>) => {
-    if (disabled) return;
+    if (disabled || handle.off) return;
     const { snap, page } = UNITS[unit];
     // Left and Right move the handle the way they point (a right-side value grows to the left);
     // Up and Page Up make its value larger, Down and Page Down smaller, as a slider's.
@@ -631,7 +643,7 @@ export function FoliRuler({
                 aria-valuemin={number(handle.min)}
                 aria-valuemax={number(Math.max(handle.min, handle.max))}
                 aria-valuetext={valueText(handle, value)}
-                aria-disabled={disabled || undefined}
+                aria-disabled={disabled || handle.off || undefined}
                 className={`foli-ruler-handle foli-ruler-${handle.kind}`}
                 data-foli-ruler={handle.key}
                 data-foli-off={drag?.key === handle.key && drag.off ? "" : undefined}

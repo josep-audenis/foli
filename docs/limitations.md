@@ -761,7 +761,11 @@ Details in the [package README](../packages/docx/README.md).
 - Right-to-left paragraphs are measured and dragged as left-to-right ones.
 - A table's columns show on the ruler for a top-level table of the body only (not a nested one,
   nor one in a header, footer or note), and only its grid's borders, not a row's own cell
-  edges; while changes are tracked a column border drag changes nothing (as in the table).
+  edges, and none while cells are selected; while changes are tracked the borders are disabled
+  (as in the table). In an autofit table drawn wider or narrower than its grid, a border dragged
+  (on the ruler or in the table) sets the width the grid then gives, so the next border may move.
+  A table as wide as the text puts its last border over the right margin's edge: take the margin
+  above or below it.
   A cell's right indent marker sits over the lower half of the border's marker: take the
   border by its top.
 - Tab stops added, moved or removed on the ruler are the document's (saved, in the Tabs dialog),

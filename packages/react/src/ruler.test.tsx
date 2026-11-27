@@ -7,6 +7,7 @@ import {
   requestedDialog,
   sectionAt,
   setTabStops,
+  setTrackChanges,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -383,6 +384,15 @@ describe("FoliRuler", () => {
     expect(grid()).toEqual([2880, 2880]);
     // The last one widens the table, by the keyboard too.
     await waitFor(() => expect(slider("Column 2 border").getAttribute("aria-valuenow")).toBe("2"));
+    fireEvent.keyDown(slider("Column 2 border"), { key: "ArrowRight" });
+    expect(grid()).toEqual([2880, 2970]);
+    // Not while tracking: disabled.
+    act(() => {
+      editor.run(setTrackChanges(true));
+    });
+    await waitFor(() =>
+      expect(slider("Column 2 border").getAttribute("aria-disabled")).toBe("true"),
+    );
     fireEvent.keyDown(slider("Column 2 border"), { key: "ArrowRight" });
     expect(grid()).toEqual([2880, 2970]);
   });
