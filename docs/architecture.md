@@ -1463,7 +1463,8 @@ since 1.0.0):
   `watermark.ts` (Word's VML watermarks, verbatim while unchanged), the section and paragraph
   properties as their other parts.
 - `@folijs/view` (`word/decoration.ts`), shared by the editing view and `renderDocument` (so
-  print and `exportPdf`): the color as each page's background (`print-color-adjust: exact`),
+  print and `exportPdf`): the color as each page's background (printed: `print-color-adjust:
+  exact`, set where each renderer gives the page its color),
   the borders and watermarks as elements over and under the page's content (`aria-hidden`,
   `contenteditable=false`, no pointer events, `PAGE_DECORATION_ATTR`), and line numbers
   measured from the laid-out lines once the pages hold their blocks (only where a section has

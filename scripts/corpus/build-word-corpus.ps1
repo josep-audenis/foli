@@ -844,7 +844,7 @@ try {
   # ---------------------------------------------------------------------------------------
   # 10: Design review memo (Phase 32). A page color, a page border (double line from the page's
   # edge), Word's CONFIDENTIAL 1 watermark from its gallery, a paragraph with a bottom border and
-  # shading, a boxed paragraph, line numbers counted by 5 continuously (Word's automation refuses
+  # shading, a boxed paragraph, line numbers every fifth line (Word's automation refuses
   # SuppressLineNumbers: unit tests cover it).
   if (Want "10") {
   Set-Author "Design" "DS"
@@ -881,7 +881,6 @@ try {
   $numbering.Active = $true
   $numbering.CountBy = 5
   $numbering.RestartMode = 2                      # wdRestartContinuous
-  # Set once lines are numbered (Word refuses it before).
   # Watermark: CONFIDENTIAL 1 from Word's gallery (building blocks, type 8), in the header.
   $word.Templates.LoadBuildingBlocks()
   $mark = $null
@@ -897,6 +896,8 @@ try {
   }
   if (-not $mark) { throw "Word's CONFIDENTIAL 1 watermark is not in its building blocks" }
   $mark.Insert($doc.Sections.Item(1).Headers.Item($HF_PRIMARY).Range, $true) | Out-Null
+  # Shown in Print Layout, as Design > Page Color turns it on (w:displayBackgroundShape).
+  $doc.ActiveWindow.View.DisplayBackgrounds = $true
   Save-Doc $doc "10-design-memo.docx"
   }
 }

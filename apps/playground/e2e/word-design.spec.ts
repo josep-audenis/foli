@@ -36,6 +36,9 @@ test("Word's design memo shows its page decoration", async ({ page }) => {
   expect(
     await shaded.evaluate((el) => getComputedStyle(el.closest("p") ?? el).borderBottomStyle),
   ).toBe("solid");
+  expect(
+    await shaded.evaluate((el) => getComputedStyle(el.closest("p") ?? el).backgroundColor),
+  ).toBe("rgb(230, 230, 230)");
   const results = await new AxeBuilder({ page }).include("section.foli-page").analyze();
   expect(results.violations).toEqual([]);
 });
