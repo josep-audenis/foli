@@ -33,6 +33,7 @@ describe("wordRibbonTabs", () => {
     expect(wordRibbonTabs.map((tab) => tab.label)).toEqual([
       "Home",
       "Insert",
+      "Design",
       "Layout",
       "References",
       "Review",
@@ -65,7 +66,15 @@ describe("wordRibbonTabs", () => {
   it("shows the table tabs, drawn apart, only while the selection is in a table", () => {
     const editor = createEditor({ document: word });
     render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
-    expect(tabNames()).toEqual(["Home", "Insert", "Layout", "References", "Review", "View"]);
+    expect(tabNames()).toEqual([
+      "Home",
+      "Insert",
+      "Design",
+      "Layout",
+      "References",
+      "Review",
+      "View",
+    ]);
     act(() => {
       editor.run(insertTable(2, 2));
     });

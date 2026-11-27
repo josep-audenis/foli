@@ -61,6 +61,7 @@ import {
   noteAtSelection,
   noteProperties,
   openLinkEditor,
+  pageColorOf,
   paragraphStyleAt,
   paragraphStyles,
   previousChangeWrapping,
@@ -91,6 +92,7 @@ import {
   setLineSpacing,
   setLink,
   setNoteProperties,
+  setPageColor,
   setParagraphStyle,
   setPictureAlt,
   setPictureCrop,
@@ -140,6 +142,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { PageBordersDialog } from "./DesignDialogs.js";
 import {
   development,
   sameItems,
@@ -457,9 +460,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
  * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"`, `"font"` and
- * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11).
+ * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11), `"pageBorders"`
+ * (Word's Page Borders, the caret's section or the document).
  */
 export type ToolbarDialogName =
+  | "pageBorders"
   | "paragraph"
   | "font"
   | "tabs"
@@ -690,6 +695,11 @@ const HIGHLIGHTS: readonly ToolbarColor[] = [
   { name: "Gray 50%", color: "#808080" },
   { name: "Gray 25%", color: "#c0c0c0" },
   { name: "Black", color: "#000000" },
+];
+/** Page colors (Design ▸ Page Color): Word's grid, as the text color's. */
+const PAGE_COLORS = (state: EditorState): readonly ToolbarColor[] => [
+  { name: "No Color", color: null },
+  ...themeColors(state),
 ];
 /** Cell shadings: Word's grid, as the text color's. */
 const SHADINGS = (state: EditorState): readonly ToolbarColor[] => [
@@ -1912,6 +1922,30 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Word's Design tab (Phase 32): its Page Background group.
+  {
+    key: "pageColor",
+    label: "Page color",
+    text: "Page Color",
+    enabled: isWord,
+    colors: {
+      options: PAGE_COLORS,
+      columns: 10,
+      custom: true,
+      value: (state) => {
+        const color = pageColorOf(state);
+        return color ? `#${color.toLowerCase()}` : null;
+      },
+      pick: (color) => setPageColor(color ? color.slice(1).toUpperCase() : null),
+    },
+  },
+  {
+    key: "pageBorders",
+    label: "Page borders",
+    text: "Page Borders",
+    enabled: isWord,
+    dialog: "pageBorders",
+  },
   // Word's Layout tab (30.5): its page menus and its Paragraph group's boxes.
   { key: "margins", label: "Margins", text: "Margins", enabled: isWord, actions: MARGIN_ACTIONS },
   {
@@ -2110,7 +2144,9 @@ export type ToolbarItemName =
   | "indentLeft"
   | "indentRight"
   | "spaceBefore"
-  | "spaceAfter";
+  | "spaceAfter"
+  | "pageColor"
+  | "pageBorders";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
@@ -2129,8 +2165,9 @@ type ToolbarMenuName =
   | "notes"
   | "controls";
 type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
-type ToolbarColorName = "textColor" | "highlight" | "cellShading";
+type ToolbarColorName = "textColor" | "highlight" | "cellShading" | "pageColor";
 type ToolbarDialogItemName =
+  | "pageBorders"
   | "paragraphSettings"
   | "fontSettings"
   | "columnWidth"
@@ -2346,6 +2383,11 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       ],
     },
     {
+      key: "design",
+      label: "Design",
+      items: [group("Page Background", large(t.pageColor), large(t.pageBorders))],
+    },
+    {
       key: "layout",
       label: "Layout",
       items: [
@@ -2487,6 +2529,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   paragraph: isWord,
   font: isWord,
   tabs: isWord,
+  pageBorders: isWord,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -2540,6 +2583,7 @@ const actionsOf = (item: Item, body: Editor): readonly Action[] =>
 const TAB_TIPS: Readonly<Record<string, string>> = {
   home: "H",
   insert: "N",
+  design: "G",
   layout: "P",
   references: "S",
   review: "R",
@@ -3208,7 +3252,7 @@ export function FoliToolbar({
   }, [disabled]);
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
-    name: "paragraph" | "font" | "tabs";
+    name: "paragraph" | "font" | "tabs" | "pageBorders";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3311,7 +3355,7 @@ export function FoliToolbar({
       }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
-      else if (name === "paragraph" || name === "font" || name === "tabs")
+      else if (name === "paragraph" || name === "font" || name === "tabs" || name === "pageBorders")
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });
@@ -4203,6 +4247,20 @@ export function FoliToolbar({
           <TabsDialog
             editor={editor}
             unit={unit}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "pageBorders" && !disabled && (
+          <PageBordersDialog
+            editor={editor}
+            colors={themeColors(editor.state).filter(
+              (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
+                c.shade === undefined && c.color !== null,
+            )}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

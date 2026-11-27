@@ -156,6 +156,8 @@ const NAMES = {
   indentRight: 1,
   spaceBefore: 1,
   spaceAfter: 1,
+  pageColor: 1,
+  pageBorders: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */

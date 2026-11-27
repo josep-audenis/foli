@@ -812,6 +812,10 @@ Details in the [package README](../packages/docx/README.md).
   drawn; changing the borders writes them anew without them. Borders measured from the text
   are placed from the section's margins, not around a header or footer (Word's "Surround
   header" and "Surround footer" settings are kept, not applied).
+- Page Color sets the RGB value of the color picked, also for a theme color (Word writes the
+  theme color and its tint as well): changing the theme does not change it.
+- The Page Borders dialog has None, Box and Custom (not Word's Shadow and 3-D), no art borders
+  and no preview; its sides are check boxes and one distance applies to every side.
 - Line numbers (`w:lnNumType`) are read and written but not drawn yet (32.5); an element without
   `countBy` numbers no line in Word and stays in the section's verbatim XML.
 - On a dark page color, text in Automatic color stays black (Word draws it white).

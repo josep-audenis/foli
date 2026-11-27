@@ -32,6 +32,7 @@ test("shows Word's tabs in captioned groups, without axe violations", async ({ p
   await expect(page.getByRole("tab")).toHaveText([
     "Home",
     "Insert",
+    "Design",
     "Layout",
     "References",
     "Review",
@@ -179,7 +180,7 @@ test("KeyTips: Alt, a tab's letter, an item's letter", async ({ page }) => {
   await editor(page).click();
   const text = await editor(page).innerText();
   await page.keyboard.press("Alt");
-  await expect(page.locator(".foli-keytip")).toHaveCount(6);
+  await expect(page.locator(".foli-keytip")).toHaveCount(7);
   await page.keyboard.press("n");
   await expect(tab(page, "Insert")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".foli-keytip").first()).toBeVisible();
