@@ -1589,10 +1589,16 @@ export function LayoutDialog({
     const v = axis(vertical, AXES.vertical.label, opened.vertical, float?.vertical);
     if (!h || !v) return setTab("position");
     const gaps: Record<string, number> = {};
+    const sideWise = wrap === "tight" || wrap === "through";
+    const shut = (key: string) =>
+      wrap === "behind" ||
+      wrap === "inFront" ||
+      (sideWise && (key === "top" || key === "bottom")) ||
+      (wrap === "topAndBottom" && (key === "left" || key === "right"));
     for (const [key, label] of DISTANCES) {
-      const own = float?.distance?.[key];
-      if (distance[key] === opened.distance[key] && typeof own === "number") {
-        gaps[key] = own;
+      // Unchanged, or not editable for this wrapping: as it was (Word's default for a new float).
+      if (distance[key] === opened.distance[key] || shut(key)) {
+        gaps[key] = float?.distance?.[key] ?? (key === "left" || key === "right" ? 114_300 : 0);
         continue;
       }
       const twips = parseLength(distance[key] ?? "", unit);
@@ -1744,7 +1750,9 @@ export function LayoutDialog({
           (on) => {
             // Where it is drawn stays: its offset from the paragraph or from the page.
             const at = object ? editor.storyView?.objectPlacement?.(object.pos) : null;
-            const px = at ? (on ? at.top - at.paragraphTop : at.top) : null;
+            // A typed offset stays as typed; only what the dialog opened with is converted.
+            const typed = vertical.offset !== opened.vertical.offset;
+            const px = at && !typed ? (on ? at.top - at.paragraphTop : at.top) : null;
             setVertical({
               ...vertical,
               from: on ? "paragraph" : "page",
