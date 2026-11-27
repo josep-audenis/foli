@@ -759,6 +759,10 @@ Details in the [package README](../packages/docx/README.md).
 ## The ruler (Phase 31)
 
 - Right-to-left paragraphs are measured and dragged as left-to-right ones.
+- In `FoliEditor`, a page wider than the window (a large zoom) scrolls the document sideways and
+  the horizontal ruler with it: its handles are under the pointer where the ruler shows, not
+  past the window's edge (an app can scroll the pages in a box of their own, as the
+  playground's `?ruler` does).
 - A table's columns show on the ruler for a top-level table of the body only (not a nested one,
   nor one in a header, footer or note), and only its grid's borders, not a row's own cell
   edges, and none while cells are selected; while changes are tracked the borders are disabled
