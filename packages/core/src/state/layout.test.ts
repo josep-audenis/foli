@@ -189,7 +189,9 @@ describe("Layout Options (33.4)", () => {
     editor.run(setTrackChanges(true));
     expect(croppingAt(editor.state)).toBeNull();
     editor.run(setTrackChanges(false));
+    editor.run(toggleCrop);
     editor.run(setObjectSize(2, 952_500, 952_500, 5_400_000));
+    expect(croppingAt(editor.state)).toBeNull();
     expect(toggleCrop(editor.state)).toBe(false);
   });
 });

@@ -409,7 +409,9 @@ export function cropPlugin(): Plugin {
           trackState(next)?.on !== true &&
           selection instanceof NodeSelection &&
           selection.from === pos &&
-          selection.node.type.name === "picture";
+          selection.node.type.name === "picture" &&
+          // Turned (a rotate button), it is no longer cropped on the page.
+          Number(selection.node.attrs.rotation ?? 0) % TURN === 0;
         return kept ? pos : null;
       },
     },
