@@ -7,7 +7,15 @@
 import { type FoliDocument, type NodeJSON, parseDocument } from "@folijs/core";
 import { importDocx } from "@folijs/docx";
 import { type DocumentPages, type ReviewView, renderDocument } from "@folijs/view";
-import { type Agreement, agreement, bodyRegion, inkPixels, overlay, samePage } from "./ink.js";
+import {
+  type Agreement,
+  agreement,
+  bodyRegion,
+  inkPixels,
+  overlay,
+  type Region,
+  samePage,
+} from "./ink.js";
 
 const container = document.getElementById("pages") as HTMLElement;
 let shown: DocumentPages | null = null;
@@ -144,6 +152,36 @@ function comparePage(
 }
 
 /**
+ * Regions of Foli's pages (PNG screenshots, CSS pixels) compared by ink with the same regions of
+ * Word's PDF pages, rendered by pdf.js at 96 px per inch (Phase 34: each shape's box). A page
+ * Word's PDF does not have scores null.
+ */
+async function compareRegions(
+  pdf: string,
+  pages: { png: string; regions: Region[] }[],
+): Promise<(Agreement | null)[][]> {
+  const { pdf: word, destroy } = await openPdf(pdf);
+  const out: (Agreement | null)[][] = [];
+  for (const [i, foliPage] of pages.entries()) {
+    if (i >= word.numPages) {
+      out.push(foliPage.regions.map(() => null));
+      continue;
+    }
+    const image = new Image();
+    image.src = `data:image/png;base64,${foliPage.png}`;
+    await image.decode();
+    const canvas = await pdfCanvas(word, i + 1);
+    const width = Math.min(canvas.width, image.naturalWidth);
+    const height = Math.min(canvas.height, image.naturalHeight);
+    const wordInk = pixels(canvas, width, height);
+    const foliInk = pixels(image, width, height);
+    out.push(foliPage.regions.map((region) => agreement(wordInk, foliInk, undefined, region)));
+  }
+  await destroy();
+  return out;
+}
+
+/**
  * Compares Foli's pages (PNG screenshots, CSS pixels, with each page's margins) with the pages
  * of Word's PDF, rendered by pdf.js at the same scale (96 px per inch). A page only one of them
  * has is not compared: the counts differ.
@@ -231,6 +269,8 @@ declare global {
       comparePdf: typeof comparePdf;
       /** Foli's PDF compared with Word's (both base64). */
       comparePdfs: typeof comparePdfs;
+      /** Regions of the pages shown compared with Word's PDF (base64). */
+      compareRegions: typeof compareRegions;
       /** A PDF's pages, text, outline and links (base64). */
       readPdf: typeof readPdf;
     };
@@ -245,6 +285,7 @@ window.foliWord = {
   show: (json, review) => show(parseDocument(json), review),
   comparePdf,
   comparePdfs,
+  compareRegions,
   readPdf,
 };
 

@@ -59,6 +59,7 @@ import {
   parseOpaque,
   pictureElement,
   type ReviewView,
+  shapeElement,
   styleParagraph,
   styleRun,
   tagOf,
@@ -88,7 +89,9 @@ function textBoxesIn(node: ModelNode): string[] {
   if (!ids) {
     const found: string[] = [];
     node.descendants((child) => {
-      if (child.type.name === "textBox") found.push(String(child.attrs.story));
+      // A shape's text too (34.2).
+      if ((child.type.name === "textBox" || child.type.name === "shape") && child.attrs.story)
+        found.push(String(child.attrs.story));
       return true;
     });
     ids = found;
@@ -465,9 +468,10 @@ export class WordRenderer {
           leafElement(span);
           return;
         }
-        case "textBox": {
-          // A text box (33.2): its story drawn read-only, one position in the text, placed as
-          // a picture is.
+        case "textBox":
+        case "shape": {
+          // A text box (33.2) or a shape (34.2): its story drawn read-only, one position in the
+          // text, placed as a picture is.
           const span = doc.createElement("span");
           span.setAttribute("contenteditable", "false");
           // On the clipboard nothing: its paragraphs in the line's would break the HTML (Foli's
@@ -476,13 +480,18 @@ export class WordRenderer {
             leafElement(span);
             return;
           }
-          const box = textBoxElement(child.attrs, this.#context.envelope, doc, {
-            resolver: this.#context.resolver,
-            review: this.#review,
-            fieldCodes: codes,
-            lineRatio: this.#ratio,
-            image: this.#image,
-          });
+          const box = (name === "shape" ? shapeElement : textBoxElement)(
+            child.attrs,
+            this.#context.envelope,
+            doc,
+            {
+              resolver: this.#context.resolver,
+              review: this.#review,
+              fieldCodes: codes,
+              lineRatio: this.#ratio,
+              image: this.#image,
+            },
+          );
           if (child.attrs.float && !this.#clipboard && !hidden) {
             geometry ??= floatGeometry(this.#context.envelope.section);
             const { nodes, holder } = floatElements(child.attrs, doc, this.#image, geometry, box);

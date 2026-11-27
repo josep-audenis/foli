@@ -104,6 +104,16 @@ test("11 exported: its text boxes print with their text, the header's too (33.2)
     expect(text).toContain(shown);
 });
 
+test("12 exported: its shapes print, a shape's text with them (34.2)", async ({
+  page,
+  context,
+}) => {
+  const exported = await exportCorpus(context, "12-shapes-poster.docx");
+  const pdf = await read(page, exported.pdf);
+  expect(pdf.pages).toHaveLength(2);
+  expect(words(pdf.pages.map((p) => p.text).join(" "))).toContain("Open day");
+});
+
 test("a document makes the exporting page request nothing: no picture, font or style URL", async ({
   context,
 }) => {

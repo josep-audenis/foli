@@ -991,6 +991,14 @@ export {};
 // word/edit.d.ts
 export {};
 
+// word/geometry.d.ts
+/**
+ * DrawingML geometry (Phase 34, ADR-0017): a shape's guides evaluated and its paths turned into
+ * SVG path data. One interpreter for the presets (`presets.ts`, ECMA-376's definitions) and a
+ * file's custom geometry (`a:custGeom`); 34.4's adjustment handles read the same guides.
+ */
+export {};
+
 // word/marks.d.ts
 /**
  * Word's Show/Hide ¶ (29.5): paragraph marks, spaces, tabs and breaks drawn over the text, in a
@@ -1086,12 +1094,39 @@ export declare function renderDocument(document: FoliDocument, container: HTMLEl
  */
 export {};
 
+// word/presets.d.ts
+/**
+ * The preset geometries Foli draws (Phase 34, ADR-0017): Word's Shapes gallery's Lines,
+ * Rectangles, Basic Shapes, Block Arrows, Stars and Callouts (and the flowchart shapes that are
+ * the same), as ECMA-376's `presetShapeDefinitions.xml` defines them, written compactly:
+ *
+ * - `av`: adjust values and their defaults, `name value;…`;
+ * - `gd`: guides in order, `name formula;…` (`x1 *\/ ss a 100000`);
+ * - `path`: paths separated by `|`, each optionally starting with `[w h fill stroke]` flags
+ *   (`[fill=none]`, `[stroke=0]`, `[w=21600 h=21600]`, `[fill=darkenLess stroke=0]`), then
+ *   commands `M x y`, `L x y`, `C x1 y1 x2 y2 x y`, `Q x1 y1 x y`, `A wR hR stAng swAng`, `Z`;
+ * - `ah`: adjustment handles separated by `|`: `x ref min max @ px py`, `y ref min max @ px py`,
+ *   `xy refX minX maxX refY minY maxY @ px py`;
+ * - `text`: the text rectangle `l t r b`.
+ *
+ * Any other preset is drawn as its bounding rectangle (`geometry.ts`).
+ */
+export {};
+
 // word/regions.d.ts
 /**
  * Headers and footers on pages (11.7, ADR-0007), for both renderers: which story a page shows, how
  * tall it is with that page's fields filled in, how far it pushes the text, and its elements.
  * A story is always drawn from the model here, by the read-only blocks renderer; `PAGE`, `NUMPAGES`
  * and `SECTIONPAGES` are filled in the copy drawn, never in the document.
+ */
+export {};
+
+// word/shapes.d.ts
+/**
+ * Shapes drawn (Phase 34, ADR-0017): a `shape` node's geometry as SVG paths in its box, filled
+ * with its color or gradient, stroked with its line (width, dash, ends), flipped as it says.
+ * The box itself (size, turn, text) is `shapeElement`'s (`blocks.ts`).
  */
 export {};
 
