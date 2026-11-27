@@ -1,5 +1,5 @@
 // Phase 30's acceptance: what Word's Paragraph, Font and Tabs dialogs set round-trips through
-// .docx, set by the dialogs' commands.
+// .docx, set by the dialogs' commands (each property, and an effect turned off over a style).
 import {
   chainCommands,
   createDocument,
@@ -8,6 +8,8 @@ import {
   runFormatAt,
   setAlign,
   setCharacterSpacing,
+  setFontFamily,
+  setFontSize,
   setIndent,
   setLineSpacing,
   setOutlineLevel,
@@ -15,6 +17,7 @@ import {
   setParagraphSpacing,
   setRunEffects,
   setTabStops,
+  setTextColor,
   setUnderline,
   setVerticalAlign,
 } from "@folijs/core";
@@ -82,5 +85,41 @@ describe("Phase 30 dialogs through .docx", () => {
       verticalAlign: "superscript",
       characterSpacing: -30,
     });
+  });
+});
+
+describe("Phase 30 dialogs through .docx, the rest", () => {
+  it("keeps the other values the dialogs set, and an effect turned off over a style", async () => {
+    const editor = createEditor({ document: createDocument() });
+    editor.commands.insertText("More");
+    editor.select(1, 5);
+    editor.run(
+      chainCommands([
+        setFontFamily("Georgia"),
+        setFontSize(13.5),
+        setTextColor("#336699"),
+        setRunEffects({ caps: true, strike: true }),
+        setVerticalAlign("subscript"),
+        setUnderline("double", null),
+        setIndent({ firstLine: 27 }),
+        setLineSpacing(16, "atLeast"),
+        setTabStops({ set: [{ position: 72, alignment: "bar" }] }),
+      ]),
+    );
+    const styled = editor.getDocument();
+    styled.styles = styled.styles.map((s) =>
+      s.isDefault && s.type === "paragraph" ? { ...s, run: [{ type: "bold" }] } : s,
+    );
+    const bold = createEditor({ document: styled });
+    bold.select(1, 5);
+    bold.run(setRunEffects({ bold: false }));
+    const paragraph = paragraphFormatAt(bold.state);
+    const run = runFormatAt(bold.state);
+    expect(run).toMatchObject({ bold: false, caps: true, strike: true, size: 27 });
+    const { document } = await importDocx(await exportDocx(bold.getDocument()));
+    const back = createEditor({ document });
+    back.select(1, 5);
+    expect(paragraphFormatAt(back.state)).toEqual(paragraph);
+    expect(runFormatAt(back.state)).toEqual(run);
   });
 });

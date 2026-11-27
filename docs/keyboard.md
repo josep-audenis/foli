@@ -108,6 +108,10 @@ core keymaps.
 The format painter (built in, every editor) also takes Escape while it is on
 (`stopFormatPainter`), then lets the key go on.
 
+The Layout tab's Indent and Spacing boxes (1.11, the toolbar's): Enter sets what was typed,
+ArrowUp and ArrowDown step the value (a tenth of an inch, 6 pt), Escape or leaving the box puts
+it back; ArrowLeft, ArrowRight, Home and End move in the box, not between toolbar items.
+
 ### The view's keys
 
 They need the pages, the stories or the app's UI, so they are the view's (`@folijs/view`), not
