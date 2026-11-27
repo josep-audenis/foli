@@ -122,7 +122,8 @@ describe("a document of schema 8 adopts what its kept XML says (32.5 review)", (
         {
           id: "X",
           type: "paragraph",
-          paragraph: { ext: `<w:pPr ${W}><w:suppressLineNumbers/></w:pPr>` },
+          // As the importer keeps it: the whole element on the style.
+          ext: `<w:style ${W} w:type="paragraph" w:styleId="X"><w:pPr><w:suppressLineNumbers/></w:pPr><w:rPr><w:b/></w:rPr></w:style>`,
         },
       ],
       section: {

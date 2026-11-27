@@ -1409,11 +1409,13 @@ const compactJson = (object: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined));
 
 /** Kept XML without its tracked change (`w:pPrChange`…): that says what was, not what is. */
-const withoutChange = (ext: string, local: "pPrChange" | "sectPrChange") =>
+const withoutChange = (ext: string, local: "pPrChange" | "sectPrChange" | "rPrChange") =>
   ext.replace(
     local === "pPrChange"
       ? /<(?:[\w.-]+:)?pPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?pPrChange>/g
-      : /<(?:[\w.-]+:)?sectPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?sectPrChange>/g,
+      : local === "rPrChange"
+        ? /<(?:[\w.-]+:)?rPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?rPrChange>/g
+        : /<(?:[\w.-]+:)?sectPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?sectPrChange>/g,
     "",
   );
 
@@ -1495,13 +1497,25 @@ function adoptKeptDecoration(doc: FoliDocument): void {
   visit(doc.content);
   for (const comment of doc.comments) for (const block of comment.content) visit(block);
   for (const story of Object.values(doc.stories ?? {})) visit(story.content);
-  // Styles, the defaults and list levels hold paragraph properties too.
-  for (const style of doc.styles) adoptParagraphProperties(style.paragraph);
-  adoptParagraphProperties(doc.defaults.paragraph);
-  for (const abstract of doc.numbering.abstracts)
-    for (const level of abstract.levels) adoptParagraphProperties(level.paragraph);
-  for (const instance of doc.numbering.instances)
-    for (const override of instance.overrides ?? [])
-      adoptParagraphProperties(override.definition?.paragraph);
+  // Styles, the defaults and list levels keep their element (`w:style`, `w:docDefaults`,
+  // `w:lvl`) whole in their own `ext`: its `w:pPr` is theirs.
+  const owners: { paragraph?: ParagraphPropertiesJSON; ext?: string }[] = [
+    ...doc.styles,
+    doc.defaults,
+    ...doc.numbering.abstracts.flatMap((a) => a.levels),
+    ...doc.numbering.instances.flatMap((i) =>
+      (i.overrides ?? []).flatMap((o) => (o.definition ? [o.definition] : [])),
+    ),
+  ];
+  for (const owner of owners) {
+    if (owner.paragraph?.suppressLineNumbers != null || !owner.ext) continue;
+    const pPr = /<(?:[\w.-]+:)?pPr\b[\s\S]*?<\/(?:[\w.-]+:)?pPr>/.exec(
+      withoutChange(withoutChange(owner.ext, "pPrChange"), "rPrChange"),
+    )?.[0];
+    const properties: Record<string, unknown> = { ext: pPr ?? "" };
+    adoptParagraphProperties(properties);
+    if (typeof properties.suppressLineNumbers === "boolean")
+      owner.paragraph = { ...owner.paragraph, suppressLineNumbers: properties.suppressLineNumbers };
+  }
   doc.schemaVersion = schemaVersionOf(doc);
 }
