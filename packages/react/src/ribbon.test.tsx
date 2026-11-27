@@ -49,9 +49,12 @@ describe("wordRibbonTabs", () => {
         ? [...g.items, ...(g.launcher ? [g.launcher] : [])].map((i) => i.key)
         : g.map((i) => i.key);
     const all = new Set(groups.flatMap(keysOf));
-    // The Styles gallery stands for the style box there, as in Word.
+    // The Styles gallery stands for the style box there, as in Word; Layout's Breaks, Margins…
+    // and Page setup for the Section menu.
     for (const item of Object.values(toolbarItems))
-      expect(all.has(item.key) || item.key === "style", item.key).toBe(true);
+      expect(all.has(item.key) || item.key === "style" || item.key === "section", item.key).toBe(
+        true,
+      );
     // An item twice in one tab would share a key.
     for (const tab of wordRibbonTabs) {
       const keys = tab.items.flatMap(keysOf);
@@ -155,6 +158,7 @@ describe("wordRibbonTabs", () => {
     const boxes = new Set([
       ...["style", "font", "size", "lineSpacing", "reviewView", "tableStyle"],
       "styleGallery",
+      ...["indentLeft", "indentRight", "spaceBefore", "spaceAfter"],
     ]);
     for (const item of Object.values(toolbarItems))
       expect(boxes.has(item.key) || item.key in toolbarIcons, item.key).toBe(true);

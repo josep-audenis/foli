@@ -42,6 +42,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { useEditorState } from "./editor.js";
+import type { ToolbarCustomProps } from "./FoliToolbar.js";
 import { type ToolbarMessage, useT } from "./messages.js";
 import { formatLength, type LengthUnit, parseLength } from "./units.js";
 
@@ -1286,5 +1288,96 @@ export function TabsDialog({
         )}
       </form>
     </div>
+  );
+}
+
+// ---------- Layout's Paragraph group: Indent and Spacing boxes ----------
+
+/** What a box of Layout's Paragraph group shows and sets. */
+type BoxField = "left" | "right" | "before" | "after";
+const BOX_STEP: Record<BoxField, number> = { left: 144, right: 144, before: 120, after: 120 };
+
+/**
+ * One of the Layout tab's Indent (Left, Right) and Spacing (Before, After) boxes: the selected
+ * paragraphs' value (blank when they differ); Enter or leaving the box sets what was typed,
+ * ArrowUp and ArrowDown step it (a tenth of an inch, 6 pt), Escape puts it back.
+ * @internal
+ */
+export function ParagraphBox({
+  editor,
+  disabled,
+  tabIndex,
+  ref,
+  onFocus,
+  field,
+  label,
+  unit,
+}: ToolbarCustomProps & { field: BoxField; label: ToolbarMessage; unit: LengthUnit }) {
+  const t = useT();
+  const indent = field === "left" || field === "right";
+  const to = indent ? unit : "pt";
+  const twips = useEditorState(
+    (state) => {
+      const format = paragraphFormatAt(state);
+      const value = indent
+        ? format?.indent[field as "left" | "right"]
+        : format?.spacing[field as "before" | "after"];
+      return value ?? null;
+    },
+    { editor },
+  );
+  const shown = twips === null ? "" : formatLength(twips, to);
+  const [text, setText] = useState<string | null>(null);
+  const commit = (value: number) => {
+    const max = 31_680;
+    const clamped = Math.max(indent ? -max : 0, Math.min(max, value));
+    editor.run(
+      indent
+        ? setIndent({ [field]: clamped / 20 })
+        : setParagraphSpacing({ [field]: clamped / 20 }),
+    );
+  };
+  const set = () => {
+    if (text === null) return;
+    const value = parseLength(text, to);
+    setText(null);
+    if (value !== null && value !== twips) commit(value);
+  };
+  return (
+    <span className={`foli-toolbar-box foli-toolbar-${field}-box`}>
+      <span className="foli-toolbar-box-label" aria-hidden="true">
+        {t(label)}
+      </span>
+      <input
+        ref={ref}
+        type="text"
+        inputMode="decimal"
+        tabIndex={tabIndex}
+        aria-label={t(label)}
+        aria-disabled={disabled || undefined}
+        readOnly={disabled}
+        value={text ?? shown}
+        onFocus={onFocus}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={set}
+        onKeyDown={(event) => {
+          if (disabled) return;
+          // The caret moves in the box: the toolbar's arrows do not take it away.
+          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
+            event.stopPropagation();
+          if (event.key === "Enter") {
+            event.preventDefault();
+            set();
+          } else if (event.key === "Escape") {
+            setText(null);
+          } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+            event.preventDefault();
+            const step = BOX_STEP[field] * (event.key === "ArrowUp" ? 1 : -1);
+            setText(null);
+            commit((twips ?? 0) + step);
+          }
+        }}
+      />
+    </span>
   );
 }

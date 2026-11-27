@@ -316,3 +316,72 @@ describe("Tabs dialog review cases", () => {
     expect(editor.state.doc.child(0).attrs.tabs).toEqual([{ position: 1440, kind: "right" }]);
   });
 });
+
+describe("Layout tab", () => {
+  const open = () => {
+    const editor = createEditor({ document: documentOf(paragraph("one"), paragraph("two")) });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" />);
+    editor.select(2);
+    return editor;
+  };
+  const pick = (menu: string, entry: string) => {
+    fireEvent.click(screen.getByRole("button", { name: menu }));
+    const item = [...document.querySelectorAll('[role^="menuitem"]')].find(
+      (m) => m.textContent === entry,
+    );
+    fireEvent.click(item as HTMLElement);
+  };
+
+  it("sets margins, orientation, size and columns on the caret's section", () => {
+    const editor = open();
+    pick("Margins", "Narrow");
+    expect(editor.getDocument().section.margins).toMatchObject({
+      top: 720,
+      bottom: 720,
+      left: 720,
+      right: 720,
+    });
+    pick("Size", "A4");
+    expect(editor.getDocument().section.pageSize).toMatchObject({ width: 11906, height: 16838 });
+    pick("Orientation", "Landscape");
+    expect(editor.getDocument().section.pageSize).toEqual({
+      width: 16838,
+      height: 11906,
+      orientation: "landscape",
+    });
+    pick("Size", "Letter");
+    expect(editor.getDocument().section.pageSize).toMatchObject({ width: 15840, height: 12240 });
+    pick("Columns", "Two");
+    expect(editor.getDocument().section.columns).toEqual({ count: 2, space: 720 });
+    pick("Columns", "Left");
+    const columns = editor.getDocument().section.columns;
+    expect(columns?.equalWidth).toBe(false);
+    const [a, b] = columns?.widths ?? [];
+    expect((a?.width ?? 0) < (b?.width ?? 0)).toBe(true);
+    pick("Columns", "One");
+    expect(editor.getDocument().section.columns).toEqual({ count: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Margins" }));
+    const narrow = screen.getAllByRole("menuitemcheckbox").find((m) => m.textContent === "Narrow");
+    expect(narrow?.getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("inserts Word's breaks", () => {
+    const editor = open();
+    pick("Breaks", "Continuous");
+    // A new section starts at the caret, continuous.
+    expect(JSON.stringify(editor.getDocument())).toContain('"type":"continuous"');
+  });
+
+  it("sets indents and spacing from its boxes, ArrowUp steps", () => {
+    const editor = open();
+    const left = screen.getByRole("textbox", { name: "Indent left" }) as HTMLInputElement;
+    expect(left.value).toBe('0"');
+    fireEvent.change(left, { target: { value: "0.5" } });
+    fireEvent.keyDown(left, { key: "Enter" });
+    expect(editor.state.doc.child(0).attrs.indent).toEqual({ left: 720 });
+    const after = screen.getByRole("textbox", { name: "Spacing after" }) as HTMLInputElement;
+    fireEvent.keyDown(after, { key: "ArrowUp" });
+    expect(editor.state.doc.child(0).attrs.spacing).toMatchObject({ after: 120 });
+    expect(after.value).toBe("6 pt");
+  });
+});
