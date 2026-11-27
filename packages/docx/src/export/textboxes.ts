@@ -159,7 +159,8 @@ export function textBoxXml(
   const bodyPr = kid(shape, WPS, "bodyPr");
   if (changed && spPr) lookEdits(source, spPr, bodyPr, read.attrs, attrs, edits);
   // Text given to a shape that had none: its `wps:txbx` before `wps:bodyPr`.
-  if (addsText && bodyPr) {
+  // A connector holds no text (Word's `wps:cNvCnPr`): it is not given any.
+  if (addsText && bodyPr && !kid(shape, WPS, "cNvCnPr")) {
     contentChanged = true;
     const p = shape?.prefix ? `${shape.prefix}:` : "";
     edits.push({

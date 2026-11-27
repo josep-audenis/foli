@@ -434,6 +434,37 @@ const checkAdjust: Check = (v) => {
   return undefined;
 };
 
+/** How many arguments a path command takes (`M x y`…; `A wR hR stAng swAng`). */
+const ARITY: Record<string, number> = { M: 2, L: 2, C: 6, Q: 4, A: 4, Z: 0 };
+const pathCommand: Check = (v) => {
+  const error = shape({ op: oneOf(Object.keys(ARITY)), args: listOf(text(64), 6) }, ["op"])(v);
+  if (error || !isRecord(v)) return error;
+  const count = Array.isArray(v.args) ? v.args.length : 0;
+  const wanted = ARITY[v.op as string] ?? 0;
+  return count === wanted ? undefined : `${v.op} takes ${wanted} arguments, not ${count}`;
+};
+
+/** DrawingML's preset geometries (ST_ShapeType), and `custom` for a custom geometry. */
+const GEOMETRIES =
+  `line lineInv triangle rtTriangle rect diamond parallelogram trapezoid nonIsoscelesTrapezoid pentagon hexagon heptagon octagon decagon dodecagon star4 star5 star6 star7 star8 star10 star12 star16 star24 star32 roundRect round1Rect round2SameRect round2DiagRect snipRoundRect snip1Rect snip2SameRect snip2DiagRect plaque ellipse teardrop homePlate chevron pieWedge pie blockArc donut noSmoking rightArrow leftArrow upArrow downArrow stripedRightArrow notchedRightArrow bentUpArrow leftRightArrow upDownArrow leftUpArrow leftRightUpArrow quadArrow leftArrowCallout rightArrowCallout upArrowCallout downArrowCallout leftRightArrowCallout upDownArrowCallout quadArrowCallout bentArrow uturnArrow circularArrow leftCircularArrow leftRightCircularArrow curvedRightArrow curvedLeftArrow curvedUpArrow curvedDownArrow swooshArrow cube can lightningBolt heart sun moon smileyFace irregularSeal1 irregularSeal2 foldedCorner bevel frame halfFrame corner diagStripe chord arc leftBracket rightBracket leftBrace rightBrace bracketPair bracePair straightConnector1 bentConnector2 bentConnector3 bentConnector4 bentConnector5 curvedConnector2 curvedConnector3 curvedConnector4 curvedConnector5 callout1 callout2 callout3 accentCallout1 accentCallout2 accentCallout3 borderCallout1 borderCallout2 borderCallout3 accentBorderCallout1 accentBorderCallout2 accentBorderCallout3 wedgeRectCallout wedgeRoundRectCallout wedgeEllipseCallout cloudCallout cloud ribbon ribbon2 ellipseRibbon ellipseRibbon2 leftRightRibbon verticalScroll horizontalScroll wave doubleWave plus flowChartProcess flowChartDecision flowChartInputOutput flowChartPredefinedProcess flowChartInternalStorage flowChartDocument flowChartMultidocument flowChartTerminator flowChartPreparation flowChartManualInput flowChartManualOperation flowChartConnector flowChartPunchedCard flowChartPunchedTape flowChartSummingJunction flowChartOr flowChartCollate flowChartSort flowChartExtract flowChartMerge flowChartOfflineStorage flowChartOnlineStorage flowChartMagneticTape flowChartMagneticDisk flowChartMagneticDrum flowChartDisplay flowChartDelay flowChartAlternateProcess flowChartOffpageConnector actionButtonBlank actionButtonHome actionButtonHelp actionButtonInformation actionButtonForwardNext actionButtonBackPrevious actionButtonEnd actionButtonBeginning actionButtonReturn actionButtonDocument actionButtonSound actionButtonMovie gear6 gear9 funnel mathPlus mathMinus mathMultiply mathDivide mathEqual mathNotEqual cornerTabs squareTabs plaqueTabs chartX chartStar chartPlus custom`.split(
+    " ",
+  );
+
+/** Word's preset dashes (ST_PresetLineDashVal). */
+const DASHES = [
+  "solid",
+  "dot",
+  "dash",
+  "lgDash",
+  "dashDot",
+  "lgDashDot",
+  "lgDashDotDot",
+  "sysDash",
+  "sysDot",
+  "sysDashDot",
+  "sysDashDotDot",
+];
+
 /**
  * A custom geometry (`a:custGeom`, schema 11): its guides (`a:gdLst`: a name and a DrawingML
  * formula, `*\/ w adj 100000`) and its paths, each a list of commands whose arguments are
@@ -451,10 +482,7 @@ const checkCustomGeometry: Check = shape(
           height: emu,
           fill: oneOf(["norm", "none", "lighten", "lightenLess", "darken", "darkenLess"]),
           stroke: bool,
-          commands: listOf(
-            shape({ op: oneOf(["M", "L", "C", "Q", "A", "Z"]), args: listOf(text(64), 6) }, ["op"]),
-            100_000,
-          ),
+          commands: listOf(pathCommand, 100_000),
         },
         ["commands"],
       ),
@@ -483,7 +511,11 @@ const lineEnd = shape(
  */
 const checkGradient: Check = shape(
   {
-    stops: listOf(shape({ position: int(0, 100_000), color }, ["position", "color"]), 32),
+    // DrawingML's stop list holds two at least (CT_GradientStopList).
+    stops: (v) =>
+      Array.isArray(v) && v.length < 2
+        ? "must have at least 2 stops"
+        : listOf(shape({ position: int(0, 100_000), color }, ["position", "color"]), 32)(v),
     angle: rotation,
     path: oneOf(["circle", "rect", "shape"]),
   },
@@ -951,7 +983,7 @@ export const schema = new Schema({
       group: "inline",
       inline: true,
       attrs: {
-        geometry: { default: "rect", validate: token },
+        geometry: { default: "rect", validate: oneOf(GEOMETRIES) },
         adjust: nullableAttr(checkAdjust),
         custom: nullableAttr(checkCustomGeometry),
         /** In EMU. */
@@ -970,7 +1002,7 @@ export const schema = new Schema({
          * missing: solid), its ends (arrows); null for no line.
          */
         outline: nullableAttr(
-          shape({ color, width: emu, dash: token, head: lineEnd, tail: lineEnd }, [
+          shape({ color, width: emu, dash: oneOf(DASHES), head: lineEnd, tail: lineEnd }, [
             "color",
             "width",
           ]),

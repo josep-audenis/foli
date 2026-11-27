@@ -91,7 +91,7 @@ function gradientOf(
     if (position === undefined || position < 0 || position > 100_000 || !color) return undefined;
     stops.push({ position, color });
   }
-  if (!stops.length || stops.length > 32) return undefined;
+  if (stops.length < 2 || stops.length > 32) return undefined;
   const path = plain(kid(grad, A, "path"), "path");
   const angle = integer(plain(kid(grad, A, "lin"), "ang"));
   return {
@@ -340,9 +340,10 @@ function shapeIn(
   const outline = shapeLine(spPr, style, context);
   if (fill === "unknown" || outline === "unknown") return undefined;
   const body = kid(shape, WPS, "bodyPr");
-  // Vertical or rotated text, drawn across, would be wrong: kept opaque.
+  // Vertical or turned text, drawn across, would be wrong: kept opaque.
   const vert = plain(body, "vert");
   if (txbx && vert && vert !== "horz") return undefined;
+  if (txbx && (integer(plain(body, "rot")) ?? 0) % 21_600_000 !== 0) return undefined;
   const inset = {
     left: emu(plain(body, "lIns")) ?? DEFAULT_INSET.left,
     top: emu(plain(body, "tIns")) ?? DEFAULT_INSET.top,

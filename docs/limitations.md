@@ -285,7 +285,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - Shapes (Phase 34, ADR-0017) are read from Word's DrawingML (`wps:wsp`) with their geometry,
   turn, flips, fill, gradient, line, dashes and arrow ends, a theme's style as plain colors and
   widths. Effects (shadows, glow, soft edges, reflections, 3-D) are kept in the file, not drawn;
-  a custom dash is drawn solid. A group, a drawing canvas, a shape filled with a picture or a
+  a custom dash is drawn solid (and kept in the file while the line's dash is not changed).
+  Colors are read without their transparency, saturation or hue changes (`alpha`, `satMod`,
+  `hueMod`): a semi-transparent fill is drawn opaque, the Office theme's gradients slightly off.
+  A line that came from the theme's style, once changed, is written without the theme's corner
+  join and cap (Word's defaults then). A group, a drawing canvas, a shape filled with a picture or a
   pattern, a linked text box, vertical text in a shape, a VML-only shape (Word 2007), and a shape
   in a note, a comment or a text box stay opaque. A changed shape loses its VML copy for Word
   2007. Until 34.2 a shape is read and written back but not drawn. The agent reads a shape's

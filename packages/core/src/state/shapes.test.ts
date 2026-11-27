@@ -63,6 +63,15 @@ describe("shapes (schema 11)", () => {
       });
     expect(withShape({ adjust: { adj: 25_000 }, rotation: 5_400_000, flipH: true })).not.toThrow();
     expect(withShape({ geometry: "not a token" })).toThrow(/geometry/);
+    // Only DrawingML's names, its dashes, two gradient stops at least, a command's arguments.
+    expect(withShape({ geometry: "circle" })).toThrow(/geometry/);
+    expect(withShape({ outline: { color: "000000", width: 1, dash: "dotted" } })).toThrow(/dash/);
+    expect(withShape({ gradient: { stops: [{ position: 0, color: "FFFFFF" }] } })).toThrow(
+      /at least 2 stops/,
+    );
+    expect(withShape({ custom: { paths: [{ commands: [{ op: "M", args: [] }] }] } })).toThrow(
+      /M takes 2 arguments/,
+    );
     expect(withShape({ adjust: { adj: 1.5 } })).toThrow(/adj must be an integer/);
     expect(
       withShape({
@@ -78,7 +87,13 @@ describe("shapes (schema 11)", () => {
     expect(withShape({ custom: { paths: [{ commands: [{ op: "X" }] }] } })).toThrow(/op/);
     expect(
       withShape({
-        gradient: { stops: [{ position: 0, color: "FFFFFF" }], angle: 5_400_000 },
+        gradient: {
+          stops: [
+            { position: 0, color: "FFFFFF" },
+            { position: 100_000, color: "000000" },
+          ],
+          angle: 5_400_000,
+        },
         outline: {
           color: "000000",
           width: 12_700,
@@ -87,9 +102,16 @@ describe("shapes (schema 11)", () => {
         },
       }),
     ).not.toThrow();
-    expect(withShape({ gradient: { stops: [{ position: 200_000, color: "FFFFFF" }] } })).toThrow(
-      /position/,
-    );
+    expect(
+      withShape({
+        gradient: {
+          stops: [
+            { position: 200_000, color: "FFFFFF" },
+            { position: 0, color: "FFFFFF" },
+          ],
+        },
+      }),
+    ).toThrow(/position/);
     expect(withShape({ outline: { color: "000000", width: 1, head: { type: "barb" } } })).toThrow(
       /type/,
     );
@@ -141,6 +163,18 @@ describe("shapes (schema 11)", () => {
       height: 500_000,
       rotation: 2_700_000,
     });
+  });
+
+  it("leaves a shape out of what is pasted into a story, the text kept", () => {
+    const editor = createEditor({ document: shaped() });
+    const context = wordContext(editor.state) as NonNullable<ReturnType<typeof wordContext>>;
+    const slice = editor.state.doc.cut(0, editor.state.doc.content.size);
+    const word = copiedDefinitions(context, slice);
+    const box = editor.story("textbox:1") as typeof editor;
+    const fitted = fitPaste(box.state, JSON.parse(JSON.stringify(slice.toJSON())), word);
+    const json = JSON.stringify(fitted.doc.toJSON());
+    expect(json).not.toContain('"shape"');
+    expect(json).toContain("Before");
   });
 
   it("copies a shape with its text, pasted as a shape of its own", () => {

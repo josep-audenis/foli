@@ -583,6 +583,8 @@ function fit(
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
     let next: Json | undefined = attrs;
+    // A shape goes where a text box may: not into a story (shortcut: a header could hold one).
+    if (node.type === "shape" && inStory) return null;
     if (node.type === "textBox" || (node.type === "shape" && attrs?.story)) {
       // A copy is a box of its own: its text a new story (Word's too). Not into a story (shortcut:
       // a header could hold it), and not without its text (HTML).

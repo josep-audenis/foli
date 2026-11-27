@@ -138,12 +138,16 @@ export function lnXml(
     const len = typeof e.length === "string" ? ` len="${q(e.length)}"` : "";
     return `<${p}:${local} type="${q(e.type)}"${w}${len}/>`;
   };
+  // A file's custom dash stays while the model says none (Foli draws it solid).
+  const custom = kid(was, A, "custDash");
   const dash =
     typeof outline.dash === "string"
       ? `<${p}:prstDash val="${q(outline.dash)}"/>`
-      : kid(was, A, "prstDash") || kid(was, A, "custDash")
-        ? `<${p}:prstDash val="solid"/>`
-        : "";
+      : custom && source
+        ? source.slice(custom.start, custom.end)
+        : kid(was, A, "prstDash")
+          ? `<${p}:prstDash val="solid"/>`
+          : "";
   return (
     `<${p}:ln w="${outline.width}"${kept}>${solid(outline.color, p)}${dash}${joinXml}` +
     `${end("headEnd", outline.head)}${end("tailEnd", outline.tail)}</${p}:ln>`
