@@ -784,6 +784,9 @@ Details in the [package README](../packages/docx/README.md).
 - In a section with several columns the ruler shows the page's margins and the caret's column as
   the box its indents are measured from; columns are not shown or dragged.
 - A header, footer or note open: the margins dragged are those of the body caret's section.
+- The vertical ruler shows the top and bottom margins as the section sets them, also where a
+  header or footer taller than its margin pushes the text; header and footer distances are not
+  on it.
 - A margin's edge is taken between the indent markers (Word's layout), a few pixels: hard by
   touch. While the left box or the hanging marker is dragged the other markers stay until the
   release. A drag a section's fixed column widths no longer fit is refused (the margin stays).
