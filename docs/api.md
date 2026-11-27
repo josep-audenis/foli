@@ -350,7 +350,12 @@ the selected paragraphs' value, blank when they differ; Enter sets it, ArrowUp a
 step a tenth of an inch or 6 pt, Escape or leaving the box puts it back), which `wordRibbonTabs`' Layout
 tab has in its Page Setup and Paragraph groups in place of the Section menu; `footnote`, `endnote` and `goToNote` (as the Notes menu: the
 caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `date` and
-`fieldCodes` (a toggle), as the Fields menu; `navigationPane` (the outline of
+`fieldCodes` (a toggle), as the Fields menu; Word's Design tab (Phase 32): `pageColor` (a color
+menu: No Color and the theme's colors, More colors…; `setPageColor`) and `pageBorders` (Word's
+Page Borders dialog: None, Box or Custom; the line's style, color and width; which sides; Apply
+to the whole document, this section, its first page only or all but its first page; measured
+from the page's edge or the text, one distance for every side), which `wordRibbonTabs`' Design
+tab has in its Page Background group; `navigationPane` (the outline of
 `FoliNavigation`); `rotateLeft` and `rotateRight` (a selected picture, a quarter turn; not while
 tracking). Those the toolbar runs with the pages or a story (`footnote`, `endnote`, `goToNote`,
 `tableOfContents`, `updateFields`, `pageNumber`, `navigationPane`) do so only from the toolbar,
@@ -1049,6 +1054,14 @@ when no room for text is left), `insertColumnBreak`; `sectionAt(state)` (`setup`
 last section's setup through `EnvelopeStep`. While tracking they are recorded as Word records
 them: an inserted or deleted paragraph mark, `w:sectPrChange` for a setup; `trackedChanges(doc,
 section)` lists those as `sectionFormatting`, and accepting and rejecting resolve them.
+`setSectionSetup` also takes `pageBorders` and `lineNumbers` (schema 9), which replace the
+section's own (undefined removes them).
+
+Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none:
+the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
+in Word), `pageColorOf(state)`; `setPageBorders(borders, applyTo?)` (`PageBordersJSON` or null;
+the caret's section, or `"document"` for every section; one undo step, recorded as a page setup
+change of each section while tracking).
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),

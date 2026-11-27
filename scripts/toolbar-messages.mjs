@@ -1,11 +1,15 @@
 // Collects every string of the toolbar (packages/react/src/FoliToolbar.tsx and its Word dialogs,
-// WordDialogs.tsx) into `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and
+// WordDialogs.tsx and DesignDialogs.tsx) into `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and
 // `tr("…")` calls, and the built-in items', menus', palettes', tabs' and dialogs' labels. With
 // `--check` (in `pnpm check`) it fails when the list is not up to date; without it, it writes
 // the list.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const sources = ["packages/react/src/FoliToolbar.tsx", "packages/react/src/WordDialogs.tsx"];
+const sources = [
+  "packages/react/src/FoliToolbar.tsx",
+  "packages/react/src/WordDialogs.tsx",
+  "packages/react/src/DesignDialogs.tsx",
+];
 const source = sources.join(" and ");
 const target = "packages/react/src/messages.ts";
 const code = sources

@@ -12,7 +12,7 @@
  */
 import { deepEqual } from "../model/attrs.js";
 import type { Node } from "../model/index.js";
-import type { SectionJSON, StoryJSON } from "../v3/document.js";
+import type { PageBordersJSON, SectionJSON, StoryJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { checkSection } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
@@ -282,10 +282,66 @@ export const removeSectionBreak: Command = (state, dispatch) => {
   return true;
 };
 
-/** What the page setup dialog changes. `pageSize` and `margins` are merged into the section's. */
+/**
+ * What the page setup dialog changes. `pageSize` and `margins` are merged into the section's;
+ * `pageBorders` and `lineNumbers` (Phase 32) replace its own, undefined removing them.
+ */
 export type SectionSetup = {
-  [K in "pageSize" | "margins" | "columns" | "type" | "titlePage"]?: SectionJSON[K] | undefined;
+  [K in "pageSize" | "margins" | "columns" | "type" | "titlePage" | "pageBorders" | "lineNumbers"]?:
+    | SectionJSON[K]
+    | undefined;
 };
+
+/** `current` with `setup`, or null when that changes nothing or leaves no room for text. */
+function setupWith(current: SectionJSON, setup: SectionSetup): SectionJSON | null {
+  const next = clean({
+    ...current,
+    ...setup,
+    pageSize: setup.pageSize ? { ...current.pageSize, ...setup.pageSize } : current.pageSize,
+    margins: setup.margins ? { ...current.margins, ...setup.margins } : current.margins,
+  });
+  if (deepEqual(next, current) || checkSection(next)) return null;
+  const m = next.margins ?? {};
+  const height =
+    (next.pageSize?.height ?? LETTER.height) -
+    Math.abs(m.top ?? LETTER.margin) -
+    Math.abs(m.bottom ?? LETTER.margin);
+  const { widths, gaps } = sectionColumns(next);
+  const used = [...widths, ...gaps].reduce((sum, width) => sum + width, 0);
+  if (height <= 0 || textWidth(next) <= 0 || used > textWidth(next) + widths.length) return null;
+  return next;
+}
+
+/**
+ * Makes `tr` give the section `at` the setup `next`, recorded while tracking (once, as Word's)
+ * under `id` (by default the next revision's). Whether it recorded.
+ */
+function writeSetup(
+  state: EditorState,
+  tr: Transaction,
+  at: { setup: SectionJSON; pos: number | null },
+  next: SectionJSON,
+  id?: number,
+): boolean {
+  const current = at.setup;
+  const revision = newRevision(state);
+  const recorded = !!revision && !current.change;
+  if (revision && recorded)
+    next.change = {
+      ...revision,
+      id: id ?? revision.id,
+      // What the change can restore: the references stay with the section.
+      previous: clean({
+        ...current,
+        ext: undefined,
+        headers: undefined,
+        footers: undefined,
+      }),
+    };
+  const holder = at.pos === null ? null : { pos: at.pos, node: tr.doc.nodeAt(at.pos) as Node };
+  writeSection(state, tr, holder, next);
+  return recorded;
+}
 
 /**
  * Changes the page setup of section `index` (by default the caret's). Not when the result has no
@@ -298,44 +354,85 @@ export function setSectionSetup(setup: SectionSetup, index?: number): Command {
     if (body) return dispatch ? body.run(command) : body.can(command);
     const at = index === undefined ? sectionAt(state) : sectionNumber(state, index);
     if (!at) return false;
-    const { setup: current } = at;
-    const next = clean({
-      ...current,
-      ...setup,
-      pageSize: setup.pageSize ? { ...current.pageSize, ...setup.pageSize } : current.pageSize,
-      margins: setup.margins ? { ...current.margins, ...setup.margins } : current.margins,
-    });
-    if (deepEqual(next, current) || checkSection(next)) return false;
-    const m = next.margins ?? {};
-    const height =
-      (next.pageSize?.height ?? LETTER.height) -
-      Math.abs(m.top ?? LETTER.margin) -
-      Math.abs(m.bottom ?? LETTER.margin);
-    const { widths, gaps } = sectionColumns(next);
-    const used = [...widths, ...gaps].reduce((sum, width) => sum + width, 0);
-    if (height <= 0 || textWidth(next) <= 0 || used > textWidth(next) + widths.length) return false;
+    const next = setupWith(at.setup, setup);
+    if (!next) return false;
     if (dispatch) {
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
-      const revision = newRevision(state);
-      if (revision && !current.change)
-        next.change = {
-          ...revision,
-          // What the change can restore: the references stay with the section.
-          previous: clean({
-            ...current,
-            ext: undefined,
-            headers: undefined,
-            footers: undefined,
-          }),
-        };
-      const holder =
-        at.pos === null ? null : { pos: at.pos, node: state.doc.nodeAt(at.pos) as Node };
-      writeSection(state, tr, holder, next);
+      writeSetup(state, tr, at, next);
       dispatch(tr);
     }
     return true;
   };
   return command;
+}
+
+/**
+ * Sets the page borders (Design ▸ Page Borders): of the caret's section, or of every section
+ * (`"document"`, Word's "Apply to: Whole document"); null removes them. One undo step; recorded
+ * as a page setup change while tracking. False when nothing would change.
+ */
+export function setPageBorders(
+  borders: PageBordersJSON | null,
+  applyTo: "section" | "document" = "section",
+): Command {
+  const command: Command = (state, dispatch) => {
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
+    const caret = sectionAt(state);
+    if (!caret) return false;
+    const sections = applyTo === "document" ? documentSections(state) : [caret];
+    const changes = sections.flatMap((at) => {
+      const next = setupWith(at.setup, { pageBorders: borders ?? undefined });
+      return next ? [{ at, next }] : [];
+    });
+    if (!changes.length) return false;
+    if (dispatch) {
+      const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
+      // Each section's record has an id of its own.
+      let id = newRevision(state)?.id ?? 0;
+      for (const { at, next } of changes)
+        if (writeSetup(state, tr, at, next, id)) id = freshId(state, id);
+      dispatch(tr);
+    }
+    return true;
+  };
+  return command;
+}
+
+/**
+ * Sets the page color (Design ▸ Page Color, `#`-less RRGGBB), or removes it (null). The
+ * document's, as in Word; not tracked (Word records no change of it). One undo step.
+ */
+export function setPageColor(color: string | null): Command {
+  const command: Command = (state, dispatch) => {
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
+    const context = wordContext(state);
+    if (!context) return false;
+    if (color !== null && !/^[0-9A-Fa-f]{6}$/.test(color)) return false;
+    const { background, ...rest } = context.envelope.settings ?? {};
+    const now = background?.color === "auto" ? undefined : background?.color;
+    if ((now?.toUpperCase() ?? null) === (color?.toUpperCase() ?? null) && !background?.themeColor)
+      return false;
+    if (color === null && !background) return false;
+    if (dispatch) {
+      const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
+      // Picked anew: the theme color and Fill Effects it had go (Word's Page Color does that).
+      setEnvelopeValue(state, tr, "settings", {
+        ...rest,
+        ...(color === null ? {} : { background: { color: color.toUpperCase() } }),
+      });
+      dispatch(tr);
+    }
+    return true;
+  };
+  return command;
+}
+
+/** The page color (`#`-less RRGGBB), null when the document has none. */
+export function pageColorOf(state: EditorState): string | null {
+  const color = wordContext(storyBody(state)?.state ?? state)?.envelope.settings?.background?.color;
+  return color && color !== "auto" ? color : null;
 }
 
 /** Section `index` of the document, as `sectionAt` gives the caret's. */

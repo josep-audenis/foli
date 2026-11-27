@@ -4521,8 +4521,15 @@ XML.
   and `renderDocument` draw the color and the borders on each page (`word/decoration.ts`,
   printed and in `exportPdf`). A v9 format fixture. `decoration.test.ts` in core, docx and
   view. document-model.md, limitations.md ("Page decoration").
-- [ ] 32.2 Page Color (theme and standard colors, No Color) and Page Borders dialog (setting,
-  style, color, width, which sides, apply to section or document).
+- [x] 32.2 Page Color (theme and standard colors, No Color) and Page Borders dialog (setting,
+  style, color, width, which sides, apply to section or document). Built: `setPageColor`,
+  `pageColorOf`, `setPageBorders(borders, applyTo)` in core (one undo step; the borders recorded
+  as each section's setup change while tracking, the color not, as Word); `setSectionSetup` takes
+  `pageBorders` and `lineNumbers`; `toolbarItems.pageColor` (No Color, the theme grid, More
+  colors…) and `pageBorders` (`PageBordersDialog`, the toolbar dialog `"pageBorders"`) in a Design tab
+  of `wordRibbonTabs` (Page Background group, KeyTip G; 32.6 fills the tab). `pagedesign.test.ts`,
+  `design.test.tsx`, `design.spec.ts` in Chromium, Firefox and WebKit (axe on the dialog and the
+  pages); checked by hand. limitations.md (the dialog's settings, RGB page colors).
 - [ ] 32.3 Watermark: read Word's text and picture watermarks from headers, draw them on every
   page under the text, Design ▸ Watermark menu (Confidential, Draft, Do not copy…, Custom…,
   Remove), written back as Word writes them.
