@@ -137,7 +137,10 @@ center, right, decimal and bar stops). A press on the ruler's strip adds a stop 
 tab selector at the ruler's start shows (a button: each click the next kind, left, center,
 right, decimal, bar); a stop dragged along moves (`setTabStops`, clear and set in one change),
 let go more than 16 px above or below the ruler it goes, and its double-click opens the Tabs
-dialog (`openDialog("tabs")`, with a toolbar). A drag shows a guide line down the page and changes the
+dialog (`openDialog("tabs")`, with a toolbar). In a table (31.4) each grid column's right border
+is a slider too ("Column 2 border", its value the column's width): dragged or moved with the
+keys it sets the width as dragging the border in the table does (`setColumnWidth`: the next
+column gives or takes the difference; the last one widens the table). A drag shows a guide line down the page and changes the
 document once on release (`setIndent`, `setSectionSetup({ margins })` on the caret's section,
 the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin unless
 Alt is held, which shows the exact value as it moves; Escape or a lost pointer cancels. The

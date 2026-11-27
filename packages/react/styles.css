@@ -1260,6 +1260,17 @@
   width: 8px;
   height: 8px;
 }
+/* A table column's border: Word's grid marker over the strip. */
+.foli-ruler-column {
+  top: 4px;
+  z-index: 0;
+  height: 16px;
+  width: 7px;
+  border: 1px solid var(--foli-ruler-color);
+  background: var(--foli-ruler-margin-background);
+  box-sizing: border-box;
+  cursor: ew-resize;
+}
 .foli-ruler-value {
   position: absolute;
   bottom: 0;

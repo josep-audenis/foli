@@ -3,6 +3,7 @@ import {
   type Editor,
   openDialog,
   type RulerGeometry,
+  setColumnWidth,
   setIndent,
   setSectionSetup,
   setTabStops,
@@ -36,6 +37,7 @@ export const rulerMessages = [
   "Decimal tab",
   "Bar tab",
   "Tab stop to add: {kind}",
+  "Column {number} border",
 ] as const;
 
 /** Translations of the ruler's strings, by their English text (`rulerMessages`). */
@@ -88,6 +90,8 @@ interface Handle {
   firstLine?: number;
   /** A tab stop's: removes it (dragged off the ruler, Delete). */
   remove?: () => Command;
+  /** What fills `{number}` in its label (a table column's, from 1). */
+  number?: number;
 }
 
 /** A handle being dragged: its value as the pointer has it, whether Alt is held, whether off. */
@@ -307,6 +311,38 @@ function tabHandles(g: RulerGeometry): Handle[] {
   });
 }
 
+/** The narrowest a column gets (0.1 inch), as `setColumnWidth` keeps it. */
+const MIN_COLUMN = 144;
+
+/**
+ * The right border of each grid column of the table the caret is in, as a handle: its value the
+ * column's width, as dragging the border in the table does (`setColumnWidth`).
+ */
+function columnHandles(g: RulerGeometry): Handle[] {
+  const { table, page, margins, pxPerTwip: k } = g;
+  if (!table) return [];
+  return table.columns.map((column, i) => {
+    const next = table.columns[i + 1];
+    return {
+      key: `column-${i}`,
+      label: "Column {number} border",
+      number: i + 1,
+      kind: "column",
+      // Measured from the column's left edge.
+      origin: column.right - column.width * k,
+      sign: 1,
+      value: column.width,
+      min: MIN_COLUMN,
+      // The next column keeps its least; the last one's border stops at the page's edge.
+      max: next
+        ? column.width + next.width - MIN_COLUMN
+        : Math.round((page.right - (column.right - column.width * k)) / k),
+      grid: margins.left,
+      set: (width) => setColumnWidth(table.pos, i, width),
+    };
+  });
+}
+
 /** The ticks and numbers between `from` and `to` (client px), counted from `zero`. */
 function scale(zero: number, from: number, to: number, k: number, unit: LengthUnit) {
   const { twips, ticks } = UNITS[unit];
@@ -369,7 +405,9 @@ export function FoliRuler({
     dragRef.current = next;
     setDragState(next);
   };
-  const handles = geometry ? [...horizontalHandles(geometry), ...tabHandles(geometry)] : [];
+  const handles = geometry
+    ? [...horizontalHandles(geometry), ...columnHandles(geometry), ...tabHandles(geometry)]
+    : [];
   /** A tab stop to focus after the next render (its value), or the document. */
   const refocus = useRef<number | "document" | null>(null);
   // The tab selector: the kind a click on the ruler adds.
@@ -584,7 +622,10 @@ export function FoliRuler({
                 key={handle.key}
                 role="slider"
                 tabIndex={disabled ? -1 : 0}
-                aria-label={t(handle.label)}
+                aria-label={t(
+                  handle.label,
+                  handle.number === undefined ? undefined : { number: String(handle.number) },
+                )}
                 aria-orientation="horizontal"
                 aria-valuenow={number(value)}
                 aria-valuemin={number(handle.min)}

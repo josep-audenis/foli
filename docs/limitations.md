@@ -759,6 +759,11 @@ Details in the [package README](../packages/docx/README.md).
 ## The ruler (Phase 31)
 
 - Right-to-left paragraphs are measured and dragged as left-to-right ones.
+- A table's columns show on the ruler for a top-level table of the body only (not a nested one,
+  nor one in a header, footer or note), and only its grid's borders, not a row's own cell
+  edges; while changes are tracked a column border drag changes nothing (as in the table).
+  A cell's right indent marker sits over the lower half of the border's marker: take the
+  border by its top.
 - Tab stops added, moved or removed on the ruler are the document's (saved, in the Tabs dialog),
   but the pages still lay text out at the default stops (Phase 30's limit, "Word's dialogs").
   The tab selector has Word's five stop kinds, not its first-line and hanging indent entries,
