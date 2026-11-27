@@ -1,4 +1,4 @@
-import { createDocument, type FoliDocument } from "@folijs/core";
+import { createDocument, type FoliDocument, parseDocument } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 import { docx } from "./testing/package.js";
@@ -75,10 +75,21 @@ describe("page decoration (schema 9)", () => {
     const out = await main(await exportDocx(doc, read.package));
     expect(out).toContain('<w:background w:color="DEEAF6"/><w:body>');
     expect(out).not.toContain("v:background");
-    // No color: the element goes, the rest of the part stays.
-    const { background: _b, ...rest } = read.document.settings ?? {};
-    const none = await main(await exportDocx({ ...read.document, settings: rest }, read.package));
+    // None (auto): the element goes, the rest of the part stays.
+    const none = await main(
+      await exportDocx(
+        {
+          ...read.document,
+          settings: { ...read.document.settings, background: { color: "auto" } },
+        },
+        read.package,
+      ),
+    );
     expect(none).toBe((await main(await decorated())).replace(BACKGROUND, ""));
+    // Left out (a document saved before schema 9): as the file has it.
+    const { background: _b, ...rest } = read.document.settings ?? {};
+    const kept = await main(await exportDocx({ ...read.document, settings: rest }, read.package));
+    expect(kept).toBe(await main(await decorated()));
   });
 
   it("adds a page color where there was none, and Word's switch to show it", async () => {
@@ -177,5 +188,29 @@ describe("suppressed line numbers (32.5)", () => {
     const out = await main(await exportDocx(doc, read.package));
     expect(out).not.toContain("suppressLineNumbers");
     expect(out).toContain('<w:jc w:val="center"/>');
+  });
+});
+
+describe("documents saved before schema 9 (review of 32.5)", () => {
+  it("adopt what their kept XML says, and write it back as it was", async () => {
+    const bytes = await docx(
+      `<w:p><w:pPr><w:suppressLineNumbers/><w:jc w:val="center"/></w:pPr><w:r><w:t>A</w:t></w:r></w:p>${SECT}`,
+    );
+    const read = await importDocx(bytes);
+    // As an earlier release saved it: no parts schema 9 models, only the kept XML.
+    const old = structuredClone(read.document) as FoliDocument;
+    const { pageBorders: _p, lineNumbers: _l, ...section } = old.section;
+    const paragraph = old.content.content?.[0]?.attrs as Record<string, unknown>;
+    delete paragraph.suppressLineNumbers;
+    const saved = { ...old, schemaVersion: 8 as const, section };
+    const parsed = parseDocument(saved);
+    expect(parsed.schemaVersion).toBe(9);
+    expect(parsed.section.lineNumbers).toEqual({ countBy: 5, restart: "continuous" });
+    expect(parsed.section.pageBorders).toMatchObject({
+      offsetFrom: "page",
+      left: { style: "double" },
+    });
+    expect(parsed.content.content?.[0]?.attrs?.suppressLineNumbers).toBe(true);
+    expect(await main(await exportDocx(saved, read.package))).toBe(await main(bytes));
   });
 });

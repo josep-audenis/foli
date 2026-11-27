@@ -186,7 +186,9 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `EnvelopeStep`s. `background` (v9) is the page color, the main part's `w:background`: `color`
   (RRGGBB), a theme color's `themeColor` with `themeTint` or `themeShade` (two hex digits), and
   `ext`, the element verbatim (Fill Effects, its VML children, are kept while the color stays; a
-  new color is written without them, as Word's Page Color does). Exporting a color set
+  new color is written without them, as Word's Page Color does); `color: "auto"` is no page
+  color (export removes the element), and `background` left out keeps what the file has (a
+  document saved before schema 9 never had it). Exporting a color set
   anew (no `ext`) turns on `w:displayBackgroundShape`, without which Word does not show it; a
   file's own background leaves its settings as they are.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
@@ -198,7 +200,8 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `right` borders, each `style`, `size` in eighths of a point, `space` in points, `color`;
   `offsetFrom` text or page, `display` allPages, firstPage or notFirstPage, `zOrder` front or
   back) and `lineNumbers` (v9, `w:lnNumType`: `countBy`, required, `start` as Word writes it, one
-  less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous)
+  less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous, left out continuous as
+  Word 16 writes it)
   were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`,
   `previous`) is a tracked change of the setup; accepting drops it, rejecting restores
   `previous` with the section's header and footer references.
@@ -501,7 +504,7 @@ Migrations never drop content. A published version never changes in place.
 | 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
 | 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
 | 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                          |
-| 8       | 1.7.0       | v8 → v9: only the version changes (v9 only adds a setting and section parts)                                         |
+| 8       | 1.7.0       | v8 → v9: what `ext` kept is adopted (a section's `w:pgBorders`, `w:lnNumType`, a paragraph's `w:suppressLineNumbers`) |
 | 9       | next minor  | — (the current version: page decoration, `settings.background`, a section's `pageBorders` and `lineNumbers`, 32.1)   |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a

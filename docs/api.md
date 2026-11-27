@@ -1071,8 +1071,8 @@ section)` lists those as `sectionFormatting`, and accepting and rejecting resolv
 `setSectionSetup` also takes `pageBorders` and `lineNumbers` (schema 9), which replace the
 section's own (undefined removes them).
 
-Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none:
-the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
+Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none,
+written as `auto`; the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
 in Word), `pageColorOf(state)`; `setPageBorders(borders, applyTo?)` (`PageBordersJSON` or null;
 the caret's section, or `"document"` for every section, one whose setup leaves no room for text
 skipped; one undo step, recorded as a page setup

@@ -104,8 +104,8 @@ export interface PageBordersJSON {
 /**
  * A section's line numbers (`w:lnNumType`, schema 9), as Word writes them: every `countBy`th line
  * numbered (an element without it numbers none, and stays in the section's `ext`), from `start` + 1 (Word's "Start at" less one), `distance` twips from
- * the text (left out: Word's automatic distance), restarting on each page (the default), section,
- * or not at all.
+ * the text (left out: Word's automatic distance), restarting on each page, section, or not at all
+ * (left out: continuous, as Word 16 writes and reads it).
  */
 export interface LineNumbersJSON {
   countBy: number;
@@ -622,7 +622,10 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     if (doc.settings?.background !== undefined)
       fail("settings.background", `is of schema 9 (the document says schema ${version})`);
     if (suppressesLineNumbers(doc))
-      fail("styles", `suppressLineNumbers is of schema 9 (the document says schema ${version})`);
+      fail(
+        "styles, defaults or numbering",
+        `suppressLineNumbers is of schema 9 (the document says schema ${version})`,
+      );
     const decorated = V9_SECTION_KEYS.find((key) => inSection(doc.section, key));
     if (decorated)
       fail("section", `${decorated} is of schema 9 (the document says schema ${version})`);
@@ -640,6 +643,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
           `${found.name} is a schema ${found.schema} node (the document says schema ${version})`,
         );
     }
+    adoptKeptDecoration(doc);
     if (version >= 5) return doc;
     if (version === 3)
       doc.styles.forEach((style, i) => {
@@ -901,7 +905,12 @@ function laterNode(
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
     if (version < 9 && name === "opaqueInline" && attrs.watermark != null)
       return { name: "a watermark", schema: 9 };
-    if (version < 9 && attrs.suppressLineNumbers != null)
+    const previous = isRecord(attrs.formatChange) ? attrs.formatChange.previous : undefined;
+    if (
+      version < 9 &&
+      (attrs.suppressLineNumbers != null ||
+        (isRecord(previous) && previous.suppressLineNumbers != null))
+    )
       return { name: "a paragraph's suppressLineNumbers", schema: 9 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
@@ -1377,4 +1386,100 @@ export function checkCommentJSON(value: unknown, schema: Schema, path: string): 
         fail(`${path}.content`, "a comment cannot hold a note reference");
       return true;
     });
+}
+
+// ---------- schema 8 → 9: what `ext` already held (Phase 32) ----------
+
+/** An element's attributes in kept XML, by local name (`w:countBy` → `countBy`). */
+function xmlAttributes(source: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const match of source.matchAll(/(?:[\w.-]+:)?([\w.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))
+    out[match[1] as string] = (match[2] ?? match[3] ?? "")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&");
+  return out;
+}
+
+const whole = (value: string | undefined) =>
+  value !== undefined && /^-?\d+$/.test(value) ? Number(value) : undefined;
+const compactJson = (object: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined));
+
+/** Page borders and line numbers a section's kept `w:sectPr` says, when its parts do not. */
+function adoptSection(section: unknown): void {
+  if (!isRecord(section)) return;
+  if (isRecord(section.change)) adoptSection(section.change.previous);
+  const ext = typeof section.ext === "string" ? section.ext : "";
+  if (!ext) return;
+  const numbers = /<(?:[\w.-]+:)?lnNumType\b([^>]*?)\/?>/.exec(ext);
+  if (numbers && section.lineNumbers === undefined) {
+    const a = xmlAttributes(numbers[1] ?? "");
+    const lineNumbers = compactJson({
+      countBy: whole(a.countBy),
+      start: whole(a.start),
+      distance: whole(a.distance),
+      restart: a.restart,
+    });
+    if (lineNumbers.countBy !== undefined && !checkSection({ lineNumbers }))
+      section.lineNumbers = lineNumbers;
+  }
+  const borders =
+    /<(?:[\w.-]+:)?pgBorders\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[\w.-]+:)?pgBorders>)/.exec(ext);
+  if (borders && section.pageBorders === undefined) {
+    const a = xmlAttributes(borders[1] ?? "");
+    const sides: Record<string, unknown> = {};
+    for (const side of (borders[2] ?? "").matchAll(
+      /<(?:[\w.-]+:)?(top|left|bottom|right)\b([^>]*?)\/?>/g,
+    )) {
+      const s = xmlAttributes(side[2] ?? "");
+      sides[side[1] as string] = compactJson({
+        style: s.val,
+        size: whole(s.sz),
+        space: whole(s.space),
+        color: s.color,
+        themeColor: s.themeColor,
+      });
+    }
+    const pageBorders = compactJson({
+      ...sides,
+      offsetFrom: a.offsetFrom,
+      display: a.display,
+      zOrder: a.zOrder,
+    });
+    if (Object.keys(pageBorders).length && !checkSection({ pageBorders }))
+      section.pageBorders = pageBorders;
+  }
+}
+
+/**
+ * A document of schema 8 or earlier with what schema 9 models read from the XML it kept: a
+ * section's `w:pgBorders` and `w:lnNumType`, a paragraph's `w:suppressLineNumbers`. Saved by an
+ * earlier release, they were kept verbatim in `ext`; adopted, export writes them back as they
+ * were instead of reading their absence as removed. (A page color was never in an earlier
+ * document: `settings.background` left out keeps the file's.)
+ */
+function adoptKeptDecoration(doc: FoliDocument): void {
+  adoptSection(doc.section);
+  const visit = (node: unknown) => {
+    if (!isRecord(node)) return;
+    const attrs = isRecord(node.attrs) ? node.attrs : undefined;
+    if (attrs) {
+      adoptSection(attrs.section);
+      const ext = typeof attrs.ext === "string" ? attrs.ext : "";
+      const suppress =
+        node.type === "paragraph" && /<(?:[\w.-]+:)?suppressLineNumbers\b([^>]*?)\/>/.exec(ext);
+      if (suppress && attrs.suppressLineNumbers == null) {
+        const value = xmlAttributes(suppress[1] ?? "").val;
+        attrs.suppressLineNumbers = !["0", "false", "off"].includes(value ?? "");
+      }
+    }
+    if (Array.isArray(node.content)) for (const child of node.content) visit(child);
+  };
+  visit(doc.content);
+  for (const comment of doc.comments) for (const block of comment.content) visit(block);
+  for (const story of Object.values(doc.stories ?? {})) visit(story.content);
+  doc.schemaVersion = schemaVersionOf(doc);
 }

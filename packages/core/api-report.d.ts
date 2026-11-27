@@ -3766,8 +3766,8 @@ export interface PageBordersJSON {
 /**
  * A section's line numbers (`w:lnNumType`, schema 9), as Word writes them: every `countBy`th line
  * numbered (an element without it numbers none, and stays in the section's `ext`), from `start` + 1 (Word's "Start at" less one), `distance` twips from
- * the text (left out: Word's automatic distance), restarting on each page (the default), section,
- * or not at all.
+ * the text (left out: Word's automatic distance), restarting on each page, section, or not at all
+ * (left out: continuous, as Word 16 writes and reads it).
  */
 export interface LineNumbersJSON {
     countBy: number;

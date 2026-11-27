@@ -831,11 +831,13 @@ Details in the [package README](../packages/docx/README.md).
   drawn as its fill color: a pattern (10%, stripes…) and its color are kept and written, not
   drawn. The Borders and Shading dialog has no preview, no Shadow or 3-D setting, and no Page
   Border tab (Design ▸ Page Borders has it); Shading in Home's menu sets a clear fill.
-- Line numbers are drawn from the text's line boxes as laid out: a line of a picture alone or
-  beside a floating picture may count differently from Word (which numbers lines beside a
-  float), and lines in tables, headers, footers, notes and text boxes are not numbered (as in
-  Word). The numbers use the page's font at the line's height, not Word's Line Number style;
-  "From text" Auto is a quarter inch. An `lnNumType` without `countBy` numbers no line in Word
+- Line numbers are drawn from the text's line boxes as laid out (a floating picture's box left
+  out), each beside its own column: a line of a picture alone may count differently from Word,
+  and lines in tables, headers, footers, notes and text boxes are not numbered (as in Word). The
+  numbers use the page's font, at most 11 pt, at the bottom of their line (not on its
+  baseline), not Word's Line Number style; "From text" Auto is a quarter inch. They are not
+  dimmed while a header or footer is open. An `lnNumType` without `w:restart` is continuous, as
+  Word 16 writes and reads it (ECMA-376 says each page). An `lnNumType` without `countBy` numbers no line in Word
   and stays in the section's verbatim XML. The Line Numbers menu sets the caret's section (Word
   applies it to the selected sections).
 - In the Borders and Shading dialog, None or a side turned off removes the paragraph's own

@@ -9,7 +9,7 @@ import type {
   WatermarkJSON,
   WordSettingsJSON,
 } from "@folijs/core";
-import { borderJsonCss, type ImageSource, PX_PER_TWIP } from "./blocks.js";
+import { borderJsonCss, FLOAT_ATTR, type ImageSource, PX_PER_TWIP } from "./blocks.js";
 
 /**
  * Marks the element holding a page's borders.
@@ -242,12 +242,26 @@ function linesOf(
   const doc = element.ownerDocument;
   const clip = element.getBoundingClientRect();
   const range = doc.createRange();
-  range.selectNodeContents(element);
-  const rects = [...range.getClientRects()].filter((r) => {
+  // The text's boxes and inline pictures': a floating picture's box would join the lines beside it.
+  const boxes: DOMRect[] = [];
+  const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const inFloat = (
+      node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element)
+    )?.closest(`[${FLOAT_ATTR}]`);
+    if (inFloat && element.contains(inFloat)) continue;
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!node.textContent) continue;
+      range.selectNodeContents(node);
+      boxes.push(...range.getClientRects());
+    } else if ((node as Element).tagName === "IMG")
+      boxes.push((node as Element).getBoundingClientRect());
+  }
+  range.detach?.();
+  const rects = boxes.filter((r) => {
     const middle = (r.top + r.bottom) / 2;
     return r.height > 0 && middle >= clip.top && middle <= clip.bottom;
   });
-  range.detach?.();
   if (!rects.length)
     return clip.height > 0
       ? [{ top: (clip.top - page.top) / scale, bottom: (clip.bottom - page.top) / scale }]
@@ -296,11 +310,13 @@ export function lineNumberElements(
     style.position = "absolute";
     style.inset = "0";
     style.pointerEvents = "none";
+    style.userSelect = "none";
     let pageStarted = false;
     for (const block of numbered) {
       const setup = setups[block.section] as SectionJSON;
       const numbers = setup.lineNumbers as NonNullable<SectionJSON["lineNumbers"]>;
-      const restart = numbers.restart ?? "newPage";
+      // Left out: continuous (what Word 16 writes for Continuous).
+      const restart = numbers.restart ?? "continuous";
       const start = numbers.start ?? 0;
       if (block.section !== section) {
         if (restart !== "continuous" || section < 0) count = start;
@@ -311,7 +327,9 @@ export function lineNumberElements(
         pageStarted = true;
       }
       if (block.skip) continue;
-      const right = box.left - (numbers.distance ?? AUTO_DISTANCE) * PX_PER_TWIP;
+      // Left of the block's own column (Word numbers each column's lines beside it).
+      const left = (block.element.getBoundingClientRect().left - rect.left) / scale || box.left;
+      const right = left - (numbers.distance ?? AUTO_DISTANCE) * PX_PER_TWIP;
       for (const line of linesOf(block.element, rect, scale)) {
         count++;
         if (count % numbers.countBy !== 0) continue;
@@ -320,6 +338,7 @@ export function lineNumberElements(
         s.position = "absolute";
         s.left = "0";
         s.width = `${Math.max(right, 0)}px`;
+        s.whiteSpace = "nowrap";
         s.top = `${line.top}px`;
         s.height = `${line.bottom - line.top}px`;
         s.display = "flex";

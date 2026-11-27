@@ -3443,25 +3443,28 @@ export class EditorView {
         });
       });
     }
-    if (numbered && context) {
+    // Measured once the pages hold their blocks; not mid-composition (the next place does it).
+    if (numbered && context && !this.composing) {
+      const byPage = new Map<number, typeof items>();
+      for (const item of items) byPage.set(item.page, [...(byPage.get(item.page) ?? []), item]);
       const doc = this.host.ownerDocument;
       const shown = lineNumberElements(
         doc,
         this.sheets.map((sheet, p) => ({
           page: this.pages[p] as HTMLElement,
           box: pageBox(sheet),
-          blocks: items
-            .filter((item) => item.page === p)
-            .map((item) => {
-              const node = this.state.doc.child(item.index);
-              return {
-                element: item.dom,
-                section: item.section.flow.index ?? 0,
-                skip:
-                  node.type.name !== "paragraph" ||
-                  context.resolver.paragraph(node.attrs).paragraph.suppressLineNumbers,
-              };
-            }),
+          blocks: (byPage.get(p) ?? []).map((item) => {
+            const node = this.state.doc.child(item.index);
+            return {
+              element: item.dom,
+              section: item.section.flow.index ?? 0,
+              // A section's empty last paragraph is on the line before (as `lineOf` counts).
+              skip:
+                item.slot.mark ||
+                node.type.name !== "paragraph" ||
+                context.resolver.paragraph(node.attrs).paragraph.suppressLineNumbers,
+            };
+          }),
         })),
         setups,
       );

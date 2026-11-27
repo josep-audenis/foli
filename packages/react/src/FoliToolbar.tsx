@@ -863,12 +863,20 @@ const LINE_NUMBER_ACTIONS: readonly Action[] = [
     sectionEntry(
       `lineNumbers-${restart}`,
       label,
-      (state) => ({
-        lineNumbers: { countBy: 1, ...sectionAt(state)?.setup.lineNumbers, restart },
-      }),
+      (state) => {
+        const { restart: _old, ...numbers } = sectionAt(state)?.setup.lineNumbers ?? {};
+        // Continuous as Word writes it: no restart.
+        return {
+          lineNumbers: {
+            countBy: 1,
+            ...numbers,
+            ...(restart === "continuous" ? {} : { restart }),
+          },
+        };
+      },
       (state) => {
         const numbers = sectionAt(state)?.setup.lineNumbers;
-        return !!numbers && (numbers.restart ?? "newPage") === restart;
+        return !!numbers && (numbers.restart ?? "continuous") === restart;
       },
     ),
   ),

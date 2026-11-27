@@ -1069,7 +1069,10 @@ export function LineNumbersDialog({
     initial?.distance === undefined ? t("Auto") : formatLength(initial.distance, unit),
   );
   const [countBy, setCountBy] = useState(String(initial?.countBy ?? 1));
-  const [restart, setRestart] = useState<string>(initial?.restart ?? "newPage");
+  // Word's dialog starts new numbering at Restart each page; a section's without one is continuous.
+  const [restart, setRestart] = useState<string>(
+    initial ? (initial.restart ?? "continuous") : "newPage",
+  );
   const [error, setError] = useState<ToolbarMessage | null>(null);
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
@@ -1092,7 +1095,7 @@ export function LineNumbersDialog({
             countBy: by,
             ...(startAt > 1 ? { start: startAt - 1 } : {}),
             ...(twips !== undefined && twips !== null ? { distance: twips } : {}),
-            restart: restart as "newPage" | "newSection" | "continuous",
+            ...(restart === "continuous" ? {} : { restart: restart as "newPage" | "newSection" }),
           },
         }),
       ),

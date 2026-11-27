@@ -608,6 +608,7 @@ export function renderDocument(
     element: HTMLElement;
     section: number;
     block: WordBlock;
+    mark: boolean;
   }[] = [];
   blocks.forEach((block, b) => {
     const section = sectionOf.get(block) as Section;
@@ -656,6 +657,7 @@ export function renderDocument(
         element,
         section: section.flow.index ?? 0,
         block,
+        mark: !!fragment.mark,
       });
       placements.push({
         page: fragment.page,
@@ -730,7 +732,7 @@ export function renderDocument(
         box: (pageSetups[p] as Section).geometry,
         blocks: numberedBlocks
           .filter((b) => b.page === p)
-          .map((b) => ({ element: b.element, section: b.section, skip: skip(b.block) })),
+          .map((b) => ({ element: b.element, section: b.section, skip: b.mark || skip(b.block) })),
       })),
       setups,
     );

@@ -421,16 +421,17 @@ export function setPageColor(color: string | null): Command {
     const now = background?.color === "auto" ? undefined : background?.color;
     if (
       color === null
-        ? !background
+        ? !background || (!now && !background.themeColor && !background.ext)
         : now?.toUpperCase() === color.toUpperCase() && !background?.themeColor && !background?.ext
     )
       return false;
     if (dispatch) {
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       // Picked anew: the theme color and Fill Effects it had go (Word's Page Color does that).
+      // None is said (`auto`): a background left out keeps what the file has.
       setEnvelopeValue(state, tr, "settings", {
         ...rest,
-        ...(color === null ? {} : { background: { color: color.toUpperCase() } }),
+        background: { color: color === null ? "auto" : color.toUpperCase() },
       });
       dispatch(tr);
     }
