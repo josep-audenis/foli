@@ -58,8 +58,8 @@ export function showsPageBorders(borders: PageBordersJSON, first: boolean): bool
  * text (Word's default, from the margins), behind the text when `zOrder` is back. Null when the
  * page shows none.
  *
- * shortcut: art borders (apples, stars…) are drawn as a solid line of their width; draw their
- * pictures when a document needs them.
+ * shortcut: art borders (apples, stars…) are drawn as a solid line, their `size` (points for
+ * art) read as eighths as a line's is: thin; draw their pictures when a document needs them.
  * @internal
  */
 export function pageBordersElement(
@@ -73,6 +73,7 @@ export function pageBordersElement(
   const element = doc.createElement("div");
   element.setAttribute(PAGE_BORDERS_ATTR, "");
   element.setAttribute("aria-hidden", "true");
+  element.contentEditable = "false";
   const { style } = element;
   style.position = "absolute";
   style.boxSizing = "border-box";

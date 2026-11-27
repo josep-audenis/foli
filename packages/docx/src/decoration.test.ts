@@ -52,6 +52,18 @@ describe("page decoration (schema 9)", () => {
     const out = await exportDocx(read.document, read.package);
     expect(await main(out)).toBe(await main(bytes));
     expect(await settingsPart(out)).toBe(await settingsPart(bytes));
+    // A file that hides its background (no displayBackgroundShape) keeps its settings so.
+    const hidden = await docx("<w:p/>", {
+      root: `<w:document xmlns:w="${W_NS}"><w:background w:color="FF0000"/><w:body><w:p/></w:body></w:document>`,
+      rels: SETTINGS_REL,
+      parts: {
+        "word/settings.xml": `<w:settings xmlns:w="${W_NS}"><w:zoom w:percent="90"/></w:settings>`,
+      },
+    });
+    const again = await importDocx(hidden);
+    expect(await settingsPart(await exportDocx(again.document, again.package))).toBe(
+      await settingsPart(hidden),
+    );
   });
 
   it("writes a changed page color as Word's Page Color does, Fill Effects gone", async () => {

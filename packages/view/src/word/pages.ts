@@ -4,7 +4,6 @@
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-
 import {
   type Extension,
   type FieldLayout,

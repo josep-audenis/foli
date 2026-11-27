@@ -186,8 +186,9 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `EnvelopeStep`s. `background` (v9) is the page color, the main part's `w:background`: `color`
   (RRGGBB), a theme color's `themeColor` with `themeTint` or `themeShade` (two hex digits), and
   `ext`, the element verbatim (Fill Effects, its VML children, are kept while the color stays; a
-  new color is written without them, as Word's Page Color does). Exporting one turns on
-  `w:displayBackgroundShape`, without which Word does not show it.
+  new color is written without them, as Word's Page Color does). Exporting a color set
+  anew (no `ext`) turns on `w:displayBackgroundShape`, without which Word does not show it; a
+  file's own background leaves its settings as they are.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
   in the paragraph's properties); the envelope's `section` is the last one. Every part of a
   section is optional (Word's defaults apply). `type` says how the section starts; `columns`

@@ -221,8 +221,9 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
     current = parseXml(text).root;
   };
   const prefix = prefixOf(root);
-  // Word shows the page color in Print Layout only with this on (it writes both).
-  if (settings.background && !isOn(current, "displayBackgroundShape"))
+  // Word shows the page color in Print Layout only with this on (it writes both). Only for a
+  // color set anew (no `ext`): a file's own background stays as shown or hidden there.
+  if (settings.background && !settings.background.ext && !isOn(current, "displayBackgroundShape"))
     put("displayBackgroundShape", `<${prefix}displayBackgroundShape/>`);
   const even = settings.evenAndOddHeaders;
   if (even !== undefined && even !== isOn(current, "evenAndOddHeaders"))

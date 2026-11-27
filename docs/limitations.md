@@ -812,8 +812,11 @@ Details in the [package README](../packages/docx/README.md).
   drawn; changing the borders writes them anew without them. Borders measured from the text
   are placed from the section's margins, not around a header or footer (Word's "Surround
   header" and "Surround footer" settings are kept, not applied).
-- Line numbers (`w:lnNumType`) are read and written; an element without `countBy` numbers no
-  line in Word and stays in the section's verbatim XML.
+- Line numbers (`w:lnNumType`) are read and written but not drawn yet (32.5); an element without
+  `countBy` numbers no line in Word and stays in the section's verbatim XML.
+- On a dark page color, text in Automatic color stays black (Word draws it white).
+- A file whose `w:background` Word hides (no `w:displayBackgroundShape` in its settings) shows
+  the color in Foli; its settings stay as they are unless the color is changed.
 
 - The docs site's search matches headings and API names, not body text. The API pages show
   each declaration's `.d.ts` text; code is not highlighted.

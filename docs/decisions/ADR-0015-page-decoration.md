@@ -19,8 +19,9 @@
    themeShade, ext }`: the values Word's Page Color writes, and the element verbatim. Export
    keeps the element as it was while its values match, Fill Effects (VML children) included;
    otherwise writes `w:background` anew with the values only, as Word does when a color is
-   picked, and removes it when there is none. It also turns on `w:displayBackgroundShape` in the
-   settings part: without it Word does not show the color. Not a part of its own in the
+   picked, and removes it when there is none. A color set anew (no `ext`) also turns on
+   `w:displayBackgroundShape` in the settings part: without it Word does not show the color. A
+   file's own background leaves its settings as they are (shown or hidden as the file says). Not a part of its own in the
    envelope: one more top-level key for one element was not worth the migration surface.
 2. **Page borders and line numbers: section parts.** `section.pageBorders` (`top`, `left`,
    `bottom`, `right` as `BorderJSON`; `offsetFrom`, `display`, `zOrder`) and
