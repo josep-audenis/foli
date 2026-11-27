@@ -31,6 +31,7 @@ import {
 import { printStyles, SHEET_ATTR } from "../print.js";
 import {
   type BlockOptions,
+  imageSource,
   NOTE_REF_ATTR,
   PICTURE_ATTR,
   PX_PER_TWIP,
@@ -40,7 +41,7 @@ import {
   type WordBlock,
 } from "./blocks.js";
 import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
-import { pageBordersElement, pageColor } from "./decoration.js";
+import { pageBordersElement, pageColor, watermarkElement } from "./decoration.js";
 import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
@@ -519,6 +520,7 @@ export function renderDocument(
   for (let p = count - 1; p >= 0; p--)
     pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
   const color = pageColor(document.settings);
+  const image = imageSource(document.resources, options.resource);
   const created = pageSetups.map((section, p) => {
     const made = createPage(doc, section.geometry);
     made.page.setAttribute(SHEET_ATTR, String(section.flow.index ?? 0));
@@ -536,6 +538,9 @@ export function renderDocument(
       !!page?.first,
     );
     if (frame) made.page.append(frame);
+    if (page?.sectionPages)
+      for (const watermark of regions.watermarks(page.section, page))
+        made.page.append(watermarkElement(doc, watermark, section.geometry, image));
     // Word's blank page before an even or odd page section has no header or footer (its PDF).
     if (!page?.sectionPages) return made;
     const { top, bottom } = regions.margins(page.section, page);

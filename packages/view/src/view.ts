@@ -81,6 +81,7 @@ import {
   type UpdateFieldsOptions,
   undo,
   updateFields,
+  type WatermarkJSON,
   type WordSettingsJSON,
 } from "@folijs/core";
 import {
@@ -161,10 +162,11 @@ import {
   ControlChrome,
 } from "./word/controls.js";
 import {
-  PAGE_BORDERS_ATTR,
+  PAGE_DECORATION_ATTR,
   pageBordersElement,
   pageBordersKey,
   pageColor,
+  watermarkElement,
 } from "./word/decoration.js";
 import {
   FLOAT_ANCHORS,
@@ -317,7 +319,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_BORDERS_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -392,7 +394,10 @@ const pageSheets = new WeakMap<HTMLElement, string>();
 /** The page color each page element was last given. */
 const pageColors = new WeakMap<HTMLElement, string>();
 /** Each page element's borders (Phase 32), as last drawn, and what they were drawn from. */
-const pageFrames = new WeakMap<HTMLElement, { key: string; element: HTMLElement | null }>();
+const pageFrames = new WeakMap<
+  HTMLElement,
+  { key: string; resources: unknown; elements: HTMLElement[] }
+>();
 /** The margins a header or footer gave each page element, as last written. */
 const pagePads = new WeakMap<HTMLElement, string>();
 /** What a view without pages gives its one flow of content. */
@@ -3313,11 +3318,13 @@ export class EditorView {
         page.style.setProperty("print-color-adjust", color ? "exact" : "");
         page.style.setProperty("-webkit-print-color-adjust", color ? "exact" : "");
       }
-      this.drawPageBorders(
+      const fact = this.facts[p];
+      this.drawDecoration(
         page,
-        setups[this.facts[p]?.section ?? -1]?.pageBorders,
+        setups[fact?.section ?? -1]?.pageBorders,
+        fact?.sectionPages && this.regions ? this.regions.watermarks(fact.section, fact) : [],
         sheet,
-        !!this.facts[p]?.first,
+        !!fact?.first,
       );
       const { top = "", bottom = "" } = this.pageMargins[p] ?? {};
       const pads = `${top} ${bottom}`;
@@ -3343,10 +3350,10 @@ export class EditorView {
       const notes = this.pageNotes[p];
       /** What follows the text of a column: its endnotes. */
       const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
-      const frame = pageFrames.get(page)?.element;
-      /** A page's children: its borders, its header, what it holds, its notes, its footer. */
+      const decoration = pageFrames.get(page)?.elements ?? [];
+      /** A page's children: its decoration, its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
-        ...(frame ? [frame] : []),
+        ...decoration,
         ...(header ? [header.element] : []),
         ...list,
         ...(notes?.foot ?? []),
@@ -3442,9 +3449,10 @@ export class EditorView {
   }
 
   /** Gives `page` the element of its section's page borders (none: null), made when they change. */
-  private drawPageBorders(
+  private drawDecoration(
     page: HTMLElement,
     borders: PageBordersJSON | undefined,
+    watermarks: readonly WatermarkJSON[],
     sheet: Sheet,
     first: boolean,
   ): void {
@@ -3458,10 +3466,21 @@ export class EditorView {
       bottom: px(margins.bottom),
       left: px(margins.left),
     };
-    const key = pageBordersKey(borders, box, first);
-    if (pageFrames.get(page)?.key === key) return;
-    const element = key ? pageBordersElement(this.host.ownerDocument, borders, box, first) : null;
-    pageFrames.set(page, { key, element });
+    const resources = wordContext(this.state)?.envelope.resources;
+    const key = `${pageBordersKey(borders, box, first)}|${watermarks.length ? JSON.stringify([watermarks, box]) : ""}`;
+    const known = pageFrames.get(page);
+    if (known?.key === key && known.resources === resources) return;
+    const doc = this.host.ownerDocument;
+    const frame = pageBordersElement(doc, borders, box, first);
+    const image = imageSource(resources, this.resource ?? undefined);
+    pageFrames.set(page, {
+      key,
+      resources,
+      elements: [
+        ...watermarks.map((watermark) => watermarkElement(doc, watermark, box, image)),
+        ...(frame ? [frame] : []),
+      ],
+    });
   }
 
   private createPage(): HTMLElement {
@@ -4748,7 +4767,7 @@ export class EditorView {
     if (
       !event.shiftKey &&
       this.pages.includes(blank) &&
-      ![...blank.children].some((c) => !c.hasAttribute(PAGE_BORDERS_ATTR))
+      ![...blank.children].some((c) => !c.hasAttribute(PAGE_DECORATION_ATTR))
     ) {
       const pos = this.posFromDOM(blank, 0);
       if (pos !== null) {

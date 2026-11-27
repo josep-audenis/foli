@@ -164,13 +164,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * and the page decoration drawn, with room for Phase 32's Design tab (Page Color, Page
  * Borders, Watermark, Borders and Shading, Line Numbers). `@folijs/pdf` and its renderer raised
  * in 32.1 (18.6 and 95.5 kB; 19.0 and 98.0 allowed): the same checks and drawing in the page.
+ * Core and docx raised in 32.3 (99.4 and 69.5 kB; 102.0 and 71.0 allowed): watermarks (the
+ * commands; Word's VML read and written, its shape types as text), with room for 32.4–32.5.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 101_376 },
+  { name: "@folijs/core", entry: dist("core"), budget: 104_448 },
   { name: "@folijs/view", entry: dist("view"), budget: 135_168 },
   { name: "@folijs/react", entry: dist("react"), budget: 227_328 },
   { name: "FoliEditor only", entry: appEntry, budget: 227_328 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 69_632 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 72_704 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 19_456 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },

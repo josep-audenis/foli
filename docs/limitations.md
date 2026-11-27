@@ -816,6 +816,15 @@ Details in the [package README](../packages/docx/README.md).
   theme color and its tint as well): changing the theme does not change it.
 - The Page Borders dialog has None, Box and Custom (not Word's Shadow and 3-D), no art borders
   and no preview; its sides are check boxes and one distance applies to every side.
+- Watermarks are Word's VML ones (`PowerPlusWaterMarkObject…`, `WordPictureWatermark…`): a
+  DrawingML shape or picture named as a watermark stays opaque, and one positioned other than
+  centered on the margins is drawn centered. A text watermark's letters are drawn stretched over
+  its box with SVG (`textLength`), close to Word's WordArt but not its exact glyph shapes; a
+  picture's washout is a CSS filter. Watermark sizes Foli makes follow Word's proportions for
+  Calibri capitals; another font is drawn in the same box. The gallery has Word's diagonal
+  presets (Custom watermark… has Horizontal). A picture watermark needs the toolbar's `upload`;
+  with no new file picked the dialog keeps the picture, its washout changed, and its Scale
+  applies to a new picture only.
 - Line numbers (`w:lnNumType`) are read and written but not drawn yet (32.5); an element without
   `countBy` numbers no line in Word and stays in the section's verbatim XML.
 - On a dark page color, text in Automatic color stays black (Word draws it white).

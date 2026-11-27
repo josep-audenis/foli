@@ -29,12 +29,15 @@ const EXTENSIONS: Record<string, string> = {
   "image/x-wmf": "wmf",
 };
 
-/** Every picture node of the document (body, comments and stories). */
+/** Every picture node of the document (body, comments and stories), and picture watermarks'. */
 function picturesOf(doc: FoliDocument): Json[] {
   const out: Json[] = [];
   const visit = (nodes: readonly NodeJSON[] | undefined) => {
     for (const node of nodes ?? []) {
       if (node.type === "picture") out.push((node.attrs ?? {}) as Json);
+      const watermark = node.attrs?.watermark as { picture?: string } | null | undefined;
+      if (node.type === "opaqueInline" && watermark?.picture)
+        out.push({ resource: watermark.picture });
       visit(node.content);
     }
   };

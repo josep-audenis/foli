@@ -4,6 +4,7 @@
  * A story is always drawn from the model here, by the read-only blocks renderer; `PAGE`, `NUMPAGES`
  * and `SECTIONPAGES` are filled in the copy drawn, never in the document.
  */
+
 import {
   type FoliDocument,
   type NodeJSON,
@@ -12,11 +13,15 @@ import {
   type StoryJSON,
   type StorySide,
   storyOfSection,
+  type WatermarkJSON,
 } from "@folijs/core";
 import { formatNumber, type Resolver } from "@folijs/core/internal";
 import type { FlowPage, PageFacts } from "../layout/flow.js";
 import { type BlockOptions, PX_PER_TWIP, renderBlocks, type WordBlock } from "./blocks.js";
+import { watermarksIn } from "./decoration.js";
 
+/** Each story's watermarks, read once per story object. */
+const watermarkCache = new WeakMap<object, WatermarkJSON[]>();
 /**
  * On what shows a page field's number in a drawn copy of a story.
  * @internal
@@ -305,6 +310,19 @@ export class PageRegions {
     if (!found) {
       found = edgesOf(this.sections[index] ?? {});
       this.edges[index] = found;
+    }
+    return found;
+  }
+
+  /** The watermarks of the header a page of section `index` shows (Phase 32). */
+  watermarks(index: number, page: { first: boolean; number: number }): WatermarkJSON[] {
+    const id = this.storyId(index, "header", page);
+    const story = id ? this.story(id) : undefined;
+    if (!story) return [];
+    let found = watermarkCache.get(story);
+    if (!found) {
+      found = watermarksIn(story.content);
+      watermarkCache.set(story, found);
     }
     return found;
   }

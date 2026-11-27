@@ -354,8 +354,11 @@ caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `dat
 menu: No Color and the theme's colors, More colors…; `setPageColor`) and `pageBorders` (Word's
 Page Borders dialog: None, Box or Custom; the line's style, color and width; which sides; Apply
 to the whole document, this section, its first page only or all but its first page; measured
-from the page's edge or the text, one distance for every side), which `wordRibbonTabs`' Design
-tab has in its Page Background group; `navigationPane` (the outline of
+from the page's edge or the text, one distance for every side), and `watermark` (a menu: Word's diagonal Confidential, Do not
+copy, Draft, Sample, ASAP and Urgent, checked when the caret's page shows it; Custom watermark…,
+Word's Printed Watermark dialog: none, a picture with its scale and washout through `upload`, or
+a text with its font, size, color, transparency and layout; Remove watermark), which
+`wordRibbonTabs`' Design tab has in its Page Background group; `navigationPane` (the outline of
 `FoliNavigation`); `rotateLeft` and `rotateRight` (a selected picture, a quarter turn; not while
 tracking). Those the toolbar runs with the pages or a story (`footnote`, `endnote`, `goToNote`,
 `tableOfContents`, `updateFields`, `pageNumber`, `navigationPane`) do so only from the toolbar,
@@ -1062,7 +1065,10 @@ the document's `settings.background`; a theme color or Fill Effects it had go; n
 in Word), `pageColorOf(state)`; `setPageBorders(borders, applyTo?)` (`PageBordersJSON` or null;
 the caret's section, or `"document"` for every section, one whose setup leaves no room for text
 skipped; one undo step, recorded as a page setup
-change of each section while tracking).
+change of each section while tracking); `setWatermark(watermark, image?)` (`WatermarkJSON` or
+null; in every header the pages show, each section's default one and its first and even pages'
+where it has them, made where missing; null removes every watermark; a picture's new image as
+`image`, a `ResourceJSON`; one undo step, not tracked), `watermarkOf(state)` (the caret's page's).
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),

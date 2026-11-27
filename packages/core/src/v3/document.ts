@@ -430,6 +430,25 @@ export interface WordSettingsJSON {
   background?: PageBackgroundJSON;
 }
 
+/**
+ * Word's watermark (schema 9): an opaque run's `watermark`, read from the VML shape it holds. A
+ * text's (`text`, `font`, `color` RRGGBB, `semitransparent`, `rotation` in degrees, 315 being
+ * Word's diagonal) or a picture's (`picture`, a key of `resources`; `washout`), in a box of
+ * `width` by `height` twips centered on the page's text area, behind the text.
+ */
+export interface WatermarkJSON {
+  kind: "text" | "picture";
+  text?: string;
+  font?: string;
+  color?: string;
+  semitransparent?: boolean;
+  rotation?: number;
+  picture?: string;
+  washout?: boolean;
+  width: number;
+  height: number;
+}
+
 /** The page color (`w:background`, schema 9). */
 export interface PageBackgroundJSON {
   color?: string;
@@ -865,6 +884,8 @@ function laterNode(
     const decorated =
       version < 9 ? V9_SECTION_KEYS.find((key) => inSection(attrs.section, key)) : undefined;
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
+    if (version < 9 && name === "opaqueInline" && attrs.watermark != null)
+      return { name: "a watermark", schema: 9 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;

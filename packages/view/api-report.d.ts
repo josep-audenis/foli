@@ -606,7 +606,7 @@ export declare class EditorView {
      */
     private cellContent;
     /** Gives `page` the element of its section's page borders (none: null), made when they change. */
-    private drawPageBorders;
+    private drawDecoration;
     private createPage;
     /** The last section's page setup (the envelope's), for an empty document. */
     private lastSheet;
@@ -1059,6 +1059,12 @@ export declare function renderDocument(document: FoliDocument, container: HTMLEl
 export {};
 
 // word/regions.d.ts
+/**
+ * Headers and footers on pages (11.7, ADR-0007), for both renderers: which story a page shows, how
+ * tall it is with that page's fields filled in, how far it pushes the text, and its elements.
+ * A story is always drawn from the model here, by the read-only blocks renderer; `PAGE`, `NUMPAGES`
+ * and `SECTIONPAGES` are filled in the copy drawn, never in the document.
+ */
 export {};
 
 // word/table.d.ts

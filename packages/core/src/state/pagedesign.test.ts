@@ -3,7 +3,13 @@ import { createDocument, type FoliDocument, type PageBordersJSON } from "../v3/d
 import { createEditor } from "./editor.js";
 import { redo, undo } from "./history.js";
 import { rejectAllChanges, trackedChanges } from "./review.js";
-import { pageColorOf, setPageBorders, setPageColor } from "./sections.js";
+import {
+  pageColorOf,
+  setPageBorders,
+  setPageColor,
+  setWatermark,
+  watermarkOf,
+} from "./sections.js";
 import { wordContext } from "./word.js";
 
 /** Design ▸ Page Color and Page Borders (32.2). */
@@ -112,5 +118,79 @@ describe("setPageBorders", () => {
     editor.run(rejectAllChanges());
     expect(editor.getDocument().section.pageBorders).toBeUndefined();
     expect(editor.getDocument().content.content?.[0]?.attrs?.section).toEqual({});
+  });
+});
+
+describe("setWatermark", () => {
+  const confidential = {
+    kind: "text" as const,
+    text: "CONFIDENTIAL",
+    font: "Calibri",
+    color: "C0C0C0",
+    semitransparent: true,
+    rotation: 315,
+    width: 10557,
+    height: 2639,
+  };
+  const watermarksOf = (editor: ReturnType<typeof editorOf>) =>
+    Object.entries(editor.getDocument().stories ?? {}).flatMap(([id, story]) =>
+      JSON.stringify(story.content).includes('"watermark"')
+        ? [
+            [
+              id,
+              (story.content.content?.[0]?.content ?? []).filter((n) => n.attrs?.watermark).length,
+            ],
+          ]
+        : [],
+    );
+
+  it("makes a header holding it, replaces it, and removes it, one undo step each", () => {
+    const editor = editorOf();
+    editor.select(1);
+    expect(watermarkOf(editor.state)).toBeNull();
+    expect(editor.can(setWatermark(null))).toBe(false);
+    expect(editor.run(setWatermark(confidential))).toBe(true);
+    const doc = editor.getDocument();
+    expect(doc.schemaVersion).toBe(9);
+    const first = doc.content.content?.[0]?.attrs?.section as { headers?: { default?: string } };
+    const id = first.headers?.default as string;
+    expect(doc.stories?.[id]?.kind).toBe("header");
+    expect(watermarksOf(editor)).toEqual([[id, 1]]);
+    expect(watermarkOf(editor.state)).toEqual(confidential);
+    editor.select(7);
+    // The second section shows the first's header (linked).
+    expect(watermarkOf(editor.state)).toEqual(confidential);
+    const draft = { ...confidential, text: "DRAFT", rotation: undefined };
+    const { rotation: _r, ...plain } = draft;
+    editor.run(setWatermark(plain));
+    expect(watermarksOf(editor)).toEqual([[id, 1]]);
+    expect(watermarkOf(editor.state)?.text).toBe("DRAFT");
+    editor.run(setWatermark(null));
+    expect(watermarksOf(editor)).toEqual([]);
+    editor.run(undo);
+    expect(watermarkOf(editor.state)?.text).toBe("DRAFT");
+    editor.run(undo);
+    editor.run(undo);
+    expect(editor.getDocument().stories ?? {}).toEqual({});
+  });
+
+  it("puts it in a first page's header too, and refuses a watermark the schema does not take", () => {
+    const editor = editorOf();
+    editor.select(7);
+    expect(editor.can(setWatermark({ ...confidential, width: 0 }))).toBe(false);
+    const document = editor.getDocument();
+    const withFirst = createEditor({
+      document: { ...document, section: { ...document.section, titlePage: true } },
+    });
+    withFirst.run(setWatermark(confidential));
+    const refs = (
+      withFirst.getDocument().content.content?.[0]?.attrs?.section as {
+        headers?: Record<string, string>;
+      }
+    ).headers;
+    const last = withFirst.getDocument().section.headers;
+    // The first section has no first page: its default header; the last one's first page gets one.
+    expect(Object.keys(refs ?? {})).toEqual(["default"]);
+    expect(Object.keys(last ?? {})).toEqual(["first"]);
   });
 });

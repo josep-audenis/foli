@@ -262,7 +262,9 @@ export {
   setPageColor,
   setSectionSetup,
   setStoryLinked,
+  setWatermark,
   storyOfSection,
+  watermarkOf,
 } from "./sections.js";
 export {
   AllSelection,

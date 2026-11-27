@@ -153,6 +153,28 @@ export const checkNoteProperties: Check = shape({
   restart: oneOf(["continuous", "eachSect", "eachPage"]),
 });
 
+/**
+ * A watermark (schema 9): a text's (`text`, `font`, `color` RRGGBB, `semitransparent`,
+ * `rotation` in degrees: 315 is Word's diagonal) or a picture's (`picture`, a resource key;
+ * `washout`), in a box of `width` by `height` twips centered on the page's text area.
+ * @internal
+ */
+export const checkWatermark: Check = shape(
+  {
+    kind: oneOf(["text", "picture"]),
+    text: str(),
+    font: text(),
+    color,
+    semitransparent: bool,
+    rotation: int(0, 359),
+    picture: text(),
+    washout: bool,
+    width: int(1, MAX_TWIPS),
+    height: int(1, MAX_TWIPS),
+  },
+  ["kind", "width", "height"],
+);
+
 /** Word's limit on a section's columns. */
 const MAX_SECTION_COLUMNS = 45;
 
@@ -815,6 +837,12 @@ export const schema = new Schema({
          * with the node's run properties. Otherwise it stands between runs (`w:sdt`…).
          */
         run: { default: false, validate: bool },
+        /**
+         * Word's watermark (schema 9, ADR-0015): what its dialog sets, read from the VML shape
+         * `xml` holds (`PowerPlusWaterMarkObject…`, `WordPictureWatermark…`). Drawn on the pages
+         * of the header's sections; `xml` is written back while it still says this.
+         */
+        watermark: nullableAttr(checkWatermark),
       },
     },
     /**
