@@ -302,7 +302,14 @@ export {
   type SelectionJSON,
   TextSelection,
 } from "./selection.js";
-export { addShapeText, type InsertShapeOptions, insertShape, setShapeAdjust } from "./shapes.js";
+export {
+  addShapeText,
+  type InsertShapeOptions,
+  insertShape,
+  type ShapeLook,
+  setShapeAdjust,
+  setShapeLook,
+} from "./shapes.js";
 export {
   type Command,
   EditorState,

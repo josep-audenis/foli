@@ -164,3 +164,64 @@ export function addShapeText(pos: number): Command {
     return true;
   };
 }
+
+/** What `setShapeLook` sets of a shape or a text box; what is left out stays. */
+export interface ShapeLook {
+  /** RRGGBB, or null for no fill (a gradient goes). */
+  fill?: string | null;
+  /**
+   * The line: null for none, else what changes of it (a line made where there was none is
+   * black, ¾ pt, unless said). A text box's line has a color and a width only.
+   */
+  outline?: {
+    color?: string;
+    width?: number;
+    dash?: string | null;
+    head?: { type: string; width?: string; length?: string } | null;
+    tail?: { type: string; width?: string; length?: string } | null;
+  } | null;
+  /** A shape's text color where its text sets none (a style's). */
+  textColor?: string | null;
+}
+
+/**
+ * Sets the fill, line and text color of the shape or text box at `pos` (34.5: Shape Format's
+ * Shape Fill, Shape Outline and Shape Styles), one undo step, kept selected. Not while tracking
+ * (Word records no change of a shape's look).
+ */
+export function setShapeLook(pos: number, look: ShapeLook): Command {
+  return (state, dispatch) => {
+    const node = pos >= 0 && pos < state.doc.content.size ? state.doc.nodeAt(pos) : null;
+    const name = node?.type.name;
+    if (!node || (name !== "shape" && name !== "textBox") || trackState(state)?.on === true)
+      return false;
+    const attrs: Record<string, unknown> = { ...node.attrs };
+    if (look.fill !== undefined) {
+      attrs.fill = look.fill;
+      if (name === "shape") attrs.gradient = null;
+    }
+    if (look.outline !== undefined) {
+      if (look.outline === null) attrs.outline = null;
+      else {
+        const was = (node.attrs.outline ?? { color: "000000", width: 9525 }) as Record<
+          string,
+          unknown
+        >;
+        const next: Record<string, unknown> = { ...was };
+        for (const [key, value] of Object.entries(look.outline)) {
+          if (value === null) delete next[key];
+          else if (value !== undefined) next[key] = value;
+        }
+        attrs.outline = name === "textBox" ? { color: next.color, width: next.width } : next;
+      }
+    }
+    if (look.textColor !== undefined && name === "shape") attrs.textColor = look.textColor;
+    if (JSON.stringify(attrs) === JSON.stringify(node.attrs)) return false;
+    return attempt(state, dispatch, (tr) => {
+      tr.setMeta(closeHistory, true);
+      tr.setNodeMarkup(pos, node.type, attrs);
+      if (state.selection instanceof NodeSelection && state.selection.from === pos)
+        tr.setSelection(NodeSelection.create(tr.doc, pos));
+    });
+  };
+}

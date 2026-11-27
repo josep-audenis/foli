@@ -317,6 +317,34 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["circle", { cx: "17", cy: "17", r: "3" }],
     ["circle", { cx: "7", cy: "7", r: "3" }],
   ],
+  shapeStyles: /* a filled square and an outlined one */ [
+    ["rect", { x: "3", y: "3", width: "10", height: "10", rx: "1", fill: "currentColor" }],
+    ["rect", { x: "11", y: "11", width: "10", height: "10", rx: "1" }],
+  ],
+  shapeFill: /* paint-bucket */ [
+    ["path", { d: "m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z" }],
+    ["path", { d: "m5 2 5 5" }],
+    ["path", { d: "M2 13h15" }],
+    ["path", { d: "M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" }],
+  ],
+  shapeOutline: /* pen-line */ [
+    ["path", { d: "M12 20h9" }],
+    ["path", { d: "M16.4 3.6a2 2 0 0 1 2.9 2.9L7 18.8l-4 1 1-4Z" }],
+  ],
+  outlineWeight: /* lines of three weights */ [
+    ["path", { d: "M3 6h18", strokeWidth: "1" }],
+    ["path", { d: "M3 12h18", strokeWidth: "2" }],
+    ["path", { d: "M3 18h18", strokeWidth: "3.5" }],
+  ],
+  outlineDashes: /* dashed lines */ [
+    ["path", { d: "M3 7h4m4 0h4m4 0h2" }],
+    ["path", { d: "M3 13h2m3 0h2m3 0h2m3 0h2" }],
+    ["path", { d: "M3 19h7m4 0h7" }],
+  ],
+  outlineArrows: /* move-right */ [
+    ["path", { d: "M3 12h18" }],
+    ["path", { d: "m15 6 6 6-6 6" }],
+  ],
   shapes: /* shapes: a triangle, a square, a circle */ [
     [
       "path",
