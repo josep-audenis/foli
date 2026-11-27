@@ -338,6 +338,15 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
     ["rect", { width: "7", height: "6", x: "6", y: "6" }],
   ],
+  objectSize: /* scaling */ [
+    ["path", { d: "M21 3 9 15" }],
+    ["path", { d: "M12 3H3v18h18v-9" }],
+    ["path", { d: "M16 3h5v5" }],
+  ],
+  crop: /* crop */ [
+    ["path", { d: "M6 2v14a2 2 0 0 0 2 2h14" }],
+    ["path", { d: "M18 22V8a2 2 0 0 0-2-2H2" }],
+  ],
   footnote: /* panel-bottom */ [
     ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
     ["path", { d: "M3 15h18" }],

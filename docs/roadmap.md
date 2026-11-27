@@ -4670,8 +4670,14 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   (`export/frames.ts`, 33.1). `layout.test.ts` (core), `word-layout.spec.ts` (three engines: the
   button, the menus, the dialog, axe; the flyer's tight and through pictures within 1.5 px of
   Word's place with lines around them). Tight and through are drawn as square (ADR-0016).
-- [ ] 33.5 Crop handles on the page (left from 19.5), resize keeping the ratio with Shift, a
-  Size dialog (height, width, scale, rotation).
+- [x] 33.5 Crop handles on the page (left from 19.5), resize keeping the ratio with Shift, a
+  Size dialog (height, width, scale, rotation). Built: core's `toggleCrop` and `croppingAt` (crop
+  mode on the selected picture, a plugin), `setObjectSize` (pictures and text boxes, a picture's
+  rotation with it), `setObjectFloat`'s size (the dialog's OK, one step); the view's edge crop
+  handles (a drag crops on release, through `setPictureCrop`), the resize handle on text boxes
+  too (free, Shift keeps the ratio; pictures keep theirs); React's Crop button and Size…
+  launcher (Picture Format ▸ Size) and the Layout dialog's Size tab (height, width, scale, lock
+  aspect ratio, rotation). `layout.test.ts` (core), `word-crop-size.spec.ts` (three engines, axe).
 - [ ] 33.6 Picture Format tab as Word's (Size group boxes, Arrange: wrap, position, bring
   forward, send backward, align); corpus run; e2e; docs; changesets.
 

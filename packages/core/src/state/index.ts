@@ -163,6 +163,7 @@ export {
   undoDepth,
 } from "./history.js";
 export {
+  croppingAt,
   OBJECT_POSITIONS,
   OBJECT_WRAPS,
   type ObjectAxis,
@@ -179,7 +180,9 @@ export {
   setObjectLayout,
   setObjectMovesWithText,
   setObjectPosition,
+  setObjectSize,
   setObjectWrap,
+  toggleCrop,
 } from "./layout.js";
 export {
   autolinkHref,

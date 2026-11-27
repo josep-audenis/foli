@@ -133,6 +133,8 @@ const NAMES = {
   crossReference: 1,
   fieldCodes: 1,
   navigationPane: 1,
+  crop: 1,
+  objectSize: 1,
   wrapText: 1,
   layoutOptions: 1,
   position: 1,

@@ -53,6 +53,7 @@ import type { FindMatch, FindOptions } from "./find.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import type { ObjectPlacement } from "./layout.js";
+import { cropPlugin } from "./layout.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { notesPlugin } from "./notes.js";
@@ -697,6 +698,7 @@ export function createEditor({
     commentsPlugin(),
     notesPlugin(),
     textBoxesPlugin(),
+    cropPlugin(),
     formatPainterPlugin(),
     formattingMarksPlugin(),
     rulerPlugin(),

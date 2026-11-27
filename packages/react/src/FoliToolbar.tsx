@@ -18,6 +18,7 @@ import {
   controlProperties,
   convertNotes,
   copyFormat,
+  croppingAt,
   crossReferenceTargets,
   deleteColumns,
   deleteRows,
@@ -130,6 +131,7 @@ import {
   type TextCase,
   tableStyleAt,
   tableStyles,
+  toggleCrop,
   toggleFieldCodes,
   toggleFormattingMarks,
   toggleHeaderRow,
@@ -495,6 +497,7 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
 export type ToolbarDialogName =
   | "layout"
   | "layoutWrapping"
+  | "layoutSize"
   | "bordersShading"
   | "lineNumbers"
   | "pageBorders"
@@ -2208,6 +2211,20 @@ const RIBBON_ITEMS: readonly Item[] = [
     actions: positionActions,
   },
   {
+    key: "crop",
+    label: "Crop",
+    text: "Crop",
+    enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
+    pressed: (state) => croppingAt(state) !== null,
+    command: toggleCrop,
+  },
+  {
+    key: "objectSize",
+    label: "Size…",
+    enabled: objectLayoutEnabled,
+    dialog: "layoutSize",
+  },
+  {
     key: "rotateLeft",
     label: "Rotate left 90°",
     enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
@@ -2491,6 +2508,8 @@ export type ToolbarItemName =
   | "crossReference"
   | "fieldCodes"
   | "navigationPane"
+  | "crop"
+  | "objectSize"
   | "wrapText"
   | "layoutOptions"
   | "position"
@@ -2864,6 +2883,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       visible: pictureSelected,
       items: [
         group("Picture", t.picture),
+        { ...group("Size", large(t.crop)), launcher: t.objectSize },
         group("Arrange", large(t.position), large(t.wrapText), t.rotateLeft, t.rotateRight),
       ],
     },
@@ -2924,6 +2944,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   lineNumbers: (state) => sectionAt(state) !== null,
   layout: (state) => objectLayoutEnabled(state),
   layoutWrapping: (state) => objectLayoutEnabled(state),
+  layoutSize: (state) => objectLayoutEnabled(state),
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -3655,7 +3676,8 @@ export function FoliToolbar({
       | "bordersShading"
       | "lineNumbers"
       | "layout"
-      | "layoutWrapping";
+      | "layoutWrapping"
+      | "layoutSize";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3767,7 +3789,8 @@ export function FoliToolbar({
         name === "bordersShading" ||
         name === "lineNumbers" ||
         name === "layout" ||
-        name === "layoutWrapping"
+        name === "layoutWrapping" ||
+        name === "layoutSize"
       )
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
@@ -4681,18 +4704,27 @@ export function FoliToolbar({
             }}
           />
         )}
-        {(wordDialog?.name === "layout" || wordDialog?.name === "layoutWrapping") && !disabled && (
-          <LayoutDialog
-            editor={editor}
-            unit={unit}
-            initialTab={wordDialog.name === "layout" ? "position" : "wrapping"}
-            onClose={(applied) => {
-              const { restore } = wordDialog;
-              setWordDialog(null);
-              closed(applied, restore);
-            }}
-          />
-        )}
+        {(wordDialog?.name === "layout" ||
+          wordDialog?.name === "layoutWrapping" ||
+          wordDialog?.name === "layoutSize") &&
+          !disabled && (
+            <LayoutDialog
+              editor={editor}
+              unit={unit}
+              initialTab={
+                wordDialog.name === "layout"
+                  ? "position"
+                  : wordDialog.name === "layoutSize"
+                    ? "size"
+                    : "wrapping"
+              }
+              onClose={(applied) => {
+                const { restore } = wordDialog;
+                setWordDialog(null);
+                closed(applied, restore);
+              }}
+            />
+          )}
         {wordDialog?.name === "lineNumbers" && !disabled && (
           <LineNumbersDialog
             editor={editor}
