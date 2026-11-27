@@ -804,17 +804,27 @@ export function BordersShadingDialog({
         setting === "box"
           ? (["top", "bottom", "left", "right"] as const)
           : PARAGRAPH_SIDES.filter((side) => sides[side]);
+      // A bar border (the dialog does not show it) stays.
+      const bar = own?.bar ? { bar: own.bar } : {};
       commands.push(
         setParagraphBorders(
           setting === "none" || !shown.length
-            ? null
-            : Object.fromEntries(
-                shown.map((side) => {
-                  const kept = own?.[side];
-                  if (!lineChanged && kept && isLine(kept.style)) return [side, kept];
-                  return [side, side === "left" || side === "right" ? { ...line, space: 4 } : line];
-                }),
-              ),
+            ? own?.bar
+              ? bar
+              : null
+            : {
+                ...bar,
+                ...Object.fromEntries(
+                  shown.map((side) => {
+                    const kept = own?.[side];
+                    if (!lineChanged && kept && isLine(kept.style)) return [side, kept];
+                    return [
+                      side,
+                      side === "left" || side === "right" ? { ...line, space: 4 } : line,
+                    ];
+                  }),
+                ),
+              },
         ),
       );
     }
@@ -823,7 +833,7 @@ export function BordersShadingDialog({
         setParagraphShading(
           fill === "auto" && pattern === "clear"
             ? null
-            : { pattern, color: rgb(patternColor), fill: rgb(fill) },
+            : { pattern, color: pattern === "clear" ? "auto" : rgb(patternColor), fill: rgb(fill) },
         ),
       );
     if (!commands.length) return onClose(false);

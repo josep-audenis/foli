@@ -65,6 +65,7 @@ import {
   paragraphBordersAt,
   paragraphStyleAt,
   paragraphStyles,
+  paragraphsHaveBorder,
   previousChangeWrapping,
   type ReviewView,
   redo,
@@ -858,11 +859,9 @@ const BORDER_ACTIONS: readonly Action[] = [
       key: `border-${preset}`,
       label,
       command: setParagraphBorder(preset),
-      ...(preset === "bottom" || preset === "top" || preset === "left" || preset === "right"
-        ? {
-            checked: (state: EditorState) => !!paragraphBordersAt(state)?.borders?.[preset],
-          }
-        : {}),
+      ...(preset === "none"
+        ? {}
+        : { checked: (state: EditorState) => paragraphsHaveBorder(state, preset) }),
     }),
   ),
   { key: "borderLine", label: "Horizontal line", command: insertHorizontalRule },
@@ -2022,7 +2021,7 @@ const RIBBON_ITEMS: readonly Item[] = [
   {
     key: "shading",
     label: "Shading",
-    enabled: hasTextblock,
+    enabled: (state) => isWord(state) && hasTextblock(state),
     colors: {
       options: SHADINGS,
       columns: 10,
@@ -2037,7 +2036,12 @@ const RIBBON_ITEMS: readonly Item[] = [
         ),
     },
   },
-  { key: "borders", label: "Borders", enabled: hasTextblock, actions: BORDER_ACTIONS },
+  {
+    key: "borders",
+    label: "Borders",
+    enabled: (state) => isWord(state) && hasTextblock(state),
+    actions: BORDER_ACTIONS,
+  },
   {
     key: "watermark",
     label: "Watermark",

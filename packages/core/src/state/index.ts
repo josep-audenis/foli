@@ -365,6 +365,7 @@ export {
   paragraphFormatAt,
   paragraphStyleAt,
   paragraphStyles,
+  paragraphsHaveBorder,
   pasteFormat,
   type RunEffects,
   rulerShown,

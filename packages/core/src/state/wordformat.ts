@@ -1944,9 +1944,9 @@ export const toggleFormattingMarks: Command = marks.set(null);
 
 // ---------- paragraph borders and shading (32.4) ----------
 
-/** A paragraph's borders (`w:pBdr`): its sides and the one between paragraphs alike. */
+/** A paragraph's borders (`w:pBdr`): its sides, the one between paragraphs alike, a bar. */
 export type ParagraphBorders = Partial<
-  Record<"top" | "bottom" | "left" | "right" | "between", BorderJSON>
+  Record<"top" | "bottom" | "left" | "right" | "between" | "bar", BorderJSON>
 >;
 
 /** Home ▸ Borders' entries (Word's): one side, none, all, outside, inside. */
@@ -1976,27 +1976,47 @@ const DEFAULT_LINE: BorderJSON = { style: "single", size: 4, space: 1, color: "a
 const lineFor = (side: string, line: BorderJSON): BorderJSON =>
   line === DEFAULT_LINE && (side === "left" || side === "right") ? { ...line, space: 4 } : line;
 
+const drawn = (border: BorderJSON | undefined) =>
+  !!border && border.style !== "none" && border.style !== "nil";
+
 /**
- * Home ▸ Borders on the selected paragraphs, as Word's menu: a side turns on (with `line`, by
- * default Word's half-point single line) or, when every paragraph has it already, off; All,
- * Outside and Inside set theirs (Inside: the border between paragraphs); None removes them. One
- * undo step; tracked as paragraph formatting.
+ * Whether every selected paragraph shows a border on each of `preset`'s sides (its own, or its
+ * style's): what Home ▸ Borders checks, and what turns the entry off.
+ */
+export function paragraphsHaveBorder(state: EditorState, preset: BorderPreset): boolean {
+  const context = wordContext(state);
+  const sides = PRESET_SIDES[preset];
+  const paragraphs = paragraphsIn(state);
+  if (!context || !sides.length || !paragraphs.length) return false;
+  return paragraphs.every(({ node }) => {
+    const shown = context.resolver.paragraph(node.attrs).paragraph.borders ?? {};
+    return sides.every((side) => drawn(shown[side]));
+  });
+}
+
+/**
+ * Home ▸ Borders on the selected paragraphs, as Word's menu: a side, All, Outside or Inside (the
+ * border between paragraphs) turns its sides on (with `line`, by default Word's half-point
+ * single line), or off when every paragraph shows them already; None removes them. A side the
+ * paragraph's style draws is turned off as Word does, with a `nil` border of its own. One undo
+ * step; tracked as paragraph formatting.
  */
 export function setParagraphBorder(preset: BorderPreset, line: BorderJSON = DEFAULT_LINE): Command {
   return (state, dispatch) => {
-    if (!wordContext(state)) return false;
-    const sides = PRESET_SIDES[preset];
-    const own = (node: Node) => (node.attrs.borders as ParagraphBorders | null) ?? {};
-    const single = sides.length === 1 && preset !== "inside";
-    const off =
-      single &&
-      paragraphsIn(state).every(({ node }) => own(node)[sides[0] as keyof ParagraphBorders]);
+    const context = wordContext(state);
+    if (!context) return false;
+    if (line !== DEFAULT_LINE && checkParagraphProperties({ borders: { top: line } })) return false;
+    const sides = preset === "none" ? PRESET_SIDES.all : PRESET_SIDES[preset];
+    const off = preset === "none" || paragraphsHaveBorder(state, preset);
     return updateParagraphs(state, dispatch, (node) => {
-      if (preset === "none") return { ...node.attrs, borders: null };
-      const next: ParagraphBorders = { ...own(node) };
+      const own = (node.attrs.borders as ParagraphBorders | null) ?? {};
+      // What the style alone draws: those sides need a `nil` of the paragraph's own to go.
+      const styled = context.resolver.paragraph({ ...node.attrs, borders: null }).paragraph.borders;
+      const next: ParagraphBorders = { ...own };
       for (const side of sides) {
-        if (off) delete next[side];
-        else next[side] = lineFor(side, line);
+        if (!off) next[side] = lineFor(side, line);
+        else if (drawn(styled?.[side])) next[side] = { style: "nil" };
+        else delete next[side];
       }
       return { ...node.attrs, borders: Object.keys(next).length ? next : null };
     });

@@ -259,6 +259,7 @@ export {
   paragraphFormatAt,
   paragraphStyleAt,
   paragraphStyles,
+  paragraphsHaveBorder,
   parseFieldInstruction,
   pasteCells,
   pasteFormat,

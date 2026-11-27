@@ -5,6 +5,7 @@ import { undo } from "./history.js";
 import { trackedChanges } from "./review.js";
 import {
   paragraphBordersAt,
+  paragraphsHaveBorder,
   setParagraphBorder,
   setParagraphBorders,
   setParagraphShading,
@@ -78,5 +79,62 @@ describe("paragraph borders", () => {
     editor.select(2);
     editor.run(setParagraphBorder("bottom"));
     expect(trackedChanges(editor.state.doc).map((c) => c.kind)).toEqual(["paragraphFormatting"]);
+  });
+});
+
+describe("paragraph borders against styles and mixed selections (review)", () => {
+  const styled = () => {
+    const base = createDocument();
+    return createEditor({
+      document: {
+        ...base,
+        styles: [
+          ...base.styles,
+          {
+            id: "Ruled",
+            type: "paragraph" as const,
+            name: "Ruled",
+            paragraph: { borders: { bottom: { style: "single", size: 4 } } },
+          },
+        ],
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              attrs: { style: "Ruled" },
+              content: [{ type: "text", text: "a" }],
+            },
+            { type: "paragraph", content: [{ type: "text", text: "b" }] },
+          ],
+        },
+      } as FoliDocument,
+    });
+  };
+
+  it("turns a style's border off with a nil one, and checks what the style draws", () => {
+    const editor = styled();
+    editor.select(1);
+    expect(paragraphsHaveBorder(editor.state, "bottom")).toBe(true);
+    editor.run(setParagraphBorder("bottom"));
+    expect(editor.state.doc.child(0).attrs.borders).toEqual({ bottom: { style: "nil" } });
+    expect(paragraphsHaveBorder(editor.state, "bottom")).toBe(false);
+    editor.run(setParagraphBorder("bottom"));
+    expect(paragraphsHaveBorder(editor.state, "bottom")).toBe(true);
+    editor.run(setParagraphBorder("none"));
+    expect(editor.state.doc.child(0).attrs.borders).toMatchObject({ bottom: { style: "nil" } });
+  });
+
+  it("turns a side on where only some paragraphs have it; All toggles; a bad line is refused", () => {
+    const editor = styled();
+    editor.select(1, 4);
+    expect(paragraphsHaveBorder(editor.state, "bottom")).toBe(false);
+    editor.run(setParagraphBorder("bottom"));
+    expect(paragraphsHaveBorder(editor.state, "bottom")).toBe(true);
+    editor.run(setParagraphBorder("all"));
+    expect(paragraphsHaveBorder(editor.state, "all")).toBe(true);
+    editor.run(setParagraphBorder("all"));
+    expect(paragraphsHaveBorder(editor.state, "top")).toBe(false);
+    expect(editor.can(setParagraphBorder("top", { style: "single", size: 500 }))).toBe(false);
   });
 });

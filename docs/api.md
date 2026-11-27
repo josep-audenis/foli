@@ -356,7 +356,8 @@ Page Borders dialog: None, Box or Custom; the line's style, color and width; whi
 to the whole document, this section, its first page only or all but its first page; measured
 from the page's edge or the text, one distance for every side), Home's Paragraph group (32.4): `shading` (a color menu: None and the theme's colors, a clear
 fill) and `borders` (a menu: Bottom, Top, Left and Right border, checked where the selection has
-them, No border, All borders, Outside borders, Inside horizontal border, Horizontal line,
+them (every selected paragraph shows them, its style's included), No border, All borders,
+Outside borders, Inside horizontal border (each checked the same way), Horizontal line,
 Borders and Shading…, Word's dialog for the paragraphs' borders and shading: None, Box or
 Custom, the line, the sides and the one between paragraphs, the fill, its pattern and pattern
 color); and `watermark` (a menu: Word's diagonal Confidential, Do not
@@ -1076,8 +1077,9 @@ where it has them, made where missing; null removes every watermark; a picture's
 `image`, a `ResourceJSON`; one undo step, not tracked), `watermarkOf(state)` (the caret's page's).
 Paragraph borders and shading (32.4, tracked as paragraph formatting, one undo step each):
 `setParagraphBorder(preset, line?)` (Home ▸ Borders: `bottom`, `top`, `left`, `right` turn a
-side on, or off when every selected paragraph has it; `all`, `outside`, `inside` (the border
-between paragraphs), `none`; `line` by default Word's half-point single line, a point from the
+side on, or off when every selected paragraph shows it; `all`, `outside`, `inside` (the border
+between paragraphs) likewise; `none`; a side a style draws turned off with a `nil` border of the
+paragraph's own, as Word does; `paragraphsHaveBorder(state, preset)` says which; `line` by default Word's half-point single line, a point from the
 text, four at the sides), `setParagraphBorders(borders)` and `setParagraphShading(shading)`
 (the dialog's: replace them, null removes), `paragraphBordersAt(state)` (the selected
 paragraphs' own `borders` and `shading` when they share them).
