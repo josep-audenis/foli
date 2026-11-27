@@ -845,6 +845,19 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   side's auto spacing off), `changeIndent(1 | -1)` (a list level for a numbered paragraph, only
   to a level its list defines, and a numbered heading takes that level's style; else the next
   half-inch stop), `canOutdent(state)`.
+  For Word's Paragraph and Font dialogs (1.11): `setLineSpacing(value, rule?)` takes Word's line
+  rule (`LineRule`: `"auto"`, the default, a multiple; `"exact"` and `"atLeast"` in points);
+  `setIndent({ left?, right?, firstLine?, hanging? })` in points (negative left and right go
+  into the margin; a first line replaces a hanging indent and the other way round; null puts
+  back the style's); `setParagraphFlags({ keepNext?, keepLines?, widowControl?,
+  pageBreakBefore?, contextualSpacing? })` (`ParagraphFlags`) and `setOutlineLevel(0–8 | null)`
+  (Level 1 to 9, null Body Text) write a value only where the style does not give it;
+  `setCharacterSpacing(points | null)` expands or condenses the text; `setRunEffects({ strike?,
+  doubleStrike?, caps?, smallCaps?, hidden? })` (`RunEffects`) turns effects on or off in one
+  step, turning one on turning its pair off (strikethrough and double, all caps and small caps).
+  `paragraphFormatAt(state)` (`ParagraphFormatAt`) and `runFormatAt(state)` give what all the
+  selected paragraphs or text show, leaving out what they differ in (a dialog's blank box);
+  `indent` and `spacing` part by part. Each is tracked while tracking, as other formatting is.
 - Lists are Word's numbering: `toggleList` / `wrapInList` number the paragraphs (a list of the
   kind right before goes on; otherwise bullets share one definition and a numbered list starts
   at 1 in a new instance; definitions are added to the document's numbering), and put Normal

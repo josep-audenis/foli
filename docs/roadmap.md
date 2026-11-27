@@ -41,7 +41,7 @@ place that says what is in progress; check it before starting work.
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
-| 30 Font & Paragraph dialogs   | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 30 Font & Paragraph dialogs   | In progress              | `phase-30/dialogs`        | Started 2026-11-27 on the owner's word: Phase 29 is merged on `main`, its release still waits                                                                                                 |
 | 31 Ruler                      | Blocked by 30            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 32 Page decoration            | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4263,11 +4263,33 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
 
 ### Tasks
 
-- [ ] 30.1 Decisions above; core commands for what the dialogs set that no command sets yet:
+- [x] 30.1 Decisions above; core commands for what the dialogs set that no command sets yet:
   `setIndent({ left?, right?, firstLine?, hanging? })`, `setLineSpacing` with a rule,
   `setParagraphFlags({ keepNext?, keepLines?, widowControl?, pageBreakBefore?,
   contextualSpacing? })`, `setOutlineLevel`, `setCharacterSpacing`, `setRunEffects` (caps, small
-  caps, double strike, hidden), each tracked while tracking.
+  caps, double strike, hidden), each tracked while tracking. Decided:
+  - Units: Word's rule, the locale's measurement system: inches where the toolbar's locale (its
+    `locale` prop, else `navigator.language`) is in the United States, Liberia or Myanmar,
+    centimetres elsewhere; `units: "in" | "cm"` on `FoliToolbar` (and `FoliEditor`) overrides
+    it. Points stay points where Word shows points (spacing before and after, Exactly and At
+    least, character spacing, font size). A box takes a value in another unit typed with it
+    (`2 cm`, `1"`, `12 pt`), as Word's do. Built in 30.6; until then the dialogs show inches.
+  - Dialogs: built-in toolbar dialogs as Page setup is (`ToolbarDialogName` gains
+    `"paragraph"`, `"font"` and `"tabs"`), opened by the groups' launchers, the right-click
+    menu's Font… and Paragraph…, Ctrl+D (Font, in `wordKeymap()`) and any code, through a core
+    command, `openDialog(name)` (and `editor.commands.openDialog`), which asks the toolbar as
+    `openLinkEditor` asks for the link dialog (a transaction carrying the request, changing
+    nothing). Without a toolbar nothing opens.
+  - Mixed values: blank, as Word's. `paragraphFormatAt` and `runFormatAt` leave out what the
+    selection differs in; a box left blank or a checkbox left mixed (`aria-checked="mixed"`, a
+    tri-state as Word's) changes nothing, so OK sets only what was changed. OK applies all in
+    one transaction: one undo step.
+  - Scale (Word's Advanced tab): the model has no `w:w`, so the Font dialog has no Scale box
+    (limitations.md says so); the rest of Advanced (Spacing, Expanded or Condensed By) is built.
+
+  Built: the six commands and two queries (`paragraphFormatAt`, `runFormatAt`) in core, in
+  points; `setLineSpacing(value, rule?)` keeps its one-argument form. `openDialog` comes with
+  the first dialog (30.2).
 - [ ] 30.2 Paragraph dialog: Indents and Spacing (alignment, outline level, left, right, special
   first line or hanging, before, after, line spacing and its value, no space between paragraphs
   of the same style) and Line and Page Breaks (widow control, keep with next, keep lines

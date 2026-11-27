@@ -20,7 +20,7 @@ import type {
   NumberingLevelJSON,
   StyleJSON,
 } from "../v3/document.js";
-import type { RunFormat } from "../v3/resolve.js";
+import type { ParagraphFormat, RunFormat } from "../v3/resolve.js";
 import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { attempt } from "./attempt.js";
 import { idsOf } from "./ids.js";
@@ -656,14 +656,14 @@ function alignmentOf(justification: string | null): Alignment | null {
  */
 function direct(
   context: WordContext,
-  node: Node,
+  attrs: Attrs,
   key: string,
   value: unknown,
-  shows: (paragraph: ReturnType<WordContext["resolver"]["paragraph"]>["paragraph"]) => boolean,
+  shows: (paragraph: ParagraphFormat) => boolean,
 ): Attrs {
-  const without = { ...node.attrs, [key]: null };
+  const without = { ...attrs, [key]: null };
   const inherited = context.resolver.paragraph(without).paragraph;
-  return shows(inherited) ? without : { ...node.attrs, [key]: value };
+  return shows(inherited) ? without : { ...attrs, [key]: value };
 }
 
 /**
@@ -677,7 +677,7 @@ export function setWordAlign(align: Alignment): Command {
     return updateParagraphs(state, dispatch, (node) =>
       direct(
         context,
-        node,
+        node.attrs,
         "justification",
         TO_WORD[align],
         (p) => alignmentOf(p.justification) === align,
@@ -700,23 +700,29 @@ export function wordAlignAt(state: EditorState): Alignment | null {
   );
 }
 
+/** Word's line spacing rules: a multiple of single (`auto`), exactly or at least some points. */
+export type LineRule = "auto" | "exact" | "atLeast";
+
 /**
- * Line spacing of the selected paragraphs as a multiple of single spacing (1, 1.15, 1.5, 2…);
- * null puts back the styles' spacing. Space before and after stays.
+ * Line spacing of the selected paragraphs: with `rule` `"auto"` (the default) `value` is a
+ * multiple of single spacing (1, 1.15, 1.5, 2…, up to 132); with `"exact"` or `"atLeast"` it is
+ * in points (up to 1584), Word's Exactly and At least. null puts back the styles' spacing.
+ * Space before and after stays.
  */
-export function setLineSpacing(multiple: number | null): Command {
+export function setLineSpacing(value: number | null, rule: LineRule = "auto"): Command {
   return (state, dispatch) => {
     const context = wordContext(state);
-    if (!context || (multiple !== null && !(multiple > 0 && multiple <= 132))) return false;
-    const line = multiple === null ? null : Math.round(multiple * 240);
+    const max = rule === "auto" ? 132 : 1584;
+    if (!context || (value !== null && !(value > 0 && value <= max))) return false;
+    const line = value === null ? null : Math.round(value * (rule === "auto" ? 240 : 20));
     return updateParagraphs(state, dispatch, (node) => {
       const own = { ...((node.attrs.spacing as Record<string, unknown> | null) ?? {}) };
       delete own.line;
       delete own.lineRule;
       const base = { ...node.attrs, spacing: Object.keys(own).length ? own : null };
       const inherited = context.resolver.paragraph(base).paragraph.spacing;
-      if (line === null || (inherited.line === line && inherited.lineRule === "auto")) return base;
-      return { ...node.attrs, spacing: { ...own, line, lineRule: "auto" } };
+      if (line === null || (inherited.line === line && inherited.lineRule === rule)) return base;
+      return { ...node.attrs, spacing: { ...own, line, lineRule: rule } };
     });
   };
 }
@@ -815,6 +821,160 @@ export function canOutdent(state: EditorState): boolean {
     const { paragraph } = context.resolver.paragraph(node.attrs);
     return paragraph.numbering !== null || paragraph.indent.left > 0;
   });
+}
+
+/** The largest indent Word takes (22 inches), in points. */
+const MAX_INDENT = 1584;
+
+/**
+ * The indents of the selected paragraphs in points, as Word's Paragraph dialog sets them (only
+ * the parts given; null puts back the style's): `left` and `right` (negative into the margin),
+ * and the special indent, `firstLine` or `hanging` (setting one replaces the other; a first
+ * line of 0 is Word's None). Always written directly, as `changeIndent` writes the left one.
+ */
+export function setIndent(indent: {
+  left?: number | null;
+  right?: number | null;
+  firstLine?: number | null;
+  hanging?: number | null;
+}): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state)) return false;
+    for (const [key, value] of Object.entries(indent)) {
+      if (value === null || value === undefined) continue;
+      const min = key === "left" || key === "right" ? -MAX_INDENT : 0;
+      if (!(value >= min && value <= MAX_INDENT)) return false;
+    }
+    return updateParagraphs(state, dispatch, (node) => {
+      const own: Record<string, unknown> = {
+        ...((node.attrs.indent as Record<string, unknown> | null) ?? {}),
+      };
+      for (const key of ["left", "right", "firstLine", "hanging"] as const) {
+        const value = indent[key];
+        if (value === undefined) continue;
+        if (value === null) delete own[key];
+        else {
+          own[key] = Math.round(value * 20);
+          // One special indent: the other one goes (Word applies a hanging one over both).
+          if (key === "firstLine") delete own.hanging;
+          if (key === "hanging") delete own.firstLine;
+        }
+      }
+      return { ...node.attrs, indent: Object.keys(own).length ? own : null };
+    });
+  };
+}
+
+/** The paragraph switches of Word's Line and Page Breaks tab, and No space between… */
+export interface ParagraphFlags {
+  keepNext?: boolean | null;
+  keepLines?: boolean | null;
+  widowControl?: boolean | null;
+  pageBreakBefore?: boolean | null;
+  contextualSpacing?: boolean | null;
+}
+
+const FLAGS = [
+  "keepNext",
+  "keepLines",
+  "widowControl",
+  "pageBreakBefore",
+  "contextualSpacing",
+] as const;
+
+/**
+ * Turns the given switches of the selected paragraphs on or off (null puts back the style's):
+ * keep with next, keep lines together, widow/orphan control, page break before, and no space
+ * between paragraphs of the same style (`contextualSpacing`). Written directly only where the
+ * style does not already give the value.
+ */
+export function setParagraphFlags(flags: ParagraphFlags): Command {
+  return (state, dispatch) => {
+    const context = wordContext(state);
+    if (!context) return false;
+    return updateParagraphs(state, dispatch, (node) => {
+      let attrs = node.attrs;
+      for (const key of FLAGS) {
+        const value = flags[key];
+        if (value === undefined) continue;
+        attrs =
+          value === null
+            ? { ...attrs, [key]: null }
+            : direct(context, attrs, key, value, (p) => p[key] === value);
+      }
+      return attrs;
+    });
+  };
+}
+
+/**
+ * The outline level of the selected paragraphs: 0 to 8 (Word's Level 1 to Level 9, as
+ * `w:outlineLvl`), or null for Body Text. Written directly only where the style gives another.
+ */
+export function setOutlineLevel(level: number | null): Command {
+  return (state, dispatch) => {
+    const context = wordContext(state);
+    if (!context || (level !== null && !(Number.isInteger(level) && level >= 0 && level <= 8)))
+      return false;
+    const body = (shown: number | null) => shown === null || shown === 9;
+    return updateParagraphs(state, dispatch, (node) =>
+      direct(context, node.attrs, "outlineLevel", level ?? 9, (p) =>
+        level === null ? body(p.outlineLevel) : p.outlineLevel === level,
+      ),
+    );
+  };
+}
+
+/** What `paragraphFormatAt` gives: `ParagraphFormat` with what the paragraphs differ in left out. */
+export type ParagraphFormatAt = Partial<Omit<ParagraphFormat, "indent" | "spacing">> & {
+  indent: Partial<ParagraphFormat["indent"]>;
+  spacing: Partial<ParagraphFormat["spacing"]>;
+};
+
+/** The properties all `formats` share, a part each where `nested` (the others left out). */
+function shared<T extends object>(formats: readonly T[], nested: readonly string[] = []) {
+  const out: Record<string, unknown> = {};
+  const [first] = formats;
+  if (!first) return out;
+  for (const key of Object.keys(first) as (keyof T & string)[]) {
+    const values = formats.map((f) => f[key]);
+    if (nested.includes(key)) out[key] = shared(values as object[]);
+    else {
+      const value = common(values);
+      if (value !== null || values.every((v) => v === null)) out[key] = value;
+    }
+  }
+  return out;
+}
+
+/** One way of writing what Word shows alike: left, single spacing, Body Text. */
+const SAME_JUSTIFICATION: Record<string, string> = { start: "left", end: "right" };
+function normalized(format: ParagraphFormat): ParagraphFormat {
+  const { spacing, justification, outlineLevel } = format;
+  return {
+    ...format,
+    justification:
+      justification === null ? "left" : (SAME_JUSTIFICATION[justification] ?? justification),
+    outlineLevel: outlineLevel === 9 ? null : outlineLevel,
+    spacing: { ...spacing, line: spacing.line ?? (spacing.lineRule === "auto" ? 240 : null) },
+  };
+}
+
+/**
+ * What every selected paragraph shows of Word's paragraph properties, as the Paragraph dialog
+ * reads them: a property the paragraphs differ in is left out (Word's blank box); `indent` and
+ * `spacing` part by part. Values Word shows alike come one way: `justification` `"left"` for
+ * none, `outlineLevel` null for Body Text (9 too), `spacing.line` 240 for single. Null outside
+ * a Word document.
+ */
+export function paragraphFormatAt(state: EditorState): ParagraphFormatAt | null {
+  const context = wordContext(state);
+  const paragraphs = paragraphsIn(state);
+  if (!context || !paragraphs.length) return null;
+  return shared(
+    paragraphs.map(({ node }) => normalized(context.resolver.paragraph(node.attrs).paragraph)),
+    ["indent", "spacing"],
+  ) as ParagraphFormatAt;
 }
 
 // ---------- lists ----------
@@ -1136,6 +1296,85 @@ export function toggleVerticalAlign(value: VerticalAlign): Command {
 /** Whether the selected text (or the text typed next) is raised or lowered, if all the same. */
 export function verticalAlignAt(state: EditorState): VerticalAlign | "baseline" | null {
   return runValueAt(state, (run) => run.verticalAlign);
+}
+
+/**
+ * The space between the characters of the selected text (or of the text typed next), in points:
+ * positive expands, negative condenses (Word's Font dialog, Advanced: -1584 to 1584, kept in
+ * twips); null or the styles' value puts back the styles' spacing.
+ */
+export function setCharacterSpacing(points: number | null): Command {
+  return (state, dispatch) => {
+    if (points !== null && !(points >= -1584 && points <= 1584)) return false;
+    const twips = points === null ? null : Math.round(points * 20);
+    return setRunMark("characterSpacing", (_existing, inherited, type) =>
+      twips === null || inherited.characterSpacing === twips ? null : type.create({ value: twips }),
+    )(state, dispatch);
+  };
+}
+
+/** The on/off effects of Word's Font dialog. */
+export interface RunEffects {
+  strike?: boolean | null;
+  doubleStrike?: boolean | null;
+  caps?: boolean | null;
+  smallCaps?: boolean | null;
+  hidden?: boolean | null;
+}
+
+/** Effects that cannot both be on: turning one on turns the other off. */
+const EXCLUSIVE: Partial<Record<keyof RunEffects, keyof RunEffects>> = {
+  strike: "doubleStrike",
+  doubleStrike: "strike",
+  caps: "smallCaps",
+  smallCaps: "caps",
+};
+
+/**
+ * Turns the given effects of the selected text (or the text typed next) on or off; null puts
+ * back the styles'. Strikethrough and double strikethrough exclude each other, as all caps and
+ * small caps do: turning one on turns the other off unless it is given too. A value the styles
+ * already give leaves no direct mark; one they do not is written, off included
+ * (`<w:caps w:val="0"/>` over a style's caps). One transaction.
+ */
+export function setRunEffects(effects: RunEffects): Command {
+  const want: RunEffects = {};
+  for (const [key, value] of Object.entries(effects) as [keyof RunEffects, boolean | null][]) {
+    if (value === undefined) continue;
+    want[key] = value;
+    const other = EXCLUSIVE[key];
+    if (value === true && other && effects[other] === undefined) want[other] = false;
+  }
+  return (state, dispatch) =>
+    chain(
+      state,
+      dispatch,
+      (Object.entries(want) as [keyof RunEffects, boolean | null][]).map(([key, value]) =>
+        setRunMark(key, (_existing, inherited, type) =>
+          value === null || inherited[key] === value ? null : type.create({ value }),
+        ),
+      ),
+    );
+}
+
+/**
+ * What all the selected text (or the text typed next) shows of Word's run properties, as the
+ * Font dialog reads them: a property the runs differ in is left out (Word's blank box). Null
+ * outside a Word document.
+ */
+export function runFormatAt(state: EditorState): Partial<RunFormat> | null {
+  const context = wordContext(state);
+  if (!context) return null;
+  const { selection } = state;
+  const runs = selection.empty
+    ? []
+    : runsIn(state, state.schema.marks.font as MarkType).filter((r) => r.node.isText);
+  // A caret, or no text selected (empty paragraphs, a picture): what text typed there shows.
+  if (!runs.length) {
+    const marks = state.storedMarks ?? marksAt(selection.$from);
+    return runFormat(context, selection.$from.parent, marks);
+  }
+  return shared(runs.map((r) => runFormat(context, r.parent, r.node.marks)));
 }
 
 /** The run marks clearing takes off: links, review and comment marks are not formatting. */
