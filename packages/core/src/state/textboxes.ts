@@ -5,10 +5,13 @@
  */
 
 import type { Node } from "../model/index.js";
-import type { EditorState, Transaction } from "./state.js";
+import { parseContent } from "../v3/document.js";
+import { closeHistory } from "./history.js";
+import { NodeSelection } from "./selection.js";
+import type { Command, EditorState, Transaction } from "./state.js";
 import { isRemote, Plugin } from "./state.js";
 import { untracked } from "./track.js";
-import { StoryStep, storyAfter, wordContext } from "./word.js";
+import { type Story, StoryStep, storyAfter, storyBody, wordContext } from "./word.js";
 
 const NONE: readonly string[] = [];
 const inBlocks = new WeakMap<Node, readonly string[]>();
@@ -90,4 +93,66 @@ export function textBoxesPlugin(): Plugin {
       return tr.steps.length ? tr : null;
     },
   });
+}
+
+/** What `insertTextBox` makes: Word's drawn text box unless said otherwise. */
+export interface InsertTextBoxOptions {
+  /** In EMU (default 2 by 1 inches). */
+  width?: number;
+  height?: number;
+  /** In line with text instead of floating (square, at the paragraph's top left). */
+  inline?: boolean;
+}
+
+/**
+ * Inserts a text box at the end of the selection (Insert ▸ Text Box, 33.3): floating, wrapped
+ * square at its paragraph's top left, 2 by 1 inches, white with Word's thin black line, holding
+ * an empty paragraph; its story added in the same undo step. Selects the box. Not in a story
+ * (shortcut: Word also puts boxes in headers; insert one there from the body's view later).
+ */
+export function insertTextBox(options: InsertTextBoxOptions = {}): Command {
+  return (state, dispatch) => {
+    if (!wordContext(state) || storyBody(state)) return false;
+    const { $to } = state.selection;
+    if (!$to.parent.inlineContent) return false;
+    if (!dispatch) return true;
+    const id = freshTextBoxId(state);
+    const box = state.schema.node("textBox", {
+      story: id,
+      width: options.width ?? 1_828_800,
+      height: options.height ?? 914_400,
+      fill: "FFFFFF",
+      outline: { color: "000000", width: 6350 },
+      float: options.inline
+        ? null
+        : {
+            horizontal: { relativeTo: "column", offset: 0 },
+            vertical: { relativeTo: "paragraph", offset: 0 },
+            wrap: "square",
+            side: "bothSides",
+            distance: { top: 0, bottom: 0, left: 114_300, right: 114_300 },
+          },
+    });
+    const tr = state.tr.setMeta(closeHistory, true);
+    tr.insert($to.pos, box);
+    tr.setSelection(NodeSelection.create(tr.doc, $to.pos));
+    const story: Story = {
+      kind: "textBox",
+      doc: parseContent(
+        { type: "doc", content: [{ type: "paragraph" }] },
+        { schema: state.schema },
+      ),
+    };
+    tr.step(new StoryStep(id, null, story));
+    dispatch(tr);
+    return true;
+  };
+}
+
+/** The text box selected (a node selection of one), or null. */
+export function selectedTextBox(state: EditorState): Node | null {
+  const { selection } = state;
+  return selection instanceof NodeSelection && selection.node.type.name === "textBox"
+    ? selection.node
+    : null;
 }

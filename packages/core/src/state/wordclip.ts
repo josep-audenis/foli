@@ -49,6 +49,7 @@ import { controlsIn, copiedControl, freshControlId } from "./controls.js";
 import { freshId, idsOf } from "./ids.js";
 import { noteIds, noteKindOf } from "./notes.js";
 import type { EditorState } from "./state.js";
+import { freshTextBoxId } from "./textboxes.js";
 import {
   otherTrees,
   type Story,
@@ -66,7 +67,7 @@ export interface WordDefinitions {
   styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   comments: CommentJSON[];
-  /** The notes the content refers to, by story id. */
+  /** The notes and text boxes the content refers to, by story id. */
   notes?: Record<string, StoryJSON>;
   /** The resources (pictures' images) the content uses, by key. */
   resources?: Record<string, ResourceJSON>;
@@ -76,7 +77,7 @@ export interface WordDefinitions {
 export interface FittedPaste {
   doc: Node;
   envelope: WordEnvelope;
-  /** The stories of the notes the references in `doc` now name, to add with it. */
+  /** The stories of the notes and text boxes `doc` now names, to add with it. */
   notes?: { id: string; story: Story }[];
 }
 
@@ -128,7 +129,8 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
     if (node.type === "table") properties(attrs);
     if (node.type === "tableRow") properties((attrs as { exceptions?: Properties }).exceptions);
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
-    if (node.type === "noteReference") noteStories.add(String(node.attrs?.story));
+    if (node.type === "noteReference" || node.type === "textBox")
+      noteStories.add(String(node.attrs?.story));
     if (node.type === "picture") resourceKeys.add(String(node.attrs?.resource));
     marks(node.marks);
   };
@@ -581,7 +583,21 @@ function fit(
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
     let next: Json | undefined = attrs;
-    if (node.type === "noteReference") {
+    if (node.type === "textBox") {
+      // A copy is a box of its own: its text a new story (Word's too). Not into a story (shortcut:
+      // a header could hold it), and not without its text (HTML).
+      const story = String(attrs?.story);
+      const copied = carried(story);
+      if (inStory || copied?.kind !== "textBox") return null;
+      const id =
+        pastedNotes.get(story) ??
+        freshTextBoxId(
+          state,
+          new Set([...pastedNotes.values()].filter((v) => v.startsWith("textbox:"))),
+        );
+      pastedNotes.set(story, id);
+      next = { ...attrs, story: id };
+    } else if (node.type === "noteReference") {
       const story = String(attrs?.story);
       const kind = noteKindOf(story);
       if (kind && carried(story)) {

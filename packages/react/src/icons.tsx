@@ -317,6 +317,11 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["circle", { cx: "17", cy: "17", r: "3" }],
     ["circle", { cx: "7", cy: "7", r: "3" }],
   ],
+  textBox: /* text-cursor-input-ish: a box with lines */ [
+    ["rect", { width: "18", height: "14", x: "3", y: "5", rx: "1" }],
+    ["path", { d: "M7 10h10" }],
+    ["path", { d: "M7 14h6" }],
+  ],
   footnote: /* panel-bottom */ [
     ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
     ["path", { d: "M3 15h18" }],

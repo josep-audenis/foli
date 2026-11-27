@@ -209,6 +209,8 @@ export class WordRenderer {
   #noteKeys: string[] = [];
   /** The text box stories each block draws, as keys: a story edited draws its block again. */
   #boxKeys: string[] = [];
+  /** The text box open for editing: its block keeps its drawing meanwhile. */
+  openBox: string | null = null;
   /** Node and mark views (`ViewExtension`), none on the clipboard. */
   views: Views | null = null;
   /** Where node views' drawings are recorded, for their `destroy` (the view's list). */
@@ -308,7 +310,9 @@ export class WordRenderer {
     const ids = textBoxesIn(node);
     if (!ids.length) return "";
     const { stories } = this.#context;
-    return ids.map((id) => storySerial(stories.get(id)?.doc)).join(",");
+    return ids
+      .map((id) => (id === this.openBox ? "open" : storySerial(stories.get(id)?.doc)))
+      .join(",");
   }
 
   /** Whether the block at `index` (of those prepared) shows a list number. */

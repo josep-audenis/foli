@@ -266,7 +266,15 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   field in a header's box shows its stored result on every page; custom nodes in a box are
   drawn by their extension in `renderDocument` and print, as their text on the editing view's
   pages; a box deleted as a tracked change is not struck through (as a picture). A copy's HTML
-  leaves the box out (Foli's own clipboard format keeps it). Not edited yet (33.3). A rotated box,
+  leaves the box out (Foli's own clipboard format keeps it). Edited (33.3) where it is drawn: a
+  press in a body's box opens its story there (the body read-only around it, as a note opens),
+  Escape or a press outside leaves it selected. While a box is open it keeps the size it had (a
+  box that grows to fit its text grows once closed). A header's or footer's box is drawn but
+  not opened from the body (open the header; shortcut), and Insert ▸ Text Box puts a box in the
+  body only: a 2 by 1 inch box at its paragraph's top left, wrapped square, white with a thin
+  black line, not drawn by dragging. A copy pasted is a box of its own (its text copied, a new
+  id); a box pasted into a header, footer, note or box is left out. The word count's "include
+  notes" counts text boxes too, as Word's option does. A rotated box,
   a linked box (text flowing from one box to the next), a box in a group or filled with a
   picture, and a shape other than a rectangle holding text stay opaque, and so does a box in a
   note, a comment or another box (Word allows none of these three). Theme colors of a box's fill
@@ -334,7 +342,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 ## Finding and going places
 
 - Find reads the body and the stories, table cells and text boxes included (a match in a text box is
-  found and replaced, not gone to until boxes are edited on the page, 33.3); comments apart (`findInComments`, a
+  found, replaced and gone to, the box opened; a header's box is not gone to); comments apart (`findInComments`, a
   list in the find panel): not content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
   expressions are not offered (a pattern could hang the page), nor replacing formatting. Find
   looks through soft hyphens and zero-width spaces (`cooperate` finds `co-operate` broken by a

@@ -20,7 +20,7 @@ export interface CountOptions {
   to?: number | undefined;
   /** Only the selection (its ranges: a cell selection's selected cells). */
   selection?: boolean | undefined;
-  /** Footnotes and endnotes too, as Word's "Include textboxes, footnotes and endnotes". */
+  /** Text boxes, footnotes and endnotes too, as Word's "Include textboxes, footnotes and endnotes". */
   notes?: boolean | undefined;
 }
 
@@ -79,8 +79,9 @@ export function countWords(state: EditorState, options: CountOptions = {}): Word
     };
     for (const story of Object.values(stories))
       if (
-        (story.kind === "footnote" || story.kind === "endnote") &&
-        (story.noteType ?? "normal") === "normal"
+        story.kind === "textBox" ||
+        ((story.kind === "footnote" || story.kind === "endnote") &&
+          (story.noteType ?? "normal") === "normal")
       )
         walk(story.content);
   }

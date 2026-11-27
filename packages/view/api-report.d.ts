@@ -558,6 +558,18 @@ export declare class EditorView {
      * reference's page. Whether it is open now.
      */
     openNote(id?: string, focus?: boolean): boolean;
+    /** Where text box `id` is in the body, or null. */
+    private textBoxPos;
+    /** The body's drawing of text box `id` (not a header's copy). */
+    private textBoxElement;
+    /**
+     * Opens text box `id` (33.3) for editing where it is drawn: its story's view in the box, the
+     * body read-only around it, as a note opens. A header's box is not opened from the body.
+     * Whether it is open now.
+     */
+    openTextBox(id: string, focus?: boolean): boolean;
+    /** The open text box, put back in its box when its block was drawn again. */
+    private keepTextBox;
     /** From the note being edited back to its reference, the caret after it. */
     private toReference;
     /** Puts `editor`'s story on its page, in `place`, the body read-only and dimmed around it. */

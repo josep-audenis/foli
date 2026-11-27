@@ -4648,8 +4648,15 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   engines: every box within 1.5 px of Word's place and at its size, lines around a square box,
   none beside a top-and-bottom one, the header's box, axe; `renderDocument`), `pdf.spec.ts` (its
   boxes' text in `exportPdf`'s PDF).
-- [ ] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and
-  replace look in text boxes (left from 19); Insert ▸ Text Box draws a new one.
+- [x] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and
+  replace look in text boxes (left from 19); Insert ▸ Text Box draws a new one. Built: the view's
+  `openTextBox` mounts the story's view in the drawn box as a note's opens (the block keeps its
+  drawing while open, put back if drawn again); a press opens it, Escape leaves the box selected;
+  `storyView.editTextBox` and `reveal` (find's go-to) open it. Core's `insertTextBox` and
+  `selectedTextBox`; the toolbar's `textBox` item (Insert ▸ Text group); the clipboard carries
+  a box's story and pastes it as a new one (`fitPaste`); the word count with notes counts boxes.
+  Find and replace already read every story. `textboxes.test.ts` (core), `word-textboxes.spec.ts`
+  (click, type, Escape, undo; Insert ▸ Text Box; reveal; three engines).
 - [ ] 33.4 Layout Options for pictures and boxes (in line, square, tight, through, top and
   bottom, behind, in front; move with text or fix on page) as a menu beside the selected object
   and in Picture Format ▸ Wrap Text; position (Position menu, Layout dialog).
