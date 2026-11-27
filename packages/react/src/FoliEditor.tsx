@@ -8,6 +8,8 @@ import {
   hint,
   type Plugin,
   type ReviewView,
+  rulerShown,
+  setRulerShown,
   type Transaction,
 } from "@folijs/core";
 import { documentJSON, wordContext } from "@folijs/core/internal";
@@ -24,6 +26,7 @@ import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComme
 import { FoliContextMenu, type FoliContextMenuProps } from "./FoliContextMenu.js";
 import { FoliMiniToolbar, type FoliMiniToolbarProps } from "./FoliMiniToolbar.js";
 import { FoliNavigation } from "./FoliNavigation.js";
+import { FoliRuler, type FoliRulerProps } from "./FoliRuler.js";
 import { FoliStatusBar, type FoliStatusBarProps } from "./FoliStatusBar.js";
 import {
   FoliToolbar,
@@ -105,6 +108,13 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
   /**
+   * Word's rulers (`FoliRuler`): the horizontal one above the pages and the vertical one beside
+   * them, shown while the View tab's Ruler is on (core's `rulerShown`, `toggleRuler`; off at
+   * first, as Word's). `true` (or an object with the rulers' `units` and `messages`) also turns it
+   * on when the editor is made; `false` never draws them (an app drawing its own `FoliRuler`).
+   */
+  ruler?: boolean | Pick<FoliRulerProps, "units" | "messages"> | undefined;
+  /**
    * Word's right-click menu on the document (`FoliContextMenu`, 1.11); Shift+right-click keeps
    * the browser's (spelling suggestions). Also the menu key and Shift+F10. Default false.
    */
@@ -168,6 +178,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     onMention,
     children,
     statusBar = false,
+    ruler,
     contextMenu = false,
     miniToolbar = false,
     ...canvas
@@ -235,11 +246,26 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   );
 
   const readOnly = canvas.readOnly === true;
+  // The rulers: as the View tab's Ruler says, turned on when the editor is made with `ruler`
+  // (before the first paint: no shift).
+  const rulerOn = ruler !== undefined && ruler !== false;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only for a new editor.
+  useIsomorphicLayoutEffect(() => {
+    if (rulerOn) editor.run(setRulerShown(true));
+  }, [editor]);
+  const rulersShown = useEditorState(rulerShown, { editor }) && ruler !== false;
   // The status bar's zoom, unless the app gives one.
   const [ownZoom, setOwnZoom] = useState(1);
   const zoomed = canvas.zoom === undefined && statusBar !== false;
   const zoom = zoomed ? ownZoom : (canvas.zoom ?? 1);
   const onZoomChange = zoomed ? setOwnZoom : canvas.onZoomChange;
+  const rulerProps = {
+    units: toolbarProps?.units,
+    ...(typeof ruler === "object" ? ruler : {}),
+    editor,
+    zoom,
+    disabled: readOnly || commentOnly,
+  };
   // The open header's, footer's or note's editor, else the body's: what the menu acts on.
   const activeEditor = useActiveEditor(editor);
   // Where the mini toolbar shows, if it does.
@@ -266,6 +292,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         />
       )}
       {children}
+      {rulersShown && <FoliRuler {...rulerProps} className="foli-editor-ruler" />}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the document's own menu event, from the keyboard too (the menu key, Shift+F10). */}
       <div
         className="foli-editor-body"
@@ -311,6 +338,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         }}
       >
         <FoliNavigation editor={editor} readOnly={readOnly || commentOnly} />
+        {rulersShown && <FoliRuler {...rulerProps} orientation="vertical" />}
         <FoliCanvas
           ref={canvasRef}
           editor={editor}

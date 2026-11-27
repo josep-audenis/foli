@@ -286,3 +286,18 @@ for (const zoom of [1, 2]) {
     expect(results.violations).toEqual([]);
   });
 }
+
+test("the View tab's Ruler shows and hides both rulers", async ({ page }) => {
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => "foliEdit" in window);
+  await expect(page.getByRole("group", { name: /ruler$/ })).toHaveCount(0);
+  await page.getByRole("tab", { name: "View", exact: true }).click();
+  const button = page.getByRole("button", { name: "Ruler", exact: true });
+  await expect(button).toHaveAttribute("aria-pressed", "false");
+  await button.click();
+  await expect(page.getByRole("group", { name: "Horizontal ruler" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Vertical ruler" })).toBeVisible();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await button.click();
+  await expect(page.getByRole("group", { name: /ruler$/ })).toHaveCount(0);
+});

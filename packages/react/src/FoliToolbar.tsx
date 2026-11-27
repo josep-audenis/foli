@@ -73,6 +73,7 @@ import {
   removeSectionBreak,
   requestedDialog,
   requestsLinkEditor,
+  rulerShown,
   type SectionJSON,
   type SectionSetup,
   type StorySide,
@@ -113,6 +114,7 @@ import {
   toggleHeaderRow,
   toggleList,
   toggleMark,
+  toggleRuler,
   toggleVerticalAlign,
   trackState,
   type UNDERLINE_STYLES,
@@ -176,7 +178,8 @@ export interface FoliToolbarProps {
   disabled?: boolean | undefined;
   /**
    * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
-   * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
+   * redo, the review view and change navigation, Navigate, the navigation pane, the ruler and
+   * field codes.
    */
   commentOnly?: boolean | undefined;
   /**
@@ -1897,6 +1900,13 @@ const RIBBON_ITEMS: readonly Item[] = [
     command: toggleFormattingMarks,
   },
   {
+    key: "ruler",
+    label: "Ruler",
+    pressed: rulerShown,
+    enabled: isWord,
+    command: toggleRuler,
+  },
+  {
     key: "styleGallery",
     label: "Styles",
     enabled: hasTextblock,
@@ -2088,6 +2098,7 @@ export type ToolbarItemName =
   | "underlineStyle"
   | "formatPainter"
   | "formattingMarks"
+  | "ruler"
   | "styleGallery"
   | "paragraphSettings"
   | "fontSettings"
@@ -2397,7 +2408,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     {
       key: "view",
       label: "View",
-      items: [group("Show", t.navigationPane, t.fieldCodes, t.formattingMarks)],
+      items: [group("Show", t.ruler, t.navigationPane, t.fieldCodes, t.formattingMarks)],
     },
     {
       key: "tableDesign",
@@ -2488,6 +2499,7 @@ const COMMENT_ONLY_ITEMS: ReadonlySet<string> = new Set([
   "nextChange",
   "navigate",
   "navigationPane",
+  "ruler",
   "fieldCodes",
 ]);
 

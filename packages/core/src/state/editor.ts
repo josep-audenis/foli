@@ -86,7 +86,12 @@ import {
   wordPlugin,
 } from "./word.js";
 import type { TabStop } from "./wordformat.js";
-import { formatPainterPlugin, formattingMarksPlugin, type ListKind } from "./wordformat.js";
+import {
+  formatPainterPlugin,
+  formattingMarksPlugin,
+  type ListKind,
+  rulerPlugin,
+} from "./wordformat.js";
 
 /**
  * A document an editor loads: schema v3 (Word's model), or one saved by 0.1.0 or 0.2.0, migrated
@@ -679,6 +684,7 @@ export function createEditor({
     notesPlugin(),
     formatPainterPlugin(),
     formattingMarksPlugin(),
+    rulerPlugin(),
     tableKeymap(),
     listKeymap(),
     baseKeymap(),
@@ -736,6 +742,7 @@ export function createEditor({
         commentsPlugin(),
         formatPainterPlugin(),
         formattingMarksPlugin(),
+        rulerPlugin(),
         tableKeymap(),
         listKeymap(),
         baseKeymap(),

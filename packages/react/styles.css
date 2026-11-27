@@ -913,6 +913,23 @@
   background: var(--foli-canvas-background);
 }
 
+/* FoliEditor's rulers: the horizontal one stays above the pages while they scroll; the vertical
+   one runs down beside them. */
+.foli-editor-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+/* The outline stays under the sticky ruler. */
+.foli-editor-ruler + .foli-editor-body > .foli-outline {
+  top: 24px;
+  max-height: calc(100vh - 24px);
+}
+.foli-editor-body > .foli-ruler-vertical {
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+
 .foli-editor-body > .foli-canvas {
   flex: 1 1 auto;
   min-width: 0;

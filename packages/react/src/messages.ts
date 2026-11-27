@@ -325,6 +325,7 @@ export const toolbarMessages = [
   "Rotation (degrees)",
   "Rows",
   "Rows & Columns",
+  "Ruler",
   "S",
   "Sample text",
   "Section",

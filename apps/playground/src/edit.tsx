@@ -15,6 +15,8 @@ import {
   insertTable,
   Plugin,
   parseDocument,
+  rulerShown,
+  setRulerShown,
 } from "@folijs/core";
 import {
   type DocxPackage,
@@ -29,8 +31,10 @@ import {
   FoliMiniToolbar,
   FoliNavigation,
   FoliRuler,
+  type FoliRulerProps,
   FoliStatusBar,
   FoliToolbar,
+  useEditorState,
   wordRibbonTabs,
 } from "@folijs/react";
 
@@ -130,6 +134,7 @@ const plugins = [
     : []),
 ];
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user", plugins });
+if (new URLSearchParams(location.search).has("ruler")) editor.run(setRulerShown(true));
 // The zoom (29.6): Ctrl+wheel and the status bar's controls (29.7) set it.
 let zoom = 1;
 const onZoom = (next: number) => {
@@ -142,7 +147,10 @@ const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
 const status = createRoot(document.getElementById("status") as HTMLElement);
-// Word's ruler (31.x); `?ruler` shows it.
+/** Word's rulers while the View tab's Ruler is on (31.6); `?ruler` turns it on. */
+function Ruler(props: FoliRulerProps & { editor: Editor }) {
+  return useEditorState(rulerShown, { editor: props.editor }) ? <FoliRuler {...props} /> : null;
+}
 const showsRuler = new URLSearchParams(location.search).has("ruler");
 const ruler = createRoot(document.getElementById("ruler") as HTMLElement);
 const verticalRuler = createRoot(document.getElementById("vruler") as HTMLElement);
@@ -195,11 +203,9 @@ const showStatus = () => {
       fitZoom={(kind) => view.fitZoom(kind)}
     />,
   );
-  ruler.render(showsRuler ? <FoliRuler editor={editor} zoom={zoom} disabled={commenting} /> : null);
+  ruler.render(<Ruler editor={editor} zoom={zoom} disabled={commenting} />);
   verticalRuler.render(
-    showsRuler ? (
-      <FoliRuler editor={editor} zoom={zoom} disabled={commenting} orientation="vertical" />
-    ) : null,
+    <Ruler editor={editor} zoom={zoom} disabled={commenting} orientation="vertical" />,
   );
 };
 /**
@@ -250,6 +256,7 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
     trackChanges,
     plugins,
   });
+  if (showsRuler) editor.run(setRulerShown(true));
   view = new EditorView(host, editor, {
     upload,
     editable: !commenting,

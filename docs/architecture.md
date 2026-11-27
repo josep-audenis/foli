@@ -1439,6 +1439,18 @@ since 1.0.0):
   Spacing boxes (custom items); lengths in `units` (`units.ts`, the locale's by default), given to
   custom items by a context.
 
+### The ruler (Phase 31)
+
+- `@folijs/core`: `RulerGeometry` (a type: what the view measures) and the ruler's switch as a
+  built-in plugin's state (`toggleRuler`, `rulerShown`), as formatting marks are.
+- `@folijs/view`: `view.rulerGeometry()`, measured from the drawn pages when asked (client px:
+  the caret's page, its section's margins, its paragraph's box, indents and stops, the body
+  table's columns as drawn), on `storyView` for the React side.
+- `@folijs/react`: `FoliRuler` (horizontal, or `orientation="vertical"`) reads the geometry in
+  the next frame after a change, scroll, resize or zoom, and changes the document only through
+  core's commands on release (`setIndent`, `setTabStops`, `setSectionSetup`, `setColumnWidth`):
+  one transaction a drag or a key. `FoliEditor`'s `ruler` draws both while `rulerShown`.
+
 ## Styling
 
 Plain CSS with custom properties (`--foli-*`) declared on `:root` and `:host` (page, canvas
