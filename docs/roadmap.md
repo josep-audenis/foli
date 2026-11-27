@@ -4731,8 +4731,34 @@ paths; text in shapes through Phase 33's stories.
 
 ### Tasks
 
-- [ ] 34.1 Decisions; schema for a shape (geometry, fill, outline, effects kept), schema bump
-  with migration, import and export.
+- [x] 34.1 Decisions; schema for a shape (geometry, fill, outline, effects kept), schema bump
+  with migration, import and export. Decided (ADR-0017):
+  - A shape is a `shape` run atom placed as a picture is (`float`), with `geometry` (the
+    preset's name or `custom`), `adjust`, `custom` (guides and paths as the file has them),
+    `rotation`, `flipH`/`flipV`, `fill` or `gradient`, `outline` (dash, head and tail ends), a
+    theme's style resolved on import; effects kept in `ext`, not drawn.
+  - Drawn presets: Word's gallery's Lines, Rectangles, Basic Shapes, Block Arrows, Stars and
+    Callouts, about 45, kept as their ECMA-376 definitions and evaluated by one interpreter of
+    DrawingML's guide formulas (custom geometry and 34.4's adjustment handles from the same
+    code); any other preset drawn as its bounding rectangle, kept whole.
+  - Text in a shape: a story of kind `textBox` (`story`), as a text box's (Phase 33); Word's
+    upright rectangle with text stays a `textBox`.
+  - Opaque still: groups, canvases, picture or pattern fills, linked boxes, vertical text,
+    VML-only shapes, shapes in notes, comments and boxes.
+  - Visual compare: in each shape's box, Foli's page against Word's PDF (pdf.js, 96 px per
+    inch) by ink within 2 px (`ink.ts`), score at least 0.9; place within 1.5 px.
+  - Schema 11 (v10 → v11: the version only).
+
+  Built: core's node (`schema.ts`), version and rules (a shape's story is a text box's; body,
+  headers and footers only); the text box plugin, clipboard, word count, and Layout, Size and
+  Arrange commands take shapes (`selectedObject`; `setObjectSize` turns a shape). `@folijs/docx`
+  reads shapes (`import/shapes.ts`: `wps:wsp` bare or in `mc:AlternateContent`, theme styles
+  through `a:fmtScheme`) and writes them back through the text box writer (`export/shapes.ts`:
+  transform, geometry, fill, gradient and line edited in place; a new shape as DrawingML).
+  A Word-made corpus document, `12-shapes-poster.docx` (`build-word-corpus.ps1`: Word 16's
+  automation leaves a shape's rotation at 0, so turning is checked by the round trip). A v11
+  format fixture. `shapes.test.ts` in core and docx. ADR-0017, document-model.md,
+  limitations.md.
 - [ ] 34.2 SVG drawing of preset and custom geometries, fill (solid, gradient), outline (color,
   width, dash, arrows), rotation, flip; on read-only pages and `exportPdf`.
 - [ ] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions.

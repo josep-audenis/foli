@@ -12,6 +12,7 @@ import v7 from "../../fixtures/formats/v7.json" with { type: "json" };
 import v8 from "../../fixtures/formats/v8.json" with { type: "json" };
 import v9 from "../../fixtures/formats/v9.json" with { type: "json" };
 import v10 from "../../fixtures/formats/v10-11-text-box-flyer.json" with { type: "json" };
+import v11 from "../../fixtures/formats/v11-12-shapes-poster.json" with { type: "json" };
 import type { NodeJSON } from "../model/index.js";
 import { createEditor } from "../state/index.js";
 import { parseDocument, SCHEMA_VERSION } from "./document.js";
@@ -22,7 +23,8 @@ import { parseDocument, SCHEMA_VERSION } from "./document.js";
  * by 0.6.0 (v3 to v5 are corpus files read by that release's `@folijs/docx`), v6 by 1.4.0, v7
  * (v6's with the tracking switch) for 1.6.0, v8 (a table's tracked formatting, 23.2) for 1.7.0,
  * v9 (v7's with a page color, page borders and line numbers, Phase 32) for the minor after 1.9,
- * v10 (the corpus's 11 with text boxes, Phase 33) for the minor after that.
+ * v10 (the corpus's 11 with text boxes, Phase 33) for the minor after that, v11 (the corpus's
+ * 12 with shapes, Phase 34) for the one after.
  * Never regenerate
  * them with the current code: they stand for documents already saved. A new format adds one.
  */
@@ -38,6 +40,7 @@ const fixtures: { name: string; json: { schemaVersion: number; content: unknown 
   { name: "v8 (table formatting change)", json: v8 },
   { name: "v9 (page color, page borders, line numbers)", json: v9 },
   { name: "v10 (text boxes)", json: v10 },
+  { name: "v11 (shapes)", json: v11 },
 ];
 
 /** JSON with sorted keys, so key order does not count. */
@@ -55,8 +58,8 @@ const text = (node: NodeJSON): string =>
 describe("0.x formats", () => {
   it("has a fixture for every version", () => {
     const versions = new Set(fixtures.map((f) => f.json.schemaVersion));
-    expect([...versions].sort()).toEqual([1, 10, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(SCHEMA_VERSION).toBe(10);
+    expect([...versions].sort()).toEqual([1, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(SCHEMA_VERSION).toBe(11);
   });
 
   for (const { name, json } of fixtures) {
@@ -69,7 +72,7 @@ describe("0.x formats", () => {
       expect(canonical(saved)).toBe(canonical(loaded));
       expect(canonical(parseDocument(structuredClone(saved)))).toBe(canonical(saved));
       if (json.schemaVersion >= 3) {
-        // v3 → v4 → … → v10 change the version only.
+        // v3 → v4 → … → v11 change the version only.
         expect(canonical({ ...saved, schemaVersion: json.schemaVersion })).toBe(canonical(json));
         expect(saved.schemaVersion).toBe(Math.max(json.schemaVersion, 5));
       } else {

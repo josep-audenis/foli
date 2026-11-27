@@ -1929,7 +1929,7 @@ export interface ObjectPlacement {
     paragraphTop: number;
     columnLeft: number;
 }
-/** The selected picture or text box (a node selection of one) and its position, if any. */
+/** The selected picture, text box or shape (a node selection of one) and its position, if any. */
 export declare function selectedObject(state: EditorState): {
     node: Node;
     pos: number;
@@ -3875,9 +3875,9 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
  * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
  * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
- * and line numbers, ADR-0015).
+ * and line numbers, ADR-0015; v10 text boxes, ADR-0016; v11 shapes, ADR-0017).
  */
-export declare const SCHEMA_VERSION = 10;
+export declare const SCHEMA_VERSION = 11;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -4318,9 +4318,9 @@ export interface PageBackgroundJSON {
 export interface FoliDocument {
     /**
      * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
-     * added (6: a picture's rotation or crop, 1.4; 10: text boxes).
+     * added (6: a picture's rotation or crop, 1.4; 10: text boxes; 11: shapes).
      */
-    schemaVersion: 5 | 6 | 7 | 8 | 9 | typeof SCHEMA_VERSION;
+    schemaVersion: 5 | 6 | 7 | 8 | 9 | 10 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */

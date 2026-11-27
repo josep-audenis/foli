@@ -81,7 +81,8 @@ export function countWords(state: EditorState, options: CountOptions = {}): Word
     // which the count leaves out).
     const boxes = new Set<string>();
     state.doc.descendants((node) => {
-      if (node.type.name === "textBox" && !deleted(node.marks)) boxes.add(String(node.attrs.story));
+      if ((node.type.name === "textBox" || node.type.name === "shape") && node.attrs.story)
+        if (!deleted(node.marks)) boxes.add(String(node.attrs.story));
       return true;
     });
     for (const [id, story] of Object.entries(stories))

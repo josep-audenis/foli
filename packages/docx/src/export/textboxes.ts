@@ -11,19 +11,13 @@
 import { A } from "../import/ooxml.js";
 import { WP } from "../import/pictures.js";
 import { Recorder } from "../import/report.js";
+import { drawnShapeOf } from "../import/shapes.js";
 import { boxOf, DEFAULT_INSET, WPS } from "../import/textboxes.js";
 import type { XmlElement } from "../xml.js";
-import {
-  applyEdits,
-  attrOf,
-  type Edit,
-  frameEdits,
-  positionXml,
-  setAttr,
-  wrapXml,
-} from "./frames.js";
+import { applyEdits, attrOf, type Edit, frameEdits, setAttr } from "./frames.js";
 import type { Media } from "./pictures.js";
 import { same } from "./properties.js";
+import { fillXml, frameOpen, freshShapeXml, geometryXml, lnXml, solid, xfrmXml } from "./shapes.js";
 import { escapeAttribute, fragment, type Namespaces } from "./xmlout.js";
 
 type Json = Record<string, unknown>;
@@ -59,8 +53,24 @@ function descendants(el: XmlElement, test: (e: XmlElement) => boolean, out: XmlE
 
 /** What the box is drawn as, to compare the model's with the file's. */
 const LOOK = ["width", "height", "float", "fill", "outline", "inset", "verticalAlign", "autoFit"];
-const look = (attrs: Json) =>
-  Object.fromEntries(LOOK.map((key) => [key, attrs[key] ?? null]).filter(([, v]) => v !== null));
+/** And a shape (Phase 34). */
+const SHAPE_LOOK = [
+  ...LOOK,
+  "geometry",
+  "adjust",
+  "custom",
+  "rotation",
+  "flipH",
+  "flipV",
+  "gradient",
+];
+const look = (attrs: Json, keys = LOOK) =>
+  Object.fromEntries(
+    keys
+      .map((key) => [key, attrs[key] ?? null])
+      // No rotation or flip is as good as said so.
+      .filter(([, v]) => v !== null && v !== false && v !== 0),
+  );
 
 /** `xml` with `edits`, the part of it `element` was. */
 function edited(source: string, element: XmlElement, edits: readonly Edit[]): string {
@@ -78,20 +88,27 @@ export function textBoxXml(
   given: string | undefined,
   namespaces: Namespaces,
   media: Media,
+  /** A shape's (Phase 34, ADR-0017): its geometry, turn, flips, gradient and line ends too. */
+  isShape = false,
 ): string {
+  // A shape's geometry left out of its JSON is the default, a rectangle.
+  if (isShape) attrs = { ...attrs, geometry: attrs.geometry ?? "rect" };
   const ext = typeof attrs.ext === "string" ? attrs.ext : undefined;
-  if (!ext) return freshXml(attrs, given ?? "<w:p/>", media);
+  const fresh = (inner: string | undefined) =>
+    isShape ? freshShapeXml(attrs, inner, media) : freshXml(attrs, inner ?? "<w:p/>", media);
+  if (!ext) return fresh(given);
   const { element, source } = fragment(ext, namespaces);
-  const read = boxOf(element, {
+  const context = {
     source,
     report: new Recorder(),
     pkg: media.pkg,
     colors: media.doc.theme?.colors,
-  });
+  };
+  const read = isShape ? drawnShapeOf(element, context) : boxOf(element, context);
   const txbxs = contents(element);
   const inner =
     given ?? (txbxs[0] ? source.slice(txbxs[0].openEnd, txbxs[0].closeStart) : "<w:p/>");
-  if (!read) return freshXml(attrs, inner, media);
+  if (!read) return fresh(isShape && !attrs.story ? undefined : inner);
   const alternate = element.ns === MC && element.local === "AlternateContent";
   const choice = alternate ? kid(element, MC, "Choice") : undefined;
   const drawing = choice
@@ -99,16 +116,18 @@ export function textBoxXml(
     : element.local === "drawing"
       ? element
       : undefined;
-  const changed = !same(look(read.attrs), look(attrs));
+  const keys = isShape ? SHAPE_LOOK : LOOK;
+  const changed = !same(look(read.attrs, keys), look(attrs, keys));
   // A VML-only box Foli changed: written as DrawingML.
-  if (!drawing && changed) return freshXml(attrs, inner, media);
+  if (!drawing && changed) return fresh(inner);
   const frame = drawing ? (kid(drawing, WP, "inline") ?? kid(drawing, WP, "anchor")) : undefined;
   const docPr = kid(frame, WP, "docPr");
   const id = attrOf(docPr, "id")?.value;
   const copy = !!docPr && !media.claim(id === undefined ? undefined : Number(id));
   const fallback = alternate ? kid(element, MC, "Fallback") : undefined;
+  const addsText = isShape && given !== undefined && !txbxs.length;
   // Word's VML copy, once the box changed or was copied: left out, not written stale.
-  const dropped = fallback && (changed || copy) ? fallback : undefined;
+  const dropped = fallback && (changed || copy || addsText) ? fallback : undefined;
   const edits: Edit[] = dropped ? [{ from: dropped.start, to: dropped.end, text: "" }] : [];
   let contentChanged = false;
   for (const txbx of given === undefined ? [] : contents(dropped && choice ? choice : element)) {
@@ -137,7 +156,18 @@ export function textBoxXml(
     ? descendants(drawing, (e) => e.ns === WPS && e.local === "wsp")[0]
     : undefined;
   const spPr = kid(shape, WPS, "spPr");
-  if (changed && spPr) lookEdits(source, spPr, kid(shape, WPS, "bodyPr"), read.attrs, attrs, edits);
+  const bodyPr = kid(shape, WPS, "bodyPr");
+  if (changed && spPr) lookEdits(source, spPr, bodyPr, read.attrs, attrs, edits);
+  // Text given to a shape that had none: its `wps:txbx` before `wps:bodyPr`.
+  if (addsText && bodyPr) {
+    contentChanged = true;
+    const p = shape?.prefix ? `${shape.prefix}:` : "";
+    edits.push({
+      from: bodyPr.start,
+      to: bodyPr.start,
+      text: `<${p}txbx><w:txbxContent>${inner}</w:txbxContent></${p}txbx>`,
+    });
+  }
   if (!dropped && contentChanged)
     // Word's cached DrawingML of the VML copy would show the old text to Word 2007.
     for (const shape of descendants(element, (e) => attrOf(e, "gfxdata", O) !== undefined))
@@ -162,10 +192,6 @@ export function textBoxXml(
   return frameChanges.length ? edited(again.source, again.element, frameChanges) : out;
 }
 
-/** A color as DrawingML's solid fill (`a` the DrawingML prefix). */
-const solid = (color: unknown, a: string) =>
-  `<${a}:solidFill><${a}:srgbClr val="${escapeAttribute(String(color))}"/></${a}:solidFill>`;
-
 const FILLS = new Set(["noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"]);
 
 /** The edits writing what the model changed of the box's look into its `wps:spPr` and `wps:bodyPr`. */
@@ -177,13 +203,34 @@ function lookEdits(
   now: Json,
   edits: Edit[],
 ): void {
-  const a = kid(spPr, A, "prstGeom")?.prefix || "a";
+  const geom = kid(spPr, A, "prstGeom") ?? kid(spPr, A, "custGeom");
   const xfrm = kid(spPr, A, "xfrm");
+  const a = geom?.prefix || xfrm?.prefix || "a";
   const size = kid(xfrm, A, "ext");
-  if (was.width !== now.width || was.height !== now.height) {
+  const resized = was.width !== now.width || was.height !== now.height;
+  const turned =
+    (was.rotation ?? 0) !== (now.rotation ?? 0) ||
+    !!was.flipH !== !!now.flipH ||
+    !!was.flipV !== !!now.flipV;
+  // CT_ShapeProperties: the transform first.
+  if (!xfrm && (turned || resized))
+    edits.push({ from: spPr.openEnd, to: spPr.openEnd, text: xfrmXml(now, a) });
+  if (resized) {
     setAttr(source, size, "cx", String(now.width), edits);
     setAttr(source, size, "cy", String(now.height), edits);
   }
+  if (xfrm && turned) {
+    setAttr(source, xfrm, "rot", now.rotation ? String(now.rotation) : undefined, edits);
+    setAttr(source, xfrm, "flipH", now.flipH ? "1" : undefined, edits);
+    setAttr(source, xfrm, "flipV", now.flipV ? "1" : undefined, edits);
+  }
+  if (
+    geom &&
+    (was.geometry !== now.geometry ||
+      !same(was.adjust ?? null, now.adjust ?? null) ||
+      !same(was.custom ?? null, now.custom ?? null))
+  )
+    edits.push({ from: geom.start, to: geom.end, text: geometryXml(now, a) });
   // CT_ShapeProperties: the geometry, the fill, then the line; what is missing goes after the
   // geometry, in that order.
   const fill = spPr.children.find(
@@ -192,16 +239,16 @@ function lookEdits(
   const ln = kid(spPr, A, "ln");
   const after = kid(spPr, A, "prstGeom") ?? kid(spPr, A, "custGeom") ?? xfrm;
   let added = "";
-  if (!same(was.fill ?? null, now.fill ?? null)) {
-    const text = now.fill ? solid(now.fill, a) : `<${a}:noFill/>`;
+  if (
+    !same(was.fill ?? null, now.fill ?? null) ||
+    !same(was.gradient ?? null, now.gradient ?? null)
+  ) {
+    const text = fillXml(now, a);
     if (fill) edits.push({ from: fill.start, to: fill.end, text });
     else added += text;
   }
   if (!same(was.outline ?? null, now.outline ?? null)) {
-    const outline = now.outline as { color: string; width: number } | null | undefined;
-    const text = outline
-      ? `<${a}:ln w="${outline.width}">${solid(outline.color, a)}</${a}:ln>`
-      : `<${a}:ln><${a}:noFill/></${a}:ln>`;
+    const text = lnXml(now.outline as Json | null | undefined, a, source, ln);
     if (ln) edits.push({ from: ln.start, to: ln.end, text });
     else if (fill) edits.push({ from: fill.end, to: fill.end, text });
     else added += text;
@@ -247,23 +294,9 @@ function freshXml(attrs: Json, inner: string, media: Media): string {
   const id = media.freshId();
   const width = String(attrs.width);
   const height = String(attrs.height);
-  const float = attrs.float && typeof attrs.float === "object" ? (attrs.float as Json) : undefined;
   const alt = typeof attrs.alt === "string" ? ` descr="${escapeAttribute(attrs.alt)}"` : "";
   const title = typeof attrs.title === "string" ? ` title="${escapeAttribute(attrs.title)}"` : "";
-  const dist = (side: string) => {
-    const d = (float?.distance ?? {}) as Json;
-    return typeof d[side] === "number" ? d[side] : side === "left" || side === "right" ? 114300 : 0;
-  };
-  const flag = (value: unknown) => (value === false ? "0" : "1");
-  const extent = `<wp:extent cx="${width}" cy="${height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>`;
-  const open = float
-    ? `<wp:anchor xmlns:wp="${WP}" distT="${dist("top")}" distB="${dist("bottom")}" ` +
-      `distL="${dist("left")}" distR="${dist("right")}" simplePos="0" relativeHeight="${typeof float.zOrder === "number" ? float.zOrder : 251659264}" ` +
-      `behindDoc="${float.wrap === "behind" ? 1 : 0}" locked="0" ` +
-      `layoutInCell="${flag(float.layoutInCell)}" allowOverlap="${flag(float.allowOverlap)}">` +
-      `<wp:simplePos x="0" y="0"/>${positionXml("H", float.horizontal as Json)}` +
-      `${positionXml("V", float.vertical as Json)}${extent}${wrapXml(float)}`
-    : `<wp:inline xmlns:wp="${WP}" distT="0" distB="0" distL="0" distR="0">${extent}`;
+  const { open, close } = frameOpen(attrs);
   const fill = attrs.fill ? solid(attrs.fill, "a") : "<a:noFill/>";
   const outline = attrs.outline as { color: string; width: number } | null | undefined;
   const ln = outline
@@ -281,6 +314,6 @@ function freshXml(attrs: Json, inner: string, media: Media): string {
     `<wps:bodyPr rot="0" vert="horz" wrap="square" lIns="${inset.left}" tIns="${inset.top}" ` +
     `rIns="${inset.right}" bIns="${inset.bottom}" anchor="${anchor}" anchorCtr="0">` +
     `${attrs.autoFit ? "<a:spAutoFit/>" : "<a:noAutofit/>"}</wps:bodyPr></wps:wsp></a:graphicData></a:graphic>` +
-    `</${float ? "wp:anchor" : "wp:inline"}></w:drawing>`
+    `${close}</w:drawing>`
   );
 }

@@ -418,6 +418,78 @@ const rotation = int(0, 21_599_999);
  * must have a size: left + right and top + bottom stay under 100 000. All sides 0 (or none
  * given) is no crop, said so; missing (null) is "as its `ext` has it", as for `rotation`.
  */
+/** DrawingML's coordinates and guide values (ST_Coordinate, ST_GeomGuideFormula's numbers). */
+const coordinate = int(-27_273_042_316_900, 27_273_042_316_900);
+
+/** A shape's adjust values (`a:avLst`: `adj` → 25 000), by guide name (schema 11, ADR-0017). */
+const checkAdjust: Check = (v) => {
+  if (!isRecord(v)) return "must be an object";
+  const entries = Object.entries(v);
+  if (entries.length > 32) return "must have at most 32 values";
+  for (const [name, value] of entries) {
+    if (text(64)(name)) return `${JSON.stringify(name)} is not a guide name`;
+    const error = coordinate(value);
+    if (error) return `${name} ${error}`;
+  }
+  return undefined;
+};
+
+/**
+ * A custom geometry (`a:custGeom`, schema 11): its guides (`a:gdLst`: a name and a DrawingML
+ * formula, `*\/ w adj 100000`) and its paths, each a list of commands whose arguments are
+ * numbers or guide names, as the file has them: `M x y`, `L x y`, `C x1 y1 x2 y2 x y`,
+ * `Q x1 y1 x y`, `A wR hR stAng swAng` (`a:arcTo`), `Z`. A path's `width` and `height` are its
+ * own coordinate space (missing: the shape's); `fill` and `stroke` say how it is drawn.
+ */
+const checkCustomGeometry: Check = shape(
+  {
+    guides: listOf(shape({ name: text(64), formula: text(1024) }, ["name", "formula"]), 1000),
+    paths: listOf(
+      shape(
+        {
+          width: emu,
+          height: emu,
+          fill: oneOf(["norm", "none", "lighten", "lightenLess", "darken", "darkenLess"]),
+          stroke: bool,
+          commands: listOf(
+            shape({ op: oneOf(["M", "L", "C", "Q", "A", "Z"]), args: listOf(text(64), 6) }, ["op"]),
+            100_000,
+          ),
+        },
+        ["commands"],
+      ),
+      100,
+    ),
+    /** The text's rectangle (`a:rect`): left, top, right, bottom as numbers or guide names. */
+    text: shape({ l: text(64), t: text(64), r: text(64), b: text(64) }, ["l", "t", "r", "b"]),
+  },
+  ["paths"],
+);
+
+/** A line end (`a:headEnd`, `a:tailEnd`): its kind and size. */
+const lineEnd = shape(
+  {
+    type: oneOf(["triangle", "stealth", "diamond", "oval", "arrow"]),
+    width: oneOf(["sm", "med", "lg"]),
+    length: oneOf(["sm", "med", "lg"]),
+  },
+  ["type"],
+);
+
+/**
+ * A gradient fill (`a:gradFill`): its stops (position in 1000ths of a percent, 0 to 100 000, and
+ * color), linear at `angle` (60 000ths of a degree, clockwise from left to right) or from the
+ * center (`path`: circle, rect, shape).
+ */
+const checkGradient: Check = shape(
+  {
+    stops: listOf(shape({ position: int(0, 100_000), color }, ["position", "color"]), 32),
+    angle: rotation,
+    path: oneOf(["circle", "rect", "shape"]),
+  },
+  ["stops"],
+);
+
 const cropSide = int(-1_000_000, 99_999);
 const cropShape = shape(
   { left: cropSide, top: cropSide, right: cropSide, bottom: cropSide },
@@ -864,7 +936,59 @@ export const schema = new Schema({
         ext: nullableAttr(xml),
       },
     },
-    /** Inline content Foli does not model yet (fields, charts, shapes, symbols…), kept verbatim. */
+    /**
+     * A shape (schema 11, ADR-0017): Word's drawn shape (`wps:wsp`), inline or floating as a
+     * picture is. `geometry` is DrawingML's preset (`a:prstGeom/@prst`: `rect`, `ellipse`,
+     * `rightArrow`…) with its `adjust` values, or `custom` with `custom`'s paths; its size,
+     * `float` and `rotation` are a picture's, `flipH`/`flipV` mirror it. `fill` (RRGGBB, null for
+     * none) or `gradient`, and `outline` (null for none) are what it is drawn with, a theme's
+     * style resolved; effects (shadows, glow, 3-D) stay in `ext`, the run content it was read
+     * from (`mc:AlternateContent` or `w:drawing`). Text in it is the envelope's `stories[story]`
+     * (kind `textBox`, as a text box's), drawn with `inset`, `verticalAlign`, `autoFit` and
+     * `textColor` (the style's font color) inside the geometry's text rectangle.
+     */
+    shape: {
+      group: "inline",
+      inline: true,
+      attrs: {
+        geometry: { default: "rect", validate: token },
+        adjust: nullableAttr(checkAdjust),
+        custom: nullableAttr(checkCustomGeometry),
+        /** In EMU. */
+        width: { validate: emu },
+        height: { validate: emu },
+        float: nullableAttr(checkFloat),
+        /** Clockwise, in 60 000ths of a degree (null: none). */
+        rotation: nullableAttr(rotation),
+        flipH: nullableAttr(bool),
+        flipV: nullableAttr(bool),
+        /** RRGGBB, or null for no fill (`gradient` wins when set). */
+        fill: nullableAttr(color),
+        gradient: nullableAttr(checkGradient),
+        /**
+         * The line: color RRGGBB, width in EMU, Word's dash (`a:prstDash`: `dash`, `sysDot`…,
+         * missing: solid), its ends (arrows); null for no line.
+         */
+        outline: nullableAttr(
+          shape({ color, width: emu, dash: token, head: lineEnd, tail: lineEnd }, [
+            "color",
+            "width",
+          ]),
+        ),
+        /** Its text (`wps:txbx`): a story of kind `textBox`; null for none. */
+        story: nullableAttr(text()),
+        inset: nullableAttr(shape({ left: emu, top: emu, right: emu, bottom: emu })),
+        verticalAlign: nullableAttr(oneOf(["top", "center", "bottom"])),
+        autoFit: nullableAttr(bool),
+        /** The color of its text where the text sets none (the style's `a:fontRef`). */
+        textColor: nullableAttr(color),
+        alt: nullableAttr(str(65_535)),
+        title: nullableAttr(str(65_535)),
+        decorative: nullableAttr(bool),
+        ext: nullableAttr(xml),
+      },
+    },
+    /** Inline content Foli does not model yet (fields, charts, groups, symbols…), kept verbatim. */
     opaqueInline: {
       group: "inline",
       inline: true,

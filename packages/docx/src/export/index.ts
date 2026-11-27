@@ -190,7 +190,10 @@ function contextFor(
         namespaces,
         media,
       ),
-    textBox: (attrs, context) => {
+    textBox: (attrs, context, shape) => {
+      // A shape without text: nothing to write into it.
+      if (shape && !attrs.story)
+        return textBoxXml(attrs, undefined, context.namespaces, media, true);
       const story = media.doc.stories?.[String(attrs.story)];
       // A box whose story is missing writes the text its file had (none for a new one).
       const blocks =
@@ -200,7 +203,7 @@ function contextFor(
       const kept =
         typeof attrs.ext === "string" && (!blocks || media.unchangedStory(String(attrs.story)));
       const inner = kept ? undefined : blocksXml(blocks ?? [], context);
-      return textBoxXml(attrs, inner, context.namespaces, media);
+      return textBoxXml(attrs, inner, context.namespaces, media, shape);
     },
     watermark: (attrs) => {
       const wanted = attrs.watermark as WatermarkJSON;
@@ -962,7 +965,10 @@ function boxesIn(content: unknown): Set<string> {
   const out = new Set<string>();
   JSON.stringify(content, (_key, value) => {
     const node = value as { type?: unknown; attrs?: { story?: unknown } } | null;
-    if (node?.type === "textBox" && typeof node.attrs?.story === "string")
+    if (
+      (node?.type === "textBox" || node?.type === "shape") &&
+      typeof node.attrs?.story === "string"
+    )
       out.add(node.attrs.story);
     return value;
   });

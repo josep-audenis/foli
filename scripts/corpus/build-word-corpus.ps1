@@ -15,7 +15,7 @@ param([string]$PdfDir = "", [string]$Only = "")
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
 $wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
-$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11")
+$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")
 foreach ($number in $wanted) {
   if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
 }
@@ -983,6 +983,106 @@ try {
     if ([math]::Abs($s.Left - $want[0]) -gt 0.5 -or [math]::Abs($s.Top - $want[1]) -gt 0.5) { throw "11: '$($s.AlternativeText)' is at $($s.Left), $($s.Top), not $($want -join ', ')" }
   }
   Save-Doc $doc "11-text-box-flyer.docx"
+  }
+  # ---------------------------------------------------------------------------------------
+  # 12: Shapes poster (Phase 34). Word's AutoShapes in front of the text, fixed on the page in
+  # a grid (MsoAutoShapeType: the preset geometries Foli draws), then shapes that test the rest:
+  # an adjusted rounded rectangle, flipped triangles, a gradient, a dashed outline,
+  # lines with arrows, a freeform (custom geometry), a rounded rectangle holding text, a hexagon
+  # wrapped square beside body text, a line in the header.
+  if (Want "12") {
+  Set-Author "Design" "DS"
+  $doc = New-Doc
+  $long = "The shapes below are Word's own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. "
+  Add-Para $doc "Shapes poster" $S_TITLE | Out-Null                           # 1
+  Add-Para $doc $long | Out-Null                                               # 2
+  $doc.Paragraphs.Last.Range.InsertParagraphAfter()
+  $doc.Paragraphs.Last.Range.InsertBreak($PAGE_BREAK)                          # 3
+  Add-Para $doc "More shapes" $S_H1 | Out-Null                                 # 4
+  Add-Para $doc ($long * 3) | Out-Null                                         # 5
+  Add-Para $doc ($long * 3) | Out-Null                                         # 6
+  $first = $doc.Paragraphs.Item(2).Range
+  $second = $doc.Paragraphs.Item(5).Range
+  $names = @{}
+  function Add-At($anchor, $type, $left, $top, $width, $height, $alt) {
+    $at = $anchor.Duplicate
+    $at.Collapse(1)
+    $s = $doc.Shapes.AddShape($type, $left, $top, $width, $height, $at)
+    $s.WrapFormat.Type = 3                     # in front of the text
+    $s.LockAnchor = $true
+    $s.RelativeHorizontalPosition = 1          # wdRelativeHorizontalPositionPage
+    $s.RelativeVerticalPosition = 1            # wdRelativeVerticalPositionPage
+    $s.Left = [single]$left; $s.Top = [single]$top
+    $s.AlternativeText = $alt
+    return $s
+  }
+  # Page 1: a grid of presets, 4 to a row, 80 by 56 points, from (90, 170).
+  $grid = @(1, 5, 9, 7, 8, 2, 3, 4, 12, 10, 6, 11, 13, 14, 18, 28, 33, 34, 35, 36, 37, 39, 51, 52, 92, 91, 21, 22, 105, 106, 107, 16)
+  for ($i = 0; $i -lt $grid.Count; $i++) {
+    $left = 90 + ($i % 4) * 110
+    $top = 170 + [int][math]::Floor($i / 4) * 78
+    Add-At $first $grid[$i] $left $top 80 56 "Preset $($grid[$i])" | Out-Null
+  }
+  # Page 2, below its text: what the presets' look can be.
+  $round = Add-At $second 5 90 480 100 60 "Rounded rectangle, adjusted"
+  $round.Adjustments.Item(1) = 0.35
+  # Word 16's automation leaves a shape's Rotation at 0 whatever it is set to: turned shapes are
+  # checked by the round trip (`shape-roundtrip.mjs`), where Foli turns one and Word reads it.
+  Add-At $second 1 240 480 100 60 "Rectangle" | Out-Null
+  $flipped = Add-At $second 8 390 480 80 60 "Right triangle flipped"
+  $flipped.Flip(0)                            # msoFlipHorizontal
+  $flipped.Flip(1)                            # msoFlipVertical
+  $gradient = Add-At $second 1 90 570 100 60 "Gradient rectangle"
+  $gradient.Fill.TwoColorGradient(1, 1)       # msoGradientHorizontal, variant 1
+  $gradient.Fill.ForeColor.RGB = 12419407     # RGB(79, 129, 189) as BGR
+  $gradient.Fill.BackColor.RGB = 16777215
+  $dashed = Add-At $second 9 240 570 100 60 "Dashed oval, no fill"
+  $dashed.Fill.Visible = $false
+  $dashed.Line.DashStyle = 4                  # msoLineDash
+  $dashed.Line.Weight = 2
+  $dashed.Line.ForeColor.RGB = 255            # red
+  $text = Add-At $second 5 390 570 120 60 "Rounded rectangle with text"
+  $text.TextFrame.TextRange.Text = "Open day"
+  $text.TextFrame.TextRange.ParagraphFormat.Alignment = $ALIGN_CENTER
+  $at = $second.Duplicate; $at.Collapse(1)
+  $line = $doc.Shapes.AddLine(90, 680, 250, 680, $at)
+  $line.Line.EndArrowheadStyle = 2           # msoArrowheadTriangle
+  $line.Line.Weight = 1.5
+  $line.AlternativeText = "Line with an arrow"
+  $line.WrapFormat.Type = 3; $line.RelativeHorizontalPosition = 1; $line.RelativeVerticalPosition = 1
+  $line.Left = 90; $line.Top = 680
+  $both = $doc.Shapes.AddLine(90, 710, 250, 750, $at)
+  $both.Line.BeginArrowheadStyle = 3         # msoArrowheadOpen
+  $both.Line.EndArrowheadStyle = 5           # msoArrowheadOval
+  $both.Line.DashStyle = 3                   # msoLineRoundDot
+  $both.AlternativeText = "Line with two ends"
+  $both.WrapFormat.Type = 3; $both.RelativeHorizontalPosition = 1; $both.RelativeVerticalPosition = 1
+  $both.Left = 90; $both.Top = 710
+  $free = $doc.Shapes.BuildFreeform(0, 90, 400)   # msoEditingAuto
+  $free.AddNodes(0, 0, 160, 380)            # msoSegmentLine, msoEditingAuto
+  $free.AddNodes(1, 0, 200, 460)            # msoSegmentCurve
+  $free.AddNodes(0, 0, 110, 470)
+  $free.AddNodes(0, 0, 90, 400)
+  $shape = $free.ConvertToShape($at)
+  $shape.AlternativeText = "Freeform"
+  $shape.WrapFormat.Type = 3; $shape.RelativeHorizontalPosition = 1; $shape.RelativeVerticalPosition = 1
+  $shape.Left = 300; $shape.Top = 660
+  # A hexagon wrapped square beside the body text, from the column and its paragraph.
+  $hexAt = $doc.Paragraphs.Item(6).Range; $hexAt.Collapse(1)
+  $hex = $doc.Shapes.AddShape(10, 300, 10, 110, 80, $hexAt)
+  $hex.WrapFormat.Type = 0
+  $hex.LockAnchor = $true
+  $hex.RelativeHorizontalPosition = 2; $hex.RelativeVerticalPosition = 2
+  $hex.Left = 300; $hex.Top = 10
+  $hex.AlternativeText = "Hexagon wrapped square"
+  # A line under the header's text.
+  $header = $doc.Sections.Item(1).Headers.Item($HF_PRIMARY)
+  $header.Range.Text = "Northwind Design"
+  $hline = $header.Shapes.AddLine(72, 60, 523, 60, $header.Range)
+  $hline.Line.ForeColor.RGB = $COLOR_DARK_BLUE
+  $hline.Line.Weight = 2
+  $hline.AlternativeText = "Header rule"
+  Save-Doc $doc "12-shapes-poster.docx"
   }
 }
 finally {

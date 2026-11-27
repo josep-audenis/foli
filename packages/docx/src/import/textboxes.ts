@@ -15,7 +15,8 @@ import { theme } from "./parts.js";
 import { floatOf, WP } from "./pictures.js";
 import { type Context, sourceOf } from "./properties.js";
 
-const MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+/** @internal */
+export const MC = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 /** @internal */
 export const WPS = "http://schemas.microsoft.com/office/word/2010/wordprocessingShape";
 /** @internal */
@@ -43,12 +44,18 @@ export interface TextBoxContext extends Context {
   readonly textBoxes?: { readonly stories: Map<string, StoryJSON>; readonly prefix: string };
 }
 
-const kid = (el: XmlElement | undefined, ns: string, local: string) =>
+/** @internal */
+export const kid = (el: XmlElement | undefined, ns: string, local: string) =>
   el?.children.find(
     (c): c is XmlElement => c.kind === "element" && c.ns === ns && c.local === local,
   );
 
-function descendant(el: XmlElement | undefined, ns: string, local: string): XmlElement | undefined {
+/** @internal */
+export function descendant(
+  el: XmlElement | undefined,
+  ns: string,
+  local: string,
+): XmlElement | undefined {
   if (!el) return undefined;
   for (const c of el.children) {
     if (c.kind !== "element") continue;
@@ -59,17 +66,20 @@ function descendant(el: XmlElement | undefined, ns: string, local: string): XmlE
   return undefined;
 }
 
-const plain = (el: XmlElement | undefined, local: string) =>
+/** @internal */
+export const plain = (el: XmlElement | undefined, local: string) =>
   el?.attributes.find((a) => a.local === local && !a.prefix)?.value;
 
-const emu = (value: string | undefined) => {
+/** @internal */
+export const emu = (value: string | undefined) => {
   const n = integer(value);
   return n !== undefined && n >= 0 && n <= MAX_EMU ? n : undefined;
 };
 
 /** The theme's colors of a package, read once. */
 const themes = new WeakMap<DocxPackage, Record<string, string>>();
-function themeColors(context: TextBoxContext): Record<string, string> {
+/** @internal */
+export function themeColors(context: TextBoxContext): Record<string, string> {
   if (context.colors || !context.pkg) return context.colors ?? {};
   let found = themes.get(context.pkg);
   if (!found) {
@@ -91,7 +101,8 @@ const MAPPED: Record<string, string> = { bg1: "lt1", tx1: "dk1", bg2: "lt2", tx2
 const PRESET: Record<string, string> = { black: "000000", white: "FFFFFF" };
 
 /** `hex` with DrawingML's luminance modifiers (`lumMod`, `lumOff`, `shade`, `tint`) applied. */
-function modified(hex: string, color: XmlElement): string {
+/** @internal */
+export function modified(hex: string, color: XmlElement): string {
   let [r, g, b] = [0, 2, 4].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255) as [
     number,
     number,
@@ -149,19 +160,29 @@ function modified(hex: string, color: XmlElement): string {
     .toUpperCase();
 }
 
-/** A DrawingML color element (`a:srgbClr`, `a:schemeClr`…) as RRGGBB. */
-function colorOf(color: XmlElement | undefined, context: TextBoxContext): string | undefined {
+/**
+ * A DrawingML color element (`a:srgbClr`, `a:schemeClr`…) as RRGGBB; `placeholder` is what a
+ * theme style's `phClr` stands for.
+ * @internal
+ */
+export function colorOf(
+  color: XmlElement | undefined,
+  context: TextBoxContext,
+  placeholder?: string,
+): string | undefined {
   if (!color || color.ns !== A) return undefined;
   const val = plain(color, "val");
   let hex: string | undefined;
   if (color.local === "srgbClr") hex = val;
   else if (color.local === "sysClr") hex = plain(color, "lastClr");
   else if (color.local === "prstClr") hex = val ? PRESET[val] : undefined;
+  else if (color.local === "schemeClr" && val === "phClr") hex = placeholder;
   else if (color.local === "schemeClr" && val) hex = themeColors(context)[MAPPED[val] ?? val];
   return hex && /^[0-9A-Fa-f]{6}$/.test(hex) ? modified(hex.toUpperCase(), color) : undefined;
 }
 
-const firstColor = (el: XmlElement | undefined) =>
+/** @internal */
+export const firstColor = (el: XmlElement | undefined) =>
   el?.children.find((c) => c.kind === "element") as XmlElement | undefined;
 
 /** A fill (`a:noFill`, `a:solidFill`, `a:gradFill`'s first stop) as RRGGBB, null for none. */
@@ -177,8 +198,9 @@ function fillOf(
   return undefined;
 }
 
-/** The text box's story read from `txbx` (`w:txbxContent`), added; its id. */
-function addStory(
+/** The text box's (or shape's) story read from `txbx` (`w:txbxContent`), added; its id. */
+/** @internal */
+export function addStory(
   txbx: XmlElement,
   context: TextBoxContext,
   read: (children: XmlElement["children"]) => NodeJSON[],
@@ -198,7 +220,8 @@ function addStory(
 }
 
 /** Where text boxes may be: the body, headers and footers. */
-const holdsBoxes = (context: TextBoxContext) =>
+/** @internal */
+export const holdsBoxes = (context: TextBoxContext) =>
   !!context.textBoxes &&
   (context.story === undefined || context.story === "header" || context.story === "footer");
 
@@ -314,7 +337,8 @@ function drawingBox(
   };
 }
 
-const sameInset = (inset: Record<string, number>) =>
+/** @internal */
+export const sameInset = (inset: Record<string, number>) =>
   inset.left === DEFAULT_INSET.left &&
   inset.top === DEFAULT_INSET.top &&
   inset.right === DEFAULT_INSET.right &&

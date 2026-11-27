@@ -225,6 +225,23 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   comment or a box. In the editor a box that goes takes its story with it (one undo step).
   Export writes the story's text into `ext` (DrawingML and its VML copy) and a changed size,
   position, wrapping or look into the DrawingML, the VML copy then left out.
+- **Shapes** (v11, ADR-0017): a `shape` is a run atom placed as a picture is: `geometry`
+  (DrawingML's preset name, `rect` by default, or `custom`), `adjust` (the preset's adjust values
+  by guide name: `{ "adj": 35000 }`), `custom` (a custom geometry: `guides`, each a `name` and a
+  DrawingML `formula`; `paths`, each with its own `width` and `height`, `fill` (`norm`, `none`,
+  `darken`…), `stroke`, and `commands` `{ op, args }`: `M x y`, `L x y`, `C x1 y1 x2 y2 x y`,
+  `Q x1 y1 x y`, `A wR hR stAng swAng`, `Z`, each argument a number or a guide's name as a string;
+  `text`, the text's rectangle), `width` and `height` (EMU), `float`, `rotation` (60 000ths of a
+  degree, clockwise), `flipH`, `flipV`, `fill` (RRGGBB, null none; with a gradient its first
+  stop), `gradient` (`stops`: `position` 0 to 100 000 and `color`; `angle` for a linear one or
+  `path` circle, rect or shape), `outline` (`color`, `width` in EMU, `dash` Word's `prstDash`,
+  `head` and `tail`: `type` triangle, stealth, diamond, oval or arrow, `width` and `length` sm, med
+  or lg; null none), `story` (its text, a story of kind `textBox` numbered with the text boxes;
+  null none), `inset`, `verticalAlign`, `autoFit` (as a text box's), `textColor` (its style's
+  font color), `alt`, `title`, `decorative`, and `ext`, the run content it was read from. A
+  theme's style is read as plain colors and widths; effects stay in `ext`. Shapes are in the
+  body, headers and footers only. Export writes a changed shape's transform, geometry, fill and
+  line into its DrawingML in place (the VML copy then left out); an unchanged one as it was.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.
@@ -520,7 +537,8 @@ Migrations never drop content. A published version never changes in place.
 | 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                           |
 | 8       | 1.7.0       | v8 → v9: what `ext` kept is adopted (a section's `w:pgBorders`, `w:lnNumType`, a paragraph's `w:suppressLineNumbers`) |
 | 9       | next minor  | v9 → v10: only the version changes (a text box kept opaque stays so until its `.docx` is imported again)              |
-| 10      | next minor  | — (the current version: text boxes, the `textBox` node and stories of kind `textBox`, 33.1)                           |
+| 10      | next minor  | v10 → v11: only the version changes (a shape kept opaque stays so until its `.docx` is imported again)                |
+| 11      | next minor  | — (the current version: shapes, the `shape` node, 34.1)                                                               |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
@@ -534,7 +552,8 @@ minor after 1.9 (Phase 32) a page color (`settings.background`) or a section wit
 or `lineNumbers` (the envelope's, a paragraph's `section`, or the setup a tracked change
 recorded) needs 9, and a document that says 8 or less holding one is refused. From Phase 33 a
 text box (a `textBox` node, or a story of kind `textBox`) needs 10, and a document that says 9
-or less holding one is refused.
+or less holding one is refused. From Phase 34 a shape (a `shape` node) needs 11, and a document
+that says 10 or less holding one is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
