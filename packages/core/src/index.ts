@@ -265,6 +265,7 @@ export {
   type ReplaceRefusal,
   type ReplaceReport,
   type ReviewView,
+  type RulerGeometry,
   type RunEffects,
   receiveBroadcast,
   receivePresence,

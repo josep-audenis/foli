@@ -42,7 +42,7 @@ place that says what is in progress; check it before starting work.
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
 | 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
-| 31 Ruler                      | Blocked by 30            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
+| 31 Ruler                      | In progress              | `phase-31/ruler`          | Assigned by the owner; 30 is merged on `main` and waits only for its release                                                                                                                  |
 | 32 Page decoration            | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 34 Shapes                     | Blocked by 33            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4379,8 +4379,41 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
 
 ### Tasks
 
-- [ ] 31.1 Decisions; `view.rulerGeometry()` (the caret's page box, margins, the paragraph's
-  indents and tabs in screen px, table column edges), following scroll and zoom.
+- [x] 31.1 Decisions; `view.rulerGeometry()` (the caret's page box, margins, the paragraph's
+  indents and tabs in screen px, table column edges), following scroll and zoom. Decided:
+  - Where: `FoliRuler` in `@folijs/react`, a component the app places as it places the status
+    bar: the horizontal ruler above the pages, `orientation="vertical"` beside them (31.5), and
+    `FoliEditor`'s `ruler` both (31.6). Values come from core (`paragraphFormatAt`, `sectionAt`,
+    `columnAt`), positions from the view through `editor.storyView.rulerGeometry()` (the core
+    type `RulerGeometry`, client px, as `fieldLayout` gives the status bar its pages), read
+    again on every change, scroll and resize, so the ruler lines up with the caret's page at any
+    zoom (the ruler itself is not zoomed: its numbers are drawn at the pages' scale).
+  - Units: Phase 30's, `units` (`LengthUnit`) on `FoliRuler`, by default the browser's language's
+    (`defaultUnit`). Numbers every inch or centimetre from the left margin (the top one on the
+    vertical ruler), ticks every 1/8 inch or 0.25 cm. A drag snaps to 1/16 inch or 0.25 cm; with
+    Alt held it does not snap and the ruler shows the exact values (Word's).
+  - Drags: as the table column border's (19.4): a guide line follows the pointer, the document
+    changes once on release (one transaction, one undo step), Escape or a lost pointer cancels.
+    Pointer events with pointer capture, so touch drags too. What each sets is the dialog's
+    command: `setIndent`, `setTabStops`, `setSectionSetup({ margins })` (the caret's section;
+    tracked as Page setup is), `setColumnWidth` (not while tracking, as the border drag).
+  - Announced: each handle is a `slider` (`aria-orientation` vertical on the vertical ruler)
+    named for what it moves ("First line indent", "Hanging indent", "Left indent", "Right indent",
+    "Left margin", "Tab stop", "Column border"…), its value in the unit (`aria-valuenow`,
+    `aria-valuetext` "1.5 cm", min and max where the command stops). Arrows move it by a step
+    (1/16 inch or 0.25 cm; Page Up and Page Down by 1/2 inch or 1 cm), each key one change, as
+    a slider's; Delete on a tab stop removes it. The ruler is a group: Tab moves
+    through its handles.
+
+  Built: `view.rulerGeometry()` and `editor.storyView.rulerGeometry` (optional on `StoryView`, a
+  view older than this one has none), the `RulerGeometry` type in core; the table measure the
+  column border drag used is shared with it. A cell's paragraph is measured with its table
+  style's formatting, as drawn; a nested table gives no columns (as the border drag, top-level
+  tables only); `gutter` is given apart, inside the left margin. The top and bottom margins are
+  the section's, not where a taller header pushes the text (31.5 decides). Right-to-left
+  paragraphs are measured as left to right (limitations.md, with 31.2). `word/ruler.test.ts` at
+  100% and 200% (a paragraph's indents and stops, a table cell with a table style's indent and
+  its columns, a node selection, no pages).
 - [ ] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
   right indent handles dragged (one undo step per drag), Alt for exact values.
 - [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,

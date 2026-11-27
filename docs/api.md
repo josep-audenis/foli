@@ -940,7 +940,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                                                                                                 |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                                                                                                      |
 | `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                                                                                                       |
-| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                                                                                                     |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages), `rulerGeometry()` (optional). `storyChanged()` tells listeners it changed.                                                                       |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                                                                                                    |
 | `extensions`                   | The extensions it was made with (`EditorOptions.extensions`); a view reads its node views, mark views, decorations and plugin views from them.                                                                                                                                                                                                                                                         |
 
@@ -1238,7 +1238,7 @@ Stable, for plugins and code that edits documents directly:
   `history()`, `baseKeymap()` and `listKeymap()` are exported (ADR-0008).
 - The option, result and JSON types of the functions on this page are stable with them:
   `EditorOptions`, `Extension`, `ExtensionNodeSpec`, `ParseOptions`, `ContentOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
-  `OpenStory`, `StoryView`, `DeleteUnit`, `CommentContent`, `CommentOptions`, `ChangeKind`,
+  `OpenStory`, `StoryView`, `RulerGeometry`, `DeleteUnit`, `CommentContent`, `CommentOptions`, `ChangeKind`,
   `ChangeFilter`, `ControlInsertOptions`, `ControlPropertiesPatch`, `ControlRange`,
   `ControlValue`, `ControlValueInput`, `CrossReference`, `CrossReferenceTargets`,
   `FieldDisplay`, `FieldInstruction`, `FieldPage`, `FieldSkip`, `FieldSkipReason`,
@@ -1307,6 +1307,20 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   `onZoom(zoom)` is called on Ctrl+wheel (on macOS Cmd+wheel and a trackpad pinch too) over the
   document with the next zoom, 10% for each hundred px the wheel moves: the app sets it. `view.fitZoom(
   "width" | "page")` gives the zoom that fits.
+- `view.rulerGeometry()` (31.1; also `editor.storyView.rulerGeometry`, optional there): where a
+  ruler's parts are on the screen for the caret, in client px, read when called (it follows
+  scrolling and the zoom; `RulerGeometry`): `pxPerTwip`; `gutter` (its width, inside the left
+  margin); `page` (`index` from 0, `left`, `top`, `right`, `bottom`); `margins` (the text area's
+  edges as the page's section sets them: the left one after the gutter, the top and bottom ones
+  as set even where a taller header or footer pushes the text); `text` (what the caret's
+  paragraph lines up in: its column, or its table cell's content); `paragraph` (`left`, the
+  hanging marker, `firstLine` and `right` indent positions as drawn, a table style's indents
+  included, and `tabs` as `setTabStops` takes them with their `x`: `position` in points from
+  `text.left`, `alignment`, `leader`; null when the caret is in no paragraph, as in a node
+  selection); `table` (the top-level body table the caret is in: `pos`, `left` and each grid
+  column's `right` edge with its `width` in twips as drawn, what `setColumnWidth` takes; null
+  outside one, in a nested table, and in a header, footer or note). Null with `paged: false` and
+  before the first layout.
   `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
   the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;
   without it image files are not pasted or dropped. `view.insertFiles(files)` inserts image files
