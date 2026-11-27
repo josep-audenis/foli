@@ -10,6 +10,7 @@ import {
   insertColumn,
   insertRow,
   mergeCells,
+  openDialog,
   openLinkEditor,
   rejectChange,
   splitCell,
@@ -37,6 +38,7 @@ export const contextMenuMessages = [
   "Cut",
   "Copy",
   "Paste",
+  "Paragraph…",
   "Link…",
   "New comment",
   "Insert row above",
@@ -85,7 +87,8 @@ const paste = async () => {
 };
 
 /**
- * Word's right-click entries that Foli has: the clipboard, a link and a comment; in a table its
+ * Word's right-click entries that Foli has: the clipboard, Paragraph… (the toolbar's dialog,
+ * so it opens only with a toolbar), a link and a comment; in a table its
  * rows, columns and cells; on a tracked change Accept and Reject. Pass a function to
  * `FoliContextMenu`'s `items` to add, drop or reorder them.
  */
@@ -97,6 +100,13 @@ export const defaultContextMenuItems: readonly ContextMenuItem[] = [
     label: "Paste",
     run: () => void paste().catch(() => undefined),
     enabled: () => typeof navigator !== "undefined" && !!navigator.clipboard?.read,
+  },
+  {
+    key: "paragraph",
+    label: "Paragraph…",
+    run: command(openDialog("paragraph")),
+    enabled: (s) => openDialog("paragraph")(s),
+    separator: true,
   },
   {
     key: "link",

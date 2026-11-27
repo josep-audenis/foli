@@ -23,6 +23,7 @@ import type {
 import type { ParagraphFormat, RunFormat } from "../v3/resolve.js";
 import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { attempt } from "./attempt.js";
+import { chainCommands } from "./dialogs.js";
 import { idsOf } from "./ids.js";
 import { marksAt, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
@@ -591,22 +592,7 @@ function chain(
   dispatch: ((tr: Transaction) => void) | undefined,
   commands: readonly Command[],
 ): boolean {
-  let current = state;
-  let tr: Transaction | null = null;
-  for (const command of commands) {
-    command(current, (next) => {
-      // Each command's steps go on the first transaction; stored marks and selection too.
-      if (!tr) tr = next;
-      else {
-        for (const step of next.steps) tr.step(step);
-        if (next.storedMarks !== current.storedMarks) tr.setStoredMarks(next.storedMarks);
-      }
-      current = current.apply(next);
-    });
-  }
-  if (!tr) return false;
-  dispatch?.(tr);
-  return true;
+  return chainCommands(commands)(state, dispatch);
 }
 
 /**

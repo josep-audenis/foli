@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
+import { chainCommands, openDialog, requestedDialog } from "./dialogs.js";
 import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
 import {
@@ -248,5 +249,32 @@ describe("tracking", () => {
     const marks = blocks(editor)[0]?.content?.[0]?.marks?.map((m) => m.type);
     expect(marks).toContain("formatChange");
     expect(marks).toContain("characterSpacing");
+  });
+});
+
+describe("openDialog and chainCommands", () => {
+  it("asks for a dialog with a transaction that changes nothing", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    editor.select(2);
+    const asked: (string | null)[] = [];
+    editor.subscribe((_state, transactions) => {
+      for (const tr of transactions) asked.push(requestedDialog(tr));
+    });
+    expect(editor.commands.openDialog("paragraph")).toBe(true);
+    expect(editor.run(openDialog("font"))).toBe(true);
+    expect(asked).toEqual(["paragraph", "font"]);
+    expect(editor.run(openDialog("nope" as "font"))).toBe(false);
+  });
+
+  it("runs commands as one transaction, one undo step", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    editor.select(1, 4);
+    const both = chainCommands([setIndent({ left: 36 }), setCharacterSpacing(1)]);
+    expect(editor.run(both)).toBe(true);
+    expect(attrsOf(editor).indent).toEqual({ left: 720 });
+    editor.run(undo);
+    expect(attrsOf(editor).indent).toBeNull();
+    expect(blocks(editor)[0]?.content?.[0]?.marks).toBeUndefined();
+    expect(editor.run(chainCommands([setIndent({ left: 5000 })]))).toBe(false);
   });
 });
