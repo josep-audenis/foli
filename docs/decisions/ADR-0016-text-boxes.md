@@ -1,7 +1,8 @@
 # ADR-0016: Text boxes as stories in floating anchors (schema 10)
 
 - **Status:** Accepted when merged, task 33.1 (2026-11-27), by an agent's review, as the owner
-  asked for Phase 33 (one PR per task, reviewed, merged).
+  asked for Phase 33 (one PR per task, reviewed, merged). Implemented in Phase 33 (33.1–33.6):
+  as decided, plus a float's `zOrder` (33.6, schema 10) for Bring Forward and Send Backward.
 - **Context:** until Phase 33 a text box was opaque: the run's `mc:AlternateContent` (Word's
   DrawingML text box with its VML copy for Word 2007), a bare `w:drawing` or a VML `w:pict` kept
   verbatim, not drawn, its text out of reach of the caret, find and the agent. Floating pictures
