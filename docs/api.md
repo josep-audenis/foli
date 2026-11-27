@@ -136,8 +136,8 @@ is), left indent (the box under it: both), right indent, and the page's left and
 document once on release (`setIndent`, `setSectionSetup({ margins })` on the caret's section,
 the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin unless
 Alt is held, which shows the exact value as it moves; Escape or a lost pointer cancels. The
-arrow keys move a focused handle by that step, Page Up and Page Down by half an inch or a
-centimetre (keyboard.md). Positions come from `editor.storyView.rulerGeometry()` (the view's),
+arrow keys move a focused handle by that step (Up always makes its value larger), Page Up
+and Page Down by half an inch or a centimetre (keyboard.md). Positions come from `editor.storyView.rulerGeometry()` (the view's),
 read again after each change, scroll, resize and `zoom` change, so the ruler lines up at any
 zoom (it is not zoomed itself); without a view it is empty. Changes go to the story open on its
 page, else the editor. Props: `editor`, `units` (`"in"` or `"cm"`; default the browser

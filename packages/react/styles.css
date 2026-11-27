@@ -1207,6 +1207,30 @@
     display: none;
   }
 }
+/* Forced colors drop backgrounds: the ruler's marks and markers keep system colors. */
+@media (forced-colors: active) {
+  .foli-ruler-page,
+  .foli-ruler-text,
+  .foli-ruler-handle,
+  .foli-ruler-half,
+  .foli-ruler-tick {
+    forced-color-adjust: none;
+  }
+  .foli-ruler-page {
+    background: GrayText;
+  }
+  .foli-ruler-text {
+    background: Canvas;
+  }
+  .foli-ruler-handle,
+  .foli-ruler-half,
+  .foli-ruler-tick {
+    background: CanvasText;
+  }
+  .foli-ruler-margin {
+    background: transparent;
+  }
+}
 
 /* Word's status bar (FoliStatusBar): page, words, tracking on the left; zoom on the right. */
 .foli-status-bar {

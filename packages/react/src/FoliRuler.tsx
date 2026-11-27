@@ -25,6 +25,8 @@ export const rulerMessages = [
   "Right indent",
   "Left margin",
   "Right margin",
+  "{position}, hanging {by}",
+  "{position}, first line {by}",
 ] as const;
 
 /** Translations of the ruler's strings, by their English text (`rulerMessages`). */
@@ -73,6 +75,8 @@ interface Handle {
   max: number;
   grid: number;
   set: (value: number) => Command;
+  /** The hanging marker's: where the first line is (twips from the same origin), which it keeps. */
+  firstLine?: number;
 }
 
 /** A handle being dragged: its value as the pointer has it, and whether Alt is held. */
@@ -96,7 +100,12 @@ interface Read {
  * Re-reads the pages' geometry (`editor.storyView.rulerGeometry`) in the next frame after a
  * change, a scroll, a resize, the zoom or fonts loading, and until the first layout.
  */
-function useGeometry(editor: Editor, root: React.RefObject<HTMLElement | null>, zoom: number) {
+function useGeometry(
+  editor: Editor,
+  active: Editor,
+  root: React.RefObject<HTMLElement | null>,
+  zoom: number,
+) {
   const [read, setRead] = useState<Read>({ geometry: null, left: 0 });
   const measureNow = useCallback(
     () =>
@@ -118,6 +127,8 @@ function useGeometry(editor: Editor, root: React.RefObject<HTMLElement | null>, 
       if (!frame) frame = requestAnimationFrame(measure);
     };
     const unsubscribe = editor.subscribe(later);
+    // An open story's selection moving does not reach the body's listeners.
+    const unsubscribeActive = active === editor ? null : active.subscribe(later);
     // The first layout comes without a change: tried each frame until there are pages.
     let wait = 0;
     let tries = 0;
@@ -134,13 +145,14 @@ function useGeometry(editor: Editor, root: React.RefObject<HTMLElement | null>, 
     void document.fonts?.ready.then(later);
     return () => {
       unsubscribe();
+      unsubscribeActive?.();
       cancelAnimationFrame(frame);
       cancelAnimationFrame(wait);
       document.removeEventListener("scroll", later, true);
       window.removeEventListener("resize", later);
       observer?.disconnect();
     };
-  }, [editor, measureNow, root, zoom]);
+  }, [editor, active, measureNow, root, zoom]);
   // Read again at once after the ruler's own change: the next key or drag starts from it.
   return { ...read, measureNow };
 }
@@ -213,6 +225,7 @@ function horizontalHandles(g: RulerGeometry): Handle[] {
       max: rightmost,
       grid: text.left,
       set: (value) => setIndent({ left: value / 20, ...specialOf(left + special - value) }),
+      firstLine: left + special,
     },
     {
       // The box under it moves both.
@@ -279,9 +292,25 @@ export function FoliRuler({
   const body = useEditorOrContext(given, "FoliRuler");
   const editor = useActiveEditor(body);
   const unit = units ?? defaultUnit();
-  const t = (message: RulerMessage) => messages?.[message] ?? message;
+  const t = (message: RulerMessage, values?: Record<string, string>) => {
+    const text = messages?.[message] ?? message;
+    return values ? text.replace(/\{(\w+)\}/g, (all, name: string) => values[name] ?? all) : text;
+  };
+  /** What a slider says of its value: the hanging marker also its special indent (Word's By). */
+  const valueText = (handle: Handle, value: number) => {
+    const position = formatLength(value, unit);
+    if (handle.firstLine === undefined || handle.firstLine === value) return position;
+    const by = formatLength(Math.abs(handle.firstLine - value), unit);
+    return t(
+      handle.firstLine < value ? "{position}, hanging {by}" : "{position}, first line {by}",
+      {
+        position,
+        by,
+      },
+    );
+  };
   const root = useRef<HTMLDivElement>(null);
-  const { geometry, left: rootLeft, measureNow } = useGeometry(body, root, zoom);
+  const { geometry, left: rootLeft, measureNow } = useGeometry(body, editor, root, zoom);
   const [drag, setDragState] = useState<Drag | null>(null);
   // Read by the pointer's events at once: they may come before a render.
   const dragRef = useRef<Drag | null>(null);
@@ -306,9 +335,9 @@ export function FoliRuler({
   };
 
   const onPointerDown = (handle: Handle) => (event: ReactPointerEvent<HTMLElement>) => {
-    if (disabled || event.button !== 0) return;
-    // The document keeps the focus and its selection.
+    // The document keeps the focus and its selection (also when nothing can change).
     event.preventDefault();
+    if (disabled || event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDrag({
       key: handle.key,
@@ -353,11 +382,12 @@ export function FoliRuler({
   const onKeyDown = (handle: Handle) => (event: ReactKeyboardEvent<HTMLElement>) => {
     if (disabled) return;
     const { snap, page } = UNITS[unit];
-    // The arrows move the handle the way they point (a right-side value grows to the left).
+    // Left and Right move the handle the way they point (a right-side value grows to the left);
+    // Up and Page Up make its value larger, Down and Page Down smaller, as a slider's.
     const moves: Record<string, number> = {
-      ArrowRight: snap,
+      ArrowRight: handle.sign * snap,
+      ArrowLeft: -handle.sign * snap,
       ArrowUp: snap,
-      ArrowLeft: -snap,
       ArrowDown: -snap,
       PageUp: page,
       PageDown: -page,
@@ -365,7 +395,7 @@ export function FoliRuler({
     const move = moves[event.key];
     if (move === undefined) return;
     event.preventDefault();
-    apply(handle, clamp(Math.round(handle.value + handle.sign * move), handle.min, handle.max));
+    apply(handle, clamp(Math.round(handle.value + move), handle.min, handle.max));
   };
 
   const shown = (handle: Handle) =>
@@ -424,11 +454,13 @@ export function FoliRuler({
                 aria-valuenow={number(value)}
                 aria-valuemin={number(handle.min)}
                 aria-valuemax={number(Math.max(handle.min, handle.max))}
-                aria-valuetext={formatLength(value, unit)}
+                aria-valuetext={valueText(handle, value)}
                 aria-disabled={disabled || undefined}
                 className={`foli-ruler-handle foli-ruler-${handle.kind}`}
                 data-foli-ruler={handle.key}
                 style={{ left: local(at(handle, value)) }}
+                // Pointer events' preventDefault does not keep the focus in every engine.
+                onMouseDown={(event) => event.preventDefault()}
                 onPointerDown={onPointerDown(handle)}
                 onPointerMove={onPointerMove(handle)}
                 onPointerUp={onPointerUp(handle)}

@@ -39,9 +39,13 @@ const K = 0.1;
 const PAGE = { left: 100, right: 100 + 12240 * K };
 
 /** Gives `editor` a view whose geometry is the page above, its paragraph's from its indents. */
-function fakeView(editor: Editor) {
+function fakeView(editor: Editor, story: { id: string | null } = { id: null }) {
   editor.storyView = {
+    get open() {
+      return story.id ? { id: story.id, side: "header", variant: "default", section: 0 } : null;
+    },
     rulerGeometry: (): RulerGeometry => {
+      const caret = (story.id && editor.story(story.id)) || editor;
       const setup = sectionAt(editor.state)?.setup.margins ?? {};
       const margins = {
         left: PAGE.left + (setup.left ?? 0) * K,
@@ -49,7 +53,7 @@ function fakeView(editor: Editor) {
         top: 0,
         bottom: 0,
       };
-      const indent = (editor.state.selection.$head.parent.attrs.indent ?? {}) as Record<
+      const indent = (caret.state.selection.$head.parent.attrs.indent ?? {}) as Record<
         string,
         number
       >;
@@ -163,6 +167,55 @@ describe("FoliRuler", () => {
     // The right indent grows leftwards: ArrowLeft moves it left, a larger value.
     fireEvent.keyDown(slider("Right indent"), { key: "ArrowLeft" });
     expect(indentOf(editor)).toEqual({ left: 90, right: 810 });
+  });
+
+  it("Up makes a value larger on every handle; the hanging marker says its special indent", async () => {
+    const editor = await setup({ left: 1440, hanging: 720, right: 720 });
+    fireEvent.keyDown(slider("Right indent"), { key: "ArrowUp" });
+    expect(indentOf(editor)).toEqual({ left: 1440, hanging: 720, right: 810 });
+    expect(slider("Hanging indent").getAttribute("aria-valuetext")).toBe('1", hanging 0.5"');
+    expect(slider("First line indent").getAttribute("aria-valuetext")).toBe('-0.5"');
+  });
+
+  it("follows the caret in an open header, whose selection the body does not hear", async () => {
+    const story = { id: null as string | null };
+    const editor = createEditor({
+      document: {
+        ...doc(),
+        section: { ...doc().section, headers: { default: "h" } },
+        stories: {
+          h: {
+            kind: "header",
+            content: {
+              type: "doc",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "One" }] },
+                {
+                  type: "paragraph",
+                  attrs: { indent: { left: 720 } },
+                  content: [{ type: "text", text: "Two" }],
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+    fakeView(editor, story);
+    render(<FoliRuler editor={editor} units="in" />);
+    act(() => {
+      story.id = "h";
+      editor.storyChanged();
+    });
+    const header = editor.story("h") as Editor;
+    await waitFor(() => expect(slider("Left indent").getAttribute("aria-valuenow")).toBe("0"));
+    act(() => {
+      header.select(7, 7);
+    });
+    await waitFor(() => expect(slider("Left indent").getAttribute("aria-valuenow")).toBe("0.5"));
+    // A change goes to the header's paragraph.
+    fireEvent.keyDown(slider("Left indent"), { key: "ArrowRight" });
+    expect(header.state.selection.$head.parent.attrs.indent).toEqual({ left: 810 });
   });
 
   it("changes nothing when disabled, and is empty without a view", async () => {

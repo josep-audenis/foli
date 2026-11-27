@@ -66,6 +66,8 @@ for (const zoom of [1, 2]) {
     expect(Math.abs(left.x - g.paragraph.left)).toBeLessThan(1);
     await drag(page, left, left.x + 1440 * g.pxPerTwip);
     await expect.poll(() => indent(page)).toEqual({ left: 1440 });
+    // The document kept the focus.
+    expect(await page.evaluate(() => document.activeElement?.id)).toBe("editor");
     // The marker is under the pointer, the paragraph's text where the geometry says.
     const moved = await handle(page, "left");
     expect(Math.abs(moved.x - (left.x + 1440 * g.pxPerTwip))).toBeLessThan(1.5);
