@@ -28,6 +28,7 @@ import {
 import {
   FoliComments,
   FoliContextMenu,
+  FoliLayoutOptions,
   FoliMiniToolbar,
   FoliNavigation,
   FoliRuler,
@@ -216,14 +217,18 @@ const showStatus = () => {
 const ribbon = !new URLSearchParams(location.search).has("toolbar");
 const showToolbar = () => {
   toolbar.render(
-    <FoliToolbar
-      editor={editor}
-      comments
-      commentOnly={commenting}
-      upload={upload}
-      onClickCommand={() => view.focus()}
-      {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
-    />,
+    <>
+      <FoliToolbar
+        editor={editor}
+        comments
+        commentOnly={commenting}
+        upload={upload}
+        onClickCommand={() => view.focus()}
+        {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
+      />
+      {/* Word's Layout Options beside a selected picture or text box (33.4). */}
+      <FoliLayoutOptions editor={editor} disabled={commenting} />
+    </>,
   );
   commentsPane.render(
     <FoliComments

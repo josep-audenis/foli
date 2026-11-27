@@ -322,6 +322,22 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["path", { d: "M7 10h10" }],
     ["path", { d: "M7 14h6" }],
   ],
+  wrapText: /* wrap-text */ [
+    ["path", { d: "M3 6h18" }],
+    ["path", { d: "M3 12h15a3 3 0 1 1 0 6h-4" }],
+    ["path", { d: "m16 16-2 2 2 2" }],
+    ["path", { d: "M3 18h7" }],
+  ],
+  layoutOptions: /* wrap-text */ [
+    ["path", { d: "M3 6h18" }],
+    ["path", { d: "M3 12h15a3 3 0 1 1 0 6h-4" }],
+    ["path", { d: "m16 16-2 2 2 2" }],
+    ["path", { d: "M3 18h7" }],
+  ],
+  position: /* layout-dashboard-ish: a box placed in a page */ [
+    ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
+    ["rect", { width: "7", height: "6", x: "6", y: "6" }],
+  ],
   footnote: /* panel-bottom */ [
     ["rect", { width: "18", height: "18", x: "3", y: "3", rx: "2" }],
     ["path", { d: "M3 15h18" }],

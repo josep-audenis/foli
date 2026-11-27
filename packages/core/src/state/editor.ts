@@ -52,6 +52,7 @@ import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupda
 import type { FindMatch, FindOptions } from "./find.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
+import type { ObjectPlacement } from "./layout.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { notesPlugin } from "./notes.js";
@@ -217,6 +218,11 @@ export interface StoryView {
    * Phase 33 has none.
    */
   editTextBox?(id: string): boolean;
+  /**
+   * Where the picture or text box at `pos` is drawn (33.4): what a change of its layout keeps
+   * it at. Null when it is not drawn. Optional: a view made before Phase 33 has none.
+   */
+  objectPlacement?(pos: number): ObjectPlacement | null;
   /** Back from the note being edited to its reference, the caret after it. */
   toReference(): boolean;
   close(): void;

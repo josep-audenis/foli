@@ -1539,6 +1539,15 @@
 }
 
 /* Word's mini toolbar (FoliMiniToolbar): faded until the pointer comes to it. */
+/* Word's Layout Options button beside a selected picture or text box (33.4). */
+.foli-layout-options {
+  z-index: 15;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: var(--foli-toolbar-background);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.14);
+}
+
 .foli-mini-toolbar {
   z-index: 15;
   border: 1px solid var(--foli-border-color);

@@ -61,6 +61,12 @@ import {
   normalizeHref,
   noteAtSelection,
   noteProperties,
+  OBJECT_WRAPS,
+  type ObjectPosition,
+  type ObjectWrap,
+  objectMovesWithText,
+  objectPosition,
+  objectWrap,
   openLinkEditor,
   pageColorOf,
   paragraphBordersAt,
@@ -83,6 +89,7 @@ import {
   type SectionSetup,
   type StorySide,
   sectionAt,
+  selectedObject,
   selectedPicture,
   selectedTextBox,
   setAlign,
@@ -97,6 +104,9 @@ import {
   setLineSpacing,
   setLink,
   setNoteProperties,
+  setObjectMovesWithText,
+  setObjectPosition,
+  setObjectWrap,
   setPageColor,
   setParagraphBorder,
   setParagraphFlags,
@@ -846,6 +856,118 @@ const MARGIN_ACTIONS: readonly Action[] = [
     dialog: "pageSetup",
   },
 ];
+
+/** Word's Wrap Text options (33.4), in its menu's order and words. */
+const WRAP_LABELS: Readonly<Record<ObjectWrap, { label: string }>> = {
+  inline: { label: "In Line with Text" },
+  square: { label: "Square" },
+  tight: { label: "Tight" },
+  through: { label: "Through" },
+  topAndBottom: { label: "Top and Bottom" },
+  behind: { label: "Behind Text" },
+  inFront: { label: "In Front of Text" },
+};
+
+/** Word's Position presets (33.4), in its menu's order. */
+const POSITION_LABELS: Readonly<Record<ObjectPosition, { label: string }>> = {
+  topLeft: { label: "Top left" },
+  topCenter: { label: "Top center" },
+  topRight: { label: "Top right" },
+  middleLeft: { label: "Middle left" },
+  middleCenter: { label: "Middle center" },
+  middleRight: { label: "Middle right" },
+  bottomLeft: { label: "Bottom left" },
+  bottomCenter: { label: "Bottom center" },
+  bottomRight: { label: "Bottom right" },
+};
+
+/** The selected object's place on its page, as the view draws it. */
+const placementOf = (editor: Editor, pos: number) =>
+  editor.storyView?.objectPlacement?.(pos) ?? undefined;
+
+/** Wrap Text (Layout ▸ Arrange, Picture Format, Layout Options): the selected object's wrapping. */
+function wrapActions(editor: Editor): readonly Action[] {
+  return [
+    ...OBJECT_WRAPS.map(
+      (wrap): Action => ({
+        key: `wrap-${wrap}`,
+        label: WRAP_LABELS[wrap].label,
+        checked: (state) => {
+          const object = selectedObject(state);
+          return !!object && objectWrap(object.node) === wrap;
+        },
+        command: (state, dispatch) => {
+          const object = selectedObject(state);
+          return (
+            !!object &&
+            setObjectWrap(object.pos, wrap, placementOf(editor, object.pos))(state, dispatch)
+          );
+        },
+      }),
+    ),
+    ...(
+      [
+        { key: "moveWithText", label: "Move with Text", moves: true },
+        { key: "fixOnPage", label: "Fix Position on Page", moves: false },
+      ] as const
+    ).map(
+      ({ key, label, moves }): Action => ({
+        key,
+        label,
+        checked: (state) => {
+          const object = selectedObject(state);
+          return !!object?.node.attrs.float && objectMovesWithText(object.node) === moves;
+        },
+        command: (state, dispatch) => {
+          const object = selectedObject(state);
+          if (!object?.node.attrs.float || trackState(state)?.on === true) return false;
+          if (objectMovesWithText(object.node) === moves) return true;
+          return setObjectMovesWithText(
+            object.pos,
+            moves,
+            placementOf(editor, object.pos),
+          )(state, dispatch);
+        },
+      }),
+    ),
+  ];
+}
+
+/** Position (Layout ▸ Arrange, Picture Format): in line, or one of Word's nine presets. */
+function positionActions(editor: Editor): readonly Action[] {
+  return [
+    {
+      key: "position-inline",
+      label: "In Line with Text",
+      checked: (state) => {
+        const object = selectedObject(state);
+        return !!object && !object.node.attrs.float;
+      },
+      command: (state, dispatch) => {
+        const object = selectedObject(state);
+        return !!object && setObjectWrap(object.pos, "inline")(state, dispatch);
+      },
+    },
+    ...(Object.keys(POSITION_LABELS) as ObjectPosition[]).map(
+      (position): Action => ({
+        key: `position-${position}`,
+        label: POSITION_LABELS[position].label,
+        checked: (state) => {
+          const object = selectedObject(state);
+          return !!object && objectPosition(object.node) === position;
+        },
+        command: (state, dispatch) => {
+          const object = selectedObject(state);
+          return !!object && setObjectPosition(object.pos, position)(state, dispatch);
+        },
+      }),
+    ),
+  ];
+}
+
+/** Whether a picture or text box is selected and its layout can change (not while tracking). */
+const objectLayoutEnabled = (state: EditorState) =>
+  !!selectedObject(state) && trackState(state)?.on !== true;
 
 /** Layout ▸ Line Numbers: Word's menu for the caret's section and paragraph. */
 const LINE_NUMBER_ACTIONS: readonly Action[] = [
@@ -2040,6 +2162,26 @@ const RIBBON_ITEMS: readonly Item[] = [
     command: () => false,
   }),
   {
+    key: "wrapText",
+    label: "Wrap Text",
+    text: "Wrap Text",
+    enabled: objectLayoutEnabled,
+    actions: wrapActions,
+  },
+  {
+    key: "layoutOptions",
+    label: "Layout Options",
+    enabled: objectLayoutEnabled,
+    actions: wrapActions,
+  },
+  {
+    key: "position",
+    label: "Position",
+    text: "Position",
+    enabled: objectLayoutEnabled,
+    actions: positionActions,
+  },
+  {
     key: "rotateLeft",
     label: "Rotate left 90°",
     enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
@@ -2323,6 +2465,9 @@ export type ToolbarItemName =
   | "crossReference"
   | "fieldCodes"
   | "navigationPane"
+  | "wrapText"
+  | "layoutOptions"
+  | "position"
   | "rotateLeft"
   | "rotateRight"
   | "superscript"
@@ -2630,6 +2775,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
           wrapBefore: "spaceBefore",
           launcher: t.paragraphSettings,
         },
+        group("Arrange", large(t.position), large(t.wrapText)),
       ],
     },
     {
@@ -2690,7 +2836,10 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       label: "Picture Format",
       contextual: true,
       visible: pictureSelected,
-      items: [group("Picture", t.picture), group("Arrange", t.rotateLeft, t.rotateRight)],
+      items: [
+        group("Picture", t.picture),
+        group("Arrange", large(t.position), large(t.wrapText), t.rotateLeft, t.rotateRight),
+      ],
     },
   ].map(drawIcons);
 })();
