@@ -62,7 +62,11 @@ export function setAttr(
  */
 export function applyEdits(source: string, edits: readonly Edit[]): string {
   let out = source;
-  for (const edit of [...edits].sort((a, b) => b.from - a.from))
+  // At one offset a range goes first, then the text inserted there, so the insertion stays;
+  // texts inserted at one offset stay in the order given.
+  const order = new Map(edits.map((edit, i) => [edit, i]));
+  const rank = (edit: Edit) => order.get(edit) ?? 0;
+  for (const edit of [...edits].sort((a, b) => b.from - a.from || b.to - a.to || rank(b) - rank(a)))
     out = out.slice(0, edit.from) + edit.text + out.slice(edit.to);
   return out;
 }

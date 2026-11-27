@@ -75,4 +75,8 @@
   learns stories of this kind (noted in limitations.md).
 - Find, replace, accept and reject all reach text boxes through the stories they already walk.
 - A copy of a box needs its story copied with a fresh id (as notes' are): the clipboard work of
-  33.3.
+  33.3. Until then a box cut and pasted back has lost its story (the plugin removed it with the
+  cut): the editor shows it empty and export writes the text its `ext` holds.
+- `parseDocument` refuses a box whose story exists but is not of kind `textBox` (a header
+  holding its own box would never end being drawn or written); a box whose story is missing
+  shows empty and is written as its `ext` says.

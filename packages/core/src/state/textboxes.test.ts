@@ -85,6 +85,20 @@ describe("text boxes (schema 10)", () => {
     ).toThrow(/a text box cannot hold a pageBreak/);
   });
 
+  it("refuses a box whose story is not a text box's (a header holding the box again)", () => {
+    expect(() =>
+      parseDocument({
+        ...boxed(),
+        stories: {
+          "textbox:1": {
+            kind: "header",
+            content: { type: "doc", content: [{ type: "paragraph", content: [box("textbox:1")] }] },
+          },
+        },
+      }),
+    ).toThrow(/a text box's story must be of kind textBox/);
+  });
+
   it("removes a box's story with its node, in one undo step", () => {
     const editor = createEditor({ document: boxed() });
     const pos = 1 + "Before ".length;

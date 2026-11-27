@@ -728,14 +728,30 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
 
   const schema = schemaWith(options.extensions);
   const content = parseContent(distinct.content, { schema });
+  const trees = new Map<string, Node>();
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
       const tree = parseContent(story.content, { path, schema });
       storyRules(tree, story.kind, path);
+      trees.set(id, tree);
       return [id, { ...structuredClone({ ...story, content: null }), content: copied(tree) }];
     },
   );
+  // A box's story, when there is one, is a text box's: no header or note drawn inside a box
+  // (which could hold the box again).
+  const given = (input.stories ?? {}) as Record<string, StoryJSON>;
+  const boxStories = (tree: Node, path: string) =>
+    tree.descendants((node) => {
+      const id = node.type.name === "textBox" ? String(node.attrs.story) : null;
+      if (id !== null && Object.hasOwn(given, id) && given[id]?.kind !== "textBox")
+        fail(path, `a text box's story must be of kind textBox (${JSON.stringify(id)} is not)`);
+      return true;
+    });
+  boxStories(content, "content");
+  for (const [id, story] of Object.entries(given))
+    if (story.kind === "header" || story.kind === "footer")
+      boxStories(trees.get(id) as Node, `stories[${JSON.stringify(id)}].content`);
   // A copy: the validated document must not change when the caller's input does.
   const envelope = structuredClone({
     section: input.section,

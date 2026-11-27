@@ -664,7 +664,11 @@ function run(
         break;
       case "br": {
         const type = attr(el, "type");
-        const inNote = context.story === "footnote" || context.story === "endnote";
+        // Word puts no page or column break in a note or a text box: kept as it is.
+        const inNote =
+          context.story === "footnote" ||
+          context.story === "endnote" ||
+          context.story === "textBox";
         if ((type === "page" || type === "column") && inNote) opaqueRun(el);
         else if (type === "page") out.push(node("pageBreak", marks));
         else if (type === "column") out.push(node("columnBreak", marks));

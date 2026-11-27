@@ -229,14 +229,16 @@ function lookEdits(
         ["noAutofit", "spAutoFit", "normAutofit"].includes(c.local),
     );
     const text = now.autoFit ? `<${a}:spAutoFit/>` : `<${a}:noAutofit/>`;
+    // CT_TextBodyProperties: the autofit after the text warp, before scene3d and the rest.
+    const warp = kid(bodyPr, A, "prstTxWarp");
     if (fit) edits.push({ from: fit.start, to: fit.end, text });
-    else if (source[bodyPr.openEnd - 2] === "/")
-      edits.push({
-        from: bodyPr.openEnd - 2,
-        to: bodyPr.openEnd,
-        text: `>${text}</${bodyPr.name}>`,
-      });
-    else edits.push({ from: bodyPr.closeStart, to: bodyPr.closeStart, text });
+    else if (source[bodyPr.openEnd - 2] === "/") {
+      // The "/" removed apart from the attributes inserted before it (`applyEdits` takes a
+      // range before an insertion at the same offset).
+      edits.push({ from: bodyPr.openEnd - 2, to: bodyPr.openEnd - 1, text: "" });
+      edits.push({ from: bodyPr.openEnd, to: bodyPr.openEnd, text: `${text}</${bodyPr.name}>` });
+    } else if (warp) edits.push({ from: warp.end, to: warp.end, text });
+    else edits.push({ from: bodyPr.openEnd, to: bodyPr.openEnd, text });
   }
 }
 

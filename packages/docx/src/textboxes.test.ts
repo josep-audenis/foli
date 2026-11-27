@@ -245,6 +245,31 @@ describe("text boxes (Phase 33)", () => {
     expect(Object.keys(report.opaque).length).toBeGreaterThan(0);
   });
 
+  it("keeps a page break in a box as it is: Word holds none there", async () => {
+    const drawing = (inner: string) =>
+      `<w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="100" cy="100"/><wp:docPr id="1" name="s"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:spPr><a:prstGeom prst="rect"/></wps:spPr><wps:txbx><w:txbxContent>${inner}</w:txbxContent></wps:txbx><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing>`;
+    const { document, package: pkg } = await importDocx(
+      await docx(
+        `<w:p><w:r>${drawing('<w:p><w:r><w:t>a</w:t><w:br w:type="page"/></w:r></w:p>')}</w:r></w:p>`,
+      ),
+    );
+    const story = document.stories?.["textbox:1"]?.content.content?.[0];
+    expect(story?.content?.map((n) => n.type)).toEqual(["text", "opaqueInline"]);
+    // Insets, alignment and autofit changed on a self-closing body: written into it whole.
+    const changed = patched(document, "textbox:1", {
+      inset: { left: 0, top: 0, right: 0, bottom: 0 },
+      verticalAlign: "bottom",
+      autoFit: true,
+    });
+    const out = await exportDocx(changed, pkg);
+    const xml = (await readPackage(out)).text("/word/document.xml");
+    expect(xml).toMatch(
+      /<wps:bodyPr lIns="0" tIns="0" rIns="0" bIns="0" anchor="b"><a:spAutoFit\/><\/wps:bodyPr>/,
+    );
+    const again = boxes((await importDocx(out)).document)[0];
+    expect(again).toMatchObject({ inset: { left: 0 }, verticalAlign: "bottom", autoFit: true });
+  });
+
   it("writes a new text box as DrawingML Word reads", async () => {
     const { document } = await importDocx(await docx("<w:p><w:r><w:t>Body</w:t></w:r></w:p>"));
     const copy = structuredClone(document) as FoliDocument & { schemaVersion: number };

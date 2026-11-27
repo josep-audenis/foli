@@ -69,7 +69,7 @@ const bodyChanges = (context: Context) => {
   return trackedChanges(state.doc, wordContext(state)?.envelope.section);
 };
 
-/** How many tracked changes the headers, footers and notes hold. */
+/** How many tracked changes the headers, footers, notes and text boxes hold. */
 function storyCount(context: Context): number {
   let n = 0;
   for (const story of wordContext(context.editor.state)?.stories.values() ?? [])
