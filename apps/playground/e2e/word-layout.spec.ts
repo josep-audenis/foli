@@ -8,6 +8,13 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
+const REFERENCE = new URL("../../../corpus/reference/word/11-text-box-flyer.json", import.meta.url);
+/** Word's floating pictures in the flyer: wrapped tight and through. */
+const wordPictures = (
+  JSON.parse(readFileSync(REFERENCE, "utf8").replace(/^﻿/, "")) as {
+    pictures: { alt: string; left: number; top: number; width: number; wrap: number }[];
+  }
+).pictures;
 
 async function open(page: Page): Promise<void> {
   await page.goto("/edit.html");
@@ -93,4 +100,108 @@ test("Layout ▸ Position puts the selected picture at a preset; fixed on the pa
   await page.getByRole("button", { name: "Wrap Text" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Fix Position on Page" }).click();
   await expect.poll(float).toMatchObject({ vertical: { relativeTo: "page" } });
+});
+
+test("the Layout dialog sets wrapping, distance and position in one step", async ({ page }) => {
+  await open(page);
+  await logo(page).click();
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByRole("button", { name: "Wrap Text" }).click();
+  await page.getByRole("menuitem", { name: "More Layout Options…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Layout" });
+  await expect(dialog.getByRole("tab", { name: "Text Wrapping" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(dialog.getByLabel("Tight")).toBeChecked();
+  const results = await new AxeBuilder({ page }).include(".foli-layout-dialog").analyze();
+  expect(results.violations).toEqual([]);
+  await dialog.getByLabel("Square").check();
+  await dialog.getByLabel("Left", { exact: true }).fill("0.5");
+  await dialog.getByRole("tab", { name: "Position" }).click();
+  await dialog.locator("input[id$='-horizontal-offset-value']").fill("1");
+  await dialog.locator("select[id$='-horizontal-offset-from']").selectOption("page");
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(dialog).toHaveCount(0);
+  const float = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          foliEdit: { editor: { getDocument(): { content: unknown } } };
+        }
+      ).foliEdit.editor.getDocument().content,
+  );
+  const json = JSON.stringify(float);
+  expect(json).toContain('"wrap":"square"');
+  expect(json).toContain('"horizontal":{"relativeTo":"page","offset":914400}');
+  expect(json).toContain('"left":457200');
+  await expect.poll(() => wrapOf(page)).toBe("square");
+  // One undo takes it all back.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect.poll(() => wrapOf(page)).toBe("tight");
+});
+
+test("pictures wrapped tight and through are where Word puts them, lines around them", async ({
+  page,
+}, info) => {
+  await open(page);
+  for (const word of wordPictures) {
+    const at = await page.evaluate((alt) => {
+      const img = document.querySelector(`[contenteditable] img[alt="${alt}"]`) as HTMLElement;
+      const holder = img.closest("[data-foli-float]") as HTMLElement;
+      const fragment = holder.parentElement as HTMLElement;
+      const section = img.closest("section.foli-page") as HTMLElement;
+      const s = section.getBoundingClientRect();
+      const scale = s.width / section.offsetWidth;
+      const left = s.left + Number.parseFloat(getComputedStyle(section).paddingLeft) * scale;
+      const r = img.getBoundingClientRect();
+      const lines: { left: number; right: number; top: number; bottom: number }[] = [];
+      const range = document.createRange();
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim() || node.parentElement?.closest("[data-foli-text-box]"))
+          continue;
+        range.selectNodeContents(node);
+        for (const x of range.getClientRects())
+          lines.push({ left: x.left, right: x.right, top: x.top, bottom: x.bottom });
+      }
+      return {
+        wrap: holder.getAttribute("data-foli-float"),
+        left: (r.left - left) / scale,
+        top: (r.top - fragment.getBoundingClientRect().top) / scale,
+        box: { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+        lines,
+      };
+    }, word.alt);
+    info.annotations.push({ type: word.alt, description: JSON.stringify({ word, at }) });
+    expect(at.wrap).toBe(word.wrap === 1 ? "tight" : "through");
+    expect(Math.abs(at.left - word.left * (96 / 72))).toBeLessThan(1.5);
+    expect(Math.abs(at.top - word.top * (96 / 72))).toBeLessThan(1.5);
+    const beside = at.lines.filter((l) => l.top < at.box.bottom - 1 && l.bottom > at.box.top + 1);
+    expect(beside.length).toBeGreaterThan(0);
+    for (const line of beside)
+      expect(line.right <= at.box.left + 1 || line.left >= at.box.right - 1).toBe(true);
+  }
+});
+
+test("OK with nothing changed changes nothing (no rounding through the unit)", async ({ page }) => {
+  await open(page);
+  await logo(page).click();
+  const before = await page.evaluate(() =>
+    JSON.stringify(
+      (window as unknown as { foliEdit: { editor: { state: { doc: unknown } } } }).foliEdit.editor
+        .state.doc,
+    ),
+  );
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByRole("button", { name: "Position" }).click();
+  await page.getByRole("menuitem", { name: "More Layout Options…" }).click();
+  await page.getByRole("dialog", { name: "Layout" }).getByRole("button", { name: "OK" }).click();
+  const after = await page.evaluate(() =>
+    JSON.stringify(
+      (window as unknown as { foliEdit: { editor: { state: { doc: unknown } } } }).foliEdit.editor
+        .state.doc,
+    ),
+  );
+  expect(after).toBe(before);
 });

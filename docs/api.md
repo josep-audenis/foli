@@ -1035,7 +1035,9 @@ and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `t
 `OBJECT_POSITIONS`' nine, or null) read it. `setObjectWrap(pos, wrap, placement?)`,
 `setObjectMovesWithText(pos, moves, placement?)`, `setObjectPosition(pos, preset)` and
 `setObjectLayout(pos, { horizontal?, vertical?, side?, distance?, allowOverlap?, layoutInCell?
-})` change it, one undo step each, refused while tracking. `placement` is where the object is
+})` and `setObjectFloat(pos, float | null)` (the whole layout at once, as the Layout dialog's OK)
+change it, one undo step each, refused while tracking. The toolbar's dialogs `"layout"` and
+`"layoutWrapping"` are Word's Layout dialog on its Position and Text Wrapping tabs. `placement` is where the object is
 drawn (`storyView.objectPlacement(pos)`, CSS px from its page's corner, with its paragraph's top
 and its column's left): an object made floating, or fixed on the page, stays there.
 

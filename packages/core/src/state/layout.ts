@@ -256,3 +256,43 @@ export function objectPosition(node: Node): ObjectPosition | null {
       return key as ObjectPosition;
   return null;
 }
+
+/** A floating object's layout as the Layout dialog sets it whole (33.4): `checkFloat`'s shape. */
+export interface ObjectFloat {
+  horizontal: ObjectAxis;
+  vertical: ObjectAxis;
+  wrap: Exclude<ObjectWrap, "inline">;
+  side?: "bothSides" | "left" | "right" | "largest";
+  /** In EMU. */
+  distance?: { top?: number; bottom?: number; left?: number; right?: number };
+  allowOverlap?: boolean;
+  layoutInCell?: boolean;
+}
+
+/**
+ * Sets the whole layout of the object at `pos` (the Layout dialog's OK): `float`, or null for in
+ * line with text. One undo step; not while tracking.
+ */
+export function setObjectFloat(pos: number, float: ObjectFloat | null): Command {
+  return setFloat(pos, (node) => {
+    if (!float) return null;
+    const own = (node.attrs.float ?? {}) as Record<string, unknown>;
+    const axis = (a: ObjectAxis, start: string) =>
+      typeof a.offset === "number"
+        ? { relativeTo: a.relativeTo, offset: Math.round(a.offset) }
+        : { relativeTo: a.relativeTo, align: a.align ?? start };
+    const distance = { ...DISTANCE, ...(own.distance as object), ...float.distance };
+    return {
+      ...own,
+      horizontal: axis(float.horizontal, "left"),
+      vertical: axis(float.vertical, "top"),
+      wrap: float.wrap,
+      side: float.side ?? (own.side as string | undefined) ?? "bothSides",
+      distance: Object.fromEntries(
+        Object.entries(distance).map(([k, v]) => [k, Math.max(0, Math.round(Number(v) || 0))]),
+      ),
+      allowOverlap: float.allowOverlap ?? (own.allowOverlap as boolean | undefined) ?? true,
+      layoutInCell: float.layoutInCell ?? (own.layoutInCell as boolean | undefined) ?? true,
+    };
+  });
+}

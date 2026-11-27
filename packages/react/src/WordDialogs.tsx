@@ -12,16 +12,21 @@ import {
   fontFamilyAt,
   fontSizeAt,
   type LineRule,
+  type ObjectAxis,
+  type ObjectFloat,
+  type ObjectWrap,
   type ParagraphFlags,
   paragraphFormatAt,
   type RunEffects,
   runFormatAt,
+  selectedObject,
   setAlign,
   setCharacterSpacing,
   setFontFamily,
   setFontSize,
   setIndent,
   setLineSpacing,
+  setObjectFloat,
   setOutlineLevel,
   setParagraphFlags,
   setParagraphSpacing,
@@ -1403,5 +1408,462 @@ export function ParagraphBox({
         }}
       />
     </span>
+  );
+}
+
+// ---------- Layout (pictures and text boxes, 33.4) ----------
+
+/** EMU per twip. */
+const EMU_PER_TWIP = 635;
+
+const HORIZONTAL_FROM = [
+  ["margin", "Margin"],
+  ["page", "Page"],
+  ["column", "Column"],
+  ["character", "Character"],
+  ["leftMargin", "Left Margin"],
+  ["rightMargin", "Right Margin"],
+  ["insideMargin", "Inside Margin"],
+  ["outsideMargin", "Outside Margin"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+const VERTICAL_FROM = [
+  ["margin", "Margin"],
+  ["page", "Page"],
+  ["paragraph", "Paragraph"],
+  ["line", "Line"],
+  ["topMargin", "Top Margin"],
+  ["bottomMargin", "Bottom Margin"],
+  ["insideMargin", "Inside Margin"],
+  ["outsideMargin", "Outside Margin"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+const HORIZONTAL_ALIGN = [
+  ["left", "Left"],
+  ["center", "Centered"],
+  ["right", "Right"],
+  ["inside", "Inside"],
+  ["outside", "Outside"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+const VERTICAL_ALIGN = [
+  ["top", "Top"],
+  ["center", "Centered"],
+  ["bottom", "Bottom"],
+  ["inside", "Inside"],
+  ["outside", "Outside"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+const WRAP_STYLES = [
+  ["inline", "In line with text"],
+  ["square", "Square"],
+  ["tight", "Tight"],
+  ["through", "Through"],
+  ["topAndBottom", "Top and bottom"],
+  ["behind", "Behind text"],
+  ["inFront", "In front of text"],
+] as const satisfies readonly (readonly [ObjectWrap, ToolbarMessage])[];
+
+const WRAP_SIDES = [
+  ["bothSides", "Both sides"],
+  ["left", "Left only"],
+  ["right", "Right only"],
+  ["largest", "Largest only"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+const DISTANCES = [
+  ["top", "Top"],
+  ["bottom", "Bottom"],
+  ["left", "Left"],
+  ["right", "Right"],
+] as const satisfies readonly (readonly ["top" | "bottom" | "left" | "right", ToolbarMessage])[];
+
+/** The Position tab's options. */
+const OPTIONS = [
+  ["moves", "Move object with text"],
+  ["overlap", "Allow overlap"],
+  ["cell", "Layout in table cell"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+/** The two axes' names, as the dialog shows them. */
+const AXES = {
+  horizontal: { label: "Horizontal" },
+  vertical: { label: "Vertical" },
+} as const satisfies Record<string, { label: ToolbarMessage }>;
+
+type AxisForm = { mode: "align" | "offset"; align: string; offset: string; from: string };
+
+/** An axis of a float as the dialog edits it. */
+function axisForm(
+  axis: ObjectAxis | undefined,
+  start: string,
+  from: string,
+  unit: LengthUnit,
+): AxisForm {
+  const offset = typeof axis?.offset === "number" ? axis.offset : 0;
+  return {
+    mode: typeof axis?.offset === "number" || !axis ? "offset" : "align",
+    align: axis?.align ?? start,
+    offset: formatLength(Math.round(offset / EMU_PER_TWIP), unit),
+    from: axis?.relativeTo ?? from,
+  };
+}
+
+/**
+ * Word's Layout dialog for the selected picture or text box (More Layout Options…): Position
+ * (horizontal and vertical alignment or absolute position and what they are from, move with
+ * text, allow overlap, layout in table cell) and Text Wrapping (the style, the sides, the
+ * distance from text). OK sets them in one undo step (`setObjectFloat`).
+ * @internal
+ */
+export function LayoutDialog({
+  editor,
+  unit,
+  initialTab = "position",
+  onClose,
+}: {
+  editor: Editor;
+  unit: LengthUnit;
+  initialTab?: "position" | "wrapping";
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [object] = useState(() => selectedObject(editor.state));
+  const float = (object?.node.attrs.float ?? null) as ObjectFloat | null;
+  const [tab, setTab] = useState<string>(initialTab);
+  const [wrap, setWrap] = useState<ObjectWrap>(float?.wrap ?? "inline");
+  const [side, setSide] = useState<string>(float?.side ?? "bothSides");
+  const [horizontal, setHorizontal] = useState<AxisForm>(() =>
+    axisForm(float?.horizontal, "left", "column", unit),
+  );
+  const [vertical, setVertical] = useState<AxisForm>(() =>
+    axisForm(float?.vertical, "top", "paragraph", unit),
+  );
+  const [distance, setDistance] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      DISTANCES.map(([key]) => [
+        key,
+        formatLength(
+          Math.round(
+            (float?.distance?.[key] ?? (key === "left" || key === "right" ? 114_300 : 0)) /
+              EMU_PER_TWIP,
+          ),
+          unit,
+        ),
+      ]),
+    ),
+  );
+  // What the dialog opened with: a value whose text is unchanged is written back as it was (its
+  // text rounds it to the unit's hundredths).
+  const [opened] = useState(() => ({ horizontal, vertical, distance }));
+  const [overlap, setOverlap] = useState(float?.allowOverlap ?? true);
+  const [inCell, setInCell] = useState(float?.layoutInCell ?? true);
+  const [error, setError] = useState<ToolbarMessage | null>(null);
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  const floating = wrap !== "inline";
+  const moves = vertical.from === "paragraph" || vertical.from === "line";
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (!object) return onClose(false);
+    if (!floating) return onClose(editor.run(setObjectFloat(object.pos, null)));
+    const axis = (
+      form: AxisForm,
+      field: ToolbarMessage,
+      was: AxisForm,
+      own: ObjectAxis | undefined,
+    ): ObjectAxis | null => {
+      if (form.mode === "align") return { relativeTo: form.from, align: form.align };
+      if (form.offset === was.offset && was.mode === "offset" && typeof own?.offset === "number")
+        return { relativeTo: form.from, offset: own.offset };
+      const twips = parseLength(form.offset, unit);
+      if (twips === null || Math.abs(twips) > 31_680) {
+        setError(field);
+        return null;
+      }
+      return { relativeTo: form.from, offset: twips * EMU_PER_TWIP };
+    };
+    const h = axis(horizontal, AXES.horizontal.label, opened.horizontal, float?.horizontal);
+    const v = axis(vertical, AXES.vertical.label, opened.vertical, float?.vertical);
+    if (!h || !v) return setTab("position");
+    const gaps: Record<string, number> = {};
+    const sideWise = wrap === "tight" || wrap === "through";
+    const shut = (key: string) =>
+      wrap === "behind" ||
+      wrap === "inFront" ||
+      (sideWise && (key === "top" || key === "bottom")) ||
+      (wrap === "topAndBottom" && (key === "left" || key === "right"));
+    for (const [key, label] of DISTANCES) {
+      // Unchanged, or not editable for this wrapping: as it was (Word's default for a new float).
+      if (distance[key] === opened.distance[key] || shut(key)) {
+        gaps[key] = float?.distance?.[key] ?? (key === "left" || key === "right" ? 114_300 : 0);
+        continue;
+      }
+      const twips = parseLength(distance[key] ?? "", unit);
+      if (twips === null || twips < 0 || twips > 31_680) {
+        setTab("wrapping");
+        return setError(label);
+      }
+      gaps[key] = twips * EMU_PER_TWIP;
+    }
+    onClose(
+      editor.run(
+        setObjectFloat(object.pos, {
+          horizontal: h,
+          vertical: v,
+          wrap,
+          side: side as NonNullable<ObjectFloat["side"]>,
+          distance: gaps,
+          allowOverlap: overlap,
+          layoutInCell: inCell,
+        }),
+      ),
+    );
+  };
+
+  const axisFields = (
+    key: "horizontal" | "vertical",
+    form: AxisForm,
+    set: (form: AxisForm) => void,
+  ) => {
+    const aligns = key === "horizontal" ? HORIZONTAL_ALIGN : VERTICAL_ALIGN;
+    // Word aligns vertically against the margins or the page, not a paragraph or a line.
+    const froms =
+      key === "horizontal"
+        ? HORIZONTAL_FROM
+        : form.mode === "align"
+          ? VERTICAL_FROM.filter(([value]) => value !== "paragraph" && value !== "line")
+          : VERTICAL_FROM;
+    const label: ToolbarMessage = AXES[key].label;
+    const fromSelect = (mode: AxisForm["mode"], text: string) => (
+      <Field id={`${id}-${key}-${mode}-from`} label={text}>
+        <select
+          id={`${id}-${key}-${mode}-from`}
+          value={form.from}
+          disabled={form.mode !== mode}
+          onChange={(e) => set({ ...form, from: e.target.value })}
+        >
+          {froms.map(([value, name]) => (
+            <option key={value} value={value}>
+              {t(name)}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+    return (
+      <fieldset className="foli-dialog-section" disabled={!floating}>
+        <legend>{t(label)}</legend>
+        <div className="foli-setup-field foli-setup-check">
+          <input
+            id={`${id}-${key}-align`}
+            type="radio"
+            name={`${id}-${key}`}
+            checked={form.mode === "align"}
+            onChange={() =>
+              set({
+                ...form,
+                mode: "align",
+                // A paragraph or line cannot align: against the margin then.
+                from: form.from === "paragraph" || form.from === "line" ? "margin" : form.from,
+              })
+            }
+          />
+          <label htmlFor={`${id}-${key}-align`}>{t("Alignment")}</label>
+        </div>
+        <Field id={`${id}-${key}-align-value`} label={t("Aligned")}>
+          <select
+            id={`${id}-${key}-align-value`}
+            value={form.align}
+            disabled={form.mode !== "align"}
+            onChange={(e) => set({ ...form, align: e.target.value })}
+          >
+            {aligns.map(([value, name]) => (
+              <option key={value} value={value}>
+                {t(name)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {fromSelect("align", t("Relative to"))}
+        <div className="foli-setup-field foli-setup-check">
+          <input
+            id={`${id}-${key}-offset`}
+            type="radio"
+            name={`${id}-${key}`}
+            checked={form.mode === "offset"}
+            onChange={() => set({ ...form, mode: "offset" })}
+          />
+          <label htmlFor={`${id}-${key}-offset`}>{t("Absolute position")}</label>
+        </div>
+        <Field id={`${id}-${key}-offset-value`} label={t("Position")}>
+          <input
+            id={`${id}-${key}-offset-value`}
+            type="text"
+            inputMode="decimal"
+            value={form.offset}
+            disabled={form.mode !== "offset"}
+            aria-invalid={error === label || undefined}
+            aria-describedby={error === label ? `${id}-error` : undefined}
+            onChange={(e) => {
+              set({ ...form, offset: e.target.value });
+              setError(null);
+            }}
+          />
+        </Field>
+        {fromSelect("offset", key === "horizontal" ? t("To the right of") : t("Below"))}
+      </fieldset>
+    );
+  };
+
+  const check = (
+    key: string,
+    label: ToolbarMessage,
+    value: boolean,
+    set: (value: boolean) => void,
+    off = false,
+  ) => (
+    <div className="foli-setup-field foli-setup-check">
+      <input
+        id={`${id}-${key}`}
+        type="checkbox"
+        disabled={off}
+        checked={value}
+        onChange={(e) => set(e.target.checked)}
+      />
+      <label htmlFor={`${id}-${key}`}>{t(label)}</label>
+    </div>
+  );
+
+  const sides = wrap === "square" || wrap === "tight" || wrap === "through";
+  const position = (
+    <>
+      {axisFields("horizontal", horizontal, setHorizontal)}
+      {axisFields("vertical", vertical, setVertical)}
+      <fieldset className="foli-dialog-section" disabled={!floating}>
+        <legend>{t("Options")}</legend>
+        {check(
+          ...OPTIONS[0],
+          moves,
+          (on) => {
+            // Where it is drawn stays: its offset from the paragraph or from the page.
+            const at = object ? editor.storyView?.objectPlacement?.(object.pos) : null;
+            // A typed offset stays as typed; only what the dialog opened with is converted.
+            const typed = vertical.offset !== opened.vertical.offset;
+            const px = at && !typed ? (on ? at.top - at.paragraphTop : at.top) : null;
+            setVertical({
+              ...vertical,
+              from: on ? "paragraph" : "page",
+              ...(px === null
+                ? {}
+                : { offset: formatLength(Math.round((px * 9525) / EMU_PER_TWIP), unit) }),
+            });
+          },
+          vertical.mode === "align",
+        )}
+        {check(...OPTIONS[1], overlap, setOverlap)}
+        {check(...OPTIONS[2], inCell, setInCell)}
+      </fieldset>
+    </>
+  );
+  const wrapping = (
+    <>
+      <fieldset className="foli-dialog-section">
+        <legend>{t("Wrapping style")}</legend>
+        {WRAP_STYLES.map(([value, label]) => (
+          <div key={value} className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-wrap-${value}`}
+              type="radio"
+              name={`${id}-wrap`}
+              checked={wrap === value}
+              onChange={() => setWrap(value)}
+            />
+            <label htmlFor={`${id}-wrap-${value}`}>{t(label)}</label>
+          </div>
+        ))}
+      </fieldset>
+      <fieldset className="foli-dialog-section" disabled={!sides}>
+        <legend>{t("Wrap text")}</legend>
+        {WRAP_SIDES.map(([value, label]) => (
+          <div key={value} className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-side-${value}`}
+              type="radio"
+              name={`${id}-side`}
+              checked={side === value}
+              onChange={() => setSide(value)}
+            />
+            <label htmlFor={`${id}-side-${value}`}>{t(label)}</label>
+          </div>
+        ))}
+      </fieldset>
+      <fieldset
+        className="foli-dialog-section"
+        disabled={!floating || wrap === "behind" || wrap === "inFront"}
+      >
+        <legend>{t("Distance from text")}</legend>
+        {DISTANCES.map(([key, label]) => (
+          <Field key={key} id={`${id}-distance-${key}`} label={t(label)}>
+            <input
+              id={`${id}-distance-${key}`}
+              type="text"
+              inputMode="decimal"
+              // As Word's: square all four, tight and through the sides, top and bottom those.
+              disabled={
+                ((wrap === "tight" || wrap === "through") && (key === "top" || key === "bottom")) ||
+                (wrap === "topAndBottom" && (key === "left" || key === "right"))
+              }
+              value={distance[key] ?? ""}
+              aria-invalid={error === label || undefined}
+              aria-describedby={error === label ? `${id}-error` : undefined}
+              onChange={(e) => {
+                setDistance({ ...distance, [key]: e.target.value });
+                setError(null);
+              }}
+            />
+          </Field>
+        ))}
+      </fieldset>
+    </>
+  );
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Layout")}
+      className="foli-link-dialog foli-word-dialog foli-layout-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <Tabs
+          id={id}
+          tabs={[
+            { key: "position", label: t("Position"), content: position },
+            { key: "wrapping", label: t("Text Wrapping"), content: wrapping },
+          ]}
+          selected={tab}
+          onSelect={setTab}
+        />
+        <div className="foli-dialog-buttons">
+          <button ref={first} type="submit">
+            {t("OK")}
+          </button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {t("Check this value: {field}.", { field: t(error) })}
+          </p>
+        )}
+      </form>
+    </div>
   );
 }

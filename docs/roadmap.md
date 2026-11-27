@@ -4657,9 +4657,19 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   a box's story and pastes it as a new one (`fitPaste`); the word count with notes counts boxes.
   Find and replace already read every story. `textboxes.test.ts` (core), `word-textboxes.spec.ts`
   (click, type, Escape, undo; Insert ▸ Text Box; reveal; three engines).
-- [ ] 33.4 Layout Options for pictures and boxes (in line, square, tight, through, top and
+- [x] 33.4 Layout Options for pictures and boxes (in line, square, tight, through, top and
   bottom, behind, in front; move with text or fix on page) as a menu beside the selected object
-  and in Picture Format ▸ Wrap Text; position (Position menu, Layout dialog).
+  and in Picture Format ▸ Wrap Text; position (Position menu, Layout dialog). Built
+  (two PRs): core's `setObjectWrap`, `setObjectMovesWithText`, `setObjectPosition` (Word's nine
+  presets), `setObjectLayout` and `setObjectFloat` (the Layout dialog's OK, one step), with
+  `selectedObject`, `objectWrap`, `objectPosition`, `objectMovesWithText`; the view's
+  `objectPlacement` and `objectRect` (an object made floating or fixed stays where it is drawn;
+  the button follows its object); React's Wrap Text and Position menus (Layout ▸ Arrange,
+  Picture Format ▸ Arrange), `FoliLayoutOptions` beside the selected object, and the Layout dialog
+  (Position, Text Wrapping; More Layout Options…). Export writes the frame in place
+  (`export/frames.ts`, 33.1). `layout.test.ts` (core), `word-layout.spec.ts` (three engines: the
+  button, the menus, the dialog, axe; the flyer's tight and through pictures within 1.5 px of
+  Word's place with lines around them). Tight and through are drawn as square (ADR-0016).
 - [ ] 33.5 Crop handles on the page (left from 19.5), resize keeping the ratio with Shift, a
   Size dialog (height, width, scale, rotation).
 - [ ] 33.6 Picture Format tab as Word's (Size group boxes, Arrange: wrap, position, bring

@@ -191,6 +191,7 @@ import { StyleGallery } from "./StyleGallery.js";
 import { defaultUnit, formatLength, type LengthUnit, parseLength } from "./units.js";
 import {
   FontDialog,
+  LayoutDialog,
   ParagraphBox,
   ParagraphDialog,
   TabsDialog,
@@ -492,6 +493,8 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section).
  */
 export type ToolbarDialogName =
+  | "layout"
+  | "layoutWrapping"
   | "bordersShading"
   | "lineNumbers"
   | "pageBorders"
@@ -937,6 +940,12 @@ function wrapActions(editor: Editor): readonly Action[] {
         },
       }),
     ),
+    {
+      key: "wrapMore",
+      label: "More Layout Options…",
+      command: (state) => objectLayoutEnabled(state),
+      dialog: "layoutWrapping",
+    },
   ];
 }
 
@@ -973,6 +982,12 @@ function positionActions(editor: Editor): readonly Action[] {
         },
       }),
     ),
+    {
+      key: "positionMore",
+      label: "More Layout Options…",
+      command: (state) => objectLayoutEnabled(state),
+      dialog: "layout",
+    },
   ];
 }
 
@@ -2907,6 +2922,8 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   watermark: isWord,
   bordersShading: (state) => paragraphBordersAt(state) !== null,
   lineNumbers: (state) => sectionAt(state) !== null,
+  layout: (state) => objectLayoutEnabled(state),
+  layoutWrapping: (state) => objectLayoutEnabled(state),
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -3636,7 +3653,9 @@ export function FoliToolbar({
       | "pageBorders"
       | "watermark"
       | "bordersShading"
-      | "lineNumbers";
+      | "lineNumbers"
+      | "layout"
+      | "layoutWrapping";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3746,7 +3765,9 @@ export function FoliToolbar({
         name === "pageBorders" ||
         name === "watermark" ||
         name === "bordersShading" ||
-        name === "lineNumbers"
+        name === "lineNumbers" ||
+        name === "layout" ||
+        name === "layoutWrapping"
       )
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
@@ -4653,6 +4674,18 @@ export function FoliToolbar({
               (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
                 c.shade === undefined && c.color !== null,
             )}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {(wordDialog?.name === "layout" || wordDialog?.name === "layoutWrapping") && !disabled && (
+          <LayoutDialog
+            editor={editor}
+            unit={unit}
+            initialTab={wordDialog.name === "layout" ? "position" : "wrapping"}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);
