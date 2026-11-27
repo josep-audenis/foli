@@ -4379,8 +4379,37 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
 
 ### Tasks
 
-- [ ] 31.1 Decisions; `view.rulerGeometry()` (the caret's page box, margins, the paragraph's
-  indents and tabs in screen px, table column edges), following scroll and zoom.
+- [x] 31.1 Decisions; `view.rulerGeometry()` (the caret's page box, margins, the paragraph's
+  indents and tabs in screen px, table column edges), following scroll and zoom. Decided:
+  - Where: `FoliRuler` in `@folijs/react`, a component the app places as it places the status
+    bar: the horizontal ruler above the pages, `orientation="vertical"` beside them (31.5), and
+    `FoliEditor`'s `ruler` both (31.6). Values come from core (`paragraphFormatAt`, `sectionAt`,
+    `columnAt`), positions from the view through `editor.storyView.rulerGeometry()` (the core
+    type `RulerGeometry`, client px, as `fieldLayout` gives the status bar its pages), read
+    again on every change, scroll and resize, so the ruler lines up with the caret's page at any
+    zoom (the ruler itself is not zoomed: its numbers are drawn at the pages' scale).
+  - Units: Phase 30's, `units` (`LengthUnit`) on `FoliRuler`, by default the browser's language's
+    (`defaultUnit`). Numbers every inch or centimetre from the left margin (the top one on the
+    vertical ruler), ticks every 1/8 inch or 0.25 cm. A drag snaps to 1/16 inch or 0.25 cm; with
+    Alt held it does not snap and the ruler shows the exact values (Word's).
+  - Drags: as the table column border's (19.4): a guide line follows the pointer, the document
+    changes once on release (one transaction, one undo step), Escape or a lost pointer cancels.
+    Pointer events with pointer capture, so touch drags too. What each sets is the dialog's
+    command: `setIndent`, `setTabStops`, `setSectionSetup({ margins })` (the caret's section;
+    tracked as Page setup is), `setColumnWidth` (not while tracking, as the border drag).
+  - Announced: each handle is a `slider` (`aria-orientation` vertical on the vertical ruler)
+    named for what it moves ("First line indent", "Hanging indent", "Left indent", "Right indent",
+    "Left margin", "Tab stop", "Column border"…), its value in the unit (`aria-valuenow`,
+    `aria-valuetext` "1.5 cm", min and max where the command stops). Arrows move it by a step
+    (1/16 inch or 0.25 cm; Page Up and Page Down by 1/2 inch or 1 cm), each key one change, as
+    a slider's; Delete on a tab stop removes it. The ruler is a group: Tab moves
+    through its handles.
+
+  Built: `view.rulerGeometry()` and `editor.storyView.rulerGeometry` (optional on `StoryView`, a
+  view older than this one has none), the `RulerGeometry` type in core; the table measure the
+  column border drag used is shared with it. Right-to-left paragraphs are measured as left to
+  right (limitations.md, with 31.2). `word/ruler.test.ts` at 100% and 200% (a paragraph's
+  indents and stops, a table cell and its columns, no pages).
 - [ ] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
   right indent handles dragged (one undo step per drag), Alt for exact values.
 - [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,

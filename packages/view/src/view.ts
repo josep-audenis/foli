@@ -56,6 +56,7 @@ import {
   presence,
   type ResourceJSON,
   type ReviewView,
+  type RulerGeometry,
   redo,
   revealSelection,
   type SectionJSON,
@@ -140,6 +141,7 @@ import {
   NOTE_REF_ATTR,
   PICTURE_ATTR,
   PICTURE_IMAGE_ATTR,
+  PX_PER_TWIP,
   WORD_COLUMN_BREAK_ATTR,
 } from "./word/blocks.js";
 import {
@@ -279,6 +281,15 @@ export interface EditorViewOptions {
    */
   onZoom?: ((zoom: number) => void) | null;
 }
+
+/** A tab stop on the ruler. */
+type RulerTab = NonNullable<RulerGeometry["paragraph"]>["tabs"][number];
+/** Tab kinds the ruler shows as another: Word's start and end stops, a list's number stop. */
+const TAB_SHOWN: Readonly<Record<string, RulerTab["alignment"]>> = {
+  start: "left",
+  end: "right",
+  num: "left",
+};
 
 /** Word's zoom range. */
 const MIN_ZOOM = 0.1;
@@ -2001,6 +2012,7 @@ export class EditorView {
     hint: (target, options) => view.hint(target, options),
     goToPage: (page, options) => view.goToPage(page, options),
     focus: () => view.focus(),
+    rulerGeometry: () => view.rulerGeometry(),
   }))(this);
 
   /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
@@ -4068,24 +4080,18 @@ export class EditorView {
   private resizeCursor = false;
 
   /**
-   * The column border of a top-level table near the pointer (within 4 px): an edge of the cell
-   * under it (a grid line through a merged cell is no border), or the table's right edge from
-   * outside; as the grid column left of it, with the table's px per twip. None in read-only
-   * mode, during a composition, or while tracking (column widths do not change then).
+   * The top-level table drawn around `target` (the part of it on that page): its node, its
+   * `<table>`, its grid columns as drawn in twips (an autofit table's measured ones, else its
+   * grid), its box, px on the screen per twip, and each column's right edge (client px).
    */
-  private columnBorder(
-    event: MouseEvent,
-  ): { table: ModelNode; column: number; perTwip: number; rect: DOMRect; width: number } | null {
-    if (!this.editable || this.composing || trackState(this.state)?.on) return null;
-    const target = event.target as Element | null;
+  private drawnTable(target: Element | null) {
     const wrapper = target?.closest?.(`[${FRAME_ATTR}="table"]`);
     const element = wrapper?.querySelector(`:scope > table[${FRAME_ATTR}]`);
     if (!wrapper || !element || !this.host.contains(wrapper)) return null;
     let table: ModelNode | undefined;
     for (const [node, frame] of this.frames)
       if (frame.wrappers.includes(wrapper as HTMLElement)) table = node;
-    // As drawn: an autofit table's measured columns, else its grid.
-    const grid =
+    const grid: readonly number[] =
       (table && this.measures.get(table)?.table?.columns) ??
       (table?.attrs.grid as number[] | undefined) ??
       [];
@@ -4099,6 +4105,23 @@ export class EditorView {
       x += width * perTwip;
       edges.push(x);
     }
+    return { table, element, grid, rect, perTwip, edges };
+  }
+
+  /**
+   * The column border of a top-level table near the pointer (within 4 px): an edge of the cell
+   * under it (a grid line through a merged cell is no border), or the table's right edge from
+   * outside; as the grid column left of it, with the table's px per twip. None in read-only
+   * mode, during a composition, or while tracking (column widths do not change then).
+   */
+  private columnBorder(
+    event: MouseEvent,
+  ): { table: ModelNode; column: number; perTwip: number; rect: DOMRect; width: number } | null {
+    if (!this.editable || this.composing || trackState(this.state)?.on) return null;
+    const target = event.target as Element | null;
+    const drawn = this.drawnTable(target);
+    if (!drawn) return null;
+    const { table, element, grid, rect, perTwip, edges } = drawn;
     const near = (column: number) => Math.abs(event.clientX - (edges[column] as number)) <= 4;
     // The grid lines that are borders here: the cell's own edges, the table's right edge from
     // outside it, any line on the table's own border area (none in a row's empty places).
@@ -4543,6 +4566,87 @@ export class EditorView {
     const across = ((host.width - 32) / shown.width) * this.zoom;
     const down = ((box.bottom - Math.max(host.top, box.top) - 32) / shown.height) * this.zoom;
     return zoomIn(kind === "width" ? across : Math.min(across, down));
+  }
+
+  /**
+   * Where a ruler's parts are on the screen (31.1, `RulerGeometry`): the caret's page, its
+   * section's margins, the box its paragraph lines up in, that paragraph's indents and tab
+   * stops, and the columns of the table it is in, in client px. Read when called, so it follows
+   * scrolling and the zoom. In an open header, footer or note: its paragraph on its page, and no
+   * table. Null without pages (`paged: false`) or before the first layout.
+   */
+  rulerGeometry(): RulerGeometry | null {
+    if (!this.paged || !this.pages.length) return null;
+    // The open story's own view has its caret.
+    const view = this.mount?.view ?? this;
+    const { node } = view.domFromPos(view.state.selection.head);
+    const element = view.blockElement(node) as HTMLElement | null;
+    const desc = element ? view.owner.get(element) : undefined;
+    const placed = element ?? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
+    const pageElement = (placed as Element | null)?.closest?.(".foli-page") as HTMLElement | null;
+    const index = pageElement ? this.pages.indexOf(pageElement) : -1;
+    const page = this.pages[index];
+    const sheet = this.sheets[index];
+    if (!page || !sheet) return null;
+    const pxPerTwip = PX_PER_TWIP * this.scale();
+    const pxPerMm = PX_PER_MM * this.scale();
+    const box = page.getBoundingClientRect();
+    const { margins } = sheet.settings;
+    const geometry: RulerGeometry = {
+      pxPerTwip,
+      page: { index, left: box.left, top: box.top, right: box.right, bottom: box.bottom },
+      margins: {
+        left: box.left + margins.left * pxPerMm,
+        top: box.top + margins.top * pxPerMm,
+        right: box.right - margins.right * pxPerMm,
+        bottom: box.bottom - margins.bottom * pxPerMm,
+      },
+      text: {
+        left: box.left + margins.left * pxPerMm,
+        right: box.right - margins.right * pxPerMm,
+      },
+      paragraph: null,
+      table: null,
+    };
+    const context = wordContext(view.state);
+    if (!element || !desc?.node.isTextblock || !context) return geometry;
+    // The paragraph's box is its column's or its cell's content (indents are its padding).
+    const own = element.getBoundingClientRect();
+    geometry.text = { left: own.left, right: own.right };
+    const { indent, tabs } = context.resolver.paragraph(desc.node.attrs).paragraph;
+    const left = own.left + indent.left * pxPerTwip;
+    geometry.paragraph = {
+      left,
+      firstLine: left + (indent.firstLine - indent.hanging) * pxPerTwip,
+      right: own.right - indent.right * pxPerTwip,
+      tabs: tabs.flatMap((tab) =>
+        tab.kind === "clear"
+          ? []
+          : [
+              {
+                x: own.left + tab.position * pxPerTwip,
+                position: tab.position / 20,
+                alignment: (TAB_SHOWN[tab.kind] ?? tab.kind) as RulerTab["alignment"],
+                leader: tab.leader,
+              },
+            ],
+      ),
+    };
+    // shortcut: a table in a header or footer is not given; add it when the ruler drags those.
+    const drawn = view === this ? this.drawnTable(element) : null;
+    if (drawn) {
+      let pos = -1;
+      this.state.doc.forEach((child, offset) => {
+        if (child === drawn.table) pos = offset;
+      });
+      if (pos >= 0)
+        geometry.table = {
+          pos,
+          left: drawn.rect.left,
+          columns: drawn.grid.map((width, i) => ({ right: drawn.edges[i] as number, width })),
+        };
+    }
+    return geometry;
   }
 
   private onMouseDown = (event: MouseEvent): void => {

@@ -92,6 +92,7 @@ export {
   type FoundMatches,
   type NavigationRequest,
   type OpenStory,
+  type RulerGeometry,
   type StoryView,
   sectionSettings,
   viewKeys,

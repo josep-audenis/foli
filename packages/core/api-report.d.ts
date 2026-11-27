@@ -42,7 +42,7 @@ export declare function parseContentV2(value: unknown, path?: string): Node;
 export { DEFAULT_SETTINGS, type DocumentSettings, type FoliDocumentV2, PAGE_SIZES, type PageMargins, type PageSize, parseContentV2, } from "./document.js";
 export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, FoliDocumentError, Fragment, Mark, type MarkJSON, type MarkSpec, MarkType, Node, type NodeJSON, NodeRange, type NodeSpec, NodeType, ReplaceError, ResolvedPos, Schema, type SchemaSpec, Slice, type SliceJSON, TextNode, } from "./model/index.js";
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
-export { AllSelection, acceptAllChanges, acceptChange, acceptChangeAndNext, acceptChangesById, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BroadcastJSON, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type CollabOptions, type Command, type CommentContent, type CommentMatch, type CommentMention, type CommentOptions, type CommentStepsOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CountOptions, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, chainCommands, changeCase, changeIndent, clearFormatting, closeHistory, collab, colorAt, columnAt, commentAnchors, commentMentions, commentOnly, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, copyFormat, countWords, createEditor, crossReferenceTargets, type DeleteUnit, type DialogName, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, dialogRequest, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, formatPainterState, formattingMarksShown, getVersion, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type LineRule, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mentionText, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextChangeWrapping, nextFontSize, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, onlyCommentSteps, openDialog, openLinkEditor, type ParagraphFlags, type ParagraphFormatAt, type PictureCrop, Plugin, PluginKey, type PluginSpec, type Presence, type PresenceMessage, pageVariant, paragraphFormatAt, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, pasteFormat, presence, presenceMessage, previousChange, previousChangeWrapping, type ReceivedBroadcast, type ReplaceRefusal, type ReplaceReport, type ReviewView, type RunEffects, receiveBroadcast, receivePresence, receiveTransaction, redo, redoDepth, rejectAllChanges, rejectChange, rejectChangeAndNext, rejectChangesById, remote, removeLink, removePresence, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestedDialog, requestsLinkEditor, resolveComment, revealSelection, runFormatAt, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type SendableSteps, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, sendableSteps, setAlign, setBlockType, setCellShading, setCharacterSpacing, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setIndent, setLineSpacing, setLink, setNoteProperties, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setRunEffects, setSectionSetup, setStoryLinked, setTableStyle, setTabStops, setTextColor, setTrackChanges, setUnderline, setVerticalAlign, sinkListItem, splitBlock, splitCell, splitListItem, stepFontSize, stopFormatPainter, storyOfSection, type TableOfContentsOptions, type TabStop, type TextCase, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleFormattingMarks, toggleHeaderRow, toggleList, toggleMark, toggleVerticalAlign, trackedChanges, trackState, trackTransaction, UNDERLINE_STYLES, type UpdateFieldsOptions, underlineAt, undo, undoDepth, untracked, updateFields, type VerticalAlign, verticalAlignAt, type WordCount, wordKeymap, wrapInList, } from "./state/index.js";
+export { AllSelection, acceptAllChanges, acceptChange, acceptChangeAndNext, acceptChangesById, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BroadcastJSON, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type CollabOptions, type Command, type CommentContent, type CommentMatch, type CommentMention, type CommentOptions, type CommentStepsOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CountOptions, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, chainCommands, changeCase, changeIndent, clearFormatting, closeHistory, collab, colorAt, columnAt, commentAnchors, commentMentions, commentOnly, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, copyFormat, countWords, createEditor, crossReferenceTargets, type DeleteUnit, type DialogName, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, dialogRequest, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, formatPainterState, formattingMarksShown, getVersion, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type LineRule, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mentionText, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextChangeWrapping, nextFontSize, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, onlyCommentSteps, openDialog, openLinkEditor, type ParagraphFlags, type ParagraphFormatAt, type PictureCrop, Plugin, PluginKey, type PluginSpec, type Presence, type PresenceMessage, pageVariant, paragraphFormatAt, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, pasteFormat, presence, presenceMessage, previousChange, previousChangeWrapping, type ReceivedBroadcast, type ReplaceRefusal, type ReplaceReport, type ReviewView, type RulerGeometry, type RunEffects, receiveBroadcast, receivePresence, receiveTransaction, redo, redoDepth, rejectAllChanges, rejectChange, rejectChangeAndNext, rejectChangesById, remote, removeLink, removePresence, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestedDialog, requestsLinkEditor, resolveComment, revealSelection, runFormatAt, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type SendableSteps, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, sendableSteps, setAlign, setBlockType, setCellShading, setCharacterSpacing, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setIndent, setLineSpacing, setLink, setNoteProperties, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setRunEffects, setSectionSetup, setStoryLinked, setTableStyle, setTabStops, setTextColor, setTrackChanges, setUnderline, setVerticalAlign, sinkListItem, splitBlock, splitCell, splitListItem, stepFontSize, stopFormatPainter, storyOfSection, type TableOfContentsOptions, type TabStop, type TextCase, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleFormattingMarks, toggleHeaderRow, toggleList, toggleMark, toggleVerticalAlign, trackedChanges, trackState, trackTransaction, UNDERLINE_STYLES, type UpdateFieldsOptions, underlineAt, undo, undoDepth, untracked, updateFields, type VerticalAlign, verticalAlignAt, type WordCount, wordKeymap, wrapInList, } from "./state/index.js";
 export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, type StoryMaps, Transform, TransformError, } from "./transform/index.js";
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
@@ -1216,6 +1216,66 @@ export interface FoundMatches extends FindOptions {
 }
 /** The commands Word has keys for, answered by what the app shows for them. */
 export type NavigationRequest = "find" | "replace" | "goTo" | "next" | "previous" | "bookmarks" | "outline";
+/**
+ * Where a ruler's parts are on the screen (31.1): x and y in client px (as
+ * `getBoundingClientRect` gives them), read when asked, so they follow scrolling and the zoom.
+ * For the page the caret is on and the paragraph it is in.
+ */
+export interface RulerGeometry {
+    /** Px on the screen per twip, at the zoom the pages are drawn at. */
+    pxPerTwip: number;
+    /** The caret's page (its index from 0) and its box. */
+    page: {
+        index: number;
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+    };
+    /** Where the page's margins are: the edges of its text area as its section sets them. */
+    margins: {
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+    };
+    /**
+     * What the caret's paragraph lines up in: its column of the page, or its table cell's
+     * content. Indents and tab stops are measured from `left` (and the right indent from `right`).
+     */
+    text: {
+        left: number;
+        right: number;
+    };
+    /**
+     * The caret's paragraph as shown: where its left indent (the hanging marker), its first line
+     * and its right indent are, and its tab stops (its style's and its own) with their positions
+     * in points from `text.left`. Null when the caret is in no paragraph.
+     */
+    paragraph: {
+        left: number;
+        firstLine: number;
+        right: number;
+        tabs: {
+            x: number;
+            position: number;
+            alignment: "left" | "center" | "right" | "decimal" | "bar";
+            leader: string | null;
+        }[];
+    } | null;
+    /**
+     * The table of the body the caret is in: its position, its left edge and each grid column's
+     * right edge with its width in twips, as drawn (`setColumnWidth`). Null outside one.
+     */
+    table: {
+        pos: number;
+        left: number;
+        columns: {
+            right: number;
+            width: number;
+        }[];
+    } | null;
+}
 /** What opens stories on the pages: the view of the editor's document. */
 export interface StoryView {
     readonly open: OpenStory | null;
@@ -1256,6 +1316,11 @@ export interface StoryView {
     }): boolean;
     /** Focuses the document, or the story open in it. */
     focus(): void;
+    /**
+     * Where the ruler's parts are on the screen for the caret (31.1); null when the pages are
+     * not laid out. Optional: a view older than this one has none.
+     */
+    rulerGeometry?(): RulerGeometry | null;
 }
 /** The built-in commands on `editor.commands`. */
 export interface BuiltInCommands {
@@ -1789,7 +1854,7 @@ export { addComment, type CommentContent, type CommentMention, type CommentOptio
 export { addRepeatingItem, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, controlAt, controlIsReadOnly, controlProperties, controlSpot, controlsIn, controlValues, insertControl, insertControlText, setControlProperties, setControlValue, } from "./controls.js";
 export { type CountOptions, countWords, type WordCount } from "./count.js";
 export { chainCommands, type DialogName, dialogRequest, openDialog, requestedDialog, } from "./dialogs.js";
-export { type BuiltInCommands, createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, editorCommand, type FoliCommands, type FoundMatches, type NavigationRequest, type OpenStory, type StoryView, sectionSettings, viewKeys, } from "./editor.js";
+export { type BuiltInCommands, createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, editorCommand, type FoliCommands, type FoundMatches, type NavigationRequest, type OpenStory, type RulerGeometry, type StoryView, sectionSettings, viewKeys, } from "./editor.js";
 export { caretStop, type Field, type FieldDisplay, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, sameSpot, toggleFieldCodes, } from "./fields.js";
 export { type CrossReference, type CrossReferenceTargets, crossReferenceTargets, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, formatDatePicture, formatNumericPicture, type InsertFieldOptions, insertCrossReference, insertDate, insertField, insertPageNumber, insertTableOfContents, parseFieldInstruction, type TableOfContentsOptions, type UpdateFieldsOptions, updateFields, } from "./fieldupdate.js";
 export { type CommentMatch, type FindMatch, type FindOptions, findAll, findInComments, findInText, nextMatch, type ReplaceRefusal, type ReplaceReport, replace, replaceAll, replaceInComments, } from "./find.js";

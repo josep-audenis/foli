@@ -129,7 +129,7 @@ export {};
 export {};
 
 // view.d.ts
-import { type DocumentTarget, type Editor, type EditorState, type FieldsReport, type FoundMatches, type ResourceJSON, type StorySide, type UpdateFieldsOptions } from "@folijs/core";
+import { type DocumentTarget, type Editor, type EditorState, type FieldsReport, type FoundMatches, type ResourceJSON, type RulerGeometry, type StorySide, type UpdateFieldsOptions } from "@folijs/core";
 interface DomPoint {
     node: Node;
     offset: number;
@@ -705,6 +705,12 @@ export declare class EditorView {
     /** Whether this view set the host's cursor (an embedder's own cursor is left alone). */
     private resizeCursor;
     /**
+     * The top-level table drawn around `target` (the part of it on that page): its node, its
+     * `<table>`, its grid columns as drawn in twips (an autofit table's measured ones, else its
+     * grid), its box, px on the screen per twip, and each column's right edge (client px).
+     */
+    private drawnTable;
+    /**
      * The column border of a top-level table near the pointer (within 4 px): an edge of the cell
      * under it (a grid line through a merged cell is no border), or the table's right edge from
      * outside; as the grid column left of it, with the table's px per twip. None in read-only
@@ -784,6 +790,14 @@ export declare class EditorView {
      * little room around the page.
      */
     fitZoom(kind: "width" | "page"): number;
+    /**
+     * Where a ruler's parts are on the screen (31.1, `RulerGeometry`): the caret's page, its
+     * section's margins, the box its paragraph lines up in, that paragraph's indents and tab
+     * stops, and the columns of the table it is in, in client px. Read when called, so it follows
+     * scrolling and the zoom. In an open header, footer or note: its paragraph on its page, and no
+     * table. Null without pages (`paged: false`) or before the first layout.
+     */
+    rulerGeometry(): RulerGeometry | null;
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
