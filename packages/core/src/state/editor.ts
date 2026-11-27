@@ -226,6 +226,12 @@ export interface StoryView {
   objectPlacement?(pos: number): ObjectPlacement | null;
   /** Where that object is on the screen (viewport px), or null. Optional, as `objectPlacement`. */
   objectRect?(pos: number): DOMRect | null;
+  /**
+   * Starts drawing a shape of DrawingML preset `geometry` on the pages (Insert ▸ Shapes, 34.3):
+   * the next press and drag give its box. Whether it started. Optional: a view made before
+   * Phase 34 has none.
+   */
+  drawShape?(geometry: string): boolean;
   /** Back from the note being edited to its reference, the caret after it. */
   toReference(): boolean;
   close(): void;
