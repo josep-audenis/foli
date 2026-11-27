@@ -756,6 +756,21 @@ Details in the [package README](../packages/docx/README.md).
 - The Paragraph dialog has no Mirror indents, no automatic space before or after (Auto), no
   Suppress line numbers, Don't hyphenate or the Asian Typography tab.
 
+## The ruler (Phase 31)
+
+- Right-to-left paragraphs are measured and dragged as left-to-right ones.
+- A paragraph with a left or right border draws its text at the border's spacing, not at its
+  indent (the border's padding replaces the indent's, `styleParagraph`): its ruler markers show
+  the indent the document has, not where the text is drawn.
+- In a section with several columns the ruler shows the page's margins and the caret's column as
+  the box its indents are measured from; columns are not shown or dragged.
+- A header, footer or note open: the margins dragged are those of the body caret's section.
+- A margin's edge is taken between the indent markers (Word's layout), a few pixels: hard by
+  touch. While the left box or the hanging marker is dragged the other markers stay until the
+  release. A drag a section's fixed column widths no longer fit is refused (the margin stays).
+- The ruler reads the pages again in the next animation frame: in a hidden browser tab it waits
+  until the tab shows.
+
 ## Docs and tooling
 
 - The docs site's search matches headings and API names, not body text. The API pages show

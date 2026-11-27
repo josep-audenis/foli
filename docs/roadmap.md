@@ -4414,8 +4414,18 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   paragraphs are measured as left to right (limitations.md, with 31.2). `word/ruler.test.ts` at
   100% and 200% (a paragraph's indents and stops, a table cell with a table style's indent and
   its columns, a node selection, no pages).
-- [ ] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
-  right indent handles dragged (one undo step per drag), Alt for exact values.
+- [x] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
+  right indent handles dragged (one undo step per drag), Alt for exact values. Built:
+  `FoliRuler` (`units`, `zoom`, `disabled`, `messages`, `className`; `rulerMessages`), the left
+  and right margins dragged too (`setSectionSetup`, the gutter kept apart); the arrows and Page
+  Up/Down on each slider (31.6's keyboard work started here); the playground's `?ruler` (its
+  `#body` scrolls sideways under it at a large zoom). Snapping counts from the left margin, as
+  Word's, so a right indent on an A4 page lands within a sixteenth of where it was let go.
+  `view.rulerGeometry` measures by position (a composition's block may hold the node before it)
+  and takes the gutter of the page's own section. `ruler.test.tsx` (jsdom), `ruler.spec.ts` in
+  Chromium, Firefox and WebKit at 100% and 200% (each marker and the left margin dragged, under
+  the pointer, one undo step each; keys; Escape; axe); checked by hand. limitations.md ("The
+  ruler").
 - [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,
   decimal, bar), drag to move, drag off to remove; double-click opens the Tabs dialog.
 - [ ] 31.4 Table columns on the ruler in a table (drag a column edge, as dragging its border).

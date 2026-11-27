@@ -37,6 +37,12 @@ export {
 } from "./FoliMiniToolbar.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export {
+  FoliRuler,
+  type FoliRulerProps,
+  type RulerMessages,
+  rulerMessages,
+} from "./FoliRuler.js";
+export {
   FoliStatusBar,
   type FoliStatusBarProps,
   type StatusBarMessages,

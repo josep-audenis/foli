@@ -326,6 +326,35 @@ export interface FoliNavigationProps {
  */
 export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigationProps): import("react").JSX.Element;
 
+// FoliRuler.d.ts
+import { type Editor } from "@folijs/core";
+import { type LengthUnit } from "./units.js";
+/** Every string the ruler shows or announces, in English; each is its own key in `messages`. */
+export declare const rulerMessages: readonly ["Horizontal ruler", "First line indent", "Hanging indent", "Left indent", "Right indent", "Left margin", "Right margin", "{position}, hanging {by}", "{position}, first line {by}"];
+/** Translations of the ruler's strings, by their English text (`rulerMessages`). */
+export type RulerMessages = Partial<Readonly<Record<(typeof rulerMessages)[number], string>>>;
+export interface FoliRulerProps {
+    /** Default: the editor of the nearest `FoliEditorProvider`. */
+    editor?: Editor | undefined;
+    /** Inches or centimetres; by default the browser's language's (Word's rule, as the toolbar's). */
+    units?: LengthUnit | undefined;
+    /** The zoom the pages are drawn at: the ruler reads the pages again when it changes. */
+    zoom?: number | undefined;
+    /** Nothing can be dragged or changed (a read-only or comment-only editor). */
+    disabled?: boolean | undefined;
+    messages?: RulerMessages | undefined;
+    className?: string | undefined;
+}
+/**
+ * Word's horizontal ruler over the caret's page: its margins shaded, numbers in the unit from the
+ * left margin, and the caret's paragraph's indents (first line, hanging, left, right) and the
+ * page's margins as sliders, dragged (one change on release, one undo step; a drag snaps to the
+ * ruler's step unless Alt is held, which shows the exact value; Escape cancels) or moved with the
+ * arrow keys. Positions come from the view (`editor.storyView.rulerGeometry`): without one the
+ * ruler is empty. Changes go to the story open on its page, else the editor.
+ */
+export declare function FoliRuler({ editor: given, units, zoom, disabled, messages, className, }: FoliRulerProps): import("react").JSX.Element;
+
 // FoliStatusBar.d.ts
 import { type Editor } from "@folijs/core";
 /** Every string the status bar shows, in English; each is its own key in `messages`. */
@@ -871,6 +900,7 @@ export { type ContextMenuItem, type ContextMenuMessages, contextMenuMessages, de
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliMiniToolbar, type FoliMiniToolbarProps, miniToolbarItems, } from "./FoliMiniToolbar.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
+export { FoliRuler, type FoliRulerProps, type RulerMessages, rulerMessages, } from "./FoliRuler.js";
 export { FoliStatusBar, type FoliStatusBarProps, type StatusBarMessages, statusBarMessages, } from "./FoliStatusBar.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, selectionInTable, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, wordRibbonTabs, } from "./FoliToolbar.js";
 export { toolbarIcons } from "./icons.js";

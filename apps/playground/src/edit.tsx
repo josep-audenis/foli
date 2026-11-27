@@ -28,6 +28,7 @@ import {
   FoliContextMenu,
   FoliMiniToolbar,
   FoliNavigation,
+  FoliRuler,
   FoliStatusBar,
   FoliToolbar,
   wordRibbonTabs,
@@ -141,6 +142,11 @@ const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
 const status = createRoot(document.getElementById("status") as HTMLElement);
+// Word's ruler (31.x); `?ruler` shows it.
+const showsRuler = new URLSearchParams(location.search).has("ruler");
+const ruler = createRoot(document.getElementById("ruler") as HTMLElement);
+// A page wider than the window (a large zoom) scrolls under the ruler, which stays in view.
+if (showsRuler) (document.getElementById("body") as HTMLElement).style.overflowX = "auto";
 // Word's mini toolbar (29.9) above a selection made with the pointer.
 const mini = createRoot(document.getElementById("mini") as HTMLElement);
 host.addEventListener("mouseup", (event) => {
@@ -179,7 +185,7 @@ host.addEventListener("contextmenu", (event) => {
     ),
   );
 });
-const showStatus = () =>
+const showStatus = () => {
   status.render(
     <FoliStatusBar
       editor={editor}
@@ -188,6 +194,8 @@ const showStatus = () =>
       fitZoom={(kind) => view.fitZoom(kind)}
     />,
   );
+  ruler.render(showsRuler ? <FoliRuler editor={editor} zoom={zoom} disabled={commenting} /> : null);
+};
 /**
  * The formatting toolbar for the current editor (a click puts the focus back in the document)
  * and the comments pane.
@@ -296,6 +304,8 @@ declare global {
       };
       /** The keys the `?keys=override` plugin took. */
       overridden: string[];
+      /** Sets the zoom as the status bar does (the view, the status bar and the ruler). */
+      zoom(zoom: number): void;
     };
   }
 }
@@ -320,4 +330,5 @@ window.foliEdit = {
   },
   commands: { insertPicture, insertTable, insertControl },
   overridden,
+  zoom: (next) => onZoom(next),
 };

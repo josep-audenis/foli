@@ -64,7 +64,6 @@ import {
   Slice,
   type StorySide,
   type StoryView,
-  sectionAt,
   sectionSettings,
   setColumnWidth,
   setLink,
@@ -4596,7 +4595,7 @@ export class EditorView {
     const pxPerMm = PX_PER_MM * this.scale();
     const box = page.getBoundingClientRect();
     const { margins } = sheet.settings;
-    const gutter = sectionAt(this.state)?.setup.margins?.gutter ?? 0;
+    const gutter = this.sections()[this.facts[index]?.section ?? -1]?.margins?.gutter ?? 0;
     const geometry: RulerGeometry = {
       pxPerTwip,
       gutter: gutter * pxPerTwip,
@@ -4617,14 +4616,16 @@ export class EditorView {
     const context = wordContext(view.state);
     // The paragraph the caret is in (a node selection's or one between blocks: none).
     const { $head } = view.state.selection;
-    if (!element || !desc || desc.node !== $head.parent || !$head.parent.isTextblock || !context)
+    // By position, not node: during a composition the block drawn may hold the node before it.
+    const at = desc ? (view.indexOf.get(desc) ?? -1) : -1;
+    if (!element || !$head.parent.isTextblock || view.starts[at] !== $head.before() || !context)
       return geometry;
     // The paragraph's box is its column's or its cell's content (indents are its padding).
     const own = element.getBoundingClientRect();
     geometry.text = { left: own.left, right: own.right };
     // As drawn: with its table cell's formatting (a table style's paragraph properties).
-    const cell = view.cells[view.indexOf.get(desc) ?? -1] ?? undefined;
-    const { indent, tabs } = context.resolver.paragraph(desc.node.attrs, cell).paragraph;
+    const cell = view.cells[at] ?? undefined;
+    const { indent, tabs } = context.resolver.paragraph($head.parent.attrs, cell).paragraph;
     const left = own.left + indent.left * pxPerTwip;
     geometry.paragraph = {
       left,

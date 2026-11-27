@@ -125,6 +125,27 @@ editor of the header, footer or note open on its page. `FoliEditor`'s
 and Shift+F10's, at the caret); Shift+right-click keeps the browser's menu, with its spelling
 suggestions. Word's Font… and Paragraph… entries wait for those dialogs.
 
+### `<FoliRuler>`
+
+Word's horizontal ruler (31.2) over the caret's page, placed by the app above the pages: the
+page's margins shaded, numbers in the unit counted from the left margin (ticks every 1/8 inch or
+0.25 cm), and as sliders the caret's paragraph's first-line indent (the marker pointing down),
+hanging indent (the one pointing up: it moves the left indent and keeps the first line where it
+is), left indent (the box under it: both), right indent, and the page's left and right margins
+(their edges, between the markers). A drag shows a guide line down the page and changes the
+document once on release (`setIndent`, `setSectionSetup({ margins })` on the caret's section,
+the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin unless
+Alt is held, which shows the exact value as it moves; Escape or a lost pointer cancels. The
+arrow keys move a focused handle by that step (Up always makes its value larger), Page Up
+and Page Down by half an inch or a centimetre (keyboard.md). Positions come from `editor.storyView.rulerGeometry()` (the view's),
+read again after each change, scroll, resize and `zoom` change, so the ruler lines up at any
+zoom (it is not zoomed itself); without a view it is empty. Changes go to the story open on its
+page, else the editor. Props: `editor`, `units` (`"in"` or `"cm"`; default the browser
+language's, as the toolbar's), `zoom` (pass the pages' zoom: the ruler reads them again when it
+changes), `disabled` (read-only or comment-only: nothing changes), `messages` (by the English
+text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler"; each
+handle a `slider` with its value in the unit (`aria-valuetext` `0.5"`, `1.27 cm`).
+
 ### `<FoliStatusBar>`
 
 Word's status bar (1.11): `Page X of Y` at the caret (from the view's pages,
