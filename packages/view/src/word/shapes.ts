@@ -245,6 +245,7 @@ export function shapeSvg(attrs: Attrs, doc: Document): SVGSVGElement {
             fill: overlay[0],
             "fill-opacity": overlay[1],
             stroke: "none",
+            ...(attrs.geometry === "custom" ? { "fill-rule": "evenodd" } : {}),
           }),
         );
     }
@@ -278,9 +279,14 @@ export function shapeTextRect(attrs: Attrs): [number, number, number, number] {
   const w = Number(attrs.width) / EMU_PER_PX;
   const h = Number(attrs.height) / EMU_PER_PX;
   const def = definitionOf(attrs);
-  const [l, t, r, b] = def
-    ? textRect(def, w, h, attrs.adjust as Record<string, number> | null)
-    : [0, 0, w, h];
+  // A custom geometry's numbers are the shape's EMU (as its paths'); a preset's guides scale.
+  const custom = attrs.geometry === "custom";
+  const scale = custom ? EMU_PER_PX : 1;
+  const [l, t, r, b] = (
+    def
+      ? textRect(def, w * scale, h * scale, attrs.adjust as Record<string, number> | null)
+      : [0, 0, w * scale, h * scale]
+  ).map((v) => v / scale) as [number, number, number, number];
   const left = attrs.flipH === true ? w - r : l;
   const top = attrs.flipV === true ? h - b : t;
   return [left, top, Math.max(r - l, 0), Math.max(b - t, 0)];
