@@ -1218,6 +1218,10 @@
   }
   .foli-ruler-page {
     background: GrayText;
+    color: CanvasText;
+  }
+  .foli-ruler-handle:focus-visible {
+    outline-color: Highlight;
   }
   .foli-ruler-text {
     background: Canvas;
