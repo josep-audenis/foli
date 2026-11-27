@@ -38,17 +38,16 @@ import {
   insertPicture,
   insertShape,
   insertText,
-  moveObject,
-  NUDGE,
-  setShapeAdjust,
   isSafeHref,
   joinHistory,
   listBookmarks,
   type Node as ModelNode,
   marksAt,
+  moveObject,
   type NavigationRequest,
   NodeSelection,
   type NoteNumber,
+  NUDGE,
   noteAtSelection,
   noteNumbers,
   noteProperties,
@@ -77,6 +76,7 @@ import {
   setLink,
   setObjectSize,
   setPictureCrop,
+  setShapeAdjust,
   splitBlock,
   stopFormatPainter,
   storyOfSection,
@@ -3091,10 +3091,7 @@ export class EditorView {
     for (const box of this.host.querySelectorAll<HTMLElement>(
       `[${TEXT_BOX_ATTR}="${CSS.escape(id)}"]`,
     ))
-      if (
-        !box.closest(`.${REGION_CLASS}`) &&
-        !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`)
-      )
+      if (!box.closest(`.${REGION_CLASS}`) && !box.parentElement?.closest(`[${TEXT_BOX_ATTR}]`))
         return box;
     return null;
   }
@@ -5132,8 +5129,7 @@ export class EditorView {
     }
     if (g.kind === "rotate") {
       // The handle is above the middle: its angle from there, clockwise; Shift by 15°.
-      let degrees =
-        (Math.atan2(event.clientY - g.cy, event.clientX - g.cx) * 180) / Math.PI + 90;
+      let degrees = (Math.atan2(event.clientY - g.cy, event.clientX - g.cx) * 180) / Math.PI + 90;
       if (event.shiftKey) degrees = Math.round(degrees / 15) * 15;
       degrees = ((Math.round(degrees) % 360) + 360) % 360;
       g.img.style.transform = degrees ? `rotate(${degrees}deg)` : "";
