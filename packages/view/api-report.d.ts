@@ -195,6 +195,8 @@ export declare class EditorView {
     private blocks;
     /** Position before each block, parallel to `blocks`. */
     private starts;
+    /** The table cell's formatting each block is drawn with (null outside tables), parallel too. */
+    private cells;
     /** The index of each block in `blocks`. */
     private indexOf;
     /** The element that shows a node selection, if any. */

@@ -4407,9 +4407,13 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
 
   Built: `view.rulerGeometry()` and `editor.storyView.rulerGeometry` (optional on `StoryView`, a
   view older than this one has none), the `RulerGeometry` type in core; the table measure the
-  column border drag used is shared with it. Right-to-left paragraphs are measured as left to
-  right (limitations.md, with 31.2). `word/ruler.test.ts` at 100% and 200% (a paragraph's
-  indents and stops, a table cell and its columns, no pages).
+  column border drag used is shared with it. A cell's paragraph is measured with its table
+  style's formatting, as drawn; a nested table gives no columns (as the border drag, top-level
+  tables only); `gutter` is given apart, inside the left margin. The top and bottom margins are
+  the section's, not where a taller header pushes the text (31.5 decides). Right-to-left
+  paragraphs are measured as left to right (limitations.md, with 31.2). `word/ruler.test.ts` at
+  100% and 200% (a paragraph's indents and stops, a table cell with a table style's indent and
+  its columns, a node selection, no pages).
 - [ ] 31.2 Horizontal ruler: margins shaded, numbers in the unit, first-line, hanging, left and
   right indent handles dragged (one undo step per drag), Alt for exact values.
 - [ ] 31.3 Tab stops: click to add (the tab selector at the ruler's start: left, center, right,

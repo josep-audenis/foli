@@ -3,6 +3,7 @@ import {
   createDocument,
   createEditor,
   type NodeJSON,
+  NodeSelection,
   parseDocument,
   TextSelection,
 } from "@folijs/core";
@@ -37,8 +38,13 @@ function mount(content: NodeJSON[]) {
   const host = document.createElement("div");
   document.body.append(host);
   const document_ = parseDocument(createDocument());
+  // A table style that indents its paragraphs a quarter inch.
+  const styles = [
+    ...document_.styles,
+    { id: "Indented", type: "table" as const, paragraph: { indent: { left: 360 } } },
+  ];
   const editor = createEditor({
-    document: { ...document_, content: { type: "doc", content } as never },
+    document: { ...document_, styles, content: { type: "doc", content } as never },
   });
   const view = new EditorView(host, editor);
   views.push(view);
@@ -97,13 +103,33 @@ describe("rulerGeometry", () => {
       expect(paragraph?.right).toBeCloseTo(right - 360 * k, 6);
       expect(paragraph?.tabs.map(({ x, ...tab }) => ({ ...tab, x: Math.round(x - left) }))).toEqual(
         [
-          { x: Math.round(1440 * k), position: 72, alignment: "center", leader: null },
+          { x: Math.round(1440 * k), position: 72, alignment: "center" },
           { x: Math.round(2880 * k), position: 144, alignment: "right", leader: "dot" },
         ],
       );
       expect(geometry.table).toBeNull();
+      expect(geometry.gutter).toBe(0);
     });
   }
+
+  it("gives a first-line indent after the left one, and no paragraph for a node selection", () => {
+    const { view, editor } = mount([
+      p("First", { indent: { left: 360, firstLine: 720 } }),
+      {
+        type: "table",
+        attrs: { grid: [2250], layout: "fixed" },
+        content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p("A")] }] }],
+      },
+      p("After"),
+    ]);
+    const { left } = screen(1, A4);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 2)));
+    const k = 96 / 1440;
+    expect(view.rulerGeometry()?.paragraph?.firstLine).toBeCloseTo(left + 1080 * k, 6);
+    const rule = editor.state.doc.child(0).nodeSize;
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, rule)));
+    expect(view.rulerGeometry()?.paragraph).toBeNull();
+  });
 
   it("in a table: the cell's box and the table's columns", () => {
     const cell = (value: string) => ({
@@ -115,7 +141,7 @@ describe("rulerGeometry", () => {
       p("Before"),
       {
         type: "table",
-        attrs: { grid: [2250, 2250], layout: "fixed" },
+        attrs: { grid: [2250, 2250], layout: "fixed", style: "Indented" },
         content: [{ type: "tableRow", content: [cell("A"), cell("B")] }],
       },
       p("After"),
@@ -129,7 +155,8 @@ describe("rulerGeometry", () => {
     editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, inCell)));
     const geometry = view.rulerGeometry();
     expect(geometry?.text).toEqual({ left: left + 5, right: left + 145 });
-    expect(geometry?.paragraph?.left).toBe(left + 5);
+    // The table style's indent, as the cell's paragraphs are drawn.
+    expect(geometry?.paragraph?.left).toBeCloseTo(left + 5 + 360 * (96 / 1440), 6);
     // 300 px over 4500 twips: each column 150 px.
     expect(geometry?.table).toEqual({
       pos: 8,

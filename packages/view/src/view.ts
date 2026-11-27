@@ -64,6 +64,7 @@ import {
   Slice,
   type StorySide,
   type StoryView,
+  sectionAt,
   sectionSettings,
   setColumnWidth,
   setLink,
@@ -603,6 +604,8 @@ export class EditorView {
   private blocks: WordBlockDesc[] = [];
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
+  /** The table cell's formatting each block is drawn with (null outside tables), parallel too. */
+  private cells: (Unit["cell"] | null)[] = [];
   /** The index of each block in `blocks`. */
   private indexOf = new Map<BlockDesc, number>();
   /** The element that shows a node selection, if any. */
@@ -1698,6 +1701,7 @@ export class EditorView {
     });
     this.blocks = blocks;
     this.starts = units.map((unit) => unit.pos);
+    this.cells = units.map((unit) => unit.cell ?? null);
     this.indexOf = new Map(blocks.map((desc, i) => [desc, i]));
     this.itemPages = new Map(items.map((_, i) => [doc.child(i), pages[i] ?? []]));
     this.itemSlots = new Map(items.map((_, i) => [doc.child(i), slots[i] ?? []]));
@@ -4592,8 +4596,10 @@ export class EditorView {
     const pxPerMm = PX_PER_MM * this.scale();
     const box = page.getBoundingClientRect();
     const { margins } = sheet.settings;
+    const gutter = sectionAt(this.state)?.setup.margins?.gutter ?? 0;
     const geometry: RulerGeometry = {
       pxPerTwip,
+      gutter: gutter * pxPerTwip,
       page: { index, left: box.left, top: box.top, right: box.right, bottom: box.bottom },
       margins: {
         left: box.left + margins.left * pxPerMm,
@@ -4609,11 +4615,16 @@ export class EditorView {
       table: null,
     };
     const context = wordContext(view.state);
-    if (!element || !desc?.node.isTextblock || !context) return geometry;
+    // The paragraph the caret is in (a node selection's or one between blocks: none).
+    const { $head } = view.state.selection;
+    if (!element || !desc || desc.node !== $head.parent || !$head.parent.isTextblock || !context)
+      return geometry;
     // The paragraph's box is its column's or its cell's content (indents are its padding).
     const own = element.getBoundingClientRect();
     geometry.text = { left: own.left, right: own.right };
-    const { indent, tabs } = context.resolver.paragraph(desc.node.attrs).paragraph;
+    // As drawn: with its table cell's formatting (a table style's paragraph properties).
+    const cell = view.cells[view.indexOf.get(desc) ?? -1] ?? undefined;
+    const { indent, tabs } = context.resolver.paragraph(desc.node.attrs, cell).paragraph;
     const left = own.left + indent.left * pxPerTwip;
     geometry.paragraph = {
       left,
@@ -4627,7 +4638,9 @@ export class EditorView {
                 x: own.left + tab.position * pxPerTwip,
                 position: tab.position / 20,
                 alignment: (TAB_SHOWN[tab.kind] ?? tab.kind) as RulerTab["alignment"],
-                leader: tab.leader,
+                ...(tab.leader && tab.leader !== "none"
+                  ? { leader: tab.leader as NonNullable<RulerTab["leader"]> }
+                  : {}),
               },
             ],
       ),

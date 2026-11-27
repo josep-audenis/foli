@@ -1309,14 +1309,18 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   "width" | "page")` gives the zoom that fits.
 - `view.rulerGeometry()` (31.1; also `editor.storyView.rulerGeometry`, optional there): where a
   ruler's parts are on the screen for the caret, in client px, read when called (it follows
-  scrolling and the zoom; `RulerGeometry`): `pxPerTwip`; `page` (`index` from 0, `left`, `top`,
-  `right`, `bottom`); `margins` (the text area's edges as the page's section sets them); `text`
-  (what the caret's paragraph lines up in: its column, or its table cell's content); `paragraph`
-  (`left`, the hanging marker, `firstLine` and `right` indent positions, and `tabs`, each with
-  its `x`, `position` in points from `text.left`, `alignment` and `leader`; null outside a
-  paragraph); `table` (a body table the caret is in: `pos`, `left` and each grid column's
-  `right` edge with its `width` in twips as drawn, what `setColumnWidth` takes; null outside
-  one, and in a header, footer or note). Null with `paged: false` and before the first layout.
+  scrolling and the zoom; `RulerGeometry`): `pxPerTwip`; `gutter` (its width, inside the left
+  margin); `page` (`index` from 0, `left`, `top`, `right`, `bottom`); `margins` (the text area's
+  edges as the page's section sets them: the left one after the gutter, the top and bottom ones
+  as set even where a taller header or footer pushes the text); `text` (what the caret's
+  paragraph lines up in: its column, or its table cell's content); `paragraph` (`left`, the
+  hanging marker, `firstLine` and `right` indent positions as drawn, a table style's indents
+  included, and `tabs` as `setTabStops` takes them with their `x`: `position` in points from
+  `text.left`, `alignment`, `leader`; null when the caret is in no paragraph, as in a node
+  selection); `table` (the top-level body table the caret is in: `pos`, `left` and each grid
+  column's `right` edge with its `width` in twips as drawn, what `setColumnWidth` takes; null
+  outside one, in a nested table, and in a header, footer or note). Null with `paged: false` and
+  before the first layout.
   `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
   the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;
   without it image files are not pasted or dropped. `view.insertFiles(files)` inserts image files

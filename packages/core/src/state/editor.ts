@@ -85,6 +85,7 @@ import {
   wordContext,
   wordPlugin,
 } from "./word.js";
+import type { TabStop } from "./wordformat.js";
 import { formatPainterPlugin, formattingMarksPlugin, type ListKind } from "./wordformat.js";
 
 /**
@@ -162,9 +163,15 @@ export type NavigationRequest =
 export interface RulerGeometry {
   /** Px on the screen per twip, at the zoom the pages are drawn at. */
   pxPerTwip: number;
+  /** The width of the section's gutter (px), inside `margins.left`; 0 without one. */
+  gutter: number;
   /** The caret's page (its index from 0) and its box. */
   page: { index: number; left: number; top: number; right: number; bottom: number };
-  /** Where the page's margins are: the edges of its text area as its section sets them. */
+  /**
+   * Where the page's margins are: the edges of its text area as its section sets them (the left
+   * one after the gutter, as Word adds it; the top and bottom ones as set, even where a taller
+   * header or footer pushes the text down or up).
+   */
   margins: { left: number; top: number; right: number; bottom: number };
   /**
    * What the caret's paragraph lines up in: its column of the page, or its table cell's
@@ -173,23 +180,21 @@ export interface RulerGeometry {
   text: { left: number; right: number };
   /**
    * The caret's paragraph as shown: where its left indent (the hanging marker), its first line
-   * and its right indent are, and its tab stops (its style's and its own) with their positions
-   * in points from `text.left`. Null when the caret is in no paragraph.
+   * and its right indent are (with its table cell's formatting), and its tab stops (its style's
+   * and its own, as `setTabStops` takes them, with their `x`): `position` in points from
+   * `text.left`; Word's start, end and list stops as left, right and left. Null when the caret
+   * is in no paragraph (a node selection).
    */
   paragraph: {
     left: number;
     firstLine: number;
     right: number;
-    tabs: {
-      x: number;
-      position: number;
-      alignment: "left" | "center" | "right" | "decimal" | "bar";
-      leader: string | null;
-    }[];
+    tabs: (TabStop & { x: number })[];
   } | null;
   /**
-   * The table of the body the caret is in: its position, its left edge and each grid column's
-   * right edge with its width in twips, as drawn (`setColumnWidth`). Null outside one.
+   * The top-level table of the body the caret is in: its position, its left edge and each grid
+   * column's right edge with its width in twips, as drawn (`setColumnWidth`). Null outside one,
+   * in a table nested in a cell, and in a header, footer or note.
    */
   table: { pos: number; left: number; columns: { right: number; width: number }[] } | null;
 }
