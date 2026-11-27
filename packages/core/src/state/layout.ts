@@ -9,7 +9,7 @@ import type { Node } from "../model/index.js";
 import { attempt } from "./attempt.js";
 import { closeHistory } from "./history.js";
 import { NodeSelection } from "./selection.js";
-import type { Command, EditorState } from "./state.js";
+import { type Command, type EditorState, Plugin, PluginKey } from "./state.js";
 import { trackState } from "./track.js";
 
 /** How text goes around an object: `inline` is in line with text (no `float`). */
@@ -83,15 +83,22 @@ const objectAt = (state: EditorState, pos: number) => {
 };
 
 /** The object at `pos` with `float` (null: in line), kept selected if it was. */
-function setFloat(pos: number, float: (node: Node) => Record<string, unknown> | null): Command {
+function setFloat(
+  pos: number,
+  float: (node: Node) => Record<string, unknown> | null,
+  /** Other attributes set in the same step (a size, a rotation: the Layout dialog's OK). */
+  more: (node: Node) => Record<string, unknown> = () => ({}),
+): Command {
   return (state, dispatch) => {
     const node = objectAt(state, pos);
     if (!node || trackState(state)?.on === true) return false;
     const next = float(node);
-    if (JSON.stringify(next) === JSON.stringify(node.attrs.float ?? null)) return false;
+    const extra = more(node);
+    const changes = Object.entries(extra).some(([key, value]) => node.attrs[key] !== value);
+    if (!changes && JSON.stringify(next) === JSON.stringify(node.attrs.float ?? null)) return false;
     return attempt(state, dispatch, (tr) => {
       tr.setMeta(closeHistory, true);
-      tr.setNodeMarkup(pos, node.type, { ...node.attrs, float: next });
+      tr.setNodeMarkup(pos, node.type, { ...node.attrs, ...extra, float: next });
       if (state.selection instanceof NodeSelection && state.selection.from === pos)
         tr.setSelection(NodeSelection.create(tr.doc, pos));
     });
@@ -273,26 +280,140 @@ export interface ObjectFloat {
  * Sets the whole layout of the object at `pos` (the Layout dialog's OK): `float`, or null for in
  * line with text. One undo step; not while tracking.
  */
-export function setObjectFloat(pos: number, float: ObjectFloat | null): Command {
-  return setFloat(pos, (node) => {
-    if (!float) return null;
-    const own = (node.attrs.float ?? {}) as Record<string, unknown>;
-    const axis = (a: ObjectAxis, start: string) =>
-      typeof a.offset === "number"
-        ? { relativeTo: a.relativeTo, offset: Math.round(a.offset) }
-        : { relativeTo: a.relativeTo, align: a.align ?? start };
-    const distance = { ...DISTANCE, ...(own.distance as object), ...float.distance };
+export function setObjectFloat(
+  pos: number,
+  float: ObjectFloat | null,
+  /** Its size in EMU and, for a picture, its rotation (60 000ths of a degree), set with it. */
+  size?: { width: number; height: number; rotation?: number },
+): Command {
+  const more = (node: Node): Record<string, unknown> => {
+    if (!size || !validSize(size.width) || !validSize(size.height)) return {};
+    const rotation =
+      size.rotation === undefined || node.type.name !== "picture" || !Number.isFinite(size.rotation)
+        ? undefined
+        : ((Math.round(size.rotation) % TURN) + TURN) % TURN;
     return {
-      ...own,
-      horizontal: axis(float.horizontal, "left"),
-      vertical: axis(float.vertical, "top"),
-      wrap: float.wrap,
-      side: float.side ?? (own.side as string | undefined) ?? "bothSides",
-      distance: Object.fromEntries(
-        Object.entries(distance).map(([k, v]) => [k, Math.max(0, Math.round(Number(v) || 0))]),
-      ),
-      allowOverlap: float.allowOverlap ?? (own.allowOverlap as boolean | undefined) ?? true,
-      layoutInCell: float.layoutInCell ?? (own.layoutInCell as boolean | undefined) ?? true,
+      width: size.width,
+      height: size.height,
+      ...(rotation === undefined ? {} : { rotation }),
     };
+  };
+  return setFloat(
+    pos,
+    (node) => {
+      if (!float) return null;
+      const own = (node.attrs.float ?? {}) as Record<string, unknown>;
+      const axis = (a: ObjectAxis, start: string) =>
+        typeof a.offset === "number"
+          ? { relativeTo: a.relativeTo, offset: Math.round(a.offset) }
+          : { relativeTo: a.relativeTo, align: a.align ?? start };
+      const distance = { ...DISTANCE, ...(own.distance as object), ...float.distance };
+      return {
+        ...own,
+        horizontal: axis(float.horizontal, "left"),
+        vertical: axis(float.vertical, "top"),
+        wrap: float.wrap,
+        side: float.side ?? (own.side as string | undefined) ?? "bothSides",
+        distance: Object.fromEntries(
+          Object.entries(distance).map(([k, v]) => [k, Math.max(0, Math.round(Number(v) || 0))]),
+        ),
+        allowOverlap: float.allowOverlap ?? (own.allowOverlap as boolean | undefined) ?? true,
+        layoutInCell: float.layoutInCell ?? (own.layoutInCell as boolean | undefined) ?? true,
+      };
+    },
+    more,
+  );
+}
+
+const MAX_EMU = 2_147_483_647;
+const validSize = (n: number) => Number.isInteger(n) && n >= 1 && n <= MAX_EMU;
+/** A turn, in DrawingML's 60 000ths of a degree. */
+const TURN = 21_600_000;
+
+/**
+ * Sets the size (EMU) of the picture or text box at `pos` and, for a picture, its rotation
+ * (clockwise, 60 000ths of a degree; left out: as it is): Word's Size dialog and a resize by its
+ * handle (33.5). One undo step, the object kept selected; not while tracking.
+ */
+export function setObjectSize(
+  pos: number,
+  width: number,
+  height: number,
+  rotation?: number,
+): Command {
+  return (state, dispatch) => {
+    const node = objectAt(state, pos);
+    if (!node || trackState(state)?.on === true) return false;
+    if (!validSize(width) || !validSize(height)) return false;
+    const turn =
+      rotation === undefined || node.type.name !== "picture" || !Number.isFinite(rotation)
+        ? undefined
+        : ((Math.round(rotation) % TURN) + TURN) % TURN;
+    const same =
+      node.attrs.width === width &&
+      node.attrs.height === height &&
+      (turn === undefined || (node.attrs.rotation ?? 0) === turn);
+    if (same) return false;
+    return attempt(state, dispatch, (tr) => {
+      tr.setMeta(closeHistory, true);
+      tr.setNodeMarkup(pos, node.type, {
+        ...node.attrs,
+        width,
+        height,
+        ...(turn === undefined ? {} : { rotation: turn }),
+      });
+      if (state.selection instanceof NodeSelection && state.selection.from === pos)
+        tr.setSelection(NodeSelection.create(tr.doc, pos));
+    });
+  };
+}
+
+const cropKey = new PluginKey<number | null>("crop");
+
+/** The picture being cropped on the page (Picture Format ▸ Crop, 33.5): its position, or null. */
+export function croppingAt(state: EditorState): number | null {
+  return cropKey.getState(state) ?? null;
+}
+
+/**
+ * Word's Crop button: crop handles on the selected picture's edges, or off again. Not while
+ * tracking (a crop is not recorded).
+ */
+export const toggleCrop: Command = (state, dispatch) => {
+  const picture = selectedObject(state);
+  if (picture?.node.type.name !== "picture" || trackState(state)?.on === true) return false;
+  // shortcut: a rotated picture is cropped by the picture dialog only (handles would need the
+  // drag turned with it).
+  if (Number(picture.node.attrs.rotation ?? 0) % TURN !== 0) return false;
+  if (cropKey.getState(state) === undefined) return false;
+  dispatch?.(state.tr.setMeta(cropKey, croppingAt(state) === null ? picture.pos : null));
+  return true;
+};
+
+/**
+ * Keeps crop mode on its picture while it stays selected (its position mapped through edits).
+ * @internal
+ */
+export function cropPlugin(): Plugin {
+  return new Plugin({
+    key: cropKey,
+    state: {
+      init: () => null,
+      apply(tr, value: number | null, _old, next) {
+        const meta = tr.getMeta(cropKey) as number | null | undefined;
+        let pos = meta !== undefined ? meta : value;
+        if (pos !== null && tr.docChanged) pos = tr.mapping.map(pos);
+        const { selection } = next;
+        const kept =
+          pos !== null &&
+          trackState(next)?.on !== true &&
+          selection instanceof NodeSelection &&
+          selection.from === pos &&
+          selection.node.type.name === "picture" &&
+          // Turned (a rotate button), it is no longer cropped on the page.
+          Number(selection.node.attrs.rotation ?? 0) % TURN === 0;
+        return kept ? pos : null;
+      },
+    },
   });
 }

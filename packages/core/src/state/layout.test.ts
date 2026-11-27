@@ -3,6 +3,7 @@ import { createDocument, parseDocument } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
 import { undo } from "./history.js";
 import {
+  croppingAt,
   objectMovesWithText,
   objectPosition,
   objectWrap,
@@ -11,9 +12,11 @@ import {
   setObjectLayout,
   setObjectMovesWithText,
   setObjectPosition,
+  setObjectSize,
   setObjectWrap,
+  toggleCrop,
 } from "./layout.js";
-import { NodeSelection } from "./selection.js";
+import { NodeSelection, TextSelection } from "./selection.js";
 import { setTrackChanges } from "./track.js";
 
 /** A paragraph "ab" holding a picture at 2 (inline), selected. */
@@ -140,5 +143,55 @@ describe("Layout Options (33.4)", () => {
     expect(float(editor) ?? null).toBeNull();
     editor.run(undo);
     expect(float(editor)).toMatchObject({ wrap: "tight" });
+  });
+
+  it("sizes a picture, its rotation with it, and a float with a size in one step (33.5)", () => {
+    const editor = pictured();
+    const node = () => selectedObject(editor.state)?.node;
+    expect(editor.run(setObjectSize(2, 1_905_000, 952_500, 5_400_000))).toBe(true);
+    expect(node()?.attrs).toMatchObject({ width: 1_905_000, height: 952_500, rotation: 5_400_000 });
+    expect(editor.run(setObjectSize(2, 1_905_000, 952_500))).toBe(false);
+    expect(editor.run(setObjectSize(2, 0, 1))).toBe(false);
+    editor.run(
+      setObjectFloat(
+        2,
+        {
+          horizontal: { relativeTo: "column", offset: 0 },
+          vertical: { relativeTo: "paragraph", offset: 0 },
+          wrap: "square",
+        },
+        { width: 100, height: 200 },
+      ),
+    );
+    expect(node()?.attrs).toMatchObject({ width: 100, height: 200, float: { wrap: "square" } });
+    editor.run(undo);
+    expect(node()?.attrs.width).toBe(1_905_000);
+  });
+
+  it("turns crop mode on for the selected picture, off when it is no longer selected", () => {
+    const editor = pictured();
+    expect(croppingAt(editor.state)).toBeNull();
+    expect(editor.run(toggleCrop)).toBe(true);
+    expect(croppingAt(editor.state)).toBe(2);
+    editor.run(toggleCrop);
+    expect(croppingAt(editor.state)).toBeNull();
+    editor.run(toggleCrop);
+    editor.dispatch(editor.state.tr.insertText("x", 1));
+    // Still selected, its position mapped.
+    expect(croppingAt(editor.state)).toBe(selectedObject(editor.state)?.pos ?? -1);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)));
+    expect(croppingAt(editor.state)).toBeNull();
+  });
+
+  it("leaves crop mode when tracking starts; a rotated picture is cropped in the dialog", () => {
+    const editor = pictured();
+    editor.run(toggleCrop);
+    editor.run(setTrackChanges(true));
+    expect(croppingAt(editor.state)).toBeNull();
+    editor.run(setTrackChanges(false));
+    editor.run(toggleCrop);
+    editor.run(setObjectSize(2, 952_500, 952_500, 5_400_000));
+    expect(croppingAt(editor.state)).toBeNull();
+    expect(toggleCrop(editor.state)).toBe(false);
   });
 });

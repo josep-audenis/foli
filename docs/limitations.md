@@ -325,14 +325,21 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   rotation only in the drawing's XML: they are written back to `.docx` as they were, but not
   shown until the file is imported again. They are set in the picture dialog (Rotation, the two
   90° buttons, Crop in percent; core's `setPictureRotation` and `setPictureCrop`, which keeps the
-  image's scale as Word does; each change is its own undo step), not by dragging on the page (no
-  crop handles); a crop or rotation only in the drawing's XML (see above) cannot be changed there
+  image's scale as Word does; each change is its own undo step), and on the page (33.5): Picture
+  Format ▸ Crop puts a handle on each edge (not Word's corner crop handles), the crop is made when
+  the handle is let go (while dragging only the handle moves, not the image), the image
+  cannot be moved inside its crop by dragging, and a rotated picture is cropped in the dialog
+  only; a crop or rotation only in the drawing's XML (see above) cannot be changed there
   until the file is imported again; cropping a floating picture's left or top keeps its anchor
   offset, so what shows moves. A picture is resized by its handle with a mouse, a pen or a finger
   (19.5c; touch tested with synthetic pointer events, not on a device; on a touch screen the
   handle is 24 px and reaches past the picture, so a tap just beside a selected picture's corner
   can land on it);
-  resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
+  resizing is refused while tracking (Foli does not record a size change yet). Only the bottom
+  right corner has a handle (33.5: a picture keeps its ratio, as Word's locked one; a text box's
+  sides follow the pointer, Shift keeps its ratio). The Layout dialog's Size tab (33.5) scales
+  from the size the object has when it opens, not its image's original size, and rotates
+  pictures only (a rotated text box stays opaque). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
   else the image the source view shows, as a `data:` URL; one shown from an object URL (a

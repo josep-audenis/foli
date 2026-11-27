@@ -1478,6 +1478,21 @@ const DISTANCES = [
   ["right", "Right"],
 ] as const satisfies readonly (readonly ["top" | "bottom" | "left" | "right", ToolbarMessage])[];
 
+/** The Size tab's fields (their names, for the toolbar's messages). */
+const SIZE_FIELDS = [
+  ["height", "Height"],
+  ["width", "Width"],
+  ["rotation", "Rotation"],
+  ["scaleHeight", "Scale height (%)"],
+  ["scaleWidth", "Scale width (%)"],
+] as const;
+
+/** The Size tab's options. */
+const SIZE_OPTIONS = [["locked", "Lock aspect ratio"]] as const satisfies readonly (readonly [
+  string,
+  ToolbarMessage,
+])[];
+
 /** The Position tab's options. */
 const OPTIONS = [
   ["moves", "Move object with text"],
@@ -1524,7 +1539,7 @@ export function LayoutDialog({
 }: {
   editor: Editor;
   unit: LengthUnit;
-  initialTab?: "position" | "wrapping";
+  initialTab?: "position" | "wrapping" | "size";
   onClose: (applied: boolean) => void;
 }) {
   const t = useT();
@@ -1560,6 +1575,36 @@ export function LayoutDialog({
   const [overlap, setOverlap] = useState(float?.allowOverlap ?? true);
   const [inCell, setInCell] = useState(float?.layoutInCell ?? true);
   const [error, setError] = useState<ToolbarMessage | null>(null);
+  // Size (33.5): height and width, their scale from the size it had, the ratio kept, rotation.
+  const picture = object?.node.type.name === "picture";
+  const [size] = useState(() => ({
+    width: Number(object?.node.attrs.width ?? 0),
+    height: Number(object?.node.attrs.height ?? 0),
+    rotation: Number(object?.node.attrs.rotation ?? 0),
+  }));
+  const asText = (emu: number) => formatLength(Math.round(emu / EMU_PER_TWIP), unit);
+  const [height, setHeight] = useState(() => asText(size.height));
+  const [width, setWidth] = useState(() => asText(size.width));
+  const [scaleH, setScaleH] = useState("100");
+  const [scaleW, setScaleW] = useState("100");
+  const [locked, setLocked] = useState(picture);
+  const [rotation, setRotation] = useState(() => String(Math.round(size.rotation / 600) / 100));
+  /** One side's new length (EMU) or scale (%): the other follows while the ratio is kept. */
+  const resize = (side: "height" | "width", emu: number | null, keep = locked) => {
+    if (emu === null || emu <= 0 || size.height <= 0 || size.width <= 0) return;
+    const scale = emu / (side === "height" ? size.height : size.width);
+    const pct = String(Math.round(scale * 100));
+    if (side === "height") setScaleH(pct);
+    else setScaleW(pct);
+    if (!keep) return;
+    if (side === "height") {
+      setWidth(asText(size.width * scale));
+      setScaleW(pct);
+    } else {
+      setHeight(asText(size.height * scale));
+      setScaleH(pct);
+    }
+  };
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => first.current?.focus(), []);
   const floating = wrap !== "inline";
@@ -1568,7 +1613,35 @@ export function LayoutDialog({
   const apply = (event: FormEvent) => {
     event.preventDefault();
     if (!object) return onClose(false);
-    if (!floating) return onClose(editor.run(setObjectFloat(object.pos, null)));
+    // The size: as it was while its text is unchanged (no rounding through the unit).
+    const length = (text: string, was: string, own: number, field: ToolbarMessage) => {
+      if (text === was) return own;
+      const twips = parseLength(text, unit);
+      if (twips === null || twips <= 0 || twips > 31_680) {
+        setTab("size");
+        setError(field);
+        return null;
+      }
+      return twips * EMU_PER_TWIP;
+    };
+    const newHeight = length(height, asText(size.height), size.height, "Height");
+    const newWidth = length(width, asText(size.width), size.width, "Width");
+    if (newHeight === null || newWidth === null) return;
+    const degrees = Number(rotation.replace(",", "."));
+    if (picture && !Number.isFinite(degrees)) {
+      setTab("size");
+      return setError("Rotation");
+    }
+    const sized = {
+      width: Math.round(newWidth),
+      height: Math.round(newHeight),
+      // A turn the same as it was (360 for 0) changes nothing.
+      ...(picture &&
+      ((Math.round(degrees * 60_000) % 21_600_000) + 21_600_000) % 21_600_000 !== size.rotation
+        ? { rotation: Math.round(degrees * 60_000) }
+        : {}),
+    };
+    if (!floating) return onClose(editor.run(setObjectFloat(object.pos, null, sized)));
     const axis = (
       form: AxisForm,
       field: ToolbarMessage,
@@ -1610,15 +1683,19 @@ export function LayoutDialog({
     }
     onClose(
       editor.run(
-        setObjectFloat(object.pos, {
-          horizontal: h,
-          vertical: v,
-          wrap,
-          side: side as NonNullable<ObjectFloat["side"]>,
-          distance: gaps,
-          allowOverlap: overlap,
-          layoutInCell: inCell,
-        }),
+        setObjectFloat(
+          object.pos,
+          {
+            horizontal: h,
+            vertical: v,
+            wrap,
+            side: side as NonNullable<ObjectFloat["side"]>,
+            distance: gaps,
+            allowOverlap: overlap,
+            layoutInCell: inCell,
+          },
+          sized,
+        ),
       ),
     );
   };
@@ -1768,6 +1845,71 @@ export function LayoutDialog({
       </fieldset>
     </>
   );
+  const lengthField = (
+    key: string,
+    label: ToolbarMessage,
+    value: string,
+    set: (text: string) => void,
+    after: (text: string) => void,
+    disabled = false,
+  ) => (
+    <Field key={key} id={`${id}-${key}`} label={t(label)}>
+      <input
+        id={`${id}-${key}`}
+        type="text"
+        inputMode="decimal"
+        value={value}
+        disabled={disabled}
+        aria-invalid={error === label || undefined}
+        aria-describedby={error === label ? `${id}-error` : undefined}
+        onChange={(e) => {
+          set(e.target.value);
+          setError(null);
+          after(e.target.value);
+        }}
+      />
+    </Field>
+  );
+  const fromScale = (text: string) => {
+    const n = Number(text.replace(",", ".").replace("%", ""));
+    return Number.isFinite(n) && n > 0 ? n / 100 : null;
+  };
+  const sizing = (
+    <>
+      <fieldset className="foli-dialog-section">
+        <legend>{t("Size")}</legend>
+        {lengthField(...SIZE_FIELDS[0], height, setHeight, (text) =>
+          resize("height", (parseLength(text, unit) ?? 0) * EMU_PER_TWIP || null),
+        )}
+        {lengthField(...SIZE_FIELDS[1], width, setWidth, (text) =>
+          resize("width", (parseLength(text, unit) ?? 0) * EMU_PER_TWIP || null),
+        )}
+        {lengthField(...SIZE_FIELDS[2], rotation, setRotation, () => {}, !picture)}
+      </fieldset>
+      <fieldset className="foli-dialog-section">
+        <legend>{t("Scale")}</legend>
+        {lengthField(...SIZE_FIELDS[3], scaleH, setScaleH, (text) => {
+          const scale = fromScale(text);
+          if (scale === null) return;
+          setHeight(asText(size.height * scale));
+          if (locked) {
+            setWidth(asText(size.width * scale));
+            setScaleW(text);
+          }
+        })}
+        {lengthField(...SIZE_FIELDS[4], scaleW, setScaleW, (text) => {
+          const scale = fromScale(text);
+          if (scale === null) return;
+          setWidth(asText(size.width * scale));
+          if (locked) {
+            setHeight(asText(size.height * scale));
+            setScaleH(text);
+          }
+        })}
+        {check(...SIZE_OPTIONS[0], locked, setLocked)}
+      </fieldset>
+    </>
+  );
   const wrapping = (
     <>
       <fieldset className="foli-dialog-section">
@@ -1846,6 +1988,7 @@ export function LayoutDialog({
           tabs={[
             { key: "position", label: t("Position"), content: position },
             { key: "wrapping", label: t("Text Wrapping"), content: wrapping },
+            { key: "size", label: t("Size"), content: sizing },
           ]}
           selected={tab}
           onSelect={setTab}

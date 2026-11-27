@@ -10,6 +10,7 @@ import {
   closeHistory,
   controlAt,
   controlProperties,
+  croppingAt,
   type DocumentSettings,
   type DocumentTarget,
   deleteBackward,
@@ -69,7 +70,8 @@ import {
   sectionSettings,
   setColumnWidth,
   setLink,
-  setPictureSize,
+  setObjectSize,
+  setPictureCrop,
   splitBlock,
   stopFormatPainter,
   storyOfSection,
@@ -325,7 +327,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `.foli-format-painter [contenteditable=true]{cursor:copy}[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region,[${PAGE_DECORATION_ATTR}]){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[data-foli-crop]{position:absolute;box-sizing:border-box;background:CanvasText;border:1px solid Canvas;touch-action:none;user-select:none;-webkit-user-select:none;forced-color-adjust:none}[data-foli-crop=left],[data-foli-crop=right]{top:50%;width:6px;height:22px;margin-top:-11px;cursor:ew-resize}[data-foli-crop=top],[data-foli-crop=bottom]{left:50%;width:22px;height:6px;margin-left:-11px;cursor:ns-resize}[data-foli-crop=left]{left:-3px}[data-foli-crop=right]{right:-3px}[data-foli-crop=top]{top:-3px}[data-foli-crop=bottom]{bottom:-3px}@media print{[data-foli-crop]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -758,10 +760,16 @@ export class EditorView {
   private upload: EditorViewOptions["upload"];
   /** The selected picture's span (with its resize handle). */
   private selectedPicture: HTMLElement | null = null;
+  /** Whether the selected picture shows its crop handles. */
+  private selectedCropping = false;
   /** A picture being resized: its position, element, size at the press, scale, the press. */
   private resize: {
     pos: number;
     img: HTMLElement;
+    /** A text box: its sides move apart unless Shift is held (a picture keeps its ratio). */
+    free: boolean;
+    /** A crop handle's side, when cropping (33.5): the edge it moves. */
+    crop?: "left" | "top" | "right" | "bottom" | undefined;
     width: number;
     height: number;
     scale: number;
@@ -4053,17 +4061,34 @@ export class EditorView {
     const { selection } = this.state;
     const name = selection instanceof NodeSelection ? selection.node.type.name : "";
     const span = name === "picture" || name === "textBox" ? this.pictureSpan(selection.from) : null;
-    const handled = !!span?.querySelector("[data-foli-resize]");
-    if (span === this.selectedPicture && (!span || handled === this.editable)) return;
+    // Picture Format ▸ Crop (33.5): the edges' crop handles in place of the resize handle.
+    const cropping = !!span && croppingAt(this.state) === selection.from;
+    const handled = !!span?.querySelector("[data-foli-resize], [data-foli-crop]");
+    if (
+      span === this.selectedPicture &&
+      (!span || (handled === this.editable && cropping === this.selectedCropping))
+    )
+      return;
     this.selectedPicture?.removeAttribute(PICTURE_SELECTED_ATTR);
-    this.selectedPicture?.querySelector("[data-foli-resize]")?.remove();
+    for (const handle of this.selectedPicture?.querySelectorAll(
+      ":scope > [data-foli-resize], :scope > [data-foli-crop]",
+    ) ?? [])
+      handle.remove();
     this.selectedPicture = span;
+    this.selectedCropping = cropping;
     if (!span) return;
     injectStyles(this.host);
     span.setAttribute(PICTURE_SELECTED_ATTR, "");
-    // shortcut: a text box has no resize handle yet (33.5's Size dialog sizes it).
-    if (!this.editable || name !== "picture") return;
-    const handle = this.host.ownerDocument.createElement("span");
+    if (!this.editable) return;
+    const doc = this.host.ownerDocument;
+    for (const side of cropping ? (["left", "top", "right", "bottom"] as const) : []) {
+      const handle = doc.createElement("span");
+      handle.setAttribute("data-foli-crop", side);
+      handle.setAttribute("aria-hidden", "true");
+      span.append(handle);
+    }
+    if (cropping) return;
+    const handle = doc.createElement("span");
     handle.setAttribute("data-foli-resize", "");
     handle.setAttribute("aria-hidden", "true");
     span.append(handle);
@@ -4556,9 +4581,18 @@ export class EditorView {
    */
   private pictureMouseDown(event: MouseEvent): boolean {
     this.endResize();
-    if (event.shiftKey || this.composing) return false;
     const target = event.target as Element | null;
-    const span = target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize]`)?.parentElement ?? null;
+    // Shift extends the selection, but on a resize handle keeps the ratio (33.5).
+    if (
+      this.composing ||
+      (event.shiftKey && !target?.closest?.("[data-foli-resize], [data-foli-crop]"))
+    )
+      return false;
+    const span =
+      target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize], [data-foli-crop]`)?.parentElement ??
+      null;
+    // A picture in a text box's or a header's drawing is not the body's to select.
+    if (span?.parentElement?.closest(`[${TEXT_BOX_ATTR}]`)) return false;
     if (!span || !this.host.contains(span)) return false;
     const pos = this.posFromDOM(FLOAT_ANCHORS.get(span) ?? span, 0);
     if (pos === null) return false;
@@ -4568,8 +4602,17 @@ export class EditorView {
       this.dispatch(this.state.tr.setSelection(NodeSelection.create(this.state.doc, pos)));
     // Already selected: written again (the focus may have put a caret in the host).
     else this.writeSelection(true);
-    const img = span.querySelector(`[${PICTURE_ATTR}]`) as HTMLElement | null;
-    if (!img || !target?.closest("[data-foli-resize]") || !this.editable) return true;
+    const img = span.querySelector(
+      `:scope > [${PICTURE_ATTR}], :scope > [${TEXT_BOX_ATTR}]`,
+    ) as HTMLElement | null;
+    const cropSide = target?.closest("[data-foli-crop]")?.getAttribute("data-foli-crop") as
+      | "left"
+      | "top"
+      | "right"
+      | "bottom"
+      | null
+      | undefined;
+    if (!img || !(target?.closest("[data-foli-resize]") || cropSide) || !this.editable) return true;
     // Its unrotated box (a rotated picture's rect is the rotated one's bounds).
     const turned = img.style.transform;
     img.style.transform = "";
@@ -4584,11 +4627,15 @@ export class EditorView {
           : "mouse",
       pos,
       img,
+      free: img.hasAttribute(TEXT_BOX_ATTR),
+      crop: cropSide ?? undefined,
       width: rect.width,
       height: rect.height,
       scale,
-      // No wider than the page's text (layout px).
-      max: Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
+      // A picture no wider than the page's text (layout px); a text box up to Word's 22 inches.
+      max: img.hasAttribute(TEXT_BOX_ATTR)
+        ? 2112
+        : Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
       x: event.clientX,
       y: event.clientY,
       style: img.getAttribute("style") ?? "",
@@ -4625,9 +4672,17 @@ export class EditorView {
     if (this.pictureMouseDown(event)) event.preventDefault();
   };
 
-  /** The size (layout px) a resize gives at the pointer: the larger move, the ratio kept. */
+  /**
+   * The size (layout px) a resize gives at the pointer: a picture, or anything with Shift, keeps
+   * its ratio (the larger move); a text box's sides follow the pointer.
+   */
   private resizedTo(event: MouseEvent): { width: number; height: number } {
     const r = this.resize as NonNullable<EditorView["resize"]>;
+    if (r.free && !event.shiftKey)
+      return {
+        width: Math.min(Math.max((r.width + event.clientX - r.x) / r.scale, MIN_PICTURE), r.max),
+        height: Math.max((r.height + event.clientY - r.y) / r.scale, MIN_PICTURE),
+      };
     const ratio = r.height / r.width;
     const dx = event.clientX - r.x;
     const dy = (event.clientY - r.y) / ratio;
@@ -4651,22 +4706,77 @@ export class EditorView {
       this.onResizeCancel();
       return;
     }
+    if (this.resize.crop) {
+      // The handle follows the pointer along its axis; the crop is made on release.
+      const handle = this.selectedPicture?.querySelector<HTMLElement>(
+        `[data-foli-crop="${this.resize.crop}"]`,
+      );
+      const across = this.resize.crop === "left" || this.resize.crop === "right";
+      const d = across ? event.clientX - this.resize.x : event.clientY - this.resize.y;
+      if (handle)
+        handle.style.transform = across
+          ? `translateX(${d / this.resize.scale}px)`
+          : `translateY(${d / this.resize.scale}px)`;
+      return;
+    }
     const { width, height } = this.resizedTo(event);
     this.resize.img.style.width = `${width}px`;
-    this.resize.img.style.height = `${height}px`;
+    // A box that grows to its text is drawn with a least height: that is what changes.
+    if (this.resize.img.style.minHeight) this.resize.img.style.minHeight = `${height}px`;
+    else this.resize.img.style.height = `${height}px`;
   };
+
+  /** The crop a crop handle dragged to the pointer gives (1000ths of a percent per side). */
+  private croppedTo(event: MouseEvent): Record<string, number> | null {
+    const r = this.resize as NonNullable<EditorView["resize"]>;
+    const node = this.state.doc.nodeAt(r.pos);
+    if (node?.type.name !== "picture" || !r.crop) return null;
+    const crop = { left: 0, top: 0, right: 0, bottom: 0, ...(node.attrs.crop ?? {}) } as Record<
+      string,
+      number
+    >;
+    const across = r.crop === "left" || r.crop === "right";
+    // The whole image's size on the screen: what shows is the part the crop leaves.
+    const shown = across ? r.width : r.height;
+    const left = across
+      ? (crop.left ?? 0) + (crop.right ?? 0)
+      : (crop.top ?? 0) + (crop.bottom ?? 0);
+    const whole = shown / ((100_000 - (left ?? 0)) / 100_000);
+    const d = (across ? event.clientX - r.x : event.clientY - r.y) / whole;
+    // Inward is more cropped: right and down for the left and top edges.
+    const inward = r.crop === "left" || r.crop === "top" ? d : -d;
+    const next = Math.round((crop[r.crop] ?? 0) + inward * 100_000);
+    const other = across
+      ? r.crop === "left"
+        ? crop.right
+        : crop.left
+      : r.crop === "top"
+        ? crop.bottom
+        : crop.top;
+    // Something of the image stays (1%), and the edge goes out no further than the image's own.
+    crop[r.crop] = Math.max(-100_000, Math.min(next, 99_000 - (other ?? 0)));
+    return crop;
+  }
 
   private onResizeEnd = (event: PointerEvent): void => {
     if (!this.resize || !this.resizing(event)) return;
     const { width, height } = this.resizedTo(event);
+    const crop = this.resize.crop ? this.croppedTo(event) : null;
     const r = this.endResize();
     if (!r) return;
+    for (const handle of this.selectedPicture?.querySelectorAll<HTMLElement>("[data-foli-crop]") ??
+      [])
+      handle.style.transform = "";
     // No real move: nothing changes (a jiggle drawn while moving goes back).
     const moved = Math.abs(event.clientX - r.x) >= 2 || Math.abs(event.clientY - r.y) >= 2;
+    if (r.crop) {
+      if (moved && crop) this.run(setPictureCrop(r.pos, crop));
+      return;
+    }
     const applied =
       moved &&
       this.run(
-        setPictureSize(r.pos, Math.round(width * EMU_PER_PX), Math.round(height * EMU_PER_PX)),
+        setObjectSize(r.pos, Math.round(width * EMU_PER_PX), Math.round(height * EMU_PER_PX)),
       );
     // Not applied (no move, tracking, the picture gone): as it was.
     if (!applied) r.img.setAttribute("style", r.style);
@@ -4684,6 +4794,9 @@ export class EditorView {
     if (event && "pointerId" in event && !this.resizing(event as PointerEvent)) return;
     const r = this.endResize();
     if (r) r.img.setAttribute("style", r.style);
+    for (const handle of this.selectedPicture?.querySelectorAll<HTMLElement>("[data-foli-crop]") ??
+      [])
+      handle.style.transform = "";
   };
 
   /** Ends a resize (its listeners gone) and returns it. */
@@ -6694,6 +6807,7 @@ function handleOnly(record: MutationRecord): boolean {
       (n) =>
         n.nodeType === 1 &&
         ((n as Element).hasAttribute("data-foli-resize") ||
+          (n as Element).hasAttribute("data-foli-crop") ||
           (n as Element).hasAttribute(CONTROL_UI_ATTR)),
     )
   );

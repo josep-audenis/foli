@@ -293,6 +293,8 @@ export declare class EditorView {
     private upload;
     /** The selected picture's span (with its resize handle). */
     private selectedPicture;
+    /** Whether the selected picture shows its crop handles. */
+    private selectedCropping;
     /** A picture being resized: its position, element, size at the press, scale, the press. */
     private resize;
     /** The app's URLs for pictures' images (`EditorViewOptions.resource`). */
@@ -772,11 +774,16 @@ export declare class EditorView {
      * afterwards are then not a second press.
      */
     private onPointerDown;
-    /** The size (layout px) a resize gives at the pointer: the larger move, the ratio kept. */
+    /**
+     * The size (layout px) a resize gives at the pointer: a picture, or anything with Shift, keeps
+     * its ratio (the larger move); a text box's sides follow the pointer.
+     */
     private resizedTo;
     /** Whether `event` is the resizing pointer's (another finger, or a mouse beside a pen, is not). */
     private resizing;
     private onResizeMove;
+    /** The crop a crop handle dragged to the pointer gives (1000ths of a percent per side). */
+    private croppedTo;
     private onResizeEnd;
     private onResizeKey;
     private onResizeCancel;

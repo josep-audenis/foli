@@ -1036,8 +1036,12 @@ and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `t
 `setObjectMovesWithText(pos, moves, placement?)`, `setObjectPosition(pos, preset)` and
 `setObjectLayout(pos, { horizontal?, vertical?, side?, distance?, allowOverlap?, layoutInCell?
 })` and `setObjectFloat(pos, float | null)` (the whole layout at once, as the Layout dialog's OK)
-change it, one undo step each, refused while tracking. The toolbar's dialogs `"layout"` and
-`"layoutWrapping"` are Word's Layout dialog on its Position and Text Wrapping tabs. `placement` is where the object is
+change it, one undo step each, refused while tracking. The toolbar's dialogs `"layout"`,
+`"layoutWrapping"` and `"layoutSize"` are Word's Layout dialog on its Position, Text Wrapping and
+Size tabs. `setObjectSize(pos, width, height, rotation?)` sizes a picture or text box (a
+picture's rotation with it) and `setObjectFloat(pos, float, size?)` takes a size too, one step.
+`toggleCrop` turns Picture Format ▸ Crop on or off for the selected picture (`croppingAt(state)`:
+its position while on): the view then shows a crop handle on each edge. `placement` is where the object is
 drawn (`storyView.objectPlacement(pos)`, CSS px from its page's corner, with its paragraph's top
 and its column's left): an object made floating, or fixed on the page, stays there.
 
