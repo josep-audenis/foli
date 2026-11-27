@@ -102,20 +102,22 @@ export function readWatermark(
     const text = plain(path, "string");
     const color = colorOf(plain(shape, "fillcolor") ?? "white");
     if (text === undefined || !color || !Number.isInteger(rotation)) return undefined;
-    const font = styleOf(plain(path, "style")).get("font-family")?.replace(/^"|"$/g, "");
+    const font = styleOf(plain(path, "style"))
+      .get("font-family")
+      ?.replace(/^["']|["']$/g, "");
     const fill = kids(shape).find((c) => c.ns === V && c.local === "fill");
     return {
       kind: "text",
       text,
       ...(font ? { font } : {}),
       color,
-      ...(plain(fill, "opacity") !== undefined ? { semitransparent: true } : {}),
+      ...(Number(plain(fill, "opacity") ?? 1) < 1 ? { semitransparent: true } : {}),
       ...(rotation ? { rotation: ((rotation % 360) + 360) % 360 } : {}),
       width,
       height,
     };
   }
-  if (!id.startsWith(PICTURE_ID) || rotation) return undefined;
+  if (!id.startsWith(PICTURE_ID) || !Number.isFinite(rotation) || rotation) return undefined;
   const data = kids(shape).find((c) => c.ns === V && c.local === "imagedata");
   const rid = data && attr(data, "id", R);
   const relationship = rid === undefined ? undefined : context.relationship(rid);
@@ -137,10 +139,6 @@ const fill = (color = "C0C0C0") =>
 /** Points as VML writes them: `412.4pt`. */
 const pt = (twipsValue: number) => `${Number((twipsValue / 20).toFixed(2))}pt`;
 
-/** A shape id of `stem` no other watermark of the output has. */
-let next = 0;
-const shapeNumber = () => 2049 + (next++ % 30_000);
-
 /** Word's WordArt shape type for text on a path (`_x0000_t136`). */
 const TEXT_TYPE =
   '<v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e"><v:formulas><v:f eqn="sum #0 0 10800"/><v:f eqn="prod #0 2 1"/><v:f eqn="sum 21600 0 @1"/><v:f eqn="sum 0 0 @2"/><v:f eqn="sum 21600 0 @3"/><v:f eqn="if @0 @3 0"/><v:f eqn="if @0 21600 @1"/><v:f eqn="if @0 0 @2"/><v:f eqn="if @0 @4 21600"/><v:f eqn="mid @5 @6"/><v:f eqn="mid @8 @5"/><v:f eqn="mid @7 @8"/><v:f eqn="mid @6 @7"/><v:f eqn="sum @6 0 @5"/></v:formulas><v:path textpathok="t" o:connecttype="custom" o:connectlocs="@9,0;@10,10800;@11,21600;@12,10800" o:connectangles="270,180,90,0"/><v:textpath on="t" fitshape="t"/><v:handles><v:h position="#0,bottomRight" xrange="6629,14971"/></v:handles><o:lock v:ext="edit" text="t" shapetype="t"/></v:shapetype>';
@@ -160,12 +158,13 @@ export function watermarkXml(
   watermark: WatermarkJSON,
   namespaces: Namespaces,
   image: (key: string) => string,
+  /** A shape number no other shape of the output has (`_x0000_s<n>`). */
+  n: number,
 ): string {
-  const declare = Object.entries({ v: V, o: O, w10: W10 })
+  const declare = Object.entries({ v: V, o: O, w10: W10, r: R })
     .filter(([prefix]) => !namespaces.prefixes.has(prefix))
     .map(([prefix, uri]) => ` xmlns:${prefix}="${uri}"`)
     .join("");
-  const n = shapeNumber();
   const size = `width:${pt(watermark.width)};height:${pt(watermark.height)}`;
   if (watermark.kind === "picture") {
     const id = image(String(watermark.picture));
@@ -175,7 +174,8 @@ export function watermarkXml(
     return `<w:pict${declare}>${PICTURE_TYPE}<v:shape id="${PICTURE_ID}${n}" o:spid="_x0000_s${n}" type="#_x0000_t75" style="position:absolute;margin-left:0;margin-top:0;${size};${PLACE}" o:allowincell="f"><v:imagedata r:id="${escapeAttribute(id)}" o:title=""${washout}/></v:shape></w:pict>`;
   }
   const rotation = watermark.rotation ? `;rotation:${watermark.rotation}` : "";
-  const font = (watermark.font ?? "Calibri").replace(/"/g, "");
+  // A quote or semicolon would end the style's value.
+  const font = (watermark.font ?? "Calibri").replace(/["';]/g, "");
   const opacity = watermark.semitransparent ? '<v:fill opacity=".5"/>' : "";
   return `<w:pict${declare}>${TEXT_TYPE}<v:shape id="${TEXT_ID}${n}" o:spid="_x0000_s${n}" type="#_x0000_t136" style="position:absolute;margin-left:0;margin-top:0;${size}${rotation};${PLACE}" o:allowincell="f" fillcolor="${fill(watermark.color)}" stroked="f">${opacity}<v:textpath style="${escapeAttribute(`font-family:"${font}";font-size:1pt`)}" string="${escapeAttribute(watermark.text ?? "")}"/><w10:wrap anchorx="margin" anchory="margin"/></v:shape></w:pict>`;
 }

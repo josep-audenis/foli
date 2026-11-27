@@ -200,10 +200,15 @@ function contextFor(
         });
         if (read && same(read, wanted)) return xml;
       }
-      return watermarkXml(wanted, namespaces, (key) => {
-        const part = media.part(key);
-        return relationships.image(part, relative(source, part), undefined);
-      });
+      return watermarkXml(
+        wanted,
+        namespaces,
+        (key) => {
+          const part = media.part(key);
+          return relationships.image(part, relative(source, part), undefined);
+        },
+        media.shapeNumber(),
+      );
     },
   };
 }

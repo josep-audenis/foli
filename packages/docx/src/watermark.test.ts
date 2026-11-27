@@ -90,15 +90,21 @@ describe("watermarks (32.3)", () => {
       readWatermark(pict as never, { relationship: () => undefined, partOf: () => undefined }),
     ).toBeUndefined();
     const plain = { declarations: `xmlns:w="${W_NS}"`, prefixes: new Set(["w"]) };
-    const xml = watermarkXml({ kind: "text", text: "X", width: 20, height: 20 }, plain, () => "");
+    const xml = watermarkXml(
+      { kind: "text", text: "X", width: 20, height: 20 },
+      plain,
+      () => "",
+      2049,
+    );
     expect(xml).toMatch(
-      /^<w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o=".*" xmlns:w10=".*">/,
+      /^<w:pict xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o=".*" xmlns:w10=".*" xmlns:r=".*">/,
     );
     expect(
       watermarkXml(
         { kind: "text", text: "X", width: 20, height: 20 },
         DEFAULT_NAMESPACES,
         () => "",
+        2049,
       ),
     ).toMatch(/^<w:pict>/);
   });

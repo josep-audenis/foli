@@ -396,7 +396,7 @@ const pageColors = new WeakMap<HTMLElement, string>();
 /** Each page element's borders (Phase 32), as last drawn, and what they were drawn from. */
 const pageFrames = new WeakMap<
   HTMLElement,
-  { key: string; resources: unknown; elements: HTMLElement[] }
+  { key: string; resources: unknown; resolve: unknown; elements: HTMLElement[] }
 >();
 /** The margins a header or footer gave each page element, as last written. */
 const pagePads = new WeakMap<HTMLElement, string>();
@@ -3469,13 +3469,15 @@ export class EditorView {
     const resources = wordContext(this.state)?.envelope.resources;
     const key = `${pageBordersKey(borders, box, first)}|${watermarks.length ? JSON.stringify([watermarks, box]) : ""}`;
     const known = pageFrames.get(page);
-    if (known?.key === key && known.resources === resources) return;
+    if (known?.key === key && known.resources === resources && known.resolve === this.resource)
+      return;
     const doc = this.host.ownerDocument;
     const frame = pageBordersElement(doc, borders, box, first);
     const image = imageSource(resources, this.resource ?? undefined);
     pageFrames.set(page, {
       key,
       resources,
+      resolve: this.resource,
       elements: [
         ...watermarks.map((watermark) => watermarkElement(doc, watermark, box, image)),
         ...(frame ? [frame] : []),
