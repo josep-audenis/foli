@@ -9,15 +9,26 @@ import {
   type Command,
   chainCommands,
   type Editor,
+  fontFamilyAt,
+  fontSizeAt,
   type LineRule,
   type ParagraphFlags,
   paragraphFormatAt,
+  type RunEffects,
+  runFormatAt,
   setAlign,
+  setCharacterSpacing,
+  setFontFamily,
+  setFontSize,
   setIndent,
   setLineSpacing,
   setOutlineLevel,
   setParagraphFlags,
   setParagraphSpacing,
+  setRunEffects,
+  setTextColor,
+  setUnderline,
+  setVerticalAlign,
 } from "@folijs/core";
 import {
   type CSSProperties,
@@ -29,7 +40,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useT } from "./messages.js";
+import { type ToolbarMessage, useT } from "./messages.js";
 import { formatLength, type LengthUnit, parseLength } from "./units.js";
 
 /** A checkbox that can show mixed (null): a click turns it on, then off and on again. */
@@ -574,6 +585,442 @@ function ParagraphPreview({
         {words.repeat(4)}
       </p>
       <p className="foli-dialog-preview-other">{words.repeat(2)}</p>
+    </div>
+  );
+}
+
+// ---------- Font ----------
+
+/** Word's underline styles in its Font dialog, with Word's names. */
+const UNDERLINE_NAMES: readonly (readonly [string, ToolbarMessage])[] = [
+  ["single", "Single"],
+  ["words", "Words only"],
+  ["double", "Double"],
+  ["thick", "Thick"],
+  ["dotted", "Dotted"],
+  ["dash", "Dashed"],
+  ["dotDash", "Dot-dash"],
+  ["dotDotDash", "Dot-dot-dash"],
+  ["wave", "Wave"],
+];
+
+const FONT_EFFECTS = [
+  "strike",
+  "doubleStrike",
+  "superscript",
+  "subscript",
+  "smallCaps",
+  "caps",
+  "hidden",
+] as const;
+type Effect = (typeof FONT_EFFECTS)[number];
+/** Effects that cannot both be on: checking one clears the other. */
+const PAIRED: Partial<Record<Effect, Effect>> = {
+  strike: "doubleStrike",
+  doubleStrike: "strike",
+  superscript: "subscript",
+  subscript: "superscript",
+  smallCaps: "caps",
+  caps: "smallCaps",
+};
+
+/** A color's value in a box: `#rrggbb`, "auto" for Word's Automatic, "" when mixed. */
+const colorValue = (rrggbb: string | null | undefined) =>
+  rrggbb === undefined
+    ? ""
+    : rrggbb === null || rrggbb.toLowerCase() === "auto"
+      ? "auto"
+      : `#${rrggbb.toLowerCase()}`;
+
+type FontField = "font" | "size" | "by";
+
+/**
+ * Word's Font dialog for the selected text (or the text typed next): Font (font, style, size,
+ * color, underline style and color, effects) and Advanced (character spacing), with a preview.
+ * `fonts`, `sizes` and `colors` are the toolbar's Font and Size boxes' and color menu's.
+ * @internal
+ */
+export function FontDialog({
+  editor,
+  fonts,
+  sizes,
+  colors,
+  onClose,
+}: {
+  editor: Editor;
+  fonts: readonly string[];
+  sizes: readonly number[];
+  colors: readonly { name: ToolbarMessage; color: string }[];
+  /** `applied`: the text changed (the focus may go to the document). */
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [initial] = useState(() => {
+    const { state } = editor;
+    const run = runFormatAt(state) ?? {};
+    const size = fontSizeAt(state);
+    const vertical = run.verticalAlign;
+    const spacing = run.characterSpacing;
+    const { from, to } = state.selection;
+    return {
+      font: fontFamilyAt(state) ?? "",
+      style:
+        run.bold === undefined || run.italic === undefined
+          ? ""
+          : run.bold
+            ? run.italic
+              ? "boldItalic"
+              : "bold"
+            : run.italic
+              ? "italic"
+              : "regular",
+      size: size === null ? "" : String(size),
+      color: colorValue(run.color),
+      underline: run.underline === undefined ? "" : (run.underline ?? "none"),
+      underlineColor: colorValue(run.underlineColor),
+      effects: {
+        strike: run.strike ?? null,
+        doubleStrike: run.doubleStrike ?? null,
+        superscript: vertical === undefined ? null : vertical === "superscript",
+        subscript: vertical === undefined ? null : vertical === "subscript",
+        smallCaps: run.smallCaps ?? null,
+        caps: run.caps ?? null,
+        hidden: run.hidden ?? null,
+      } as Record<Effect, boolean | null>,
+      spacing:
+        spacing === undefined
+          ? ""
+          : spacing > 0
+            ? "expanded"
+            : spacing < 0
+              ? "condensed"
+              : "normal",
+      by: spacing ? formatLength(Math.abs(spacing), "pt") : "",
+      sample: state.doc
+        .textBetween(from, Math.min(to, from + 200), " ")
+        .trim()
+        .slice(0, 40),
+    };
+  });
+  const [tab, setTab] = useState("font");
+  const [font, setFont] = useState(initial.font);
+  const [style, setStyle] = useState(initial.style);
+  const [size, setSize] = useState(initial.size);
+  const [color, setColor] = useState(initial.color);
+  const [underline, setUnderlineStyle] = useState(initial.underline);
+  const [underlineColor, setUnderlineColor] = useState(initial.underlineColor);
+  const [effects, setEffects] = useState(initial.effects);
+  const [spacing, setSpacing] = useState(initial.spacing);
+  const [by, setBy] = useState(initial.by);
+  const [error, setError] = useState<FontField | null>(null);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  const labels: Record<FontField, string> = { font: t("Font"), size: t("Size"), by: t("By") };
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    const wrong = (field: FontField) => {
+      setError(field);
+      setTab(field === "by" ? "advanced" : "font");
+      requestAnimationFrame(() => document.getElementById(`${id}-${field}`)?.focus());
+    };
+    const commands: Command[] = [];
+    if (font !== initial.font) {
+      if (!font.trim()) return wrong("font");
+      commands.push(setFontFamily(font));
+    }
+    if (style !== initial.style && style)
+      commands.push(
+        setRunEffects({
+          bold: style === "bold" || style === "boldItalic",
+          italic: style === "italic" || style === "boldItalic",
+        }),
+      );
+    if (size !== initial.size) {
+      const points = Number(size.trim().replace(",", "."));
+      if (!(points >= 1 && points <= 1638)) return wrong("size");
+      commands.push(setFontSize(Math.round(points * 2) / 2));
+    }
+    if (color !== initial.color && color)
+      commands.push(setTextColor(color === "auto" ? null : color));
+    if (
+      underline &&
+      (underline !== initial.underline || underlineColor !== initial.underlineColor)
+    ) {
+      if (underline === "none") commands.push(setUnderline(null));
+      else {
+        const changed = underlineColor !== initial.underlineColor && underlineColor !== "";
+        const value = underlineColor === "auto" ? null : underlineColor;
+        commands.push(setUnderline(underline, changed ? value : undefined));
+      }
+    }
+    const set: RunEffects = {};
+    for (const key of ["strike", "doubleStrike", "smallCaps", "caps", "hidden"] as const) {
+      const value = effects[key];
+      if (value !== initial.effects[key] && value !== null) set[key] = value;
+    }
+    if (Object.keys(set).length) commands.push(setRunEffects(set));
+    const { superscript, subscript } = effects;
+    if (superscript !== initial.effects.superscript || subscript !== initial.effects.subscript) {
+      if (superscript) commands.push(setVerticalAlign("superscript"));
+      else if (subscript) commands.push(setVerticalAlign("subscript"));
+      else if (superscript === false && subscript === false)
+        commands.push(setVerticalAlign("baseline"));
+    }
+    if (spacing && (spacing !== initial.spacing || by !== initial.by)) {
+      if (spacing === "normal") commands.push(setCharacterSpacing(0));
+      else {
+        const twips = parseLength(by, "pt");
+        if (twips === null || twips <= 0 || twips > 31_680) return wrong("by");
+        commands.push(setCharacterSpacing(((spacing === "condensed" ? -1 : 1) * twips) / 20));
+      }
+    }
+    if (!commands.length) return onClose(false);
+    onClose(editor.run(chainCommands(commands)));
+  };
+
+  const colorOptions = (current: string, initialValue: string) => {
+    const others = [current, initialValue].filter(
+      (v, i, all) =>
+        v.startsWith("#") && all.indexOf(v) === i && !colors.some((c) => c.color === v),
+    );
+    return (
+      <>
+        {initialValue === "" && <option value="" />}
+        <option value="auto">{t("Automatic")}</option>
+        {colors.map((c) => (
+          <option key={c.color} value={c.color}>
+            {t(c.name)}
+          </option>
+        ))}
+        {others.map((v) => (
+          <option key={v} value={v}>
+            {t("Other color {color}", { color: v })}
+          </option>
+        ))}
+      </>
+    );
+  };
+  const effect = (key: Effect, label: string) => (
+    <TriCheck
+      id={`${id}-${key}`}
+      label={label}
+      value={effects[key]}
+      onChange={(value) =>
+        setEffects((current) => {
+          const next = { ...current, [key]: value };
+          const other = PAIRED[key];
+          if (value && other) next[other] = false;
+          return next;
+        })
+      }
+    />
+  );
+  const marked = (field: FontField) => ({
+    "aria-invalid": error === field || undefined,
+    "aria-describedby": error === field ? `${id}-error` : undefined,
+  });
+  const typed = (field: FontField, set: (value: string) => void) => ({
+    ...marked(field),
+    onChange: (event: { target: { value: string } }) => {
+      set(event.target.value);
+      setError(null);
+    },
+  });
+
+  const fontTab = (
+    <>
+      <fieldset className="foli-dialog-section">
+        <legend>{t("Font")}</legend>
+        <Field id={`${id}-font`} label={t("Font")}>
+          <input
+            ref={first}
+            id={`${id}-font`}
+            type="text"
+            list={`${id}-fonts`}
+            value={font}
+            {...typed("font", setFont)}
+          />
+          <datalist id={`${id}-fonts`}>
+            {fonts.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </Field>
+        <Field id={`${id}-style`} label={t("Font style")}>
+          <select id={`${id}-style`} value={style} onChange={(e) => setStyle(e.target.value)}>
+            {initial.style === "" && <option value="" />}
+            <option value="regular">{t("Regular")}</option>
+            <option value="italic">{t("Italic")}</option>
+            <option value="bold">{t("Bold")}</option>
+            <option value="boldItalic">{t("Bold Italic")}</option>
+          </select>
+        </Field>
+        <Field id={`${id}-size`} label={t("Size")}>
+          <input
+            id={`${id}-size`}
+            type="text"
+            inputMode="decimal"
+            list={`${id}-sizes`}
+            value={size}
+            {...typed("size", setSize)}
+          />
+          <datalist id={`${id}-sizes`}>
+            {sizes.map((n) => (
+              <option key={n} value={String(n)} />
+            ))}
+          </datalist>
+        </Field>
+        <Field id={`${id}-color`} label={t("Font color")}>
+          <select id={`${id}-color`} value={color} onChange={(e) => setColor(e.target.value)}>
+            {colorOptions(color, initial.color)}
+          </select>
+        </Field>
+        <Field id={`${id}-underline`} label={t("Underline style")}>
+          <select
+            id={`${id}-underline`}
+            value={underline}
+            onChange={(e) => setUnderlineStyle(e.target.value)}
+          >
+            {initial.underline === "" && <option value="" />}
+            <option value="none">{t("None")}</option>
+            {UNDERLINE_NAMES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {t(label)}
+              </option>
+            ))}
+            {/* A style Word has that the list does not name (dashLong, wavyDouble…). */}
+            {initial.underline &&
+              initial.underline !== "none" &&
+              !UNDERLINE_NAMES.some(([value]) => value === initial.underline) && (
+                <option value={initial.underline}>{initial.underline}</option>
+              )}
+          </select>
+        </Field>
+        <Field id={`${id}-underlineColor`} label={t("Underline color")}>
+          <select
+            id={`${id}-underlineColor`}
+            value={underlineColor}
+            disabled={underline === "none" || underline === ""}
+            onChange={(e) => setUnderlineColor(e.target.value)}
+          >
+            {colorOptions(underlineColor, initial.underlineColor)}
+          </select>
+        </Field>
+      </fieldset>
+      <fieldset className="foli-dialog-section">
+        <legend>{t("Effects")}</legend>
+        {effect("strike", t("Strikethrough"))}
+        {effect("doubleStrike", t("Double strikethrough"))}
+        {effect("superscript", t("Superscript"))}
+        {effect("subscript", t("Subscript"))}
+        {effect("smallCaps", t("Small caps"))}
+        {effect("caps", t("All caps"))}
+        {effect("hidden", t("Hidden"))}
+      </fieldset>
+    </>
+  );
+  const advanced = (
+    <fieldset className="foli-dialog-section">
+      <legend>{t("Character Spacing")}</legend>
+      <Field id={`${id}-spacing`} label={t("Spacing")}>
+        <select
+          id={`${id}-spacing`}
+          value={spacing}
+          onChange={(event) => {
+            const next = event.target.value;
+            setSpacing(next);
+            setBy(next === "normal" ? "" : by || formatLength(20, "pt"));
+            setError(null);
+          }}
+        >
+          {initial.spacing === "" && <option value="" />}
+          <option value="normal">{t("Normal")}</option>
+          <option value="expanded">{t("Expanded")}</option>
+          <option value="condensed">{t("Condensed")}</option>
+        </select>
+      </Field>
+      <Field id={`${id}-by`} label={t("By")}>
+        <input
+          id={`${id}-by`}
+          type="text"
+          inputMode="decimal"
+          value={by}
+          disabled={spacing !== "expanded" && spacing !== "condensed"}
+          {...typed("by", setBy)}
+        />
+      </Field>
+    </fieldset>
+  );
+  const spaced = spacing === "expanded" || spacing === "condensed";
+  const decorations = [
+    underline && underline !== "none" ? "underline" : "",
+    effects.strike || effects.doubleStrike ? "line-through" : "",
+  ].filter(Boolean);
+  const preview: CSSProperties = {
+    fontFamily: font || undefined,
+    fontSize: `${Math.max(6, Math.min(Number(size) || 11, 36))}pt`,
+    fontWeight: style === "bold" || style === "boldItalic" ? "bold" : undefined,
+    fontStyle: style === "italic" || style === "boldItalic" ? "italic" : undefined,
+    color: color.startsWith("#") ? color : undefined,
+    textDecorationLine: decorations.join(" ") || undefined,
+    textDecorationStyle:
+      underline === "double" || effects.doubleStrike
+        ? "double"
+        : underline === "wave"
+          ? "wavy"
+          : underline === "dotted"
+            ? "dotted"
+            : underline.startsWith("dash") || underline.startsWith("dot")
+              ? "dashed"
+              : undefined,
+    textDecorationColor: underlineColor.startsWith("#") ? underlineColor : undefined,
+    textTransform: effects.caps ? "uppercase" : undefined,
+    fontVariant: effects.smallCaps ? "small-caps" : undefined,
+    letterSpacing: spaced
+      ? `${((spacing === "condensed" ? -1 : 1) * (parseLength(by, "pt") ?? 0)) / 20}pt`
+      : undefined,
+    verticalAlign: effects.superscript ? "super" : effects.subscript ? "sub" : undefined,
+    opacity: effects.hidden ? 0.5 : undefined,
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Font")}
+      className="foli-link-dialog foli-word-dialog foli-font-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <Tabs
+          id={id}
+          selected={tab}
+          onSelect={setTab}
+          tabs={[
+            { key: "font", label: t("Font"), content: fontTab },
+            { key: "advanced", label: t("Advanced"), content: advanced },
+          ]}
+        />
+        <div className="foli-dialog-preview foli-font-preview" role="img" aria-label={t("Preview")}>
+          <span style={preview}>{initial.sample || font || t("Sample text")}</span>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {t("Check this value: {field}.", { field: labels[error] })}
+          </p>
+        )}
+      </form>
     </div>
   );
 }

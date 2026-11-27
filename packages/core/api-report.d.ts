@@ -42,7 +42,7 @@ export declare function parseContentV2(value: unknown, path?: string): Node;
 export { DEFAULT_SETTINGS, type DocumentSettings, type FoliDocumentV2, PAGE_SIZES, type PageMargins, type PageSize, parseContentV2, } from "./document.js";
 export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, FoliDocumentError, Fragment, Mark, type MarkJSON, type MarkSpec, MarkType, Node, type NodeJSON, NodeRange, type NodeSpec, NodeType, ReplaceError, ResolvedPos, Schema, type SchemaSpec, Slice, type SliceJSON, TextNode, } from "./model/index.js";
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
-export { AllSelection, acceptAllChanges, acceptChange, acceptChangeAndNext, acceptChangesById, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BroadcastJSON, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type CollabOptions, type Command, type CommentContent, type CommentMatch, type CommentMention, type CommentOptions, type CommentStepsOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CountOptions, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, chainCommands, changeCase, changeIndent, clearFormatting, closeHistory, collab, colorAt, columnAt, commentAnchors, commentMentions, commentOnly, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, copyFormat, countWords, createEditor, crossReferenceTargets, type DeleteUnit, type DialogName, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, dialogRequest, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, formatPainterState, formattingMarksShown, getVersion, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type LineRule, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mentionText, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextChangeWrapping, nextFontSize, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, onlyCommentSteps, openDialog, openLinkEditor, type ParagraphFlags, type ParagraphFormatAt, type PictureCrop, Plugin, PluginKey, type PluginSpec, type Presence, type PresenceMessage, pageVariant, paragraphFormatAt, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, pasteFormat, presence, presenceMessage, previousChange, previousChangeWrapping, type ReceivedBroadcast, type ReplaceRefusal, type ReplaceReport, type ReviewView, type RunEffects, receiveBroadcast, receivePresence, receiveTransaction, redo, redoDepth, rejectAllChanges, rejectChange, rejectChangeAndNext, rejectChangesById, remote, removeLink, removePresence, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestedDialog, requestsLinkEditor, resolveComment, revealSelection, runFormatAt, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type SendableSteps, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, sendableSteps, setAlign, setBlockType, setCellShading, setCharacterSpacing, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setIndent, setLineSpacing, setLink, setNoteProperties, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setRunEffects, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, setUnderline, sinkListItem, splitBlock, splitCell, splitListItem, stepFontSize, stopFormatPainter, storyOfSection, type TableOfContentsOptions, type TextCase, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleFormattingMarks, toggleHeaderRow, toggleList, toggleMark, toggleVerticalAlign, trackedChanges, trackState, trackTransaction, UNDERLINE_STYLES, type UpdateFieldsOptions, underlineAt, undo, undoDepth, untracked, updateFields, type VerticalAlign, verticalAlignAt, type WordCount, wordKeymap, wrapInList, } from "./state/index.js";
+export { AllSelection, acceptAllChanges, acceptChange, acceptChangeAndNext, acceptChangesById, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BroadcastJSON, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type CollabOptions, type Command, type CommentContent, type CommentMatch, type CommentMention, type CommentOptions, type CommentStepsOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CountOptions, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, chainCommands, changeCase, changeIndent, clearFormatting, closeHistory, collab, colorAt, columnAt, commentAnchors, commentMentions, commentOnly, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, copyFormat, countWords, createEditor, crossReferenceTargets, type DeleteUnit, type DialogName, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, dialogRequest, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, formatPainterState, formattingMarksShown, getVersion, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, isRemote, joinBackward, joinForward, joinHistory, type LineRule, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mentionText, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextChangeWrapping, nextFontSize, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, onlyCommentSteps, openDialog, openLinkEditor, type ParagraphFlags, type ParagraphFormatAt, type PictureCrop, Plugin, PluginKey, type PluginSpec, type Presence, type PresenceMessage, pageVariant, paragraphFormatAt, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, pasteFormat, presence, presenceMessage, previousChange, previousChangeWrapping, type ReceivedBroadcast, type ReplaceRefusal, type ReplaceReport, type ReviewView, type RunEffects, receiveBroadcast, receivePresence, receiveTransaction, redo, redoDepth, rejectAllChanges, rejectChange, rejectChangeAndNext, rejectChangesById, remote, removeLink, removePresence, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestedDialog, requestsLinkEditor, resolveComment, revealSelection, runFormatAt, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type SendableSteps, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, sendableSteps, setAlign, setBlockType, setCellShading, setCharacterSpacing, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setIndent, setLineSpacing, setLink, setNoteProperties, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setRunEffects, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, setUnderline, setVerticalAlign, sinkListItem, splitBlock, splitCell, splitListItem, stepFontSize, stopFormatPainter, storyOfSection, type TableOfContentsOptions, type TextCase, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleFormattingMarks, toggleHeaderRow, toggleList, toggleMark, toggleVerticalAlign, trackedChanges, trackState, trackTransaction, UNDERLINE_STYLES, type UpdateFieldsOptions, underlineAt, undo, undoDepth, untracked, updateFields, type VerticalAlign, verticalAlignAt, type WordCount, wordKeymap, wrapInList, } from "./state/index.js";
 export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, type StoryMaps, Transform, TransformError, } from "./transform/index.js";
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
@@ -1130,11 +1130,11 @@ export declare function countWords(state: EditorState, options?: CountOptions): 
  */
 import type { Command, Transaction } from "./state.js";
 /** The formatting dialogs a UI opens on request (the React toolbar's built-in ones). */
-export type DialogName = "paragraph";
+export type DialogName = "font" | "paragraph";
 /** Transaction metadata set by `openDialog`: the dialog's name. */
 export declare const dialogRequest = "dialogRequest";
 /**
- * Asks the UI to open Word's Paragraph dialog for the selection, with a
+ * Asks the UI to open Word's Font or Paragraph dialog for the selection, with a
  * transaction that changes nothing and carries `dialogRequest`. Applies in a Word document where the selection has a paragraph; without such
  * a UI nothing opens.
  */
@@ -1327,7 +1327,7 @@ export interface BuiltInCommands {
      * editor): one undo step, tracked when tracking is on. False when none could take it.
      */
     setControlValue(target: string, value: ControlValueInput): boolean;
-    /** Asks the toolbar to open Word's Paragraph dialog (`openDialog`). */
+    /** Asks the toolbar to open Word's Font or Paragraph dialog (`openDialog`). */
     openDialog(name: DialogName): boolean;
 }
 /**
@@ -1810,7 +1810,7 @@ export { CellSelection, cellsAsTable, extendCellSelection, goToCell, goToCellVer
 export { type ReviewView, setReviewView, setTrackChanges, type TrackState, trackState, trackTransaction, untracked, } from "./track.js";
 export { CommentStep, documentJSON, EnvelopeStep, StoryEditStep, StoryStep, setComments, type WordContext, type WordEnvelope, withEnvelope, wordContext, } from "./word.js";
 export { copiedDefinitions, type FittedPaste, fitPaste, fitPastedV2, type WordDefinitions, } from "./wordclip.js";
-export { canOutdent, changeCase, changeIndent, clearFormatting, copyFormat, fontFamilyAt, fontSizeAt, formatPainterState, formattingMarksShown, HIGHLIGHT_HEX, type LineRule, type ListKind, lineSpacingAt, nextFontSize, type ParagraphFlags, type ParagraphFormatAt, paragraphFormatAt, paragraphStyleAt, paragraphStyles, pasteFormat, type RunEffects, runFormatAt, setCharacterSpacing, setFontFamily, setFontSize, setIndent, setLineSpacing, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setRunEffects, setUnderline, stepFontSize, stopFormatPainter, type TextCase, toggleFormattingMarks, toggleVerticalAlign, UNDERLINE_STYLES, underlineAt, type VerticalAlign, verticalAlignAt, } from "./wordformat.js";
+export { canOutdent, changeCase, changeIndent, clearFormatting, copyFormat, fontFamilyAt, fontSizeAt, formatPainterState, formattingMarksShown, HIGHLIGHT_HEX, type LineRule, type ListKind, lineSpacingAt, nextFontSize, type ParagraphFlags, type ParagraphFormatAt, paragraphFormatAt, paragraphStyleAt, paragraphStyles, pasteFormat, type RunEffects, runFormatAt, setCharacterSpacing, setFontFamily, setFontSize, setIndent, setLineSpacing, setOutlineLevel, setParagraphFlags, setParagraphSpacing, setParagraphStyle, setRunEffects, setUnderline, setVerticalAlign, stepFontSize, stopFormatPainter, type TextCase, toggleFormattingMarks, toggleVerticalAlign, UNDERLINE_STYLES, underlineAt, type VerticalAlign, verticalAlignAt, } from "./wordformat.js";
 export { wordKeymap } from "./wordkeys.js";
 
 // state/links.d.ts
@@ -3051,6 +3051,11 @@ export type VerticalAlign = "superscript" | "subscript";
  * text typed next) raised or lowered, or back on its baseline where it all already is.
  */
 export declare function toggleVerticalAlign(value: VerticalAlign): Command;
+/**
+ * Raises or lowers the selected text (or the text typed next), or puts it back on its baseline:
+ * Word's Font dialog's Superscript and Subscript boxes (not a toggle).
+ */
+export declare function setVerticalAlign(value: VerticalAlign | "baseline"): Command;
 /** Whether the selected text (or the text typed next) is raised or lowered, if all the same. */
 export declare function verticalAlignAt(state: EditorState): VerticalAlign | "baseline" | null;
 /**
@@ -3059,8 +3064,10 @@ export declare function verticalAlignAt(state: EditorState): VerticalAlign | "ba
  * twips); null or the styles' value puts back the styles' spacing.
  */
 export declare function setCharacterSpacing(points: number | null): Command;
-/** The on/off effects of Word's Font dialog. */
+/** The on/off effects of Word's Font dialog, and its Font style (bold, italic). */
 export interface RunEffects {
+    bold?: boolean | null;
+    italic?: boolean | null;
     strike?: boolean | null;
     doubleStrike?: boolean | null;
     caps?: boolean | null;
@@ -3072,7 +3079,8 @@ export interface RunEffects {
  * back the styles'. Strikethrough and double strikethrough exclude each other, as all caps and
  * small caps do: turning one on turns the other off unless it is given too. A value the styles
  * already give leaves no direct mark; one they do not is written, off included
- * (`<w:caps w:val="0"/>` over a style's caps). One transaction.
+ * (`<w:caps w:val="0"/>` over a style's caps). Bold and italic set Latin text's (`w:b`, `w:i`),
+ * complex scripts' staying. One transaction.
  */
 export declare function setRunEffects(effects: RunEffects): Command;
 /**
@@ -3112,8 +3120,12 @@ export declare function nextFontSize(points: number, direction: 1 | -1): number;
 export declare function stepFontSize(direction: 1 | -1): Command;
 /** Word's underline styles (`w:u`) the toolbar offers; a document's other ones are kept. */
 export declare const UNDERLINE_STYLES: readonly ["single", "words", "double", "thick", "dotted", "dash", "dotDash", "dotDotDash", "wave"];
-/** The selected text (or the text typed next) underlined in `style`; null removes it. */
-export declare function setUnderline(style: string | null): Command;
+/**
+ * The selected text (or the text typed next) underlined in `style`; null removes it. `color`
+ * (`#rrggbb`, null for automatic; left out: the text's own stays) is the underline's color, as
+ * Word's Font dialog sets it.
+ */
+export declare function setUnderline(style: string | null, color?: string | null): Command;
 /** The underline style of the selected text (or the text typed next) if all the same: "none" for none. */
 export declare function underlineAt(state: EditorState): string | null;
 /** Whether the format painter has a format, and whether the next selection gets it. */
@@ -3153,7 +3165,7 @@ import { Plugin } from "./state.js";
  * to `createEditor`'s plugins for an editor that behaves as Word. Shift+F3 changes case (not
  * find's previous result), Ctrl+Shift+L is the bulleted list, Ctrl+Shift+C copies formatting and
  * Ctrl+Shift+V pastes it while some is copied (else the key goes on to the plain-text paste),
- * Ctrl+Shift+8 shows or hides formatting marks.
+ * Ctrl+Shift+8 shows or hides formatting marks, Ctrl+D asks for the Font dialog (`openDialog`).
  */
 export declare function wordKeymap(): Plugin;
 

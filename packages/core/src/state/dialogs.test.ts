@@ -5,6 +5,7 @@ import { chainCommands, openDialog, requestedDialog } from "./dialogs.js";
 import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
 import {
+  fontSizeAt,
   paragraphFormatAt,
   runFormatAt,
   setCharacterSpacing,
@@ -13,7 +14,10 @@ import {
   setOutlineLevel,
   setParagraphFlags,
   setRunEffects,
+  setUnderline,
+  setVerticalAlign,
 } from "./wordformat.js";
+import { wordKeymap } from "./wordkeys.js";
 
 const text = (value: string, marks?: MarkJSON[]): NodeJSON =>
   marks ? { type: "text", text: value, marks } : { type: "text", text: value };
@@ -261,7 +265,8 @@ describe("openDialog and chainCommands", () => {
       for (const tr of transactions) asked.push(requestedDialog(tr));
     });
     expect(editor.commands.openDialog("paragraph")).toBe(true);
-    expect(asked).toEqual(["paragraph"]);
+    expect(editor.run(openDialog("font"))).toBe(true);
+    expect(asked).toEqual(["paragraph", "font"]);
     expect(editor.run(openDialog("nope" as "paragraph"))).toBe(false);
   });
 
@@ -275,5 +280,86 @@ describe("openDialog and chainCommands", () => {
     expect(attrsOf(editor).indent).toBeNull();
     expect(blocks(editor)[0]?.content?.[0]?.marks).toBeUndefined();
     expect(editor.run(chainCommands([setIndent({ left: 5000 })]))).toBe(false);
+  });
+});
+
+describe("the Font dialog's commands", () => {
+  it("set bold and italic, keeping their complex-script half", () => {
+    const editor = editorOf([
+      p({}, text("abc", [{ type: "bold", attrs: { value: null, complexScript: true } }])),
+    ]);
+    editor.select(1, 4);
+    editor.run(setRunEffects({ bold: true, italic: true }));
+    expect(blocks(editor)[0]?.content?.[0]?.marks).toEqual([
+      { type: "bold", attrs: { complexScript: true } },
+      { type: "italic" },
+    ]);
+    editor.run(setRunEffects({ bold: false }));
+    expect(runFormatAt(editor.state)).toMatchObject({ bold: false, boldCs: true, italic: true });
+  });
+
+  it("sets superscript, subscript or the baseline", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    editor.select(1, 4);
+    editor.run(setVerticalAlign("superscript"));
+    expect(runFormatAt(editor.state)?.verticalAlign).toBe("superscript");
+    editor.run(setVerticalAlign("superscript"));
+    expect(runFormatAt(editor.state)?.verticalAlign).toBe("superscript");
+    editor.run(setVerticalAlign("baseline"));
+    expect(blocks(editor)[0]?.content?.[0]?.marks).toBeUndefined();
+  });
+
+  it("sets an underline's color, or keeps it", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    editor.select(1, 4);
+    editor.run(setUnderline("double", "#ff0000"));
+    expect(runFormatAt(editor.state)).toMatchObject({
+      underline: "double",
+      underlineColor: "FF0000",
+    });
+    editor.run(setUnderline("wave"));
+    expect(runFormatAt(editor.state)).toMatchObject({
+      underline: "wave",
+      underlineColor: "FF0000",
+    });
+    editor.run(setUnderline("wave", null));
+    expect(runFormatAt(editor.state)?.underlineColor).toBeNull();
+  });
+
+  it("opens with Ctrl+D in wordKeymap", () => {
+    const editor = createEditor({
+      document: editorOf([p({}, text("a"))]).getDocument(),
+      plugins: [wordKeymap()],
+    });
+    let asked: string | null = null;
+    editor.subscribe((_s, trs) => {
+      asked = trs.map(requestedDialog).find(Boolean) ?? asked;
+    });
+    editor.select(1);
+    expect(editor.handleKey("Mod-d")).toBe(true);
+    expect(asked).toBe("font");
+  });
+});
+
+describe("Font dialog review cases", () => {
+  it("keeps a style's underline color when only the style changes", () => {
+    const editor = editorOf([p({}, text("abc"))]);
+    const document = editor.getDocument();
+    document.styles = document.styles.map((s) =>
+      s.id === "Normal" ? { ...s, run: [{ type: "underline", attrs: { color: "FF0000" } }] } : s,
+    );
+    const styled = createEditor({ document });
+    styled.select(1, 4);
+    styled.run(setUnderline("double"));
+    expect(runFormatAt(styled.state)).toMatchObject({
+      underline: "double",
+      underlineColor: "FF0000",
+    });
+  });
+
+  it("reads the size and font of empty paragraphs as the caret's", () => {
+    const editor = editorOf([p({}), p({})]);
+    editor.select(1, 3);
+    expect(fontSizeAt(editor.state)).toBe(11);
   });
 });

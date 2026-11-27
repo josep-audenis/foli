@@ -1,6 +1,6 @@
 /**
- * Word's formatting dialogs (Phase 30): the Paragraph dialog from the ribbon's launcher and the
- * right-click menu, applied in one undo step; axe.
+ * Word's formatting dialogs (Phase 30): the Paragraph and Font dialogs from the ribbon's
+ * launchers and the right-click menu, applied in one undo step; axe.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
@@ -50,4 +50,47 @@ test("Paragraph… in the right-click menu opens the dialog; Escape goes back", 
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(page.locator("#editor")).toBeFocused();
+});
+
+test("the Font dialog sets the font, effects and spacing in one undo step", async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => window.foliEdit.editor.select(40, 60));
+  await page.getByRole("button", { name: "Font settings" }).click();
+  const dialog = page.getByRole("dialog", { name: "Font" });
+  await expect(dialog.getByRole("combobox", { name: "Font", exact: true })).toBeFocused();
+  const results = await new AxeBuilder({ page }).include(".foli-font-dialog").analyze();
+  expect(results.violations).toEqual([]);
+  await dialog.getByLabel("Font style").selectOption("bold");
+  await dialog.getByLabel("Size").fill("16");
+  await dialog.getByLabel("Underline style").selectOption("wave");
+  await dialog.getByLabel("Small caps").check();
+  await dialog.getByRole("tab", { name: "Advanced" }).click();
+  await dialog.getByLabel("Spacing").selectOption("condensed");
+  await dialog.getByLabel("By").fill("0.5");
+  const advanced = await new AxeBuilder({ page }).include(".foli-font-dialog").analyze();
+  expect(advanced.violations).toEqual([]);
+  await dialog.getByRole("button", { name: "OK" }).click();
+  await expect(dialog).toHaveCount(0);
+  const marks = () =>
+    page.evaluate(() => {
+      const { state } = window.foliEdit.editor;
+      let found: string[] = [];
+      state.doc.nodesBetween(45, 46, (node) => {
+        if (node.isText) found = node.marks.map((m) => m.type.name).sort();
+      });
+      return found;
+    });
+  expect(await marks()).toEqual(
+    expect.arrayContaining(["bold", "characterSpacing", "fontSize", "smallCaps", "underline"]),
+  );
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(await marks()).not.toContain("smallCaps");
+});
+
+test("Font… in the right-click menu opens the Font dialog", async ({ page }) => {
+  await open(page);
+  const word = page.locator("section.foli-page").getByText("Open a .docx", { exact: false });
+  await word.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Font…" }).click();
+  await expect(page.getByRole("dialog", { name: "Font" })).toBeVisible();
 });

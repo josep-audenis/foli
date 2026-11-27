@@ -38,6 +38,7 @@ export const contextMenuMessages = [
   "Cut",
   "Copy",
   "Paste",
+  "Font…",
   "Paragraph…",
   "Link…",
   "New comment",
@@ -87,8 +88,8 @@ const paste = async () => {
 };
 
 /**
- * Word's right-click entries that Foli has: the clipboard, Paragraph… (the toolbar's dialog,
- * so it opens only with a toolbar), a link and a comment; in a table its
+ * Word's right-click entries that Foli has: the clipboard, Font… and Paragraph… (the toolbar's
+ * dialogs, so they open only with a toolbar), a link and a comment; in a table its
  * rows, columns and cells; on a tracked change Accept and Reject. Pass a function to
  * `FoliContextMenu`'s `items` to add, drop or reorder them.
  */
@@ -102,11 +103,17 @@ export const defaultContextMenuItems: readonly ContextMenuItem[] = [
     enabled: () => typeof navigator !== "undefined" && !!navigator.clipboard?.read,
   },
   {
+    key: "font",
+    label: "Font…",
+    run: command(openDialog("font")),
+    enabled: (s) => openDialog("font")(s),
+    separator: true,
+  },
+  {
     key: "paragraph",
     label: "Paragraph…",
     run: command(openDialog("paragraph")),
     enabled: (s) => openDialog("paragraph")(s),
-    separator: true,
   },
   {
     key: "link",

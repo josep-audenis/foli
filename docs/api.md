@@ -110,7 +110,7 @@ highlight, styles and New comment, with the ribbon's icons. Props: `editor`, `at
 Word's right-click menu (1.11), a WAI-ARIA menu at a point (`.foli-menu.foli-context-menu`):
 Cut and Copy (with a selection: the browser's `execCommand` on the document), Paste (through
 the Clipboard API, which the browser may ask about first; then pasted as the keyboard's paste
-is), Paragraph… (the toolbar's Paragraph dialog, through `openDialog`, 1.11), Link… (the
+is), Font… and Paragraph… (the toolbar's dialogs, through `openDialog`, 1.11), Link… (the
 toolbar's link dialog), New comment; in a table Insert row above or below,
 Insert column left or right, Delete rows, columns or the table, Merge cells, Split cell; on a
 tracked change Accept change and Reject change. Only entries that apply now are shown. Arrows,
@@ -293,7 +293,8 @@ in the default toolbar: the Table menu's `rowAbove`, `rowBelow`, `columnLeft`, `
 `deleteRows`, `deleteColumns`, `deleteTable`, `mergeCells`, `splitCell`, `columnWidth` (its
 dialog), `headerRow` (a toggle); `pageSetup`, `controlProperties`, `noteOptions` and
 `crossReference` (their dialogs); `paragraphSettings` (Word's Paragraph dialog, the
-launcher of `wordRibbonTabs`' Paragraph groups on Home and Layout, 1.11); `footnote`, `endnote` and `goToNote` (as the Notes menu: the
+launcher of `wordRibbonTabs`' Paragraph groups on Home and Layout, 1.11) and `fontSettings` (the
+Font dialog, the Font group's launcher on Home); `footnote`, `endnote` and `goToNote` (as the Notes menu: the
 caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `date` and
 `fieldCodes` (a toggle), as the Fields menu; `navigationPane` (the outline of
 `FoliNavigation`); `rotateLeft` and `rotateRight` (a selected picture, a quarter turn; not while
@@ -394,7 +395,7 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
   focus from the document unless the control prevents it on `mousedown`.
 
 - `dialog: "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" |
-  "controlProperties" | "noteOptions" | "columnWidth" | "paragraph"` (`ToolbarDialogName`): the button opens that dialog of
+  "controlProperties" | "noteOptions" | "columnWidth" | "paragraph" | "font"` (`ToolbarDialogName`): the button opens that dialog of
   the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does); a
   dialog closed without applying gives the focus back to the button (the link dialog, to where
   it was), one that applied calls `onClickCommand`. Without `enabled` it is enabled where the
@@ -870,7 +871,15 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   (a checkbox mixed) where they differ; OK applies only what was changed, in one undo step
   (`chainCommands(commands)`: commands run one after another as one transaction). Lengths are
   in inches for now (30.6 adds centimetres); a box also takes `cm`, `mm`, `pt` or `"` after the
-  number.
+  number. `openDialog("font")` (Ctrl+D in `wordKeymap()`) opens the Font dialog the same way:
+  Font (font, font style, size, font color, underline style and color, the effects
+  strikethrough, double strikethrough, superscript, subscript, small caps, all caps, hidden) and
+  Advanced (character spacing: Normal, Expanded or Condensed by points), with a preview of the
+  selected text. Its commands: `setFontFamily`, `setFontSize`, `setTextColor`,
+  `setUnderline(style, color?)` (`color` `#rrggbb` or null for automatic; left out, the text's
+  own stays), `setRunEffects` (also `bold` and `italic`, their complex-script half kept),
+  `setVerticalAlign("superscript" | "subscript" | "baseline")` (not a toggle) and
+  `setCharacterSpacing`.
 - Lists are Word's numbering: `toggleList` / `wrapInList` number the paragraphs (a list of the
   kind right before goes on; otherwise bullets share one definition and a numbered list starts
   at 1 in a new instance; definitions are added to the document's numbering), and put Normal

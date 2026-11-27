@@ -4302,10 +4302,16 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   in inches until 30.6; the Tabs… button comes with 30.4. `dialogs.test.tsx`, and
   `dialogs.spec.ts` in Chromium, Firefox and WebKit with axe on both tabs; checked by hand
   (launcher, OK, right-click Paragraph…, Escape back to the document).
-- [ ] 30.3 Font dialog: font, style, size, color, underline style and color, effects
+- [x] 30.3 Font dialog: font, style, size, color, underline style and color, effects
   (strikethrough, double, superscript, subscript, small caps, all caps, hidden), Advanced
   (character spacing, scale where the model has it); a preview; launcher on Home's Font group;
-  Font… in the right-click menu; Ctrl+D (with `wordKeymap()`).
+  Font… in the right-click menu; Ctrl+D (with `wordKeymap()`). Built: `FontDialog` (the
+  toolbar's `"font"` dialog), `toolbarItems.fontSettings` as Home's Font group's launcher, Font…
+  in `defaultContextMenuItems`, `Mod-d` in `wordKeymap()`; in core `setVerticalAlign`,
+  `setUnderline`'s color, bold and italic in `setRunEffects`. No Scale (no `w:w` in the model)
+  and no Position; colors as a list (Automatic, the theme's, Word's standard). The playground
+  has no `wordKeymap()`, so Ctrl+D is tested in core only. `dialogs.test.tsx` and
+  `dialogs.spec.ts` in Chromium, Firefox and WebKit with axe on both tabs; checked by hand.
 - [ ] 30.4 Tabs dialog (stops, alignment, leader, default stop, clear), from the Paragraph
   dialog's Tabs… button.
 - [ ] 30.5 Layout tab quick menus as Word's: Margins (Normal, Narrow, Moderate, Wide, Mirrored,

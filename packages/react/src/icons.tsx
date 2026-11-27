@@ -421,6 +421,12 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["path", { d: "M17 4v16" }],
     ["path", { d: "M19 4H9.5a4.5 4.5 0 0 0 0 9H13" }],
   ],
+  fontSettings: /* settings-2 */ [
+    ["path", { d: "M14 17H5" }],
+    ["path", { d: "M19 7h-9" }],
+    ["circle", { cx: "17", cy: "17", r: "3" }],
+    ["circle", { cx: "7", cy: "7", r: "3" }],
+  ],
   paragraphSettings: /* settings-2 */ [
     ["path", { d: "M14 17H5" }],
     ["path", { d: "M19 7h-9" }],
