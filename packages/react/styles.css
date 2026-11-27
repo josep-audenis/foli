@@ -381,6 +381,26 @@
   overflow: hidden;
 }
 
+/* Tabs…, at the buttons' start (Word's). */
+.foli-dialog-start {
+  margin-right: auto;
+}
+
+.foli-dialog-note {
+  flex: 1 1 100%;
+  margin: 0;
+  min-height: 1.4em;
+}
+
+.foli-tabs-dialog .foli-dialog-section .foli-setup-check {
+  flex: 0 1 7em;
+}
+
+.foli-tabs-dialog select[size] {
+  height: auto;
+  min-width: 8em;
+}
+
 .foli-font-dialog .foli-dialog-section .foli-setup-check {
   flex: 0 1 14em;
 }

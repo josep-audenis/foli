@@ -14,6 +14,7 @@ import {
   setOutlineLevel,
   setParagraphFlags,
   setRunEffects,
+  setTabStops,
   setUnderline,
   setVerticalAlign,
 } from "./wordformat.js";
@@ -361,5 +362,69 @@ describe("Font dialog review cases", () => {
     const editor = editorOf([p({}), p({})]);
     editor.select(1, 3);
     expect(fontSizeAt(editor.state)).toBe(11);
+  });
+});
+
+describe("setTabStops", () => {
+  const styled = () => {
+    const editor = editorOf([p({}, text("a")), p({}, text("b"))]);
+    // A style with a stop at 1 inch.
+    const document = editor.getDocument();
+    document.styles = document.styles.map((s) =>
+      s.id === "Normal" ? { ...s, paragraph: { tabs: [{ position: 1440, kind: "left" }] } } : s,
+    );
+    return createEditor({ document, author: "Me" });
+  };
+
+  it("sets and clears stops against the style's, in one undo step", () => {
+    const editor = styled();
+    editor.select(2);
+    expect(
+      editor.run(
+        setTabStops({ set: [{ position: 144, alignment: "right", leader: "dot" }], clear: [72] }),
+      ),
+    ).toBe(true);
+    expect(attrsOf(editor).tabs).toEqual([
+      { position: 1440, kind: "clear" },
+      { position: 2880, kind: "right", leader: "dot" },
+    ]);
+    expect(paragraphFormatAt(editor.state)?.tabs).toEqual([
+      { position: 2880, kind: "right", leader: "dot" },
+    ]);
+    // Setting the style's own stop back leaves nothing of it.
+    editor.run(setTabStops({ set: [{ position: 72, alignment: "left" }], clear: [144] }));
+    expect(attrsOf(editor).tabs).toBeNull();
+    editor.run(undo);
+    expect(attrsOf(editor).tabs).toHaveLength(2);
+  });
+
+  it("clears all, and works on paragraphs with different stops", () => {
+    const editor = styled();
+    editor.select(2);
+    editor.run(setTabStops({ set: [{ position: 36, alignment: "center" }] }));
+    editor.select(2, 5);
+    editor.run(setTabStops({ clear: "all", set: [{ position: 216, alignment: "decimal" }] }));
+    for (const i of [0, 1])
+      expect(attrsOf(editor, i).tabs).toEqual([
+        { position: 1440, kind: "clear" },
+        { position: 4320, kind: "decimal" },
+      ]);
+    expect(editor.run(setTabStops({ set: [{ position: -2000, alignment: "left" }] }))).toBe(false);
+    expect(editor.run(setTabStops({ set: [{ position: 1, alignment: "clear" as "left" }] }))).toBe(
+      false,
+    );
+  });
+});
+
+describe("setTabStops limits", () => {
+  it("changes no paragraph when one would get more than 64 stops", () => {
+    const editor = editorOf([p({}, text("a"))]);
+    editor.select(2);
+    const many = Array.from({ length: 65 }, (_, i) => ({
+      position: i,
+      alignment: "left" as const,
+    }));
+    expect(editor.run(setTabStops({ set: many }))).toBe(false);
+    expect(attrsOf(editor).tabs).toBeNull();
   });
 });

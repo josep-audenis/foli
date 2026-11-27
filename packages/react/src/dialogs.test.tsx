@@ -225,3 +225,94 @@ describe("Font dialog", () => {
     expect(screen.getByRole("alert").textContent).toBe("Check this value: Size.");
   });
 });
+
+describe("Tabs dialog", () => {
+  const dialog = () => screen.getByRole("dialog", { name: "Tabs" });
+  const field = (name: string) => within(dialog()).getByLabelText(name) as HTMLInputElement;
+  const button = (name: string) => within(dialog()).getByRole("button", { name });
+
+  it("opens from the Paragraph dialog's Tabs…, sets and clears stops, in one undo step", () => {
+    const editor = createEditor({
+      document: documentOf(paragraph("one", { tabs: [{ position: 1440, kind: "left" }] })),
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    editor.select(2);
+    act(() => {
+      editor.run(openDialog("paragraph"));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tabs…" }));
+    expect(screen.queryByRole("dialog", { name: "Paragraph" })).toBeNull();
+    const stops = field("Stops") as unknown as HTMLSelectElement;
+    expect([...stops.options].map((o) => o.text)).toEqual(['1"']);
+    fireEvent.change(stops, { target: { value: "1440" } });
+    fireEvent.click(button("Clear"));
+    expect(within(dialog()).getByText('Tab stops to be cleared: 1"')).toBeTruthy();
+    fireEvent.change(field("Tab stop position"), { target: { value: "2.5" } });
+    fireEvent.click(field("Right"));
+    fireEvent.click(field("Dots"));
+    fireEvent.click(button("Set"));
+    fireEvent.change(field("Tab stop position"), { target: { value: "3" } });
+    fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(editor.state.doc.child(0).attrs.tabs).toEqual([
+      { position: 3600, kind: "right", leader: "dot" },
+      { position: 4320, kind: "right", leader: "dot" },
+    ]);
+    editor.run(undo);
+    expect(editor.state.doc.child(0).attrs.tabs).toEqual([{ position: 1440, kind: "left" }]);
+  });
+
+  it("marks a wrong position; Clear All clears every stop", () => {
+    const editor = createEditor({
+      document: documentOf(paragraph("one", { tabs: [{ position: 720, kind: "center" }] })),
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    editor.select(2);
+    act(() => {
+      editor.run(openDialog("tabs"));
+    });
+    fireEvent.change(field("Tab stop position"), { target: { value: "far" } });
+    fireEvent.click(button("Set"));
+    expect(screen.getByRole("alert").textContent).toBe("Check this value: Tab stop position.");
+    fireEvent.change(field("Tab stop position"), { target: { value: "" } });
+    fireEvent.click(button("Clear All"));
+    fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(0).attrs.tabs).toBeNull();
+  });
+});
+
+describe("Tabs dialog review cases", () => {
+  const dialog = () => screen.getByRole("dialog", { name: "Tabs" });
+  const field = (name: string) => within(dialog()).getByLabelText(name) as HTMLInputElement;
+  const openTabs = (tabs: object[]) => {
+    const editor = createEditor({ document: documentOf(paragraph("one", { tabs })) });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} />);
+    editor.select(2);
+    act(() => {
+      editor.run(openDialog("tabs"));
+    });
+    return editor;
+  };
+
+  it("clears a picked stop whose position the unit rounds, and one before the margin", () => {
+    const editor = openTabs([
+      { position: -360, kind: "left" },
+      { position: 709, kind: "left" },
+    ]);
+    const stops = field("Stops") as unknown as HTMLSelectElement;
+    for (const value of ["-360", "709"]) {
+      fireEvent.change(stops, { target: { value } });
+      fireEvent.click(within(dialog()).getByRole("button", { name: "Clear" }));
+    }
+    fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(0).attrs.tabs).toBeNull();
+  });
+
+  it("OK keeps a picked stop's new alignment without Set", () => {
+    const editor = openTabs([{ position: 1440, kind: "left" }]);
+    fireEvent.change(field("Stops"), { target: { value: "1440" } });
+    fireEvent.click(field("Right"));
+    fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(0).attrs.tabs).toEqual([{ position: 1440, kind: "right" }]);
+  });
+});

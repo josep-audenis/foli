@@ -7,15 +7,15 @@ import type { Command, Transaction } from "./state.js";
 import { paragraphFormatAt } from "./wordformat.js";
 
 /** The formatting dialogs a UI opens on request (the React toolbar's built-in ones). */
-export type DialogName = "font" | "paragraph";
+export type DialogName = "font" | "paragraph" | "tabs";
 
-const DIALOGS: readonly DialogName[] = ["font", "paragraph"];
+const DIALOGS: readonly DialogName[] = ["font", "paragraph", "tabs"];
 
 /** Transaction metadata set by `openDialog`: the dialog's name. */
 export const dialogRequest = "dialogRequest";
 
 /**
- * Asks the UI to open Word's Font or Paragraph dialog for the selection, with a
+ * Asks the UI to open Word's Font, Paragraph or Tabs dialog for the selection, with a
  * transaction that changes nothing and carries `dialogRequest`. Applies in a Word document where the selection has a paragraph; without such
  * a UI nothing opens.
  */

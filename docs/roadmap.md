@@ -4312,8 +4312,13 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   and no Position; colors as a list (Automatic, the theme's, Word's standard). The playground
   has no `wordKeymap()`, so Ctrl+D is tested in core only. `dialogs.test.tsx` and
   `dialogs.spec.ts` in Chromium, Firefox and WebKit with axe on both tabs; checked by hand.
-- [ ] 30.4 Tabs dialog (stops, alignment, leader, default stop, clear), from the Paragraph
-  dialog's Tabs… button.
+- [x] 30.4 Tabs dialog (stops, alignment, leader, default stop, clear), from the Paragraph
+  dialog's Tabs… button. Built: `TabsDialog` (the toolbar's `"tabs"`
+  dialog, also `openDialog("tabs")`), `setTabStops({ set?, clear? })` in core; Tabs… applies the
+  Paragraph dialog's changes first, as Word's. Changed: no default stop box (the default stop is
+  not in the model; `w:defaultTabStop` stays in the settings part as read), and the pages do not
+  draw custom stops yet (limitations.md). `dialogs.test.tsx`, `dialogs.spec.ts` in Chromium,
+  Firefox and WebKit with axe; checked by hand.
 - [ ] 30.5 Layout tab quick menus as Word's: Margins (Normal, Narrow, Moderate, Wide, Mirrored,
   Custom… to Page setup), Orientation, Size (Letter, Legal, A3, A4, A5, Executive, Custom…),
   Columns (One to Three, Left, Right, More…), Breaks (page, column, text wrapping, the four

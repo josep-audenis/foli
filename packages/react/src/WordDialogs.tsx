@@ -26,9 +26,11 @@ import {
   setParagraphFlags,
   setParagraphSpacing,
   setRunEffects,
+  setTabStops,
   setTextColor,
   setUnderline,
   setVerticalAlign,
+  type TabStop,
 } from "@folijs/core";
 import {
   type CSSProperties,
@@ -199,11 +201,14 @@ export function ParagraphDialog({
   editor,
   unit,
   onClose,
+  onTabs,
 }: {
   editor: Editor;
   unit: LengthUnit;
   /** `applied`: the paragraphs changed (the focus may go to the document). */
   onClose: (applied: boolean) => void;
+  /** Tabs…: what was changed is applied (as OK), then the Tabs dialog takes this one's place. */
+  onTabs: () => void;
 }) {
   const t = useT();
   const id = useId();
@@ -282,8 +287,9 @@ export function ParagraphDialog({
     return twips !== null && twips >= min && twips <= max ? twips : null;
   };
 
-  const apply = (event: FormEvent) => {
+  const apply = (event: { preventDefault(): void }, toTabs = false) => {
     event.preventDefault();
+    const done = (applied: boolean) => (toTabs ? onTabs() : onClose(applied));
     const wrong = (field: ParagraphField) => {
       setError(field);
       setTab("indents");
@@ -340,10 +346,9 @@ export function ParagraphDialog({
     for (const key of PARAGRAPH_FLAGS)
       if (flags[key] !== initial.flags[key] && flags[key] !== null) set[key] = flags[key];
     if (Object.keys(set).length) commands.push(setParagraphFlags(set));
-    if (!commands.length) return onClose(false);
-    if (editor.run(chainCommands(commands))) return onClose(true);
-    // Nothing the commands did changed anything (the values were already there).
-    onClose(false);
+    if (!commands.length) return done(false);
+    // False: nothing the commands did changed anything (the values were already there).
+    done(editor.run(chainCommands(commands)));
   };
 
   const input = (name: ParagraphField, disabled = false) => (
@@ -525,6 +530,13 @@ export function ParagraphDialog({
           ]}
         />
         <div className="foli-dialog-buttons">
+          <button
+            type="button"
+            className="foli-dialog-start"
+            onClick={(event) => apply(event, true)}
+          >
+            {t("Tabs…")}
+          </button>
           <button type="submit">{t("OK")}</button>
           <button type="button" onClick={() => onClose(false)}>
             {t("Cancel")}
@@ -1018,6 +1030,258 @@ export function FontDialog({
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {t("Check this value: {field}.", { field: labels[error] })}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+// ---------- Tabs ----------
+
+const TAB_ALIGNMENT_NAMES: readonly (readonly [TabStop["alignment"], ToolbarMessage])[] = [
+  ["left", "Left"],
+  ["center", "Center"],
+  ["right", "Right"],
+  ["decimal", "Decimal"],
+  ["bar", "Bar"],
+];
+const TAB_LEADER_NAMES: readonly (readonly [NonNullable<TabStop["leader"]>, ToolbarMessage])[] = [
+  ["none", "None"],
+  ["dot", "Dots"],
+  ["hyphen", "Dashes"],
+  ["underscore", "Underline"],
+];
+
+/** A stop in the dialog, its position in twips. */
+type Stop = {
+  position: number;
+  alignment: TabStop["alignment"];
+  leader: NonNullable<TabStop["leader"]>;
+};
+
+/**
+ * Word's Tabs dialog for the selected paragraphs: their stops (those all of them share), a
+ * position, alignment and leader to Set, Clear the stop picked, Clear All. OK applies what was
+ * set and cleared to each paragraph, in one undo step.
+ * @internal
+ */
+export function TabsDialog({
+  editor,
+  unit,
+  onClose,
+}: {
+  editor: Editor;
+  unit: LengthUnit;
+  /** `applied`: the paragraphs changed (the focus may go to the document). */
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [stops, setStops] = useState<Stop[]>(() =>
+    (paragraphFormatAt(editor.state)?.tabs ?? [])
+      .filter((s) => s.kind !== "clear" && s.kind !== "num")
+      .map((s) => ({
+        position: s.position,
+        alignment: (s.kind === "start"
+          ? "left"
+          : s.kind === "end"
+            ? "right"
+            : s.kind) as Stop["alignment"],
+        leader: (s.leader ?? "none") as Stop["leader"],
+      })),
+  );
+  const [set, setSet] = useState<Stop[]>([]);
+  const [cleared, setCleared] = useState<number[]>([]);
+  const [clearAll, setClearAll] = useState(false);
+  const [position, setPosition] = useState("");
+  // The stop picked from the list, exactly: its position shown in the unit may be rounded.
+  const [pickedAt, setPickedAt] = useState<number | null>(null);
+  const at = pickedAt ?? parseLength(position, unit);
+  const [alignment, setAlignment] = useState<Stop["alignment"]>("left");
+  const [leader, setLeader] = useState<Stop["leader"]>("none");
+  const [error, setError] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+
+  /** The stop the fields describe, or null (the position is marked) when it is not one. */
+  const typed = (): Stop | null => {
+    const twips = at;
+    if (twips === null || twips < -31_680 || twips > 31_680) {
+      setError(true);
+      first.current?.focus();
+      return null;
+    }
+    return { position: twips, alignment, leader };
+  };
+  const add = (stop: Stop) => {
+    const others = (list: Stop[]) => list.filter((s) => s.position !== stop.position);
+    setStops((list) => [...others(list), stop].sort((a, b) => a.position - b.position));
+    setSet((list) => [...others(list), stop]);
+    setCleared((list) => list.filter((p) => p !== stop.position));
+  };
+  const onSet = () => {
+    const stop = typed();
+    if (stop) add(stop);
+  };
+  const onClear = () => {
+    const twips = at;
+    if (twips === null || !stops.some((s) => s.position === twips)) return;
+    setStops((list) => list.filter((s) => s.position !== twips));
+    setSet((list) => list.filter((s) => s.position !== twips));
+    setCleared((list) => [...list, twips]);
+    setPosition("");
+    setPickedAt(null);
+  };
+  const onClearAll = () => {
+    setStops([]);
+    setSet([]);
+    setCleared([]);
+    setClearAll(true);
+    setPosition("");
+    setPickedAt(null);
+  };
+  const pick = (twips: number) => {
+    const stop = stops.find((s) => s.position === twips);
+    if (!stop) return;
+    setPosition(formatLength(stop.position, unit));
+    setPickedAt(stop.position);
+    setAlignment(stop.alignment);
+    setLeader(stop.leader);
+    setError(false);
+  };
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    let toSet = set;
+    // A position typed (or picked and changed) but not Set is set by OK, as in Word.
+    if (position.trim()) {
+      const stop = typed();
+      if (!stop) return;
+      const listed = stops.find((s) => s.position === stop.position);
+      if (!listed || listed.alignment !== stop.alignment || listed.leader !== stop.leader)
+        toSet = [...set.filter((s) => s.position !== stop.position), stop];
+    }
+    if (!toSet.length && !cleared.length && !clearAll) return onClose(false);
+    const pt = (twips: number) => twips / 20;
+    const command = setTabStops({
+      set: toSet.map((s) => ({
+        position: pt(s.position),
+        alignment: s.alignment,
+        leader: s.leader,
+      })),
+      clear: clearAll ? "all" : cleared.map(pt),
+    });
+    onClose(editor.run(command));
+  };
+
+  const picked = at;
+  const radios = <T extends string>(
+    name: string,
+    legend: string,
+    options: readonly (readonly [T, ToolbarMessage])[],
+    value: T | undefined,
+    onChange: (value: T) => void,
+  ) => (
+    <fieldset className="foli-dialog-section">
+      <legend>{legend}</legend>
+      {options.map(([key, label]) => (
+        <div key={key} className="foli-setup-field foli-setup-check">
+          <input
+            id={`${id}-${name}-${key}`}
+            type="radio"
+            name={`${id}-${name}`}
+            checked={value === key}
+            onChange={() => onChange(key)}
+          />
+          <label htmlFor={`${id}-${name}-${key}`}>{t(label)}</label>
+        </div>
+      ))}
+    </fieldset>
+  );
+
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Tabs")}
+      className="foli-link-dialog foli-word-dialog foli-tabs-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <fieldset className="foli-dialog-section">
+            <legend>{t("Tab stops")}</legend>
+            <Field id={`${id}-position`} label={t("Tab stop position")}>
+              <input
+                ref={first}
+                id={`${id}-position`}
+                type="text"
+                inputMode="decimal"
+                value={position}
+                aria-invalid={error || undefined}
+                aria-describedby={error ? `${id}-error` : undefined}
+                onChange={(event) => {
+                  setPosition(event.target.value);
+                  setPickedAt(null);
+                  setError(false);
+                }}
+              />
+            </Field>
+            <Field id={`${id}-stops`} label={t("Stops")}>
+              <select
+                id={`${id}-stops`}
+                size={5}
+                value={
+                  picked !== null && stops.some((s) => s.position === picked) ? String(picked) : ""
+                }
+                onChange={(event) => pick(Number(event.target.value))}
+              >
+                {stops.map((s) => (
+                  <option key={s.position} value={String(s.position)}>
+                    {formatLength(s.position, unit)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <p className="foli-dialog-note">
+              {clearAll
+                ? t("Tab stops to be cleared: all")
+                : cleared.length
+                  ? t("Tab stops to be cleared: {stops}", {
+                      stops: cleared.map((p) => formatLength(p, unit)).join(", "),
+                    })
+                  : ""}
+            </p>
+          </fieldset>
+          {radios("alignment", t("Alignment"), TAB_ALIGNMENT_NAMES, alignment, setAlignment)}
+          {radios("leader", t("Leader"), TAB_LEADER_NAMES, leader, setLeader)}
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="button" onClick={onSet}>
+            {t("Set")}
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={!stops.some((s) => s.position === picked)}
+          >
+            {t("Clear")}
+          </button>
+          <button type="button" onClick={onClearAll} disabled={!stops.length}>
+            {t("Clear All")}
+          </button>
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {t("Check this value: {field}.", { field: t("Tab stop position") })}
           </p>
         )}
       </form>
