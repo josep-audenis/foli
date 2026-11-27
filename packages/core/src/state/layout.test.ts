@@ -182,4 +182,14 @@ describe("Layout Options (33.4)", () => {
     editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1)));
     expect(croppingAt(editor.state)).toBeNull();
   });
+
+  it("leaves crop mode when tracking starts; a rotated picture is cropped in the dialog", () => {
+    const editor = pictured();
+    editor.run(toggleCrop);
+    editor.run(setTrackChanges(true));
+    expect(croppingAt(editor.state)).toBeNull();
+    editor.run(setTrackChanges(false));
+    editor.run(setObjectSize(2, 952_500, 952_500, 5_400_000));
+    expect(toggleCrop(editor.state)).toBe(false);
+  });
 });

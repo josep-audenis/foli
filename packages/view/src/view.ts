@@ -4583,7 +4583,10 @@ export class EditorView {
     this.endResize();
     const target = event.target as Element | null;
     // Shift extends the selection, but on a resize handle keeps the ratio (33.5).
-    if (this.composing || (event.shiftKey && !target?.closest?.("[data-foli-resize]")))
+    if (
+      this.composing ||
+      (event.shiftKey && !target?.closest?.("[data-foli-resize], [data-foli-crop]"))
+    )
       return false;
     const span =
       target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize], [data-foli-crop]`)?.parentElement ??
@@ -4629,8 +4632,10 @@ export class EditorView {
       width: rect.width,
       height: rect.height,
       scale,
-      // No wider than the page's text (layout px).
-      max: Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
+      // A picture no wider than the page's text (layout px); a text box up to Word's 22 inches.
+      max: img.hasAttribute(TEXT_BOX_ATTR)
+        ? 2112
+        : Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
       x: event.clientX,
       y: event.clientY,
       style: img.getAttribute("style") ?? "",
@@ -4716,7 +4721,9 @@ export class EditorView {
     }
     const { width, height } = this.resizedTo(event);
     this.resize.img.style.width = `${width}px`;
-    this.resize.img.style.height = `${height}px`;
+    // A box that grows to its text is drawn with a least height: that is what changes.
+    if (this.resize.img.style.minHeight) this.resize.img.style.minHeight = `${height}px`;
+    else this.resize.img.style.height = `${height}px`;
   };
 
   /** The crop a crop handle dragged to the pointer gives (1000ths of a percent per side). */
@@ -4747,7 +4754,7 @@ export class EditorView {
         ? crop.bottom
         : crop.top;
     // Something of the image stays (1%), and the edge goes out no further than the image's own.
-    crop[r.crop] = Math.max(-1_000_000, Math.min(next, 99_000 - (other ?? 0)));
+    crop[r.crop] = Math.max(-100_000, Math.min(next, 99_000 - (other ?? 0)));
     return crop;
   }
 

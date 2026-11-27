@@ -382,6 +382,9 @@ export function croppingAt(state: EditorState): number | null {
 export const toggleCrop: Command = (state, dispatch) => {
   const picture = selectedObject(state);
   if (picture?.node.type.name !== "picture" || trackState(state)?.on === true) return false;
+  // shortcut: a rotated picture is cropped by the picture dialog only (handles would need the
+  // drag turned with it).
+  if (Number(picture.node.attrs.rotation ?? 0) % TURN !== 0) return false;
   if (cropKey.getState(state) === undefined) return false;
   dispatch?.(state.tr.setMeta(cropKey, croppingAt(state) === null ? picture.pos : null));
   return true;
@@ -403,6 +406,7 @@ export function cropPlugin(): Plugin {
         const { selection } = next;
         const kept =
           pos !== null &&
+          trackState(next)?.on !== true &&
           selection instanceof NodeSelection &&
           selection.from === pos &&
           selection.node.type.name === "picture";

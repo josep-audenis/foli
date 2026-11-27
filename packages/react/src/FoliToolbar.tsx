@@ -2214,7 +2214,7 @@ const RIBBON_ITEMS: readonly Item[] = [
     key: "crop",
     label: "Crop",
     text: "Crop",
-    enabled: (state) => pictureSelected(state) && trackState(state)?.on !== true,
+    enabled: (state) => toggleCrop(state),
     pressed: (state) => croppingAt(state) !== null,
     command: toggleCrop,
   },

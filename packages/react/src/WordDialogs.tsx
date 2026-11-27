@@ -1591,7 +1591,7 @@ export function LayoutDialog({
   const [rotation, setRotation] = useState(() => String(Math.round(size.rotation / 600) / 100));
   /** One side's new length (EMU) or scale (%): the other follows while the ratio is kept. */
   const resize = (side: "height" | "width", emu: number | null, keep = locked) => {
-    if (emu === null || emu <= 0) return;
+    if (emu === null || emu <= 0 || size.height <= 0 || size.width <= 0) return;
     const scale = emu / (side === "height" ? size.height : size.width);
     const pct = String(Math.round(scale * 100));
     if (side === "height") setScaleH(pct);
@@ -1635,7 +1635,9 @@ export function LayoutDialog({
     const sized = {
       width: Math.round(newWidth),
       height: Math.round(newHeight),
-      ...(picture && rotation !== String(Math.round(size.rotation / 600) / 100)
+      // A turn the same as it was (360 for 0) changes nothing.
+      ...(picture &&
+      ((Math.round(degrees * 60_000) % 21_600_000) + 21_600_000) % 21_600_000 !== size.rotation
         ? { rotation: Math.round(degrees * 60_000) }
         : {}),
     };

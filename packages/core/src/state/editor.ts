@@ -760,6 +760,7 @@ export function createEditor({
         formatPainterPlugin(),
         formattingMarksPlugin(),
         rulerPlugin(),
+        cropPlugin(),
         tableKeymap(),
         listKeymap(),
         baseKeymap(),

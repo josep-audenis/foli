@@ -327,8 +327,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   90° buttons, Crop in percent; core's `setPictureRotation` and `setPictureCrop`, which keeps the
   image's scale as Word does; each change is its own undo step), and on the page (33.5): Picture
   Format ▸ Crop puts a handle on each edge (not Word's corner crop handles), the crop is made when
-  the handle is let go (while dragging only the handle moves, not the image), and the image
-  cannot be moved inside its crop by dragging; a crop or rotation only in the drawing's XML (see above) cannot be changed there
+  the handle is let go (while dragging only the handle moves, not the image), the image
+  cannot be moved inside its crop by dragging, and a rotated picture is cropped in the dialog
+  only; a crop or rotation only in the drawing's XML (see above) cannot be changed there
   until the file is imported again; cropping a floating picture's left or top keeps its anchor
   offset, so what shows moves. A picture is resized by its handle with a mouse, a pen or a finger
   (19.5c; touch tested with synthetic pointer events, not on a device; on a touch screen the
