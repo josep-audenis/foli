@@ -2937,7 +2937,6 @@ export declare function fitPaste(state: EditorState, content: unknown, definitio
  * with Word's definitions when first applied.
  */
 import type { ParagraphFormat, RunFormat } from "../v3/resolve.js";
-import { TAB_LEADERS } from "../v3/schema.js";
 import { type Command, type EditorState } from "./state.js";
 /**
  * The paragraph styles a style picker offers: the document's, its default first, then Word's
@@ -3036,7 +3035,7 @@ export interface TabStop {
     position: number;
     alignment: "left" | "center" | "right" | "decimal" | "bar";
     /** The characters that fill the space before the stop (default none). */
-    leader?: (typeof TAB_LEADERS)[number];
+    leader?: "none" | "dot" | "hyphen" | "underscore" | "heavy" | "middleDot";
 }
 /**
  * Word's Tabs dialog on the selected paragraphs, each from the stops it shows (its style's and

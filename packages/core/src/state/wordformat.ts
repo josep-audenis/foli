@@ -916,7 +916,7 @@ export interface TabStop {
   position: number;
   alignment: "left" | "center" | "right" | "decimal" | "bar";
   /** The characters that fill the space before the stop (default none). */
-  leader?: (typeof TAB_LEADERS)[number];
+  leader?: "none" | "dot" | "hyphen" | "underscore" | "heavy" | "middleDot";
 }
 
 const TAB_ALIGNMENTS: readonly string[] = ["left", "center", "right", "decimal", "bar"];
