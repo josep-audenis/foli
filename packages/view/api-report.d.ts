@@ -240,6 +240,8 @@ export declare class EditorView {
      */
     private printStyles;
     private destroyed;
+    /** `destroy` running: nothing is drawn again. */
+    private closingDown;
     /** Set by a render during a composition, which places blocks but does not flow them. */
     private unflowed;
     /**

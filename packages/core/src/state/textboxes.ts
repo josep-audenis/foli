@@ -117,6 +117,8 @@ export function insertTextBox(options: InsertTextBoxOptions = {}): Command {
     if (!$to.parent.inlineContent) return false;
     if (!dispatch) return true;
     const id = freshTextBoxId(state);
+    // Over a selected box (just left with Escape): a quarter inch down and right of it.
+    const shift = selectedTextBox(state) ? 228_600 : 0;
     const box = state.schema.node("textBox", {
       story: id,
       width: options.width ?? 1_828_800,
@@ -126,8 +128,8 @@ export function insertTextBox(options: InsertTextBoxOptions = {}): Command {
       float: options.inline
         ? null
         : {
-            horizontal: { relativeTo: "column", offset: 0 },
-            vertical: { relativeTo: "paragraph", offset: 0 },
+            horizontal: { relativeTo: "column", offset: shift },
+            vertical: { relativeTo: "paragraph", offset: shift },
             wrap: "square",
             side: "bothSides",
             distance: { top: 0, bottom: 0, left: 114_300, right: 114_300 },

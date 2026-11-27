@@ -233,3 +233,19 @@ test("find goes into a text box: its match revealed opens the box", async ({ pag
     "All is welcome",
   );
 });
+
+test("a press in another box after typing in one opens that one", async ({ page }) => {
+  await open(page);
+  const first = await page.locator('[data-foli-text-box="textbox:1"] p').first().boundingBox();
+  if (!first) throw new Error("no first box");
+  await page.mouse.click(first.x + 2, first.y + 4);
+  await page.keyboard.type("Q");
+  const second = await page.locator('[data-foli-text-box="textbox:2"] p').first().boundingBox();
+  if (!second) throw new Error("no second box");
+  await page.mouse.click(second.x + second.width / 2, second.y + 4);
+  await expect(page.locator(".foli-story-mount")).toHaveCount(1);
+  await page.keyboard.type("Z");
+  await page.keyboard.press("Escape");
+  expect(textOf((await boxText(page, "textbox:2"))?.content)).toContain("Z");
+  expect(textOf((await boxText(page, "textbox:1"))?.content)).toContain("Q");
+});

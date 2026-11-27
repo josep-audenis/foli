@@ -703,6 +703,8 @@ export class EditorView {
    */
   private printStyles: HTMLStyleElement[] = [];
   private destroyed = false;
+  /** `destroy` running: nothing is drawn again. */
+  private closingDown = false;
   /** Set by a render during a composition, which places blocks but does not flow them. */
   private unflowed = false;
   /**
@@ -1047,6 +1049,8 @@ export class EditorView {
   destroy(): void {
     this.eachPluginView((view) => view.destroy?.());
     this.pluginViews = [];
+    // Nothing drawn again on the way out (a text box closing would).
+    this.closingDown = true;
     this.closeStory(false);
     this.showFound(null);
     this.endHint();
@@ -3075,15 +3079,25 @@ export class EditorView {
     const element = box?.firstElementChild as HTMLElement | null | undefined;
     if (!editor || !box || !element) return false;
     const page = Math.max(this.pages.indexOf(box.closest(".foli-page") as HTMLElement), 0);
+    // The section it is in: what the toolbar's section commands act on meanwhile.
+    const pos = this.textBoxPos(id);
+    const block = pos === null ? 0 : this.state.doc.resolve(pos).index(0);
+    const context = wordContext(this.state) as WordContext;
+    const section = Math.max(
+      sectionSpans(this.state.doc, context.envelope.section).findIndex(
+        (span) => block >= span.from && block < span.to,
+      ),
+      0,
+    );
     this.mountStory(
       editor,
       {
         id,
         side: "textBox",
         variant: "default",
-        section: 0,
+        section,
         page,
-        region: { element, drawing: {}, section: 0, id },
+        region: { element, drawing: {}, section, id },
       },
       box.getAttribute("aria-label") ?? "Text box",
       undefined,
@@ -3095,6 +3109,8 @@ export class EditorView {
   /** The open text box, put back in its box when its block was drawn again. */
   private keepTextBox(): void {
     const { mount } = this;
+    // shortcut: moving the view during a composition in the box ends it; such a redraw comes
+    // only from another editor's change (collaboration), not from typing here.
     if (mount?.side !== "textBox" || mount.wrapper.isConnected) return;
     const element = this.textBoxElement(mount.id)?.firstElementChild as HTMLElement | null;
     if (!element) {
@@ -3216,7 +3232,7 @@ export class EditorView {
       if (!this.destroyed) this.render();
     }
     this.bodyEditable();
-    if (mount.side === "textBox" && !this.destroyed) {
+    if (mount.side === "textBox" && !this.destroyed && !this.closingDown) {
       // Its block drawn again with what was typed (its key changes now it is closed), and the
       // box selected, as Word leaves it.
       this.render();
@@ -3271,18 +3287,14 @@ export class EditorView {
    * first click may have scrolled the page (Firefox) and the double click would land elsewhere.
    */
   private onPress = (event: MouseEvent): void => {
-    this.closeStory(false);
-    // A press in a body's text box puts the caret in it (33.3), as Word does.
+    // A press in a body's text box puts the caret in it (33.3), as Word does. Read before a box
+    // that was open closes: its block is drawn again then, the target with it.
     const pressed = event.target instanceof Element ? event.target : null;
     const inBox = pressed?.closest(`[${TEXT_BOX_ATTR}]`);
-    const boxId = inBox?.getAttribute(TEXT_BOX_ATTR);
-    if (
-      boxId &&
-      event.button === 0 &&
-      !event.shiftKey &&
-      this.editable &&
-      this.textBoxElement(boxId) === inBox
-    ) {
+    const pressedId = inBox?.getAttribute(TEXT_BOX_ATTR);
+    const boxId = pressedId && this.textBoxElement(pressedId) === inBox ? pressedId : null;
+    this.closeStory(false);
+    if (boxId && event.button === 0 && !event.shiftKey && this.editable) {
       event.preventDefault();
       if (this.openTextBox(boxId)) this.mount?.view.placeCaret(event.clientX, event.clientY);
       return;
