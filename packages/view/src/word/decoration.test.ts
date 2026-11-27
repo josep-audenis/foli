@@ -97,13 +97,8 @@ describe("EditorView", () => {
     // A change of the envelope alone: the color goes, the borders too.
     const envelope = wordContext(editor.state)?.envelope;
     if (!envelope) throw new Error("no envelope");
-    editor.dispatch(
-      withEnvelope(editor.state.tr, {
-        ...envelope,
-        settings: {},
-        section: { ...envelope.section, pageBorders: undefined } as SectionJSON,
-      }),
-    );
+    const { pageBorders: _gone, ...section } = envelope.section;
+    editor.dispatch(withEnvelope(editor.state.tr, { ...envelope, settings: {}, section }));
     expect(page().style.backgroundColor).toBe("");
     expect(page().querySelector(`[${PAGE_BORDERS_ATTR}]`)).toBeNull();
   });
