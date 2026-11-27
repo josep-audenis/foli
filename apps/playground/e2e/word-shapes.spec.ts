@@ -353,3 +353,65 @@ test("a selected shape is moved, nudged, turned, adjusted and written in, one un
     (await new AxeBuilder({ page }).include("section.foli-page").analyze()).violations,
   ).toEqual([]);
 });
+
+/** The first shape's attributes in the editor's document. */
+const shapeAttrs = (page: Page) =>
+  page.evaluate(() => {
+    const find = (node: {
+      type: string;
+      attrs?: Record<string, unknown>;
+      content?: unknown[];
+    }): Record<string, unknown> | undefined =>
+      node.type === "shape"
+        ? node.attrs
+        : (node.content as (typeof node)[] | undefined)?.map(find).find(Boolean);
+    return find(window.foliEdit.editor.getDocument().content as never);
+  });
+
+test("Shape Format: fill, outline color, weight, dashes, arrows and styles (34.5)", async ({
+  page,
+}) => {
+  await ribbon(page);
+  const button = page.getByRole("button", { name: "Shapes" });
+  await button.focus();
+  await page.keyboard.press("ArrowDown");
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await page.getByRole("tab", { name: "Shape Format" }).click();
+  await page.getByRole("button", { name: "Shape fill" }).click();
+  await page.getByRole("menuitemradio", { name: "Accent 2", exact: true }).click();
+  await expect.poll(async () => (await shapeAttrs(page))?.fill).toMatch(/^[0-9A-F]{6}$/);
+  const accent2 = (await shapeAttrs(page))?.fill;
+  expect(
+    await page.evaluate(() =>
+      document.querySelector("[data-foli-shape] g path")?.getAttribute("fill"),
+    ),
+  ).toBe(`#${accent2}`);
+  await page.getByRole("button", { name: "Weight" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "3 pt" }).click();
+  await expect
+    .poll(async () => ((await shapeAttrs(page))?.outline as { width: number }).width)
+    .toBe(38_100);
+  await page.getByRole("button", { name: "Dashes" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Long Dash", exact: true }).click();
+  await expect
+    .poll(async () => ((await shapeAttrs(page))?.outline as { dash: string }).dash)
+    .toBe("lgDash");
+  // Arrows are a line's.
+  await expect(page.getByRole("button", { name: "Arrows" })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
+  await page.getByRole("button", { name: "Shape outline" }).click();
+  await page.getByRole("menuitemradio", { name: "No Outline" }).click();
+  await expect.poll(async () => (await shapeAttrs(page))?.outline ?? null).toBeNull();
+  await page.getByRole("button", { name: "Shape styles" }).click();
+  await page.getByRole("menuitem", { name: "Colored Outline - Accent 1" }).click();
+  await expect
+    .poll(async () => shapeAttrs(page))
+    .toMatchObject({ fill: "FFFFFF", outline: { width: 12_700 } });
+  // One undo step each.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect.poll(async () => (await shapeAttrs(page))?.outline ?? null).toBeNull();
+  expect((await new AxeBuilder({ page }).include(".foli-ribbon").analyze()).violations).toEqual([]);
+});

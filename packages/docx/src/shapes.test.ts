@@ -179,6 +179,7 @@ describe("shapes (Phase 34)", () => {
         },
       ],
       ["Preset 9", { fill: null, outline: null }],
+      ["Rounded rectangle with text", { textColor: "FFC000", fill: "002060" }],
       [
         "Freeform",
         {
@@ -250,6 +251,7 @@ describe("shapes (Phase 34)", () => {
                 outline: { color: "2F528F", width: 12700, dash: "dash" },
                 story: "textbox:1",
                 verticalAlign: "center",
+                textColor: "FFFFFF",
               },
             },
             { type: "text", text: "Beside" },

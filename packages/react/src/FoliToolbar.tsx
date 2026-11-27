@@ -1140,17 +1140,17 @@ const SHAPE_OUTLINES = (state: EditorState): readonly ToolbarColor[] => [
 /** Shape Outline ▸ Weight: Word's widths, in points. */
 const WEIGHT_ACTIONS: readonly Action[] = (
   [
-    [0.25, "0.25 pt"],
-    [0.5, "0.5 pt"],
-    [0.75, "0.75 pt"],
-    [1, "1 pt"],
-    [1.5, "1.5 pt"],
-    [2.25, "2.25 pt"],
-    [3, "3 pt"],
-    [4.5, "4.5 pt"],
-    [6, "6 pt"],
+    { points: 0.25, label: "0.25 pt" },
+    { points: 0.5, label: "0.5 pt" },
+    { points: 0.75, label: "0.75 pt" },
+    { points: 1, label: "1 pt" },
+    { points: 1.5, label: "1.5 pt" },
+    { points: 2.25, label: "2.25 pt" },
+    { points: 3, label: "3 pt" },
+    { points: 4.5, label: "4.5 pt" },
+    { points: 6, label: "6 pt" },
   ] as const
-).map(([points, label]) => ({
+).map(({ points, label }) => ({
   key: `weight-${points}`,
   label,
   checked: (state) => outlineOf(state)?.width === Math.round(points * 12_700),
@@ -1160,16 +1160,16 @@ const WEIGHT_ACTIONS: readonly Action[] = (
 /** Shape Outline ▸ Dashes: Word's, by name (`a:prstDash`). */
 const DASH_ACTIONS: readonly Action[] = (
   [
-    ["solid", "Solid"],
-    ["sysDot", "Round Dot"],
-    ["sysDash", "Square Dot"],
-    ["dash", "Dash"],
-    ["dashDot", "Dash Dot"],
-    ["lgDash", "Long Dash"],
-    ["lgDashDot", "Long Dash Dot"],
-    ["lgDashDotDot", "Long Dash Dot Dot"],
+    { dash: "solid", label: "Solid" },
+    { dash: "sysDot", label: "Round Dot" },
+    { dash: "sysDash", label: "Square Dot" },
+    { dash: "dash", label: "Dash" },
+    { dash: "dashDot", label: "Dash Dot" },
+    { dash: "lgDash", label: "Long Dash" },
+    { dash: "lgDashDot", label: "Long Dash Dot" },
+    { dash: "lgDashDotDot", label: "Long Dash Dot Dot" },
   ] as const
-).map(([dash, label]) => ({
+).map(({ dash, label }) => ({
   key: `dash-${dash}`,
   label,
   checked: (state) => (outlineOf(state)?.dash ?? "solid") === dash,
@@ -1182,12 +1182,12 @@ const DASH_ACTIONS: readonly Action[] = (
 const ARROW = { type: "triangle" } as const;
 const ARROW_ACTIONS: readonly Action[] = (
   [
-    ["arrowsNone", "No Arrows", null, null],
-    ["arrowEnd", "Arrow at End", null, ARROW],
-    ["arrowStart", "Arrow at Start", ARROW, null],
-    ["arrowsBoth", "Arrows at Both Ends", ARROW, ARROW],
+    { key: "arrowsNone", label: "No Arrows", head: null, tail: null },
+    { key: "arrowEnd", label: "Arrow at End", head: null, tail: ARROW },
+    { key: "arrowStart", label: "Arrow at Start", head: ARROW, tail: null },
+    { key: "arrowsBoth", label: "Arrows at Both Ends", head: ARROW, tail: ARROW },
   ] as const
-).map(([key, label, head, tail]) => ({
+).map(({ key, label, head, tail }) => ({
   key,
   label,
   checked: (state) => {
@@ -1222,23 +1222,23 @@ const themeColor = (state: EditorState, slot: string) => {
 };
 const STYLE_ACTIONS: readonly Action[] = (
   [
-    ["outline", "dk1", "Colored Outline - Black, Dark 1"],
-    ["outline", "accent1", "Colored Outline - Accent 1"],
-    ["outline", "accent2", "Colored Outline - Accent 2"],
-    ["outline", "accent3", "Colored Outline - Accent 3"],
-    ["outline", "accent4", "Colored Outline - Accent 4"],
-    ["outline", "accent5", "Colored Outline - Accent 5"],
-    ["outline", "accent6", "Colored Outline - Accent 6"],
-    ["fill", "dk1", "Colored Fill - Black, Dark 1"],
-    ["fill", "accent1", "Colored Fill - Accent 1"],
-    ["fill", "accent2", "Colored Fill - Accent 2"],
-    ["fill", "accent3", "Colored Fill - Accent 3"],
-    ["fill", "accent4", "Colored Fill - Accent 4"],
-    ["fill", "accent5", "Colored Fill - Accent 5"],
-    ["fill", "accent6", "Colored Fill - Accent 6"],
+    { kind: "outline", slot: "dk1", label: "Colored Outline - Black, Dark 1" },
+    { kind: "outline", slot: "accent1", label: "Colored Outline - Accent 1" },
+    { kind: "outline", slot: "accent2", label: "Colored Outline - Accent 2" },
+    { kind: "outline", slot: "accent3", label: "Colored Outline - Accent 3" },
+    { kind: "outline", slot: "accent4", label: "Colored Outline - Accent 4" },
+    { kind: "outline", slot: "accent5", label: "Colored Outline - Accent 5" },
+    { kind: "outline", slot: "accent6", label: "Colored Outline - Accent 6" },
+    { kind: "fill", slot: "dk1", label: "Colored Fill - Black, Dark 1" },
+    { kind: "fill", slot: "accent1", label: "Colored Fill - Accent 1" },
+    { kind: "fill", slot: "accent2", label: "Colored Fill - Accent 2" },
+    { kind: "fill", slot: "accent3", label: "Colored Fill - Accent 3" },
+    { kind: "fill", slot: "accent4", label: "Colored Fill - Accent 4" },
+    { kind: "fill", slot: "accent5", label: "Colored Fill - Accent 5" },
+    { kind: "fill", slot: "accent6", label: "Colored Fill - Accent 6" },
   ] as const
 ).map(
-  ([kind, slot, label]): Action => ({
+  ({ kind, slot, label }): Action => ({
     key: `style-${kind}-${slot}`,
     label,
     command: (state, dispatch) => {
