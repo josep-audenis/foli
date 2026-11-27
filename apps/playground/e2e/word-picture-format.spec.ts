@@ -42,7 +42,7 @@ test("a selected picture brings Picture Format: its size in the boxes, Arrange's
   await page.getByRole("tab", { name: "Picture Format" }).click();
   const results = await new AxeBuilder({ page }).include(".foli-toolbar").analyze();
   expect(results.violations).toEqual([]);
-  const width = page.getByRole("textbox", { name: "Width" });
+  const width = page.getByRole("spinbutton", { name: "Width" });
   await expect(width).toHaveValue(/2.22|5.64/);
   // A picture keeps its ratio: half the width, half the height.
   const before = (await selected(page)) as { width: number; height: number };
@@ -71,7 +71,7 @@ test("a selected text box brings Shape Format with Arrange and Size", async ({ p
   await page.keyboard.press("Escape");
   await page.getByRole("tab", { name: "Shape Format" }).click();
   await expect(page.getByRole("tab", { name: "Picture Format" })).toHaveCount(0);
-  const height = page.getByRole("textbox", { name: "Height" });
+  const height = page.getByRole("spinbutton", { name: "Height" });
   await height.fill("1");
   await height.press("Enter");
   await expect

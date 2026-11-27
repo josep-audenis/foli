@@ -2067,9 +2067,11 @@ export function ObjectSizeBox({
     if (text === null) return;
     const twips = parseLength(text, unit);
     setText(null);
+    // The value shown, typed again: nothing changes (no rounding through the unit).
+    if (text.trim() === shown) return;
     if (twips !== null && twips > 0) commit(twips);
   };
-  const off = disabled || !size;
+  const off = disabled || !size || !size.width || !size.height;
   return (
     <span className={`foli-toolbar-box foli-toolbar-object-${side}-box`}>
       <span className="foli-toolbar-box-label" aria-hidden="true">
@@ -2078,9 +2080,11 @@ export function ObjectSizeBox({
       <input
         ref={ref}
         type="text"
+        role="spinbutton"
         inputMode="decimal"
         tabIndex={tabIndex}
         aria-label={t(label)}
+        aria-valuetext={shown}
         aria-disabled={off || undefined}
         readOnly={off}
         value={text ?? shown}

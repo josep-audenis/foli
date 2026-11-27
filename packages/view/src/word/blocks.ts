@@ -455,10 +455,12 @@ export function floatElements(
   style.display = "block";
   const x = floatLeft(float.horizontal, width, geometry);
   const top = floatTop(float.vertical, height, geometry);
-  // Its place front to back (33.6): ranks in Word's `relativeHeight` steps, behind text below 0.
+  // Its place front to back (33.6): Bring Forward and Send Backward give every float its rank in
+  // Word's `relativeHeight` steps (1024 from 251 658 240), which is its z-index here; behind text
+  // below 0. A float none has ranked is under those (document order among themselves).
   const z =
     typeof float.zOrder === "number"
-      ? Math.min(Math.max(Math.floor(float.zOrder / 1024) - 245_760 + 1000, 1), 1_000_000)
+      ? Math.min(Math.max(Math.round((float.zOrder - 251_658_240) / 1024) + 2, 2), 1_000_000)
       : null;
   if (float.wrap === "behind" || float.wrap === "inFront") {
     style.position = "absolute";

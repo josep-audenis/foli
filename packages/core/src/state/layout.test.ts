@@ -218,15 +218,21 @@ describe("Layout Options (33.4)", () => {
     });
     const z = (pos: number) =>
       (editor.state.doc.nodeAt(pos)?.attrs.float as { zOrder?: number } | undefined)?.zOrder;
+    const order = () => [1, 2, 3].sort((a, b) => (z(a) as number) - (z(b) as number));
     // In document order the first is at the back: forward puts it between the other two.
     expect(editor.run(setObjectOrder(1, "forward"))).toBe(true);
-    expect(z(1)).toBeGreaterThan(251_658_240 + 1024);
-    expect(z(1)).toBeLessThan(251_658_240 + 2048);
+    expect(order()).toEqual([2, 1, 3]);
     expect(editor.run(setObjectOrder(1, "front"))).toBe(true);
+    expect(order()).toEqual([2, 3, 1]);
     expect(editor.run(setObjectOrder(1, "front"))).toBe(false);
-    expect(editor.run(setObjectOrder(3, "back"))).toBe(true);
-    expect(z(3)).toBeLessThan(251_658_240 + 1024);
-    expect(editor.run(setObjectOrder(3, "backward"))).toBe(false);
+    expect(editor.run(setObjectOrder(1, "back"))).toBe(true);
+    expect(order()).toEqual([1, 2, 3]);
+    expect(editor.run(setObjectOrder(1, "backward"))).toBe(false);
+    // Every float carries its rank: one undo step takes the whole move back.
+    editor.run(setObjectOrder(3, "backward"));
+    expect(order()).toEqual([1, 3, 2]);
+    editor.run(undo);
+    expect(order()).toEqual([1, 2, 3]);
     // Saved, it needs schema 10.
     expect(editor.getDocument().schemaVersion).toBe(10);
     editor.run(alignObject(2, "middle"));

@@ -439,38 +439,44 @@ export type ObjectOrder = "forward" | "front" | "backward" | "back";
 
 /**
  * Word's Bring Forward, Bring to Front, Send Backward and Send to Back for the floating object at
- * `pos` (33.6): its place among the floating objects (`float.zOrder`). Objects with none are taken
- * in document order. One undo step; not while tracking; false where it would not move.
+ * `pos` (33.6). The body's floating objects are put in order, back to front (by `float.zOrder`;
+ * one without counts where it stands in the document, among those without, ties by place), the
+ * object moved in that order, and every one given its rank as its `zOrder` (Word's
+ * `relativeHeight` steps): what is drawn and written is then always the order shown. One undo
+ * step; not while tracking; false where it would not move.
  */
 export function setObjectOrder(pos: number, order: ObjectOrder): Command {
   return (state, dispatch) => {
     const node = objectAt(state, pos);
-    if (!node?.attrs.float) return false;
-    const all = stacking(state);
-    const own = all.find((o) => o.pos === pos)?.z ?? Z_BASE;
-    const others = all.filter((o) => o.pos !== pos).map((o) => o.z);
-    const above = others.filter((z) => z > own).sort((a, b) => a - b);
-    const below = others.filter((z) => z < own).sort((a, b) => b - a);
-    let z: number;
-    if (order === "front" || order === "forward") {
-      if (!above.length) return false;
-      z =
-        order === "front" || above.length === 1
-          ? (above.at(-1) as number) + Z_STEP
-          : Math.floor(((above[0] as number) + (above[1] as number)) / 2);
-      if (z === above[0]) z = (above[0] as number) + 1;
-    } else {
-      if (!below.length) return false;
-      z =
-        order === "back" || below.length === 1
-          ? Math.max((below.at(-1) as number) - Z_STEP, 0)
-          : Math.ceil(((below[0] as number) + (below[1] as number)) / 2);
-      if (z === below[0]) z = Math.max((below[0] as number) - 1, 0);
-    }
-    return setFloat(pos, (n) => ({
-      ...(n.attrs.float as Record<string, unknown>),
-      zOrder: Math.min(Math.max(z, 0), 2_147_483_647),
-    }))(state, dispatch);
+    if (!node?.attrs.float || trackState(state)?.on === true) return false;
+    const stack = stacking(state)
+      .map((o, i) => ({ ...o, i }))
+      .sort((a, b) => a.z - b.z || a.i - b.i);
+    const at = stack.findIndex((o) => o.pos === pos);
+    if (at < 0) return false;
+    const to =
+      order === "front"
+        ? stack.length - 1
+        : order === "back"
+          ? 0
+          : order === "forward"
+            ? Math.min(at + 1, stack.length - 1)
+            : Math.max(at - 1, 0);
+    if (to === at) return false;
+    const [moved] = stack.splice(at, 1);
+    stack.splice(to, 0, moved as (typeof stack)[number]);
+    return attempt(state, dispatch, (tr) => {
+      tr.setMeta(closeHistory, true);
+      stack.forEach((o, rank) => {
+        const n = tr.doc.nodeAt(o.pos) as Node;
+        const float = n.attrs.float as Record<string, unknown>;
+        const zOrder = Z_BASE + rank * Z_STEP;
+        if (float.zOrder !== zOrder)
+          tr.setNodeMarkup(o.pos, n.type, { ...n.attrs, float: { ...float, zOrder } });
+      });
+      if (state.selection instanceof NodeSelection && state.selection.from === pos)
+        tr.setSelection(NodeSelection.create(tr.doc, pos));
+    });
   };
 }
 

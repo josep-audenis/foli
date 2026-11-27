@@ -2033,8 +2033,11 @@ export declare const toggleCrop: Command;
 export type ObjectOrder = "forward" | "front" | "backward" | "back";
 /**
  * Word's Bring Forward, Bring to Front, Send Backward and Send to Back for the floating object at
- * `pos` (33.6): its place among the floating objects (`float.zOrder`). Objects with none are taken
- * in document order. One undo step; not while tracking; false where it would not move.
+ * `pos` (33.6). The body's floating objects are put in order, back to front (by `float.zOrder`;
+ * one without counts where it stands in the document, among those without, ties by place), the
+ * object moved in that order, and every one given its rank as its `zOrder` (Word's
+ * `relativeHeight` steps): what is drawn and written is then always the order shown. One undo
+ * step; not while tracking; false where it would not move.
  */
 export declare function setObjectOrder(pos: number, order: ObjectOrder): Command;
 /** Word's Align for one object: against the margins. */
