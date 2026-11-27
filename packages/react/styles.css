@@ -920,6 +920,11 @@
   top: 0;
   z-index: 3;
 }
+/* The outline stays under the sticky ruler. */
+.foli-editor-ruler + .foli-editor-body > .foli-outline {
+  top: 24px;
+  max-height: calc(100vh - 24px);
+}
 .foli-editor-body > .foli-ruler-vertical {
   flex: 0 0 auto;
   align-self: stretch;

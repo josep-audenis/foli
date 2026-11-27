@@ -227,9 +227,9 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
     statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
     /**
      * Word's rulers (`FoliRuler`): the horizontal one above the pages and the vertical one beside
-     * them, shown while the View tab's Ruler is on (core's `rulerShown`, `toggleRuler`). `true` (or
-     * an object with the rulers' `units` and `messages`) turns it on when the editor is made.
-     * Default false: no rulers are drawn (the Ruler button still switches `rulerShown`).
+     * them, shown while the View tab's Ruler is on (core's `rulerShown`, `toggleRuler`; off at
+     * first, as Word's). `true` (or an object with the rulers' `units` and `messages`) also turns it
+     * on when the editor is made; `false` never draws them (an app drawing its own `FoliRuler`).
      */
     ruler?: boolean | Pick<FoliRulerProps, "units" | "messages"> | undefined;
     /**
@@ -413,7 +413,8 @@ export interface FoliToolbarProps {
     disabled?: boolean | undefined;
     /**
      * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
-     * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
+     * redo, the review view and change navigation, Navigate, the navigation pane, the ruler and
+     * field codes.
      */
     commentOnly?: boolean | undefined;
     /**

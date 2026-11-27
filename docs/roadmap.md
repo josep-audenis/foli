@@ -4454,8 +4454,9 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   arrows move by a step); e2e in three engines at 100% and 200% zoom; docs; changesets. Built:
   the switch as core state (`toggleRuler`, `setRulerShown`, `rulerShown`; a built-in plugin, as
   formatting marks; no undo step), `toolbarItems.ruler` in the ribbon's View tab (Show group,
-  with Lucide's ruler icon), `FoliEditor`'s `ruler` (both rulers while the switch is on, the
-  horizontal one sticky at the top; `true` turns it on); the playground draws them while the
+  with Lucide's ruler icon), `FoliEditor` draws both rulers while the switch is on (off at first; `ruler` `true`
+  turns it on, `false` never draws them; the horizontal one sticky at the top); a comment-only
+  toolbar keeps Ruler; the playground draws them while the
   switch is on. The keyboard came with 31.2–31.5 (arrows, Page Up/Down, Delete on a stop).
   `ruler.test.tsx`, `ruler.spec.ts` (39 cases: every handle kind dragged at 100% and 200% in
   Chromium, Firefox and WebKit, the View tab's Ruler, axe on both rulers); api.md, keyboard.md,

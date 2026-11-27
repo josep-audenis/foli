@@ -178,7 +178,8 @@ export interface FoliToolbarProps {
   disabled?: boolean | undefined;
   /**
    * Comment-only (`FoliEditor`'s `commentOnly`): every item is off but "New comment", undo and
-   * redo, the review view and change navigation, Navigate, the navigation pane and field codes.
+   * redo, the review view and change navigation, Navigate, the navigation pane, the ruler and
+   * field codes.
    */
   commentOnly?: boolean | undefined;
   /**
@@ -2498,6 +2499,7 @@ const COMMENT_ONLY_ITEMS: ReadonlySet<string> = new Set([
   "nextChange",
   "navigate",
   "navigationPane",
+  "ruler",
   "fieldCodes",
 ]);
 

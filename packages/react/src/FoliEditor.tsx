@@ -13,15 +13,7 @@ import {
   type Transaction,
 } from "@folijs/core";
 import { documentJSON, wordContext } from "@folijs/core/internal";
-import {
-  forwardRef,
-  type ReactNode,
-  useEffect,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, type ReactNode, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   FoliEditorProvider,
   useActiveEditor,
@@ -117,9 +109,9 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   statusBar?: boolean | Omit<FoliStatusBarProps, "editor" | "zoom" | "onZoomChange"> | undefined;
   /**
    * Word's rulers (`FoliRuler`): the horizontal one above the pages and the vertical one beside
-   * them, shown while the View tab's Ruler is on (core's `rulerShown`, `toggleRuler`). `true` (or
-   * an object with the rulers' `units` and `messages`) turns it on when the editor is made.
-   * Default false: no rulers are drawn (the Ruler button still switches `rulerShown`).
+   * them, shown while the View tab's Ruler is on (core's `rulerShown`, `toggleRuler`; off at
+   * first, as Word's). `true` (or an object with the rulers' `units` and `messages`) also turns it
+   * on when the editor is made; `false` never draws them (an app drawing its own `FoliRuler`).
    */
   ruler?: boolean | Pick<FoliRulerProps, "units" | "messages"> | undefined;
   /**
@@ -186,7 +178,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     onMention,
     children,
     statusBar = false,
-    ruler = false,
+    ruler,
     contextMenu = false,
     miniToolbar = false,
     ...canvas
@@ -254,13 +246,14 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   );
 
   const readOnly = canvas.readOnly === true;
-  // The rulers: on when the editor is made with `ruler`, then as the View tab's Ruler says.
-  const rulerOn = ruler !== false;
+  // The rulers: as the View tab's Ruler says, turned on when the editor is made with `ruler`
+  // (before the first paint: no shift).
+  const rulerOn = ruler !== undefined && ruler !== false;
   // biome-ignore lint/correctness/useExhaustiveDependencies: only for a new editor.
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (rulerOn) editor.run(setRulerShown(true));
   }, [editor]);
-  const rulersShown = useEditorState(rulerShown, { editor }) && rulerOn;
+  const rulersShown = useEditorState(rulerShown, { editor }) && ruler !== false;
   // The status bar's zoom, unless the app gives one.
   const [ownZoom, setOwnZoom] = useState(1);
   const zoomed = canvas.zoom === undefined && statusBar !== false;

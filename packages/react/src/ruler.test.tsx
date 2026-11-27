@@ -13,8 +13,9 @@ import {
   toggleRuler,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createRef } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { FoliEditor, FoliRuler, wordRibbonTabs } from "./index.js";
+import { FoliEditor, type FoliEditorHandle, FoliRuler, wordRibbonTabs } from "./index.js";
 
 afterEach(cleanup);
 
@@ -487,8 +488,16 @@ describe("the ruler's switch", () => {
     await waitFor(() => expect(screen.getAllByRole("group", { name: /ruler$/ })).toHaveLength(2));
   });
 
-  it("FoliEditor draws none without ruler", () => {
-    render(<FoliEditor initialContent={doc()} toolbar={false} />);
+  it("FoliEditor: off at first without ruler, drawn when switched on; never with ruler={false}", async () => {
+    const handle = createRef<FoliEditorHandle>();
+    const { rerender } = render(<FoliEditor ref={handle} initialContent={doc()} toolbar={false} />);
+    expect(screen.queryByRole("group", { name: /ruler$/ })).toBeNull();
+    const editor = handle.current?.editor as Editor;
+    act(() => {
+      editor.run(toggleRuler);
+    });
+    await waitFor(() => expect(screen.getAllByRole("group", { name: /ruler$/ })).toHaveLength(2));
+    rerender(<FoliEditor ref={handle} initialContent={doc()} toolbar={false} ruler={false} />);
     expect(screen.queryByRole("group", { name: /ruler$/ })).toBeNull();
   });
 });
