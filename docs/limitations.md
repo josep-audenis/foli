@@ -759,6 +759,16 @@ Details in the [package README](../packages/docx/README.md).
 ## The ruler (Phase 31)
 
 - Right-to-left paragraphs are measured and dragged as left-to-right ones.
+- Tab stops added, moved or removed on the ruler are the document's (saved, in the Tabs dialog),
+  but the pages still lay text out at the default stops (Phase 30's limit, "Word's dialogs").
+  The tab selector has Word's five stop kinds, not its first-line and hanging indent entries,
+  and no default stops are drawn.
+- With several paragraphs selected, a stop moved on the ruler is cleared where it was and set
+  in every selected paragraph (as the Tabs dialog does). A Word start, end or list (`num`) stop
+  is shown as left or right, and moving one writes it back as that kind. A stop a table style
+  gives a cell's paragraphs is shown, but moving or removing it leaves the style's in place
+  (`setTabStops` reads the paragraph without its table style). Arrows step a stop over another
+  rather than onto it; a drag onto one replaces it, as Word's.
 - A paragraph with a left or right border draws its text at the border's spacing, not at its
   indent (the border's padding replaces the indent's, `styleParagraph`): its ruler markers show
   the indent the document has, not where the text is drawn.

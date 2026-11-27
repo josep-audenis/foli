@@ -139,6 +139,58 @@ test("each handle is a slider the keyboard moves; Escape cancels a drag; axe", a
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect.poll(() => indent(page)).toEqual({ left: 810 });
+  // With a tab stop on it too.
+  const strip = await page.locator(".foli-ruler-page").boundingBox();
+  const g = await geometry(page);
+  if (!strip || !g) throw new Error("no ruler");
+  await page.mouse.click(g.text.left + 2880 * g.pxPerTwip, strip.y + strip.height - 3);
+  await expect(page.getByRole("slider", { name: "Left tab" })).toBeVisible();
   const results = await new AxeBuilder({ page }).include(".foli-ruler").analyze();
   expect(results.violations).toEqual([]);
+});
+
+const tabs = (page: Page) =>
+  page.evaluate(() => window.foliEdit.editor.state.selection.$head.parent.attrs.tabs);
+
+for (const zoom of [1, 2]) {
+  test(`at ${zoom * 100}%, a click adds a tab stop, a drag moves it, off the ruler removes it`, async ({
+    page,
+  }) => {
+    await open(page, zoom);
+    const g = await geometry(page);
+    if (!g?.paragraph) throw new Error("no geometry");
+    const strip = await page.locator(".foli-ruler-page").boundingBox();
+    if (!strip) throw new Error("no ruler");
+    // A center stop an inch from the left margin.
+    await page.getByRole("button", { name: "Tab stop to add: Left tab" }).click();
+    await page.mouse.click(g.text.left + 1440 * g.pxPerTwip, strip.y + strip.height - 3);
+    await expect.poll(() => tabs(page)).toEqual([{ position: 1440, kind: "center" }]);
+    // Dragged half an inch right: one undo step.
+    const stop = await handle(page, "tab-0");
+    expect(Math.abs(stop.x - (g.text.left + 1440 * g.pxPerTwip))).toBeLessThan(1.5);
+    await drag(page, stop, stop.x + 720 * g.pxPerTwip);
+    await expect.poll(() => tabs(page)).toEqual([{ position: 2160, kind: "center" }]);
+    const moved = await handle(page, "tab-0");
+    expect(Math.abs(moved.x - (stop.x + 720 * g.pxPerTwip))).toBeLessThan(1.5);
+    await page.evaluate(() => window.foliEdit.editor.commands.undo());
+    await expect.poll(() => tabs(page)).toEqual([{ position: 1440, kind: "center" }]);
+    // Dragged down off the ruler: gone.
+    const back = await handle(page, "tab-0");
+    await page.mouse.move(back.x, back.y);
+    await page.mouse.down();
+    await page.mouse.move(back.x, back.y + 80, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(() => tabs(page)).toBeNull();
+  });
+}
+
+test("a tab stop's double-click opens the Tabs dialog", async ({ page }) => {
+  await open(page, 1);
+  const g = await geometry(page);
+  const strip = await page.locator(".foli-ruler-page").boundingBox();
+  if (!g || !strip) throw new Error("no ruler");
+  await page.mouse.click(g.text.left + 1440 * g.pxPerTwip, strip.y + strip.height - 3);
+  await expect.poll(() => tabs(page)).toEqual([{ position: 1440, kind: "left" }]);
+  await page.locator('[data-foli-ruler="tab-0"]').dblclick();
+  await expect(page.locator(".foli-tabs-dialog")).toBeVisible();
 });

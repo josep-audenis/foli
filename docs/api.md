@@ -132,7 +132,12 @@ page's margins shaded, numbers in the unit counted from the left margin (ticks e
 0.25 cm), and as sliders the caret's paragraph's first-line indent (the marker pointing down),
 hanging indent (the one pointing up: it moves the left indent and keeps the first line where it
 is), left indent (the box under it: both), right indent, and the page's left and right margins
-(their edges, between the markers). A drag shows a guide line down the page and changes the
+(their edges, between the markers), and the paragraph's tab stops (31.3: Word's marks for left,
+center, right, decimal and bar stops). A press on the ruler's strip adds a stop of the kind the
+tab selector at the ruler's start shows (a button: each click the next kind, left, center,
+right, decimal, bar); a stop dragged along moves (`setTabStops`, clear and set in one change),
+let go more than 16 px above or below the ruler it goes, and its double-click opens the Tabs
+dialog (`openDialog("tabs")`, with a toolbar). A drag shows a guide line down the page and changes the
 document once on release (`setIndent`, `setSectionSetup({ margins })` on the caret's section,
 the gutter apart): one undo step; it snaps to 1/16 inch or 0.25 cm from the left margin unless
 Alt is held, which shows the exact value as it moves; Escape or a lost pointer cancels. The
