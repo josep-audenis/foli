@@ -2686,7 +2686,8 @@ export declare function setShapeAdjust(pos: number, adjust: Readonly<Record<stri
 /**
  * Gives the shape at `pos` text (34.4: typing on a selected shape, as Word does): a story of kind
  * `textBox` with an empty paragraph, the text centered in the shape as Word's new shapes have it,
- * in the style's light color. One undo step; false when it has text, is a line, or is in a story.
+ * white on its fill (black without one). One undo step; false when it has text, is a line, is in
+ * a story, or while tracking.
  */
 export declare function addShapeText(pos: number): Command;
 
