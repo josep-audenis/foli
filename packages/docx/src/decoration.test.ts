@@ -162,3 +162,20 @@ describe("page decoration (schema 9)", () => {
     expect(await main(await exportDocx(read.document, read.package))).toBe(await main(bytes));
   });
 });
+
+describe("suppressed line numbers (32.5)", () => {
+  it("reads and writes w:suppressLineNumbers, the rest of the paragraph as it was", async () => {
+    const bytes = await docx(
+      '<w:p><w:pPr><w:suppressLineNumbers/><w:jc w:val="center"/></w:pPr><w:r><w:t>A</w:t></w:r></w:p><w:sectPr><w:lnNumType w:countBy="1"/></w:sectPr>',
+    );
+    const read = await importDocx(bytes);
+    expect(read.document.schemaVersion).toBe(9);
+    expect(read.document.content.content?.[0]?.attrs?.suppressLineNumbers).toBe(true);
+    expect(await main(await exportDocx(read.document, read.package))).toBe(await main(bytes));
+    const doc = structuredClone(read.document);
+    (doc.content.content?.[0]?.attrs as Record<string, unknown>).suppressLineNumbers = null;
+    const out = await main(await exportDocx(doc, read.package));
+    expect(out).not.toContain("suppressLineNumbers");
+    expect(out).toContain('<w:jc w:val="center"/>');
+  });
+});

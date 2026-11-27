@@ -202,6 +202,8 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`,
   `previous`) is a tracked change of the setup; accepting drops it, rejecting restores
   `previous` with the section's header and footer references.
+- **Line numbers** (v9): a paragraph's `suppressLineNumbers` (`w:suppressLineNumbers`, also in
+  styles) keeps its lines out of its section's `lineNumbers`.
 - **Watermarks** (v9): an opaque run (`opaqueInline`, `run: true`) holding Word's watermark shape
   (`w:pict`) has `watermark` (`WatermarkJSON`): `kind` text or picture, `text`, `font`, `color`,
   `semitransparent`, `rotation` (315: Word's diagonal), `picture` (a key of `resources`),

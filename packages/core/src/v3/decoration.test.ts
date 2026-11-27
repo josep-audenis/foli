@@ -81,3 +81,31 @@ describe("page decoration (schema 9)", () => {
     expect(() => parseDocument(doc({}, { background: { themeTint: "1" } }))).toThrow(/hex/);
   });
 });
+
+describe("suppressLineNumbers (schema 9)", () => {
+  it("needs schema 9 in a paragraph or a style", () => {
+    const plain = createDocument();
+    const paragraph = parseDocument({
+      ...plain,
+      schemaVersion: 9,
+      content: {
+        type: "doc",
+        content: [{ type: "paragraph", attrs: { suppressLineNumbers: true } }],
+      },
+    });
+    expect(paragraph.schemaVersion).toBe(9);
+    const styled = parseDocument({
+      ...plain,
+      schemaVersion: 9,
+      styles: [
+        ...plain.styles,
+        { id: "X", type: "paragraph", paragraph: { suppressLineNumbers: true } },
+      ],
+    });
+    expect(styled.schemaVersion).toBe(9);
+    expect(() => parseDocument({ ...styled, schemaVersion: 8 })).toThrow(
+      /suppressLineNumbers is of schema 9/,
+    );
+    expect(() => parseDocument({ ...paragraph, schemaVersion: 8 })).toThrow(/schema 9/);
+  });
+});

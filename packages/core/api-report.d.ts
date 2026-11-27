@@ -3116,6 +3116,8 @@ export interface ParagraphFlags {
     widowControl?: boolean | null;
     pageBreakBefore?: boolean | null;
     contextualSpacing?: boolean | null;
+    /** Word's Suppress line numbers (schema 9). */
+    suppressLineNumbers?: boolean | null;
 }
 /**
  * Turns the given switches of the selected paragraphs on or off (null puts back the style's):
@@ -3811,6 +3813,8 @@ export interface ParagraphPropertiesJSON {
     widowControl?: boolean;
     pageBreakBefore?: boolean;
     contextualSpacing?: boolean;
+    /** `w:suppressLineNumbers` (schema 9). */
+    suppressLineNumbers?: boolean;
     outlineLevel?: number;
     numbering?: {
         id?: number;
@@ -4348,6 +4352,7 @@ export interface ParagraphFormat {
     widowControl: boolean;
     pageBreakBefore: boolean;
     contextualSpacing: boolean;
+    suppressLineNumbers: boolean;
     outlineLevel: number | null;
     tabs: {
         position: number;

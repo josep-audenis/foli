@@ -425,6 +425,7 @@ export function paragraphProperties(
     ["widowControl", "widowControl"],
     ["pageBreakBefore", "pageBreakBefore"],
     ["contextualSpacing", "contextualSpacing"],
+    ["suppressLineNumbers", "suppressLineNumbers"],
   ] as const) {
     set(name, toggleProperty(at(local)), local);
   }

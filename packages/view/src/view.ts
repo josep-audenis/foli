@@ -162,6 +162,8 @@ import {
   ControlChrome,
 } from "./word/controls.js";
 import {
+  LINE_NUMBERS_ATTR,
+  lineNumberElements,
   PAGE_DECORATION_ATTR,
   pageBordersElement,
   pageBordersKey,
@@ -391,6 +393,38 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
+/** A page's box in px, from its sheet's settings. */
+function pageBox(sheet: Sheet) {
+  const { pageSize, margins } = sheet.settings;
+  const px = (mm: number) => (mm * 96) / 25.4;
+  return {
+    width: px(pageSize.width),
+    height: px(pageSize.height),
+    top: px(margins.top),
+    right: px(margins.right),
+    bottom: px(margins.bottom),
+    left: px(margins.left),
+  };
+}
+
+/** Each page's line numbers holder (32.5). */
+const lineNumberHolders = new WeakMap<HTMLElement, HTMLElement>();
+function lineNumberHolder(page: HTMLElement): HTMLElement {
+  let holder = lineNumberHolders.get(page);
+  if (!holder) {
+    holder = page.ownerDocument.createElement("div");
+    holder.setAttribute(PAGE_DECORATION_ATTR, "");
+    holder.setAttribute(LINE_NUMBERS_ATTR, "");
+    holder.setAttribute("aria-hidden", "true");
+    holder.contentEditable = "false";
+    holder.style.position = "absolute";
+    holder.style.inset = "0";
+    holder.style.pointerEvents = "none";
+    lineNumberHolders.set(page, holder);
+  }
+  return holder;
+}
+
 /** The page color each page element was last given. */
 const pageColors = new WeakMap<HTMLElement, string>();
 /** Each page element's borders (Phase 32), as last drawn, and what they were drawn from. */
@@ -3279,6 +3313,7 @@ export class EditorView {
     const items = elements.flatMap((list, i) =>
       list.map((dom, f) => ({
         dom,
+        index: i,
         page: pages[i]?.[f] ?? 0,
         slot: slots[i]?.[f] as Slot,
         section: (layout[i] as BlockLayout).section,
@@ -3301,6 +3336,8 @@ export class EditorView {
     const context = this.paged ? wordContext(this.state) : null;
     const color = pageColor(context?.envelope.settings) ?? "";
     const setups = context ? this.sections() : [];
+    // Line numbers (32.5): a holder on each page, filled once the pages are laid out.
+    const numbered = setups.some((setup) => setup.lineNumbers);
     this.sheets.forEach((sheet, p) => {
       const page = this.pages[p] as HTMLElement;
       const key = `${sheet.index} ${sheet.css}`;
@@ -3351,9 +3388,11 @@ export class EditorView {
       /** What follows the text of a column: its endnotes. */
       const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
       const decoration = pageFrames.get(page)?.elements ?? [];
+      const numbers = numbered ? lineNumberHolder(page) : null;
       /** A page's children: its decoration, its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
         ...decoration,
+        ...(numbers ? [numbers] : []),
         ...(header ? [header.element] : []),
         ...list,
         ...(notes?.foot ?? []),
@@ -3402,6 +3441,33 @@ export class EditorView {
             this.viewRemoved,
           );
         });
+      });
+    }
+    if (numbered && context) {
+      const doc = this.host.ownerDocument;
+      const shown = lineNumberElements(
+        doc,
+        this.sheets.map((sheet, p) => ({
+          page: this.pages[p] as HTMLElement,
+          box: pageBox(sheet),
+          blocks: items
+            .filter((item) => item.page === p)
+            .map((item) => {
+              const node = this.state.doc.child(item.index);
+              return {
+                element: item.dom,
+                section: item.section.flow.index ?? 0,
+                skip:
+                  node.type.name !== "paragraph" ||
+                  context.resolver.paragraph(node.attrs).paragraph.suppressLineNumbers,
+              };
+            }),
+        })),
+        setups,
+      );
+      this.sheets.forEach((_sheet, p) => {
+        const holder = lineNumberHolder(this.pages[p] as HTMLElement);
+        holder.replaceChildren(...(shown[p]?.childNodes ?? []));
       });
     }
     // Pages no longer needed and stray DOM in the host: all after the last page by now.
@@ -3456,16 +3522,7 @@ export class EditorView {
     sheet: Sheet,
     first: boolean,
   ): void {
-    const { pageSize, margins } = sheet.settings;
-    const px = (mm: number) => (mm * 96) / 25.4;
-    const box = {
-      width: px(pageSize.width),
-      height: px(pageSize.height),
-      top: px(margins.top),
-      right: px(margins.right),
-      bottom: px(margins.bottom),
-      left: px(margins.left),
-    };
+    const box = pageBox(sheet);
     const resources = wordContext(this.state)?.envelope.resources;
     const key = `${pageBordersKey(borders, box, first)}|${watermarks.length ? JSON.stringify([watermarks, box]) : ""}`;
     const known = pageFrames.get(page);

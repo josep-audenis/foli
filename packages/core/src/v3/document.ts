@@ -149,6 +149,8 @@ export interface ParagraphPropertiesJSON {
   widowControl?: boolean;
   pageBreakBefore?: boolean;
   contextualSpacing?: boolean;
+  /** `w:suppressLineNumbers` (schema 9). */
+  suppressLineNumbers?: boolean;
   outlineLevel?: number;
   numbering?: { id?: number; level?: number };
   tabs?: { position: number; kind: string; leader?: string }[];
@@ -521,6 +523,9 @@ export function schemaVersionOf(
   doc: Pick<FoliDocument, "content" | "comments" | "stories"> & {
     settings?: WordSettingsJSON | undefined;
     section?: SectionJSON | undefined;
+    styles?: unknown;
+    defaults?: unknown;
+    numbering?: unknown;
   },
 ): FoliDocument["schemaVersion"] {
   const trees = [
@@ -531,6 +536,7 @@ export function schemaVersionOf(
   if (
     doc.settings?.background !== undefined ||
     V9_SECTION_KEYS.some((key) => inSection(doc.section, key)) ||
+    suppressesLineNumbers(doc) ||
     trees.some((tree) => laterNode(tree, 8))
   )
     return 9;
@@ -615,6 +621,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
       fail("settings.trackRevisions", `is of schema 7 (the document says schema ${version})`);
     if (doc.settings?.background !== undefined)
       fail("settings.background", `is of schema 9 (the document says schema ${version})`);
+    if (suppressesLineNumbers(doc))
+      fail("styles", `suppressLineNumbers is of schema 9 (the document says schema ${version})`);
     const decorated = V9_SECTION_KEYS.find((key) => inSection(doc.section, key));
     if (decorated)
       fail("section", `${decorated} is of schema 9 (the document says schema ${version})`);
@@ -848,6 +856,13 @@ function laterSection(section: unknown): string | undefined {
 
 const TABLE_NODES = new Set(["table", "tableRow", "tableCell"]);
 
+/** Whether a style, the defaults or a list level says `suppressLineNumbers` (schema 9). */
+function suppressesLineNumbers(doc: { styles?: unknown; defaults?: unknown; numbering?: unknown }) {
+  return JSON.stringify([doc.styles, doc.defaults, doc.numbering]).includes(
+    '"suppressLineNumbers":',
+  );
+}
+
 /** The parts of a section that schema 9 added. */
 const V9_SECTION_KEYS = ["pageBorders", "lineNumbers"];
 
@@ -886,6 +901,8 @@ function laterNode(
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
     if (version < 9 && name === "opaqueInline" && attrs.watermark != null)
       return { name: "a watermark", schema: 9 };
+    if (version < 9 && attrs.suppressLineNumbers != null)
+      return { name: "a paragraph's suppressLineNumbers", schema: 9 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;

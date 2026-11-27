@@ -2,7 +2,13 @@
  * Page decoration (Phase 32, ADR-0015): the page color and a section's page borders, drawn on
  * each page by the editing view and by `renderDocument` (so in print and `exportPdf` too).
  */
-import type { NodeJSON, PageBordersJSON, WatermarkJSON, WordSettingsJSON } from "@folijs/core";
+import type {
+  NodeJSON,
+  PageBordersJSON,
+  SectionJSON,
+  WatermarkJSON,
+  WordSettingsJSON,
+} from "@folijs/core";
 import { borderJsonCss, type ImageSource, PX_PER_TWIP } from "./blocks.js";
 
 /**
@@ -20,6 +26,11 @@ export const PAGE_DECORATION_ATTR = "data-foli-page-decoration";
  * @internal
  */
 export const WATERMARK_ATTR = "data-foli-watermark";
+/**
+ * Marks a page's line numbers.
+ * @internal
+ */
+export const LINE_NUMBERS_ATTR = "data-foli-line-numbers";
 
 /**
  * The page color as CSS (`#RRGGBB`), undefined when the document has none (or `auto`).
@@ -205,4 +216,122 @@ export function watermarkElement(
   svg.append(text);
   element.append(svg);
   return element;
+}
+
+/**
+ * A block on a page, for line numbers: what is drawn, its section, whether it is numbered.
+ * @internal
+ */
+export interface NumberedBlock {
+  /** The element on the page (a split block's clip). */
+  element: HTMLElement;
+  section: number;
+  /** Not counted: a table, or a paragraph that suppresses its line numbers. */
+  skip: boolean;
+}
+
+/** Word's automatic distance between line numbers and the text: a quarter inch. */
+const AUTO_DISTANCE = 360;
+
+/** The lines `element` shows, as top and bottom in the page's px (`scale`: the page's zoom). */
+function linesOf(
+  element: HTMLElement,
+  page: DOMRect,
+  scale: number,
+): { top: number; bottom: number }[] {
+  const doc = element.ownerDocument;
+  const clip = element.getBoundingClientRect();
+  const range = doc.createRange();
+  range.selectNodeContents(element);
+  const rects = [...range.getClientRects()].filter((r) => {
+    const middle = (r.top + r.bottom) / 2;
+    return r.height > 0 && middle >= clip.top && middle <= clip.bottom;
+  });
+  range.detach?.();
+  if (!rects.length)
+    return clip.height > 0
+      ? [{ top: (clip.top - page.top) / scale, bottom: (clip.bottom - page.top) / scale }]
+      : [];
+  rects.sort((a, b) => a.top - b.top);
+  const lines: { top: number; bottom: number }[] = [];
+  for (const r of rects) {
+    const last = lines.at(-1);
+    // One line: boxes whose middles fall inside the line so far.
+    if (last && (r.top + r.bottom) / 2 < last.bottom) last.bottom = Math.max(last.bottom, r.bottom);
+    else lines.push({ top: r.top, bottom: r.bottom });
+  }
+  return lines.map((l) => ({
+    top: (l.top - page.top) / scale,
+    bottom: (l.bottom - page.top) / scale,
+  }));
+}
+
+/**
+ * Word's line numbers (`w:lnNumType`) of `pages`, in order: one element per page holding its
+ * numbers in the left margin (null for a page with none), every `countBy`th line numbered,
+ * restarting on each page, section, or never, from `start` + 1. Measured from the pages as laid
+ * out (call it with them in the document).
+ * shortcut: lines are counted from the text's boxes (a picture's line counts when it has text
+ * beside it); Word also counts the lines beside a floating picture, and numbers text boxes' none.
+ * @internal
+ */
+export function lineNumberElements(
+  doc: Document,
+  pages: readonly { page: HTMLElement; box: PageBox; blocks: readonly NumberedBlock[] }[],
+  setups: readonly SectionJSON[],
+): (HTMLElement | null)[] {
+  let count = 0;
+  let section = -1;
+  return pages.map(({ page, box, blocks }) => {
+    const numbered = blocks.filter((b) => setups[b.section]?.lineNumbers);
+    if (!numbered.length) return null;
+    const rect = page.getBoundingClientRect();
+    const scale = page.offsetWidth ? rect.width / page.offsetWidth || 1 : 1;
+    const holder = doc.createElement("div");
+    holder.setAttribute(PAGE_DECORATION_ATTR, "");
+    holder.setAttribute(LINE_NUMBERS_ATTR, "");
+    holder.setAttribute("aria-hidden", "true");
+    holder.contentEditable = "false";
+    const { style } = holder;
+    style.position = "absolute";
+    style.inset = "0";
+    style.pointerEvents = "none";
+    let pageStarted = false;
+    for (const block of numbered) {
+      const setup = setups[block.section] as SectionJSON;
+      const numbers = setup.lineNumbers as NonNullable<SectionJSON["lineNumbers"]>;
+      const restart = numbers.restart ?? "newPage";
+      const start = numbers.start ?? 0;
+      if (block.section !== section) {
+        if (restart !== "continuous" || section < 0) count = start;
+        section = block.section;
+      }
+      if (!pageStarted) {
+        if (restart === "newPage") count = start;
+        pageStarted = true;
+      }
+      if (block.skip) continue;
+      const right = box.left - (numbers.distance ?? AUTO_DISTANCE) * PX_PER_TWIP;
+      for (const line of linesOf(block.element, rect, scale)) {
+        count++;
+        if (count % numbers.countBy !== 0) continue;
+        const number = doc.createElement("span");
+        const s = number.style;
+        s.position = "absolute";
+        s.left = "0";
+        s.width = `${Math.max(right, 0)}px`;
+        s.top = `${line.top}px`;
+        s.height = `${line.bottom - line.top}px`;
+        s.display = "flex";
+        s.alignItems = "flex-end";
+        s.justifyContent = "flex-end";
+        s.fontSize = `${Math.min(line.bottom - line.top, 14.67)}px`;
+        s.lineHeight = "1.2";
+        s.color = "#000";
+        number.textContent = String(count);
+        holder.append(number);
+      }
+    }
+    return holder;
+  });
 }

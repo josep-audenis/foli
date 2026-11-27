@@ -41,7 +41,12 @@ import {
   type WordBlock,
 } from "./blocks.js";
 import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
-import { pageBordersElement, pageColor, watermarkElement } from "./decoration.js";
+import {
+  lineNumberElements,
+  pageBordersElement,
+  pageColor,
+  watermarkElement,
+} from "./decoration.js";
 import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
@@ -597,6 +602,13 @@ export function renderDocument(
     lines: () => number;
   }[] = [];
   const cellPages: { page: number; text: string }[] = [];
+  /** Each fragment as placed, for line numbers (32.5). */
+  const numberedBlocks: {
+    page: number;
+    element: HTMLElement;
+    section: number;
+    block: WordBlock;
+  }[] = [];
   blocks.forEach((block, b) => {
     const section = sectionOf.get(block) as Section;
     const placed = fragments[b] ?? [];
@@ -639,6 +651,12 @@ export function renderDocument(
       if (fragment.mark) element.style.position = "absolute";
       element.style.marginTop = `${fragment.fromLine === 0 ? (gaps[b] ?? 0) : 0}px`;
       target.append(element);
+      numberedBlocks.push({
+        page: fragment.page,
+        element,
+        section: section.flow.index ?? 0,
+        block,
+      });
       placements.push({
         page: fragment.page,
         nodes: f === 0 ? block.nodes : null,
@@ -695,6 +713,31 @@ export function renderDocument(
     container.append(page);
     return page;
   });
+  if (setups.some((setup) => setup.lineNumbers)) {
+    const nodes = document.content.content ?? [];
+    const skip = (block: WordBlock) =>
+      block.nodes.some((i) => {
+        const node = nodes[i];
+        return (
+          node?.type !== "paragraph" ||
+          resolver.paragraph((node.attrs ?? {}) as never).paragraph.suppressLineNumbers
+        );
+      });
+    const numbers = lineNumberElements(
+      doc,
+      pages.map((page, p) => ({
+        page,
+        box: (pageSetups[p] as Section).geometry,
+        blocks: numberedBlocks
+          .filter((b) => b.page === p)
+          .map((b) => ({ element: b.element, section: b.section, skip: skip(b.block) })),
+      })),
+      setups,
+    );
+    numbers.forEach((holder, p) => {
+      if (holder) pages[p]?.append(holder);
+    });
+  }
   let firstLine: Map<number, number> | null = null;
   let starts: number[] | null = null;
   const fieldLayout: FieldLayout = {
