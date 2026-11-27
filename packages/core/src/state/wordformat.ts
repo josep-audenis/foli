@@ -864,6 +864,8 @@ export interface ParagraphFlags {
   widowControl?: boolean | null;
   pageBreakBefore?: boolean | null;
   contextualSpacing?: boolean | null;
+  /** Word's Suppress line numbers (schema 9). */
+  suppressLineNumbers?: boolean | null;
 }
 
 const FLAGS = [
@@ -872,6 +874,7 @@ const FLAGS = [
   "widowControl",
   "pageBreakBefore",
   "contextualSpacing",
+  "suppressLineNumbers",
 ] as const;
 
 /**

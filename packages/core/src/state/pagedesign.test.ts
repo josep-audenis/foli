@@ -51,7 +51,9 @@ describe("setPageColor", () => {
     expect(editor.can(setPageColor("FFF2CC"))).toBe(false);
     expect(trackedChanges(editor.state.doc).length).toBe(0);
     editor.run(setPageColor(null));
-    expect(editor.getDocument().settings?.background).toBeUndefined();
+    // None is said: a background left out keeps what the file has.
+    expect(editor.getDocument().settings?.background).toEqual({ color: "auto" });
+    expect(editor.can(setPageColor(null))).toBe(false);
     editor.run(undo);
     expect(pageColorOf(editor.state)).toBe("FFF2CC");
     editor.run(undo);

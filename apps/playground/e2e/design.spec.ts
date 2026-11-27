@@ -30,9 +30,13 @@ test("Page Color colors every page and No Color takes it away", async ({ page })
   await page.getByRole("menuitemradio", { name: "Accent 1", exact: true }).click();
   await page.getByRole("button", { name: "Page color" }).click();
   await page.getByRole("menuitemradio", { name: "No Color" }).click();
+  // None is said (auto): a background left out would keep the file's.
   expect(
     await page.evaluate(() => window.foliEdit.editor.getDocument().settings?.background),
-  ).toBeUndefined();
+  ).toEqual({ color: "auto" });
+  expect(await firstPage(page).evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+    "rgb(255, 255, 255)",
+  );
 });
 
 test("the Page Borders dialog draws a box on the pages, in one undo step", async ({ page }) => {

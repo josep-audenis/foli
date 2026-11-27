@@ -354,7 +354,12 @@ caret goes into the note); `tableOfContents`, `updateFields`, `pageNumber`, `dat
 menu: No Color and the theme's colors, More colors…; `setPageColor`) and `pageBorders` (Word's
 Page Borders dialog: None, Box or Custom; the line's style, color and width; which sides; Apply
 to the whole document, this section, its first page only or all but its first page; measured
-from the page's edge or the text, one distance for every side), Home's Paragraph group (32.4): `shading` (a color menu: None and the theme's colors, a clear
+from the page's edge or the text, one distance for every side), Layout's Page Setup group (32.5): `lineNumbers` (a menu for the caret's section: None,
+Continuous, Restart each page, Restart each section, checked as the section has them; Suppress
+for current paragraph, a toggle; Line numbering options…, Word's dialog: on or off, Start at,
+From text, Auto or a length, Count by, the restart; all through `setSectionSetup({ lineNumbers
+})`, one undo step, tracked as page setup), drawn in the left margin of each page by the view
+and `renderDocument`. Home's Paragraph group (32.4): `shading` (a color menu: None and the theme's colors, a clear
 fill) and `borders` (a menu: Bottom, Top, Left and Right border, checked where the selection has
 them (every selected paragraph shows them, its style's included), No border, All borders,
 Outside borders, Inside horizontal border (each checked the same way), Horizontal line,
@@ -1066,8 +1071,8 @@ section)` lists those as `sectionFormatting`, and accepting and rejecting resolv
 `setSectionSetup` also takes `pageBorders` and `lineNumbers` (schema 9), which replace the
 section's own (undefined removes them).
 
-Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none:
-the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
+Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none,
+written as `auto`; the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
 in Word), `pageColorOf(state)`; `setPageBorders(borders, applyTo?)` (`PageBordersJSON` or null;
 the caret's section, or `"document"` for every section, one whose setup leaves no room for text
 skipped; one undo step, recorded as a page setup
@@ -1079,7 +1084,8 @@ Paragraph borders and shading (32.4, tracked as paragraph formatting, one undo s
 `setParagraphBorder(preset, line?)` (Home ▸ Borders: `bottom`, `top`, `left`, `right` turn a
 side on, or off when every selected paragraph shows it; `all`, `outside`, `inside` (the border
 between paragraphs) likewise; `none`; a side a style draws turned off with a `nil` border of the
-paragraph's own, as Word does; `paragraphsHaveBorder(state, preset)` says which; `line` by default Word's half-point single line, a point from the
+paragraph's own, as Word does; `paragraphsHaveBorder(state, preset)` says which; `setParagraphFlags` also takes
+`suppressLineNumbers` (32.5, the Paragraph dialog's Line and Page Breaks tab has it); `line` by default Word's half-point single line, a point from the
 text, four at the sides), `setParagraphBorders(borders)` and `setParagraphShading(shading)`
 (the dialog's: replace them, null removes), `paragraphBordersAt(state)` (the selected
 paragraphs' own `borders` and `shading` when they share them).

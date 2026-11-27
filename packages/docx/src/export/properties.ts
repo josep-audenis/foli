@@ -327,6 +327,7 @@ const PARAGRAPH_CHILDREN: Record<string, string> = {
   spacing: "spacing",
   indent: "ind",
   contextualSpacing: "contextualSpacing",
+  suppressLineNumbers: "suppressLineNumbers",
   justification: "jc",
   outlineLevel: "outlineLvl",
   section: "sectPr",
@@ -348,6 +349,7 @@ function paragraphChild(name: string, value: unknown, ns: Namespaces): string {
     case "pageBreakBefore":
     case "widowControl":
     case "contextualSpacing":
+    case "suppressLineNumbers":
       return onOff(name, value as boolean);
     case "numbering":
       return el("w:numPr", {}, val("ilvl", s(v.level)) + val("numId", s(v.id)));

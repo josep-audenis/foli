@@ -63,6 +63,7 @@ import {
   openLinkEditor,
   pageColorOf,
   paragraphBordersAt,
+  paragraphFormatAt,
   paragraphStyleAt,
   paragraphStyles,
   paragraphsHaveBorder,
@@ -96,6 +97,7 @@ import {
   setNoteProperties,
   setPageColor,
   setParagraphBorder,
+  setParagraphFlags,
   setParagraphShading,
   setParagraphStyle,
   setPictureAlt,
@@ -150,6 +152,7 @@ import {
 } from "react";
 import {
   BordersShadingDialog,
+  LineNumbersDialog,
   PageBordersDialog,
   textWatermark,
   WatermarkDialog,
@@ -474,10 +477,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11), `"pageBorders"`
  * (Word's Page Borders, the caret's section or the document), `"watermark"` (its Printed
  * Watermark dialog, every header), `"bordersShading"` (its Borders and Shading dialog for the
- * selected paragraphs).
+ * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section).
  */
 export type ToolbarDialogName =
   | "bordersShading"
+  | "lineNumbers"
   | "pageBorders"
   | "watermark"
   | "paragraph"
@@ -838,6 +842,58 @@ const MARGIN_ACTIONS: readonly Action[] = [
     label: "Custom margins…",
     command: (state) => sectionAt(state) !== null,
     dialog: "pageSetup",
+  },
+];
+
+/** Layout ▸ Line Numbers: Word's menu for the caret's section and paragraph. */
+const LINE_NUMBER_ACTIONS: readonly Action[] = [
+  sectionEntry(
+    "lineNumbers-none",
+    "None",
+    () => ({ lineNumbers: undefined }),
+    (state) => !sectionAt(state)?.setup.lineNumbers,
+  ),
+  ...(
+    [
+      ["continuous", "Continuous"],
+      ["newPage", "Restart each page"],
+      ["newSection", "Restart each section"],
+    ] as const
+  ).map(([restart, label]) =>
+    sectionEntry(
+      `lineNumbers-${restart}`,
+      label,
+      (state) => {
+        const { restart: _old, ...numbers } = sectionAt(state)?.setup.lineNumbers ?? {};
+        // Continuous as Word writes it: no restart.
+        return {
+          lineNumbers: {
+            countBy: 1,
+            ...numbers,
+            ...(restart === "continuous" ? {} : { restart }),
+          },
+        };
+      },
+      (state) => {
+        const numbers = sectionAt(state)?.setup.lineNumbers;
+        return !!numbers && (numbers.restart ?? "continuous") === restart;
+      },
+    ),
+  ),
+  {
+    key: "suppressLineNumbers",
+    label: "Suppress for current paragraph",
+    command: (state, dispatch) =>
+      setParagraphFlags({
+        suppressLineNumbers: !paragraphFormatAt(state)?.suppressLineNumbers,
+      })(state, dispatch),
+    checked: (state) => paragraphFormatAt(state)?.suppressLineNumbers === true,
+  },
+  {
+    key: "lineNumberOptions",
+    label: "Line numbering options…",
+    command: (state) => sectionAt(state) !== null,
+    dialog: "lineNumbers",
   },
 ];
 
@@ -2017,6 +2073,13 @@ const RIBBON_ITEMS: readonly Item[] = [
       pick: (color) => setPageColor(color ? color.slice(1).toUpperCase() : null),
     },
   },
+  {
+    key: "lineNumbers",
+    label: "Line numbers",
+    text: "Line Numbers",
+    enabled: isWord,
+    actions: LINE_NUMBER_ACTIONS,
+  },
   // Home's Paragraph group (32.4): Shading and Borders.
   {
     key: "shading",
@@ -2259,10 +2322,12 @@ export type ToolbarItemName =
   | "pageBorders"
   | "watermark"
   | "shading"
-  | "borders";
+  | "borders"
+  | "lineNumbers";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "lineNumbers"
   | "watermark"
   | "borders"
   | "margins"
@@ -2518,6 +2583,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
             large(t.pageSize),
             large(t.columns),
             t.breaks,
+            t.lineNumbers,
           ),
           launcher: t.pageSetup,
         },
@@ -2651,6 +2717,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   pageBorders: isWord,
   watermark: isWord,
   bordersShading: (state) => paragraphBordersAt(state) !== null,
+  lineNumbers: (state) => sectionAt(state) !== null,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -3373,7 +3440,14 @@ export function FoliToolbar({
   }, [disabled]);
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
-    name: "paragraph" | "font" | "tabs" | "pageBorders" | "watermark" | "bordersShading";
+    name:
+      | "paragraph"
+      | "font"
+      | "tabs"
+      | "pageBorders"
+      | "watermark"
+      | "bordersShading"
+      | "lineNumbers";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3482,7 +3556,8 @@ export function FoliToolbar({
         name === "tabs" ||
         name === "pageBorders" ||
         name === "watermark" ||
-        name === "bordersShading"
+        name === "bordersShading" ||
+        name === "lineNumbers"
       )
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
@@ -4389,6 +4464,17 @@ export function FoliToolbar({
               (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
                 c.shade === undefined && c.color !== null,
             )}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "lineNumbers" && !disabled && (
+          <LineNumbersDialog
+            editor={editor}
+            unit={unit}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

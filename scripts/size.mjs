@@ -166,14 +166,17 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * in 32.1 (18.6 and 95.5 kB; 19.0 and 98.0 allowed): the same checks and drawing in the page.
  * Core and docx raised in 32.3 (99.4 and 69.5 kB; 102.0 and 71.0 allowed): watermarks (the
  * commands; Word's VML read and written, its shape types as text), with room for 32.4–32.5.
+ * React, FoliEditor and `@folijs/pdf` raised in 32.5 (222.3 and 19.4 kB; 228.0 and 20.0 allowed):
+ * the Borders and Shading, Watermark and Line Numbers dialogs, line numbers drawn, and schema
+ * 8's kept decoration adopted on parse.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 104_448 },
   { name: "@folijs/view", entry: dist("view"), budget: 135_168 },
-  { name: "@folijs/react", entry: dist("react"), budget: 227_328 },
-  { name: "FoliEditor only", entry: appEntry, budget: 227_328 },
+  { name: "@folijs/react", entry: dist("react"), budget: 233_472 },
+  { name: "FoliEditor only", entry: appEntry, budget: 233_472 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 72_704 },
-  { name: "@folijs/pdf", entry: dist("pdf"), budget: 19_456 },
+  { name: "@folijs/pdf", entry: dist("pdf"), budget: 20_480 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];

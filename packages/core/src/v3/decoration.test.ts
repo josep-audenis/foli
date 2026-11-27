@@ -81,3 +81,69 @@ describe("page decoration (schema 9)", () => {
     expect(() => parseDocument(doc({}, { background: { themeTint: "1" } }))).toThrow(/hex/);
   });
 });
+
+describe("suppressLineNumbers (schema 9)", () => {
+  it("needs schema 9 in a paragraph or a style", () => {
+    const plain = createDocument();
+    const paragraph = parseDocument({
+      ...plain,
+      schemaVersion: 9,
+      content: {
+        type: "doc",
+        content: [{ type: "paragraph", attrs: { suppressLineNumbers: true } }],
+      },
+    });
+    expect(paragraph.schemaVersion).toBe(9);
+    const styled = parseDocument({
+      ...plain,
+      schemaVersion: 9,
+      styles: [
+        ...plain.styles,
+        { id: "X", type: "paragraph", paragraph: { suppressLineNumbers: true } },
+      ],
+    });
+    expect(styled.schemaVersion).toBe(9);
+    expect(() => parseDocument({ ...styled, schemaVersion: 8 })).toThrow(
+      /suppressLineNumbers is of schema 9/,
+    );
+    expect(() => parseDocument({ ...paragraph, schemaVersion: 8 })).toThrow(/schema 9/);
+  });
+});
+
+describe("a document of schema 8 adopts what its kept XML says (32.5 review)", () => {
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  it("in styles, and not from a tracked change", () => {
+    const plain = createDocument();
+    const doc = parseDocument({
+      ...plain,
+      schemaVersion: 8,
+      styles: [
+        ...plain.styles,
+        {
+          id: "X",
+          type: "paragraph",
+          // As the importer keeps it: the whole element on the style.
+          ext: `<w:style ${W} w:type="paragraph" w:styleId="X"><w:pPr><w:suppressLineNumbers/></w:pPr><w:rPr><w:b/></w:rPr></w:style>`,
+        },
+      ],
+      section: {
+        ext: `<w:sectPr ${W}><w:sectPrChange w:id="1" w:author="A"><w:sectPr><w:lnNumType w:countBy="2"/></w:sectPr></w:sectPrChange></w:sectPr>`,
+      },
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: {
+              ext: `<w:pPr ${W}><w:pPrChange w:id="2" w:author="A"><w:pPr><w:suppressLineNumbers/></w:pPr></w:pPrChange></w:pPr>`,
+            },
+          },
+        ],
+      },
+    });
+    expect(doc.styles.find((s) => s.id === "X")?.paragraph?.suppressLineNumbers).toBe(true);
+    expect(doc.section.lineNumbers).toBeUndefined();
+    expect(doc.content.content?.[0]?.attrs?.suppressLineNumbers ?? null).toBeNull();
+    expect(doc.schemaVersion).toBe(9);
+  });
+});

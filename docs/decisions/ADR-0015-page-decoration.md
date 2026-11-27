@@ -19,7 +19,9 @@
    themeShade, ext }`: the values Word's Page Color writes, and the element verbatim. Export
    keeps the element as it was while its values match, Fill Effects (VML children) included;
    otherwise writes `w:background` anew with the values only, as Word does when a color is
-   picked, and removes it when there is none. A color set anew (no `ext`) also turns on
+   picked, and removes it for `color: "auto"` (Word's none, what Foli writes for No Color); a
+   background left out keeps what the file has, as the tracking switch does (a document saved
+   before schema 9 never had one). A color set anew (no `ext`) also turns on
    `w:displayBackgroundShape` in the settings part: without it Word does not show the color. A
    file's own background leaves its settings as they are (shown or hidden as the file says). Not a part of its own in the
    envelope: one more top-level key for one element was not worth the migration surface.
@@ -32,7 +34,9 @@
    line in Word, and stays in `ext`.
 3. **Schema 9.** Holding any of them makes a document need schema 9 (ADR-0008: saved with the
    lowest version its content needs, so earlier 1.x keep reading what has none); a document
-   that says 8 or less holding one is refused. v8 → v9 changes the version only. Phase 32's
+   that says 8 or less holding one is refused. v8 → v9 adopts what an earlier release kept in
+   `ext` (a section's `w:pgBorders` and `w:lnNumType`, a paragraph's `w:suppressLineNumbers`):
+   left out, export would read their absence as removed and drop them. Phase 32's
    later tasks add to v9 before it is released (a watermark node, 32.3; a paragraph's
    `suppressLineNumbers`, 32.5); nothing of v9 is published before the phase ends.
 4. **Watermarks (built in 32.3).** Recognised on import: a header run's `w:pict` whose VML shape
@@ -53,7 +57,8 @@
 
 ## Consequences
 
-- Documents with page borders or line numbers read by 1.9 or earlier keep them in `ext`; read
-  again by this release they are modeled, and saving writes them back as they were.
+- Documents with page borders or line numbers read by 1.9 or earlier keep them in `ext`; parsed
+  by this release they are adopted from it (and imported again they are modeled), and saving
+  writes them back as they were.
 - Changing page borders writes them without what the model does not hold (a border's shadow,
   an art border's picture relationship): Word's dialog sets them again the same way.

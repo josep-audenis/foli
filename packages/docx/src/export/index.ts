@@ -16,7 +16,7 @@ import {
   type StoryJSON,
   type WatermarkJSON,
 } from "@folijs/core";
-import { backgroundXml, withBackground } from "../background.js";
+import { backgroundXml, noBackground, withBackground } from "../background.js";
 import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
@@ -759,7 +759,8 @@ async function newPackage(
   const rels = new Relationships([]);
   const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
   const { ext: _ext, ...color } = doc.settings?.background ?? {};
-  const background = doc.settings?.background ? backgroundXml("w:", color) : "";
+  const wanted = doc.settings?.background;
+  const background = wanted && !noBackground(wanted) ? backgroundXml("w:", color) : "";
   const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}>${background}<w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
   const parts: { name: string; text: string; contentType: string }[] = [
     { name: "/word/document.xml", text: main, contentType: CT.main },

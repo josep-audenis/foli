@@ -3116,6 +3116,8 @@ export interface ParagraphFlags {
     widowControl?: boolean | null;
     pageBreakBefore?: boolean | null;
     contextualSpacing?: boolean | null;
+    /** Word's Suppress line numbers (schema 9). */
+    suppressLineNumbers?: boolean | null;
 }
 /**
  * Turns the given switches of the selected paragraphs on or off (null puts back the style's):
@@ -3764,8 +3766,8 @@ export interface PageBordersJSON {
 /**
  * A section's line numbers (`w:lnNumType`, schema 9), as Word writes them: every `countBy`th line
  * numbered (an element without it numbers none, and stays in the section's `ext`), from `start` + 1 (Word's "Start at" less one), `distance` twips from
- * the text (left out: Word's automatic distance), restarting on each page (the default), section,
- * or not at all.
+ * the text (left out: Word's automatic distance), restarting on each page, section, or not at all
+ * (left out: continuous, as Word 16 writes and reads it).
  */
 export interface LineNumbersJSON {
     countBy: number;
@@ -3811,6 +3813,8 @@ export interface ParagraphPropertiesJSON {
     widowControl?: boolean;
     pageBreakBefore?: boolean;
     contextualSpacing?: boolean;
+    /** `w:suppressLineNumbers` (schema 9). */
+    suppressLineNumbers?: boolean;
     outlineLevel?: number;
     numbering?: {
         id?: number;
@@ -4348,6 +4352,7 @@ export interface ParagraphFormat {
     widowControl: boolean;
     pageBreakBefore: boolean;
     contextualSpacing: boolean;
+    suppressLineNumbers: boolean;
     outlineLevel: number | null;
     tabs: {
         position: number;

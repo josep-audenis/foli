@@ -13,6 +13,7 @@ import {
   setPageBorders,
   setParagraphBorders,
   setParagraphShading,
+  setSectionSetup,
   setWatermark,
   type WatermarkJSON,
   watermarkOf,
@@ -20,6 +21,7 @@ import {
 import { measureImageFile } from "@folijs/view";
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { type ToolbarMessage, useT } from "./messages.js";
+import { formatLength, type LengthUnit, parseLength } from "./units.js";
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
@@ -1024,6 +1026,158 @@ export function BordersShadingDialog({
             {t("Cancel")}
           </button>
         </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------- Layout ▸ Line Numbers (32.5) ----------
+
+/** The dialog's boxes (their names are messages). */
+const LINE_NUMBER_FIELDS = [
+  ["start", "Start at"],
+  ["distance", "From text"],
+  ["countBy", "Count by"],
+] as const;
+
+const RESTART_NAMES = [
+  ["newPage", "Restart each page"],
+  ["newSection", "Restart each section"],
+  ["continuous", "Continuous"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+/**
+ * Word's Line Numbers dialog for the caret's section: on or off, Start at, From text (Auto or a
+ * length), Count by, and the restart. OK sets them in one undo step (`setSectionSetup`).
+ * @internal
+ */
+export function LineNumbersDialog({
+  editor,
+  unit,
+  onClose,
+}: {
+  editor: Editor;
+  unit: LengthUnit;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [initial] = useState(() => sectionAt(editor.state)?.setup.lineNumbers);
+  const [on, setOn] = useState(!!initial);
+  const [start, setStart] = useState(String((initial?.start ?? 0) + 1));
+  const [distance, setDistance] = useState(
+    initial?.distance === undefined ? t("Auto") : formatLength(initial.distance, unit),
+  );
+  const [countBy, setCountBy] = useState(String(initial?.countBy ?? 1));
+  // Word's dialog starts new numbering at Restart each page; a section's without one is continuous.
+  const [restart, setRestart] = useState<string>(
+    initial ? (initial.restart ?? "continuous") : "newPage",
+  );
+  const [error, setError] = useState<ToolbarMessage | null>(null);
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (!on) return onClose(editor.run(setSectionSetup({ lineNumbers: undefined })));
+    const startAt = Number(start);
+    if (!Number.isInteger(startAt) || startAt < 1 || startAt > 32_767) return setError("Start at");
+    const by = Number(countBy);
+    if (!Number.isInteger(by) || by < 1 || by > 100) return setError("Count by");
+    const auto = !distance.trim() || distance.trim().toLowerCase() === t("Auto").toLowerCase();
+    const twips = auto ? undefined : parseLength(distance, unit);
+    if (!auto && (twips === null || twips === undefined || twips < 0 || twips > 31_680))
+      return setError("From text");
+    onClose(
+      editor.run(
+        setSectionSetup({
+          lineNumbers: {
+            countBy: by,
+            ...(startAt > 1 ? { start: startAt - 1 } : {}),
+            ...(twips !== undefined && twips !== null ? { distance: twips } : {}),
+            ...(restart === "continuous" ? {} : { restart: restart as "newPage" | "newSection" }),
+          },
+        }),
+      ),
+    );
+  };
+
+  const box = (field: ToolbarMessage, value: string, set: (v: string) => void) => (
+    <Field key={field} id={`${id}-${field}`} label={t(field)}>
+      <input
+        id={`${id}-${field}`}
+        type="text"
+        inputMode={field === "From text" ? "decimal" : "numeric"}
+        value={value}
+        aria-invalid={error === field || undefined}
+        aria-describedby={error === field ? `${id}-error` : undefined}
+        onChange={(e) => {
+          set(e.target.value);
+          setError(null);
+        }}
+      />
+    </Field>
+  );
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Line Numbers")}
+      className="foli-link-dialog foli-word-dialog foli-line-numbers-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <div className="foli-setup-field foli-setup-check">
+            <input
+              ref={first}
+              id={`${id}-on`}
+              type="checkbox"
+              checked={on}
+              onChange={(e) => setOn(e.target.checked)}
+            />
+            <label htmlFor={`${id}-on`}>{t("Add line numbering")}</label>
+          </div>
+          <fieldset className="foli-dialog-section" disabled={!on}>
+            <legend>{t("Line Numbers")}</legend>
+            {LINE_NUMBER_FIELDS.map(([key, label]) =>
+              key === "start"
+                ? box(label, start, setStart)
+                : key === "distance"
+                  ? box(label, distance, setDistance)
+                  : box(label, countBy, setCountBy),
+            )}
+            <fieldset className="foli-dialog-section">
+              <legend>{t("Numbering")}</legend>
+              {RESTART_NAMES.map(([value, label]) => (
+                <div key={value} className="foli-setup-field foli-setup-check">
+                  <input
+                    id={`${id}-restart-${value}`}
+                    type="radio"
+                    name={`${id}-restart`}
+                    checked={restart === value}
+                    onChange={() => setRestart(value)}
+                  />
+                  <label htmlFor={`${id}-restart-${value}`}>{t(label)}</label>
+                </div>
+              ))}
+            </fieldset>
+          </fieldset>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {t("Check this value: {field}.", { field: t(error) })}
+          </p>
+        )}
       </form>
     </div>
   );

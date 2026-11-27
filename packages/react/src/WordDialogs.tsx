@@ -191,6 +191,7 @@ const PARAGRAPH_FLAGS = [
   "keepLines",
   "pageBreakBefore",
   "contextualSpacing",
+  "suppressLineNumbers",
 ] as const;
 type Flag = (typeof PARAGRAPH_FLAGS)[number];
 
@@ -514,6 +515,12 @@ export function ParagraphDialog({
       {flag("pageBreakBefore", t("Page break before"))}
     </fieldset>
   );
+  const exceptions = (
+    <fieldset className="foli-dialog-section">
+      <legend>{t("Formatting exceptions")}</legend>
+      {flag("suppressLineNumbers", t("Suppress line numbers"))}
+    </fieldset>
+  );
 
   return (
     <div
@@ -533,7 +540,16 @@ export function ParagraphDialog({
           onSelect={setTab}
           tabs={[
             { key: "indents", label: t("Indents and Spacing"), content: indents },
-            { key: "breaks", label: t("Line and Page Breaks"), content: breaks },
+            {
+              key: "breaks",
+              label: t("Line and Page Breaks"),
+              content: (
+                <>
+                  {breaks}
+                  {exceptions}
+                </>
+              ),
+            },
           ]}
         />
         <div className="foli-dialog-buttons">

@@ -186,7 +186,9 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `EnvelopeStep`s. `background` (v9) is the page color, the main part's `w:background`: `color`
   (RRGGBB), a theme color's `themeColor` with `themeTint` or `themeShade` (two hex digits), and
   `ext`, the element verbatim (Fill Effects, its VML children, are kept while the color stays; a
-  new color is written without them, as Word's Page Color does). Exporting a color set
+  new color is written without them, as Word's Page Color does); `color: "auto"` is no page
+  color (export removes the element), and `background` left out keeps what the file has (a
+  document saved before schema 9 never had it). Exporting a color set
   anew (no `ext`) turns on `w:displayBackgroundShape`, without which Word does not show it; a
   file's own background leaves its settings as they are.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
@@ -198,10 +200,13 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `right` borders, each `style`, `size` in eighths of a point, `space` in points, `color`;
   `offsetFrom` text or page, `display` allPages, firstPage or notFirstPage, `zOrder` front or
   back) and `lineNumbers` (v9, `w:lnNumType`: `countBy`, required, `start` as Word writes it, one
-  less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous)
+  less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous, left out continuous as
+  Word 16 writes it)
   were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`,
   `previous`) is a tracked change of the setup; accepting drops it, rejecting restores
   `previous` with the section's header and footer references.
+- **Line numbers** (v9): a paragraph's `suppressLineNumbers` (`w:suppressLineNumbers`, also in
+  styles) keeps its lines out of its section's `lineNumbers`.
 - **Watermarks** (v9): an opaque run (`opaqueInline`, `run: true`) holding Word's watermark shape
   (`w:pict`) has `watermark` (`WatermarkJSON`): `kind` text or picture, `text`, `font`, `color`,
   `semitransparent`, `rotation` (315: Word's diagonal), `picture` (a key of `resources`),
@@ -490,17 +495,17 @@ v5; a v3 or v4 document is validated as v5 holding nothing its version did not h
 newer Foli is rejected with a message saying so; versions below 1 or not integers are invalid.
 Migrations never drop content. A published version never changes in place.
 
-| Version | Released in | Migration to the next                                                                                                |
-| ------- | ----------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes)                                      |
-| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                                                           |
-| 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again) |
-| 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)      |
-| 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
-| 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
-| 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                          |
-| 8       | 1.7.0       | v8 → v9: only the version changes (v9 only adds a setting and section parts)                                         |
-| 9       | next minor  | — (the current version: page decoration, `settings.background`, a section's `pageBorders` and `lineNumbers`, 32.1)   |
+| Version | Released in | Migration to the next                                                                                                 |
+| ------- | ----------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes)                                       |
+| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                                                            |
+| 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again)  |
+| 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)       |
+| 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                           |
+| 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                            |
+| 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                           |
+| 8       | 1.7.0       | v8 → v9: what `ext` kept is adopted (a section's `w:pgBorders`, `w:lnNumType`, a paragraph's `w:suppressLineNumbers`) |
+| 9       | next minor  | — (the current version: page decoration, `settings.background`, a section's `pageBorders` and `lineNumbers`, 32.1)    |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that

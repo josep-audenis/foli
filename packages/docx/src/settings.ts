@@ -6,6 +6,7 @@
  * verbatim, and so is the part when none of them changes.
  */
 import type { NotePropertiesJSON, WordSettingsJSON } from "@folijs/core";
+import { noBackground } from "./background.js";
 import { child, isW, toggle, W } from "./import/ooxml.js";
 import { parseXml, type XmlElement } from "./xml.js";
 
@@ -223,7 +224,8 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
   const prefix = prefixOf(root);
   // Word shows the page color in Print Layout only with this on (it writes both). Only for a
   // color set anew (no `ext`): a file's own background stays as shown or hidden there.
-  if (settings.background && !settings.background.ext && !isOn(current, "displayBackgroundShape"))
+  const color = settings.background;
+  if (color && !color.ext && !noBackground(color) && !isOn(current, "displayBackgroundShape"))
     put("displayBackgroundShape", `<${prefix}displayBackgroundShape/>`);
   const even = settings.evenAndOddHeaders;
   if (even !== undefined && even !== isOn(current, "evenAndOddHeaders"))
@@ -304,7 +306,9 @@ export function newSettingsXml(
           .join("")
       : "");
   const children =
-    (settings.background ? "<w:displayBackgroundShape/>" : "") +
+    (settings.background && !noBackground(settings.background)
+      ? "<w:displayBackgroundShape/>"
+      : "") +
     (trackRevisions ? "<w:trackRevisions/>" : "") +
     (settings.evenAndOddHeaders ? "<w:evenAndOddHeaders/>" : "") +
     NOTES.map(([key, local]) => notesXml("w:", local, settings[key] ?? {})).join("") +

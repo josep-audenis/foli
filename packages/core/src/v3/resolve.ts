@@ -72,6 +72,7 @@ export interface ParagraphFormat {
   widowControl: boolean;
   pageBreakBefore: boolean;
   contextualSpacing: boolean;
+  suppressLineNumbers: boolean;
   outlineLevel: number | null;
   tabs: { position: number; kind: string; leader: string | null }[];
   borders: NonNullable<ParagraphPropertiesJSON["borders"]> | null;
@@ -154,6 +155,7 @@ const DEFAULT_PARAGRAPH: Merging = {
   widowControl: true,
   pageBreakBefore: false,
   contextualSpacing: false,
+  suppressLineNumbers: false,
   outlineLevel: null,
   tabs: [],
   borders: null,
@@ -168,6 +170,7 @@ const PLAIN_KEYS = new Set([
   "widowControl",
   "pageBreakBefore",
   "contextualSpacing",
+  "suppressLineNumbers",
   "outlineLevel",
   "shading",
 ]);

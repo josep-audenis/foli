@@ -47,9 +47,18 @@ const sameValues = (a: Omit<PageBackgroundJSON, "ext">, b: Omit<PageBackgroundJS
   a.themeShade === b.themeShade;
 
 /**
+ * Whether `background` says the document has no page color (`auto`, Word's none): what removing
+ * it writes, so that a background left out still means "as the file has it".
+ * @internal
+ */
+export const noBackground = (background: PageBackgroundJSON): boolean =>
+  (background.color ?? "auto") === "auto" && background.themeColor === undefined;
+
+/**
  * `head` (the main part's source up to the body's start tag, `document` its root, `body` its
- * `w:body`) saying `wanted`: unchanged while the element says it, else the element replaced,
- * added before the body or removed.
+ * `w:body`) saying `wanted`: unchanged while the element says it, or when the document says
+ * nothing (left out: as the file has it, as for the tracking switch; a document saved before
+ * schema 9 had none); else the element replaced, added before the body, or removed for none.
  * @internal
  */
 export function withBackground(
@@ -59,10 +68,13 @@ export function withBackground(
   wanted: PageBackgroundJSON | undefined,
 ): string {
   const existing = child(document, "background");
-  if (!existing && !wanted) return head;
-  const { ext: _ext, ...values } = wanted ?? {};
-  if (existing && wanted && sameValues(valuesOf(existing), values)) return head;
-  const xml = wanted ? backgroundXml(document.prefix ? `${document.prefix}:` : "", values) : "";
+  if (!wanted) return head;
+  const { ext: _ext, ...values } = wanted;
+  if (existing && sameValues(valuesOf(existing), values)) return head;
+  if (!existing && noBackground(wanted)) return head;
+  const xml = noBackground(wanted)
+    ? ""
+    : backgroundXml(document.prefix ? `${document.prefix}:` : "", values);
   if (existing) return head.slice(0, existing.start) + xml + head.slice(existing.end);
   return head.slice(0, body.start) + xml + head.slice(body.start);
 }

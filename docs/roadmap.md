@@ -4554,8 +4554,16 @@ XML.
   watermark's box unless its text, size or layout change (32.3's review). `borders.test.ts`,
   `design.test.tsx`, `borders.spec.ts` in three engines (axe on the dialog). limitations.md
   (boxes not joined, patterns not drawn).
-- [ ] 32.5 Line numbers (Layout ▸ Line Numbers: none, continuous, restart each page or section,
-  suppress for paragraph) drawn in the margin, from `w:lnNumType`.
+- [x] 32.5 Line numbers (Layout ▸ Line Numbers: none, continuous, restart each page or section,
+  suppress for paragraph) drawn in the margin, from `w:lnNumType`. Built: a paragraph's
+  `suppressLineNumbers` (schema 9, `w:suppressLineNumbers`, in styles too) read and written,
+  in `setParagraphFlags` and the Paragraph dialog; the numbers drawn in each page's left margin
+  from the lines as laid out (`lineNumberElements`, shared by the view and `renderDocument`,
+  so print and `exportPdf`): every `countBy`th line, from `start` + 1, restarting each page,
+  section or never, `distance` from the text (Auto a quarter inch), tables and suppressed
+  paragraphs not counted; `toolbarItems.lineNumbers` (Word's menu and `LineNumbersDialog`) in
+  Layout's Page Setup group. `decoration.test.ts` (core, docx), `linenumbers.spec.ts` in three
+  engines (axe); checked by a screenshot. The ribbon's screenshots updated for the Design tab.
 - [ ] 32.6 Design tab in `wordRibbonTabs`; e2e, corpus files with watermarks and borders
   through import, export and compare; docs; changesets.
 

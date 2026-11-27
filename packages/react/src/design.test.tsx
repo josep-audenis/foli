@@ -47,9 +47,9 @@ describe("Design tab", () => {
     expect(editor.getDocument().settings?.background?.color).toMatch(/^[0-9A-F]{6}$/);
     fireEvent.click(screen.getByRole("button", { name: /^Page color/i }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "No Color" }));
-    expect(editor.getDocument().settings?.background).toBeUndefined();
+    expect(editor.getDocument().settings?.background).toEqual({ color: "auto" });
     editor.run(undo);
-    expect(editor.getDocument().settings?.background).toBeDefined();
+    expect(editor.getDocument().settings?.background?.color).not.toBe("auto");
   });
 });
 

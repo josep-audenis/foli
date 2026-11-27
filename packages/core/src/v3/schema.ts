@@ -493,6 +493,8 @@ const paragraphProperties: Record<string, AttributeSpec> = {
   widowControl: nullableAttr(bool),
   pageBreakBefore: nullableAttr(bool),
   contextualSpacing: nullableAttr(bool),
+  /** `w:suppressLineNumbers` (schema 9): the paragraph's lines are not numbered. */
+  suppressLineNumbers: nullableAttr(bool),
   outlineLevel: nullableAttr(int(0, 9)),
   /**
    * `id` is the numbering instance (`w:numId`; 0 removes numbering), `level` 0–8 (`w:ilvl`).
