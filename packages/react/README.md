@@ -54,8 +54,8 @@ words, tracking, zoom), right-click menu and mini toolbar: `statusBar`, `context
 your own layout. Word's Font and Paragraph dialogs open from the ribbon's launchers, the
 right-click menu and `openDialog`, the Tabs dialog from the Paragraph dialog's Tabs…; the Layout tab has Word's Margins, Orientation, Size, Columns
 and Breaks menus; lengths show in `units` (inches or centimetres, the locale's by default). Word's rulers:
-`ruler` on `FoliEditor` (the View tab's Ruler shows or hides them), or `FoliRuler` in your own
-layout (indents, tab stops, table columns and margins dragged, or moved with the arrow keys).
+`FoliEditor` draws them while the View tab's Ruler is on (`ruler` turns it on at first), or
+`FoliRuler` in your own layout (with `ruler={false}`) (indents, tab stops, table columns and margins dragged, or moved with the arrow keys).
 
 Roles: `readOnly` reads (select, copy, find); `commentOnly` comments and changes nothing else (a
 read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin refusing
