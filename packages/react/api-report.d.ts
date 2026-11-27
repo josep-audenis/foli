@@ -330,10 +330,15 @@ export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigati
 import { type Editor } from "@folijs/core";
 import { type LengthUnit } from "./units.js";
 /** Every string the ruler shows or announces, in English; each is its own key in `messages`. */
-export declare const rulerMessages: readonly ["Horizontal ruler", "First line indent", "Hanging indent", "Left indent", "Right indent", "Left margin", "Right margin", "{position}, hanging {by}", "{position}, first line {by}", "Left tab", "Center tab", "Right tab", "Decimal tab", "Bar tab", "Tab stop to add: {kind}", "Column {number} border"];
+export declare const rulerMessages: readonly ["Horizontal ruler", "Vertical ruler", "Top margin", "Bottom margin", "First line indent", "Hanging indent", "Left indent", "Right indent", "Left margin", "Right margin", "{position}, hanging {by}", "{position}, first line {by}", "Left tab", "Center tab", "Right tab", "Decimal tab", "Bar tab", "Tab stop to add: {kind}", "Column {number} border"];
 /** Translations of the ruler's strings, by their English text (`rulerMessages`). */
 export type RulerMessages = Partial<Readonly<Record<(typeof rulerMessages)[number], string>>>;
 export interface FoliRulerProps {
+    /**
+     * The ruler above the pages (indents, tab stops, a table's columns, the left and right margins)
+     * or, `"vertical"`, beside them (the caret's page's top and bottom margins). Default horizontal.
+     */
+    orientation?: "horizontal" | "vertical" | undefined;
     /** Default: the editor of the nearest `FoliEditorProvider`. */
     editor?: Editor | undefined;
     /** Inches or centimetres; by default the browser's language's (Word's rule, as the toolbar's). */
@@ -353,7 +358,7 @@ export interface FoliRulerProps {
  * arrow keys. Positions come from the view (`editor.storyView.rulerGeometry`): without one the
  * ruler is empty. Changes go to the story open on its page, else the editor.
  */
-export declare function FoliRuler({ editor: given, units, zoom, disabled, messages, className, }: FoliRulerProps): import("react").JSX.Element;
+export declare function FoliRuler({ editor: given, orientation, units, zoom, disabled, messages, className, }: FoliRulerProps): import("react").JSX.Element;
 
 // FoliStatusBar.d.ts
 import { type Editor } from "@folijs/core";

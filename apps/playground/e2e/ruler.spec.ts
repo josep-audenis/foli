@@ -140,12 +140,16 @@ test("each handle is a slider the keyboard moves; Escape cancels a drag; axe", a
   await page.mouse.up();
   await expect.poll(() => indent(page)).toEqual({ left: 810 });
   // With a tab stop on it too.
-  const strip = await page.locator(".foli-ruler-page").boundingBox();
+  const strip = await page
+    .locator(".foli-ruler:not(.foli-ruler-vertical) > .foli-ruler-page")
+    .boundingBox();
   const g = await geometry(page);
   if (!strip || !g) throw new Error("no ruler");
   await page.mouse.click(g.text.left + 2880 * g.pxPerTwip, strip.y + strip.height - 3);
   await expect(page.getByRole("slider", { name: "Left tab" })).toBeVisible();
-  const results = await new AxeBuilder({ page }).include(".foli-ruler").analyze();
+  const results = await new AxeBuilder({ page })
+    .include(".foli-ruler:not(.foli-ruler-vertical)")
+    .analyze();
   expect(results.violations).toEqual([]);
 });
 
@@ -159,7 +163,9 @@ for (const zoom of [1, 2]) {
     await open(page, zoom);
     const g = await geometry(page);
     if (!g?.paragraph) throw new Error("no geometry");
-    const strip = await page.locator(".foli-ruler-page").boundingBox();
+    const strip = await page
+      .locator(".foli-ruler:not(.foli-ruler-vertical) > .foli-ruler-page")
+      .boundingBox();
     if (!strip) throw new Error("no ruler");
     // A center stop an inch from the left margin.
     await page.getByRole("button", { name: "Tab stop to add: Left tab" }).click();
@@ -187,7 +193,9 @@ for (const zoom of [1, 2]) {
 test("a tab stop's double-click opens the Tabs dialog", async ({ page }) => {
   await open(page, 1);
   const g = await geometry(page);
-  const strip = await page.locator(".foli-ruler-page").boundingBox();
+  const strip = await page
+    .locator(".foli-ruler:not(.foli-ruler-vertical) > .foli-ruler-page")
+    .boundingBox();
   if (!g || !strip) throw new Error("no ruler");
   await page.mouse.click(g.text.left + 1440 * g.pxPerTwip, strip.y + strip.height - 3);
   await expect.poll(() => tabs(page)).toEqual([{ position: 1440, kind: "left" }]);
@@ -240,5 +248,41 @@ for (const zoom of [1, 2]) {
     );
     await page.evaluate(() => window.foliEdit.editor.commands.undo());
     await expect.poll(grid).toEqual(before);
+  });
+}
+
+for (const zoom of [1, 2]) {
+  test(`at ${zoom * 100}%, the vertical ruler drags the caret's page's top margin`, async ({
+    page,
+  }) => {
+    await open(page, zoom);
+    const g = await geometry(page);
+    if (!g) throw new Error("no geometry");
+    const ruler = page.getByRole("group", { name: "Vertical ruler" });
+    await expect(ruler).toBeVisible();
+    const box = await page
+      .locator('.foli-ruler-vertical [data-foli-ruler="margin-top"]')
+      .boundingBox();
+    if (!box) throw new Error("no top margin");
+    const at = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    expect(Math.abs(at.y - g.margins.top)).toBeLessThan(1);
+    // Half an inch down.
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await page.mouse.move(at.x, at.y + 720 * g.pxPerTwip, { steps: 6 });
+    await page.mouse.up();
+    const top = () =>
+      page.evaluate(() => window.foliEdit.editor.getDocument().section?.margins?.top ?? null);
+    await expect.poll(top).toBe(2160);
+    const moved = await page
+      .locator('.foli-ruler-vertical [data-foli-ruler="margin-top"]')
+      .boundingBox();
+    expect(
+      Math.abs((moved?.y ?? 0) + (moved?.height ?? 0) / 2 - (at.y + 720 * g.pxPerTwip)),
+    ).toBeLessThan(1.5);
+    await page.evaluate(() => window.foliEdit.editor.commands.undo());
+    await expect.poll(top).toBe(1440);
+    const results = await new AxeBuilder({ page }).include(".foli-ruler-vertical").analyze();
+    expect(results.violations).toEqual([]);
   });
 }

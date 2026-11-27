@@ -148,7 +148,11 @@ arrow keys move a focused handle by that step (Up always makes its value larger)
 and Page Down by half an inch or a centimetre (keyboard.md). Positions come from `editor.storyView.rulerGeometry()` (the view's),
 read again after each change, scroll, resize and `zoom` change, so the ruler lines up at any
 zoom (it is not zoomed itself); without a view it is empty. Changes go to the story open on its
-page, else the editor. Props: `editor`, `units` (`"in"` or `"cm"`; default the browser
+page, else the editor. `orientation="vertical"` (31.5) is Word's vertical ruler, placed beside
+the pages: the caret's page from its top, its top and bottom margins shaded and as sliders
+("Top margin", "Bottom margin"; `setSectionSetup`, a negative, exact margin keeping its sign),
+numbers counted from the top margin; it has none of the horizontal ruler's other parts. Props:
+`editor`, `orientation`, `units` (`"in"` or `"cm"`; default the browser
 language's, as the toolbar's), `zoom` (pass the pages' zoom: the ruler reads them again when it
 changes), `disabled` (read-only or comment-only: nothing changes), `messages` (by the English
 text, `rulerMessages`), `className`. It is a `role="group"` named "Horizontal ruler"; each

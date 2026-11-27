@@ -54,8 +54,8 @@ function fakeView(editor: Editor, story: { id: string | null } = { id: null }) {
       const margins = {
         left: PAGE.left + (setup.left ?? 0) * K,
         right: PAGE.right - (setup.right ?? 0) * K,
-        top: 0,
-        bottom: 0,
+        top: Math.abs(setup.top ?? 0) * K,
+        bottom: 1584 - Math.abs(setup.bottom ?? 0) * K,
       };
       const indent = (caret.state.selection.$head.parent.attrs.indent ?? {}) as Record<
         string,
@@ -395,6 +395,42 @@ describe("FoliRuler", () => {
     );
     fireEvent.keyDown(slider("Column 2 border"), { key: "ArrowRight" });
     expect(grid()).toEqual([2880, 2970]);
+  });
+
+  it("vertical: drags the caret's page's top and bottom margins, keeping an exact one's sign", async () => {
+    const editor = createEditor({
+      document: {
+        ...doc(),
+        section: {
+          ...doc().section,
+          margins: { top: 1440, right: 1440, bottom: -1440, left: 1440 },
+        },
+      },
+    });
+    fakeView(editor);
+    render(<FoliRuler editor={editor} units="in" orientation="vertical" />);
+    expect(screen.getByRole("group", { name: "Vertical ruler" })).toBeTruthy();
+    const top = await waitFor(() => slider("Top margin"));
+    expect(top.getAttribute("aria-orientation")).toBe("vertical");
+    expect(top.style.top).toBe("144px");
+    expect(slider("Bottom margin").getAttribute("aria-valuetext")).toBe('1"');
+    // No horizontal parts.
+    expect(screen.queryByRole("slider", { name: "Left indent" })).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+    // Half an inch down: one undo step.
+    const margins = () => sectionAt(editor.state)?.setup.margins;
+    fireEvent.pointerDown(top, { button: 0, pointerId: 1, clientY: 144 });
+    fireEvent.pointerMove(top, { pointerId: 1, clientY: 216 });
+    fireEvent.pointerUp(top, { pointerId: 1, clientY: 216 });
+    expect(margins()?.top).toBe(2160);
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(margins()?.top).toBe(1440);
+    // The bottom one up a step with the key pointing up: larger, still exact (negative).
+    await waitFor(() => expect(slider("Top margin").style.top).toBe("144px"));
+    fireEvent.keyDown(slider("Bottom margin"), { key: "ArrowUp" });
+    expect(margins()?.bottom).toBe(-1530);
   });
 
   it("changes nothing when disabled, and is empty without a view", async () => {
