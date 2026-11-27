@@ -13,6 +13,15 @@ import type { DocxPackage } from "../package.js";
 import { DocxError } from "../package.js";
 import type { XmlElement } from "../xml.js";
 import { ControlWriter } from "./controls.js";
+import {
+  applyEdits,
+  attrOf,
+  type Edit,
+  frameEdits,
+  positionXml,
+  setAttr,
+  wrapXml,
+} from "./frames.js";
 import { same } from "./properties.js";
 import { escapeAttribute, fragment, type Namespaces } from "./xmlout.js";
 
@@ -130,6 +139,8 @@ export class Media {
   /** Ids the pictures written so far took. */
   readonly #claimed = new Set<number>();
   #nextId: number;
+  /** Whether story `id` is as the original package has it (set by the export). */
+  unchangedStory: (id: string) => boolean = () => false;
   /** The next VML shape number (`_x0000_s<n>`) above every one the output holds. */
   #nextShape = 2049;
 
@@ -155,6 +166,13 @@ export class Media {
     };
     JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
       if (key === "xml" && typeof value === "string") reserve(value);
+      // A text box's ids are its own (claimed as it is written), above the new ones.
+      const box = value as { type?: unknown; attrs?: { ext?: unknown } } | null;
+      if (box?.type === "textBox" && typeof box.attrs?.ext === "string") {
+        for (const id of docPrIds(box.attrs.ext)) max = Math.max(max, id);
+        for (const match of box.attrs.ext.matchAll(/_x0000_s(\d+)/g))
+          this.#nextShape = Math.max(this.#nextShape, Number(match[1]) + 1);
+      }
       return value;
     });
     const skip = new Set(rewritten.map((n) => n.toLowerCase()));
@@ -229,34 +247,6 @@ function descendants(el: XmlElement, test: (e: XmlElement) => boolean, out: XmlE
   return out;
 }
 
-/** Edits to a source string: replace `[from, to)` with `text`. */
-type Edit = { from: number; to: number; text: string };
-
-const attrOf = (el: XmlElement | undefined, local: string, ns?: string) =>
-  el?.attributes.find((x) => x.local === local && (ns ? x.ns === ns : !x.prefix));
-
-/** The edits setting (or, undefined, removing) attribute `local` (`ns`: none for plain) of `el`. */
-function setAttr(
-  source: string,
-  el: XmlElement | undefined,
-  local: string,
-  value: string | undefined,
-  edits: Edit[],
-  ns?: string,
-  qualified = local,
-): void {
-  if (!el) return;
-  const a = attrOf(el, local, ns);
-  if (a) {
-    if (value === undefined) edits.push({ from: a.start - 1, to: a.end, text: "" });
-    else if (a.value !== value)
-      edits.push({ from: a.valueStart, to: a.valueEnd, text: escapeAttribute(value) });
-  } else if (value !== undefined) {
-    const at = source[el.openEnd - 2] === "/" ? el.openEnd - 2 : el.openEnd - 1;
-    edits.push({ from: at, to: at, text: ` ${qualified}="${escapeAttribute(value)}"` });
-  }
-}
-
 /**
  * A part's relationships as a picture's drawing needs them.
  * @internal
@@ -268,80 +258,12 @@ export interface PictureRelations {
   target(id: string): string | undefined;
 }
 
-/** `relativeFrom` values Word reads, horizontal and vertical (the first is the default). */
-const RELATIVE = {
-  H: [
-    "column",
-    "margin",
-    "page",
-    "character",
-    "leftMargin",
-    "rightMargin",
-    "insideMargin",
-    "outsideMargin",
-  ],
-  V: [
-    "paragraph",
-    "margin",
-    "page",
-    "line",
-    "topMargin",
-    "bottomMargin",
-    "insideMargin",
-    "outsideMargin",
-  ],
-};
-const ALIGN = {
-  H: ["left", "right", "center", "inside", "outside"],
-  V: ["top", "bottom", "center", "inside", "outside"],
-};
-
-/** A `wp:positionH`/`wp:positionV` for a float's position, values Word cannot read replaced. */
-function positionXml(axis: "H" | "V", position: Json | undefined): string {
-  const from = String(position?.relativeTo);
-  const relativeTo = RELATIVE[axis].includes(from) ? from : RELATIVE[axis][0];
-  const offset = position?.offset;
-  const align = String(position?.align);
-  const value =
-    typeof offset !== "number" && ALIGN[axis].includes(align)
-      ? `<wp:align>${align}</wp:align>`
-      : `<wp:posOffset>${typeof offset === "number" ? offset : 0}</wp:posOffset>`;
-  return `<wp:position${axis} relativeFrom="${relativeTo}">${value}</wp:position${axis}>`;
-}
-
-/** The `wp:wrap*` element for a float's wrapping. */
-function wrapXml(float: Json): string {
-  const side = ["bothSides", "left", "right", "largest"].includes(String(float.side))
-    ? String(float.side)
-    : "bothSides";
-  switch (float.wrap) {
-    case "topAndBottom":
-      return "<wp:wrapTopAndBottom/>";
-    case "behind":
-    case "inFront":
-      return "<wp:wrapNone/>";
-    case "tight":
-    case "through": {
-      // The picture's rectangle as the wrap polygon (21600 is the full side).
-      const tag = float.wrap === "tight" ? "wp:wrapTight" : "wp:wrapThrough";
-      return (
-        `<${tag} wrapText="${side}"><wp:wrapPolygon edited="0"><wp:start x="0" y="0"/>` +
-        '<wp:lineTo x="0" y="21600"/><wp:lineTo x="21600" y="21600"/><wp:lineTo x="21600" y="0"/>' +
-        `<wp:lineTo x="0" y="0"/></wp:wrapPolygon></${tag}>`
-      );
-    }
-    default:
-      return `<wp:wrapSquare wrapText="${side}"/>`;
-  }
-}
-
 /**
  * The `w:drawing` for picture `attrs`, inline or floating (`wp:anchor`). From its `ext` with
- * only what the model changed from it written in (size, alt text, title), its image's
- * relationship, and a new id when another drawing of the document has its id; fresh when it
- * has none, when its position or wrapping changed, or when it was read in another part or
- * package and refers to other relationships (an SVG's PNG fallback, a click link) that mean
- * something else here.
+ * only what the model changed from it written in (size, position, wrapping, alt text, title:
+ * `frameEdits`), its image's relationship, and a new id when another drawing of the document has
+ * its id; fresh when it has none, or when it was read in another part or package and refers to
+ * other relationships (an SVG's PNG fallback, a click link) that mean something else here.
  * @internal
  */
 export function drawingXml(
@@ -364,11 +286,6 @@ export function drawingXml(
     const { element, source } = fragment(ext, namespaces);
     const anchor = kid(element, WP, "anchor");
     const inline = kid(element, WP, "inline") ?? anchor;
-    // shortcut: a float changed from the file's is written fresh, losing what only its `ext`
-    // holds (effects, z-order, lock, wrap polygon, an SVG part, a click link; a crop or rotation
-    // the model left out); edit
-    // `wp:positionH`/`wp:wrap*` in place once a command changes floats.
-    const sameFloat = same(anchor ? (floatOf(anchor) ?? false) : undefined, float);
     const blip = descendants(element, (e) => e.ns === A && e.local === "blip")[0];
     const current = attrOf(blip, "embed", R)?.value;
     // Read against this part: its image id still points to its image here.
@@ -377,14 +294,12 @@ export function drawingXml(
     const others = descendants(element, () => true).some((e) =>
       e.attributes.some((a) => a.ns === R && !(e === blip && a.local === "embed")),
     );
-    if (blip && inline && sameFloat && (here || !others)) {
+    if (blip && inline && (here || !others)) {
       const edits: Edit[] = [];
       setAttr(source, blip, "embed", relations.image(part, current), edits, R, "r:embed");
       const extent = kid(inline, WP, "extent");
       // Only what the model changed: values the file holds twice may differ, and stay so.
       if (attrOf(extent, "cx")?.value !== width || attrOf(extent, "cy")?.value !== height) {
-        setAttr(source, extent, "cx", width, edits);
-        setAttr(source, extent, "cy", height, edits);
         const spPr = descendants(element, (e) => e.ns === PIC && e.local === "spPr")[0];
         const size = kid(kid(spPr, A, "xfrm"), A, "ext");
         setAttr(source, size, "cx", width, edits);
@@ -426,11 +341,10 @@ export function drawingXml(
         setAttr(source, inline, "anchorId", undefined, edits, WP14);
         setAttr(source, inline, "editId", undefined, edits, WP14);
       }
-      let out = source;
-      for (const edit of edits.sort((a, b) => b.from - a.from))
-        out = out.slice(0, edit.from) + edit.text + out.slice(edit.to);
       const shift = edits.reduce((sum, e) => sum + e.text.length - (e.to - e.from), 0);
-      return out.slice(element.start, element.end + shift);
+      const inner = applyEdits(source, edits).slice(element.start, element.end + shift);
+      // The frame last (it may be written anew from its children: in line or floating).
+      return framed(inner, float ?? null, width, height, namespaces);
     }
   }
   const embed = relations.image(part, undefined);
@@ -462,6 +376,24 @@ export function drawingXml(
     `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>` +
     `</${tag}></w:drawing>`
   );
+}
+
+/** A drawing's XML with its frame as `float`, `width` and `height` say (`frameEdits`). */
+function framed(
+  xml: string,
+  float: Json | null,
+  width: string,
+  height: string,
+  namespaces: Namespaces,
+): string {
+  const { element, source } = fragment(xml, namespaces);
+  const frame = kid(element, WP, "inline") ?? kid(element, WP, "anchor");
+  if (!frame) return xml;
+  const edits: Edit[] = [];
+  frameEdits(source, frame, float, width, height, edits);
+  if (!edits.length) return xml;
+  const shift = edits.reduce((sum, e) => sum + e.text.length - (e.to - e.from), 0);
+  return applyEdits(source, edits).slice(element.start, element.end + shift);
 }
 
 /** A `crop`'s sides that cut something (none: an empty object). */

@@ -1,0 +1,203 @@
+{
+    "document":  "11-text-box-flyer.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "comments":  0,
+    "revisionsAccepted":  0,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "Northwind open day",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. ",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. ",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. ",
+                           "page":  1,
+                           "line":  16,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. ",
+                           "page":  1,
+                           "line":  24,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "See you there.",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+                     {
+                         "float":  true,
+                         "page":  1,
+                         "paragraph":  4,
+                         "left":  0,
+                         "top":  10,
+                         "horizontalAlign":  null,
+                         "verticalAlign":  null,
+                         "width":  160,
+                         "height":  40,
+                         "alt":  "Northwind logo, wrapped tight",
+                         "wrap":  1,
+                         "horizontalTo":  2,
+                         "verticalTo":  2
+                     },
+                     {
+                         "float":  true,
+                         "page":  1,
+                         "paragraph":  5,
+                         "left":  300,
+                         "top":  0,
+                         "horizontalAlign":  null,
+                         "verticalAlign":  null,
+                         "width":  150,
+                         "height":  90,
+                         "alt":  "Chart of visitors, wrapped through",
+                         "wrap":  2,
+                         "horizontalTo":  2,
+                         "verticalTo":  2
+                     }
+                 ],
+    "textBoxes":  [
+                      {
+                          "page":  1,
+                          "paragraph":  2,
+                          "left":  280,
+                          "top":  0,
+                          "horizontalAlign":  null,
+                          "verticalAlign":  null,
+                          "width":  170,
+                          "height":  110,
+                          "alt":  "Programme box",
+                          "wrap":  0,
+                          "horizontalTo":  2,
+                          "verticalTo":  2,
+                          "text":  "Programme\nWorkshops, talks and a lunch for every visitor."
+                      },
+                      {
+                          "page":  1,
+                          "paragraph":  3,
+                          "left":  40,
+                          "top":  20,
+                          "horizontalAlign":  null,
+                          "verticalAlign":  null,
+                          "width":  360,
+                          "height":  50,
+                          "alt":  "Pull quote",
+                          "wrap":  4,
+                          "horizontalTo":  2,
+                          "verticalTo":  2,
+                          "text":  "Everyone is welcome: bring a friend."
+                      },
+                      {
+                          "page":  1,
+                          "paragraph":  4,
+                          "left":  400,
+                          "top":  760,
+                          "horizontalAlign":  null,
+                          "verticalAlign":  null,
+                          "width":  120,
+                          "height":  40,
+                          "alt":  "Free entry badge",
+                          "wrap":  3,
+                          "horizontalTo":  1,
+                          "verticalTo":  1,
+                          "text":  "Free entry"
+                      }
+                  ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1,
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "Northwind Training Centre",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+
+               ],
+    "bookmarks":  [
+
+                  ],
+    "controls":  [
+
+                 ]
+}

@@ -827,6 +827,38 @@ export const schema = new Schema({
         ext: nullableAttr(xml),
       },
     },
+    /**
+     * A text box (schema 10, ADR-0016): Word's rectangle holding text (`wps:wsp` with `wps:txbx`,
+     * or VML's `v:textbox`), inline or floating as a picture is. Its text is the envelope's
+     * `stories[story]` (kind `textBox`); its size and `float` are a picture's; `fill` and
+     * `outline` are what it is drawn with (null: none); `ext` is the run content it was read from
+     * (`mc:AlternateContent`, `w:drawing` or `w:pict`), written back with the story's text in it.
+     */
+    textBox: {
+      group: "inline",
+      inline: true,
+      attrs: {
+        story: { validate: text() },
+        /** In EMU. */
+        width: { validate: emu },
+        height: { validate: emu },
+        float: nullableAttr(checkFloat),
+        /** RRGGBB, or null for no fill. */
+        fill: nullableAttr(color),
+        /** Color RRGGBB and width in EMU, or null for no line. */
+        outline: nullableAttr(shape({ color, width: emu }, ["color", "width"])),
+        /** The space between the box and its text, in EMU (null: Word's 0.1" and 0.05"). */
+        inset: nullableAttr(shape({ left: emu, top: emu, right: emu, bottom: emu })),
+        /** Where the text sits in the box's height (null: at the top). */
+        verticalAlign: nullableAttr(oneOf(["top", "center", "bottom"])),
+        /** The box grows to fit its text (`a:spAutoFit`, VML's `mso-fit-shape-to-text`). */
+        autoFit: nullableAttr(bool),
+        /** Alt text and title (`wp:docPr`, VML's `alt`). */
+        alt: nullableAttr(str(65_535)),
+        title: nullableAttr(str(65_535)),
+        ext: nullableAttr(xml),
+      },
+    },
     /** Inline content Foli does not model yet (fields, charts, shapes, symbols…), kept verbatim. */
     opaqueInline: {
       group: "inline",

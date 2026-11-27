@@ -4615,8 +4615,28 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
 
 ### Tasks
 
-- [ ] 33.1 ADR: text boxes as stories in floating anchors; schema bump with migration; import
-  and export of `wps:txbx` / VML text boxes, the rest of the drawing kept.
+- [x] 33.1 ADR: text boxes as stories in floating anchors; schema bump with migration; import
+  and export of `wps:txbx` / VML text boxes, the rest of the drawing kept. Decided (ADR-0016):
+  - A box's text is a story of kind `textBox` (`textbox:<n>`, a header's or footer's
+    `textbox:<relationship id>/<n>`), edited on its page by a nested view as a note is (33.3);
+    boxes only in the body, headers and footers, never one in another.
+  - The box is a `textBox` run atom with a picture's `width`, `height` and `float`, and what it
+    is drawn with (`fill`, `outline`, `inset`, `verticalAlign`, `autoFit`), `alt`, `title`, the
+    run content verbatim in `ext`; a box that goes takes its story in the same undo step.
+  - Tight and through: the frame's rectangle for now; a file's wrap polygon kept and written
+    back while the wrapping stays.
+  - Schema 10 (v9 → v10: the version only; an opaque box stays so until imported again).
+
+  Built: core's node, story kind, rules and `textBoxesPlugin`; `@folijs/docx` reads DrawingML
+  (`mc:AlternateContent` or a bare `w:drawing`) and VML text boxes (`import/textboxes.ts`) and
+  writes them back (`export/textboxes.ts`): unchanged byte for byte, edited text into the
+  DrawingML and its VML copy, a changed frame edited in place (`export/frames.ts`, which
+  pictures use too: a moved or rewrapped picture keeps its drawing now), a new box as DrawingML.
+  A corpus document with text boxes and tight and through pictures,
+  `11-text-box-flyer.docx`, Word's reference for it (`word-reference.ps1` records text boxes),
+  `textbox-roundtrip.mjs` (Word 16 opens the unchanged and the edited file without repair, the
+  boxes' text, size, position and wrapping as Foli wrote them). A v10 format fixture.
+  `textboxes.test.ts` in core and docx. document-model.md, limitations.md.
 - [ ] 33.2 Drawing: the box, its fill and outline, its text laid out inside, wrapped around as a
   picture is; read-only pages and `exportPdf` too.
 - [ ] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and

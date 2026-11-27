@@ -15,7 +15,7 @@ param([string]$PdfDir = "", [string]$Only = "")
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
 $wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
-$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10")
+$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11")
 foreach ($number in $wanted) {
   if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
 }
@@ -899,6 +899,90 @@ try {
   # Shown in Print Layout, as Design > Page Color turns it on (w:displayBackgroundShape).
   $doc.ActiveWindow.View.DisplayBackgrounds = $true
   Save-Doc $doc "10-design-memo.docx"
+  }
+  # ---------------------------------------------------------------------------------------
+  # 11: Text box flyer (Phase 33). Text boxes (DrawingML with Word's VML fallback): one wrapped
+  # square with a fill and an outline holding two paragraphs, a pull quote between paragraphs
+  # (top and bottom), one in front of the text fixed on the page, one in the header; pictures
+  # wrapped tight and through. WdWrapType: 0 square, 1 tight, 2 through, 3 in front, 4 top and
+  # bottom.
+  if (Want "11") {
+  Set-Author "Events" "EV"
+  $doc = New-Doc
+  $long = "The open day starts at ten with a tour of the workshops, followed by short talks from the teams that run them. Visitors can try the tools, ask about the courses and meet the people who teach them. Lunch is served in the hall from half past twelve. "
+  Add-Para $doc "Northwind open day" $S_TITLE | Out-Null                      # 1
+  Add-Para $doc ($long * 3) | Out-Null                                         # 2
+  Add-Para $doc ($long * 2) | Out-Null                                         # 3
+  Add-Para $doc ($long * 3) | Out-Null                                         # 4
+  Add-Para $doc ($long * 3) | Out-Null                                         # 5
+  Add-Para $doc "See you there." | Out-Null                                    # 6
+  # A shape anchored in paragraph $n, positioned from the column and the paragraph (points).
+  function Anchor-At($s, $left, $top) {
+    $s.LockAnchor = $true
+    $s.RelativeHorizontalPosition = 2   # wdRelativeHorizontalPositionColumn
+    $s.RelativeVerticalPosition = 2     # wdRelativeVerticalPositionParagraph
+    $s.Left = $left; $s.Top = $top
+  }
+  function Add-Box($n, $left, $top, $width, $height, $wrap) {
+    $at = $doc.Paragraphs.Item($n).Range
+    $at.Collapse(1)
+    $s = $doc.Shapes.AddTextbox(1, $left, $top, $width, $height, $at)
+    $s.WrapFormat.Type = $wrap
+    Anchor-At $s $left $top
+    return $s
+  }
+  $box = Add-Box 2 280 0 170 110 0
+  $box.TextFrame.TextRange.Text = "Programme"
+  $box.TextFrame.TextRange.InsertParagraphAfter()
+  $box.TextFrame.TextRange.InsertAfter("Workshops, talks and a lunch for every visitor.")
+  $box.TextFrame.TextRange.Paragraphs.Item(1).Range.Font.Bold = $true
+  $box.Fill.ForeColor.RGB = 15921906          # RGB(242, 242, 242) as BGR
+  $box.Line.ForeColor.RGB = $COLOR_DARK_BLUE
+  $box.Line.Weight = 1.5
+  $box.AlternativeText = "Programme box"
+  $quote = Add-Box 3 40 20 360 50 4
+  $quote.TextFrame.TextRange.Text = "Everyone is welcome: bring a friend."
+  $quote.TextFrame.TextRange.ParagraphFormat.Alignment = $ALIGN_CENTER
+  $quote.TextFrame.TextRange.Font.Italic = $true
+  $quote.Line.Visible = $false
+  $quote.AlternativeText = "Pull quote"
+  $front = Add-Box 4 0 0 120 40 3
+  $front.TextFrame.TextRange.Text = "Free entry"
+  $front.RelativeHorizontalPosition = 1        # wdRelativeHorizontalPositionPage
+  $front.RelativeVerticalPosition = 1          # wdRelativeVerticalPositionPage
+  $front.Left = 400; $front.Top = 760
+  $front.Fill.ForeColor.RGB = 10079487         # RGB(255, 204, 153) as BGR
+  $front.AlternativeText = "Free entry badge"
+  # Pictures wrapped tight and through, converted from inline at their paragraph's start.
+  function Add-Wrapped($n, $file, $left, $top, $width, $height, $wrap, $alt) {
+    $at = $doc.Paragraphs.Item($n).Range
+    $at.Collapse(1)
+    $s = $doc.InlineShapes.AddPicture($file, $false, $true, $at).ConvertToShape()
+    $s.LockAspectRatio = 0
+    $s.Width = $width; $s.Height = $height
+    $s.WrapFormat.Type = $wrap
+    Anchor-At $s $left $top
+    $s.AlternativeText = $alt
+  }
+  Add-Wrapped 4 $logo 0 10 160 40 1 "Northwind logo, wrapped tight"
+  Add-Wrapped 5 $chart 300 0 150 90 2 "Chart of visitors, wrapped through"
+  # A text box in the header, in front of the text, from the page's corner.
+  $header = $doc.Sections.Item(1).Headers.Item($HF_PRIMARY)
+  $header.Range.Text = "Northwind Training Centre"
+  $hbox = $header.Shapes.AddTextbox(1, 400, 30, 140, 28, $header.Range)
+  $hbox.TextFrame.TextRange.Text = "Saturday 14 March"
+  $hbox.WrapFormat.Type = 3
+  $hbox.RelativeHorizontalPosition = 1
+  $hbox.RelativeVerticalPosition = 1
+  $hbox.Left = 400; $hbox.Top = 30
+  $hbox.AlternativeText = "Date box"
+  # Word must have kept each where it was put (points from the column and the paragraph).
+  foreach ($s in $doc.Shapes) {
+    if ($s.RelativeVerticalPosition -ne 2) { continue }
+    $want = @{ "Programme box" = @(280, 0); "Pull quote" = @(40, 20); "Northwind logo, wrapped tight" = @(0, 10); "Chart of visitors, wrapped through" = @(300, 0) }[$s.AlternativeText]
+    if ([math]::Abs($s.Left - $want[0]) -gt 0.5 -or [math]::Abs($s.Top - $want[1]) -gt 0.5) { throw "11: '$($s.AlternativeText)' is at $($s.Left), $($s.Top), not $($want -join ', ')" }
+  }
+  Save-Doc $doc "11-text-box-flyer.docx"
   }
 }
 finally {

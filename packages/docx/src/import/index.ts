@@ -110,7 +110,12 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     return { name: part.name, root: xml.root, source: xml.source };
   };
 
-  const mainContext = contextFor(pkg.mainDocument, main.source);
+  // Text boxes (Phase 33): the body's are `textbox:<n>`, a header's or footer's prefixed by its id.
+  const boxes = new Map<string, StoryJSON>();
+  const mainContext = {
+    ...contextFor(pkg.mainDocument, main.source),
+    textBoxes: { stories: boxes, prefix: "textbox:" },
+  };
   // The body's section: its last `w:sectPr`, whatever follows it (a bookmark end…).
   const sectPr = body.children
     .filter((c): c is XmlElement => c.kind === "element" && isW(c, "sectPr"))
@@ -140,7 +145,8 @@ export function importPackage(pkg: DocxPackage): DocxImport {
         contextFor(commentsPart.name, commentsPart.source),
       )
     : [];
-  const stories = readStories(pkg, contextFor);
+  const stories = readStories(pkg, contextFor, boxes);
+  Object.assign(stories, Object.fromEntries(boxes));
   const usedControls = controlsUsed([content, commented, stories]);
   // A settings part Foli cannot read is kept as it is, and read as saying nothing.
   let trackRevisions = false;
@@ -211,33 +217,41 @@ export function controlsUsed(content: unknown): Set<string> {
  * The package's stories and their controls, as a validated document holds them.
  * @internal
  */
-export function packageStories(pkg: DocxPackage): {
+export function packageStories(
+  pkg: DocxPackage,
+  /** The body's text boxes too. */
+  body = false,
+): {
   stories: Record<string, StoryJSON>;
   controls: Map<string, ControlJSON>;
 } {
   const report = new Recorder();
   const resources = new Map<string, ResourceJSON>();
   const controls = new Map<string, ControlJSON>();
-  const stories = canonicalStories(pkg, (part, source) => {
-    const byId = new Map(pkg.relationships(part).map((r) => [r.id, r]));
-    // Read once a part, when a text first asks.
-    let preserved: WeakSet<XmlElement> | undefined;
-    return {
-      source,
-      report,
-      pkg,
-      part,
-      preserved: (el: XmlElement) => {
-        preserved ??= preservedIn(pkg.xml(part).root);
-        return preserved.has(el);
-      },
-      moves: new Moves(),
-      relationship: (id) => byId.get(id),
-      resources,
-      controls,
-      ordinals: { next: 0 },
-    };
-  });
+  const stories = canonicalStories(
+    pkg,
+    (part, source) => {
+      const byId = new Map(pkg.relationships(part).map((r) => [r.id, r]));
+      // Read once a part, when a text first asks.
+      let preserved: WeakSet<XmlElement> | undefined;
+      return {
+        source,
+        report,
+        pkg,
+        part,
+        preserved: (el: XmlElement) => {
+          preserved ??= preservedIn(pkg.xml(part).root);
+          return preserved.has(el);
+        },
+        moves: new Moves(),
+        relationship: (id) => byId.get(id),
+        resources,
+        controls,
+        ordinals: { next: 0 },
+      };
+    },
+    body,
+  );
   return { stories, controls };
 }
 

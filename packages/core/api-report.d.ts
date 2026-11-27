@@ -2764,6 +2764,14 @@ export declare function cellsAsTable(selection: CellSelection): Node;
  */
 export declare function pasteCells(tr: Transaction, table: Node): boolean;
 
+// state/textboxes.d.ts
+/**
+ * Text boxes (Phase 33, ADR-0016). A text box is a `textBox` node in the body or in a header or
+ * footer, its text a story of kind `textBox` (`textbox:<n>`), edited as a note's is. A text box
+ * that goes takes its story in the same transaction (one undo step), as a note's reference does.
+ */
+export {};
+
 // state/track.d.ts
 /**
  * Tracked changes (9.2): with tracking on, an edit is recorded as Word records it. Text and
@@ -3688,7 +3696,7 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
  * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
  * and line numbers, ADR-0015).
  */
-export declare const SCHEMA_VERSION = 9;
+export declare const SCHEMA_VERSION = 10;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -4014,10 +4022,12 @@ export interface CommentJSON {
 }
 /**
  * Content outside the body (schema v5, ADR-0007). `noteType` is a note's `w:type`: the separators
- * and the continuation notice have no reference and are not numbered.
+ * and the continuation notice have no reference and are not numbered. A text box's text is a
+ * story of kind `textBox` (schema 10, ADR-0016), its `textBox` node in the body or a header or
+ * footer.
  */
 export interface StoryJSON {
-    kind: "header" | "footer" | "footnote" | "endnote";
+    kind: "header" | "footer" | "footnote" | "endnote" | "textBox";
     noteType?: "normal" | "separator" | "continuationSeparator" | "continuationNotice";
     /** A `doc` of blocks. */
     content: NodeJSON;
@@ -4127,9 +4137,9 @@ export interface PageBackgroundJSON {
 export interface FoliDocument {
     /**
      * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
-     * added (6: a picture's rotation or crop, 1.4).
+     * added (6: a picture's rotation or crop, 1.4; 10: text boxes).
      */
-    schemaVersion: 5 | 6 | 7 | 8 | typeof SCHEMA_VERSION;
+    schemaVersion: 5 | 6 | 7 | 8 | 9 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */

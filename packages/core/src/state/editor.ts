@@ -68,6 +68,7 @@ import { Selection, TextSelection } from "./selection.js";
 import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { callListener, StoryEditing } from "./stories.js";
 import { tableKeymap } from "./tables.js";
+import { textBoxesPlugin } from "./textboxes.js";
 import {
   type ReviewView,
   setReviewView,
@@ -682,6 +683,7 @@ export function createEditor({
     controlsPlugin(),
     commentsPlugin(),
     notesPlugin(),
+    textBoxesPlugin(),
     formatPainterPlugin(),
     formattingMarksPlugin(),
     rulerPlugin(),
