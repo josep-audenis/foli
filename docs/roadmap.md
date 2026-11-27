@@ -4637,8 +4637,17 @@ wrap); tight and through wrapping (a wrap polygon, or the box for now).
   `textbox-roundtrip.mjs` (Word 16 opens the unchanged and the edited file without repair, the
   boxes' text, size, position and wrapping as Foli wrote them). A v10 format fixture.
   `textboxes.test.ts` in core and docx. document-model.md, limitations.md.
-- [ ] 33.2 Drawing: the box, its fill and outline, its text laid out inside, wrapped around as a
-  picture is; read-only pages and `exportPdf` too.
+- [x] 33.2 Drawing: the box, its fill and outline, its text laid out inside, wrapped around as a
+  picture is; read-only pages and `exportPdf` too. Built: `textBoxElement` (view's
+  `word/blocks.ts`): the box at its size, fill, line on its edge, insets, vertical alignment,
+  autofit, its story's blocks drawn read-only inside; placed by `floatElements` as a floating
+  picture is, or in its line. The editing view draws it as one position (`word/edit.ts`), again
+  when its story changes (the block's key holds the box stories' versions); headers redraw when
+  a box in them changes; line measures, line numbers and find's marks in drawn stories leave a
+  box's text out. `textboxes.test.ts` (view), `word-textboxes.spec.ts` (the corpus's 11 in three
+  engines: every box within 1.5 px of Word's place and at its size, lines around a square box,
+  none beside a top-and-bottom one, the header's box, axe; `renderDocument`), `pdf.spec.ts` (its
+  boxes' text in `exportPdf`'s PDF).
 - [ ] 33.3 Editing: a click puts the caret in the box (its story), Escape leaves; find and
   replace look in text boxes (left from 19); Insert ▸ Text Box draws a new one.
 - [ ] 33.4 Layout Options for pictures and boxes (in line, square, tight, through, top and

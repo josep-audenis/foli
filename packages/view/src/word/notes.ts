@@ -12,7 +12,7 @@ import {
 } from "@folijs/core";
 import { noteKindOf, type Resolver } from "@folijs/core/internal";
 import { arrangeNotes, type FlowNote, type FlowRules, type NotePiece } from "../layout/flow.js";
-import { type BlockOptions, renderBlocks } from "./blocks.js";
+import { type BlockOptions, FLOAT_ATTR, renderBlocks, TEXT_BOX_ATTR } from "./blocks.js";
 import { columnsPx } from "./columns.js";
 import { REGION_CLASS, REGION_CONTENT_CLASS, type RegionOptions, stack } from "./regions.js";
 
@@ -42,8 +42,17 @@ export function lineBottoms(element: HTMLElement): number[] {
   const range = doc.createRange();
   const rects: { rect: DOMRect; text: boolean }[] = [];
   // Text and line breaks only: a range over the whole block also has the boxes of the
-  // elements inside it (a table's), which span many lines.
-  const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  // elements inside it (a table's), which span many lines. A text box's text is its own: the
+  // box in line is one item of its line, a floating one none.
+  const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) =>
+      node.nodeType === Node.ELEMENT_NODE && (node as Element).hasAttribute(TEXT_BOX_ATTR)
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
+  });
+  for (const box of element.querySelectorAll(`[${TEXT_BOX_ATTR}]`))
+    if (!box.parentElement?.closest(`[${TEXT_BOX_ATTR}],[${FLOAT_ATTR}]`))
+      rects.push({ rect: box.getBoundingClientRect(), text: true });
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (node.nodeType === Node.TEXT_NODE) {
       // A raised number says nothing about where its line is.

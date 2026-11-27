@@ -259,7 +259,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   opaque, and so do floating pictures positioned by `simplePos`, hidden, or sized relative to
   the page.
 - Text boxes (Phase 33) are modeled: their text a story, the box a floating anchor (ADR-0016).
-  Not drawn or edited yet (33.2, 33.3): they show nothing until then, as before. A rotated box,
+  Drawn (33.2) as Word places them, on the editing view's pages, `renderDocument`'s, in print
+  and `exportPdf`: their fill, a solid line (its width and color; dashes and effects not
+  drawn), their text inside at the insets, cut off at the box's height unless it grows to fit.
+  A floating box is laid out as a floating picture is, with the same limits (above). Not edited
+  yet (33.3). A rotated box,
   a linked box (text flowing from one box to the next), a box in a group or filled with a
   picture, and a shape other than a rectangle holding text stay opaque, and so does a box in a
   note, a comment or another box (Word allows none of these three). Theme colors of a box's fill
@@ -327,7 +331,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 ## Finding and going places
 
 - Find reads the body and the stories, table cells and text boxes included (a match in a text box is
-  found and replaced, not gone to until boxes are drawn, 33.2); comments apart (`findInComments`, a
+  found and replaced, not gone to until boxes are edited on the page, 33.3); comments apart (`findInComments`, a
   list in the find panel): not content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
   expressions are not offered (a pattern could hang the page), nor replacing formatting. Find
   looks through soft hyphens and zero-width spaces (`cooperate` finds `co-operate` broken by a

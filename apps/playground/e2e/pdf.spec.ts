@@ -87,6 +87,23 @@ test("04 exported: Word's four pages, the landscape one too, its text and headin
   ]);
 });
 
+test("11 exported: its text boxes print with their text, the header's too (33.2)", async ({
+  page,
+  context,
+}) => {
+  const exported = await exportCorpus(context, "11-text-box-flyer.docx");
+  const pdf = await read(page, exported.pdf);
+  const text = words(pdf.pages.map((p) => p.text).join(" "));
+  for (const shown of [
+    "Programme",
+    "Workshops, talks and a lunch for every visitor.",
+    "Everyone is welcome: bring a friend.",
+    "Free entry",
+    "Saturday 14 March",
+  ])
+    expect(text).toContain(shown);
+});
+
 test("a document makes the exporting page request nothing: no picture, font or style URL", async ({
   context,
 }) => {

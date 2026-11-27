@@ -17,7 +17,10 @@ import {
 } from "@folijs/core";
 import { formatNumber, type Resolver } from "@folijs/core/internal";
 import type { FlowPage, PageFacts } from "../layout/flow.js";
-import { type BlockOptions, PX_PER_TWIP, renderBlocks, type WordBlock } from "./blocks.js";
+import { type BlockOptions, PX_PER_TWIP, renderBlocks, stack, type WordBlock } from "./blocks.js";
+
+export { stack };
+
 import { watermarksIn } from "./decoration.js";
 
 /** Each story's watermarks, read once per story object. */
@@ -192,6 +195,29 @@ interface StoryDrawing {
   after: number;
   drawn: Map<string, Drawn>;
   heights: Map<string, number>;
+  /** The stories of the text boxes it holds, as drawn: another one draws it again. */
+  boxes: readonly (StoryJSON | undefined)[];
+}
+
+const boxIds = new WeakMap<object, string[]>();
+
+/**
+ * The stories of the text boxes in `content`, read once per content object.
+ * @internal
+ */
+export function textBoxStories(content: NodeJSON): string[] {
+  let found = boxIds.get(content);
+  if (!found) {
+    const ids: string[] = [];
+    const visit = (node: NodeJSON) => {
+      if (node.type === "textBox") ids.push(String(node.attrs?.story));
+      for (const child of node.content ?? []) visit(child);
+    };
+    visit(content);
+    found = ids;
+    boxIds.set(content, found);
+  }
+  return found;
 }
 
 /**
@@ -234,26 +260,6 @@ function edgesOf(section: SectionJSON): Edges {
     height: (section.pageSize?.height ?? 15_840) * PX_PER_TWIP,
     width: Math.max(width - left - right, 1) * PX_PER_TWIP,
   };
-}
-
-/**
- * Lays `blocks` out as a story: spacing as between the paragraphs of a page.
- * @internal
- */
-export function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
-  let previous = 0;
-  blocks.forEach((block, i) => {
-    const gap = !i
-      ? block.before
-      : adds
-        ? previous + block.before
-        : Math.max(previous, block.before);
-    block.element.style.marginTop = `${gap}px`;
-    block.element.style.marginBottom = "0";
-    previous = block.after;
-    parent.append(block.element);
-  });
-  return previous;
 }
 
 /** @internal */
@@ -339,6 +345,8 @@ export class PageRegions {
 
   private entry(story: StoryJSON): StoryDrawing {
     let entry = this.cache.get(story);
+    const boxes = textBoxStories(story.content).map((id) => this.story(id));
+    if (entry && entry.boxes.some((box, i) => box !== boxes[i])) entry = undefined;
     if (!entry) {
       const slots: FieldSlot[] = [];
       const withSlots = marked(story.content, slots);
@@ -354,7 +362,7 @@ export class PageRegions {
       const after = stack(blocks, template, !!this.resolver?.addsParagraphSpacing);
       // The last space after is the story's too: a footer sits above it.
       template.style.paddingBottom = `${after}px`;
-      entry = { slots, template, after, drawn: new Map(), heights: new Map() };
+      entry = { slots, template, after, drawn: new Map(), heights: new Map(), boxes };
       this.cache.set(story, entry);
     }
     return entry;

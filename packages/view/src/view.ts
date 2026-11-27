@@ -1218,7 +1218,13 @@ export class EditorView {
     // Decorations that changed redraw their blocks (the others are reused).
     const decorated = this.decorate(state);
     const redrawn = docChanged || decorated || resolvedChanged;
-    if (redrawn || (storiesChanged && !this.redrawRegions())) this.render();
+    // A text box's text changed (33.2): the block holding it is drawn again (its key says so).
+    const boxesChanged =
+      storiesChanged &&
+      Object.entries(envelope?.stories ?? {}).some(
+        ([id, story]) => story.kind === "textBox" && before?.stories?.[id] !== story,
+      );
+    if (redrawn || boxesChanged || (storiesChanged && !this.redrawRegions())) this.render();
     // Blocks drawn again hold new text nodes: the hint's ranges are made again on them (and
     // during a composition, when the pages are not placed again).
     if (this.shownHint && redrawn) this.drawHint();
