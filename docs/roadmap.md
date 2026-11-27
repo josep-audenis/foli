@@ -4435,7 +4435,13 @@ view API, `view.rulerGeometry()`); units from Phase 30; how drags are announced 
   (limitations.md). `ruler.test.tsx`; `ruler.spec.ts` at 100% and 200% in three engines (add,
   move under the pointer, undo, drag off, the Tabs dialog on a double-click, axe with a stop);
   checked by a screenshot of the five marks.
-- [ ] 31.4 Table columns on the ruler in a table (drag a column edge, as dragging its border).
+- [x] 31.4 Table columns on the ruler in a table (drag a column edge, as dragging its border).
+  Built: in `FoliRuler`, each grid column's right border a slider ("Column N border", its
+  width), dragged or moved with the keys through `setColumnWidth` (the next column gives the
+  difference, the last widens the table; one undo step), from `rulerGeometry().table` (the
+  columns as drawn). Top-level body tables only; refused while tracking, as the border drag.
+  `ruler.test.tsx`; `ruler.spec.ts` at 100% and 200% in three engines (under the pointer, the
+  table's width kept, undo).
 - [ ] 31.5 Vertical ruler: top and bottom margins of the caret's page, dragged.
 - [ ] 31.6 View tab's Ruler toggle; `FoliEditor`'s `ruler`; keyboard (each handle a slider:
   arrows move by a step); e2e in three engines at 100% and 200% zoom; docs; changesets.

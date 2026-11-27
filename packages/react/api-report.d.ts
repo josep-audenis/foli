@@ -330,7 +330,7 @@ export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigati
 import { type Editor } from "@folijs/core";
 import { type LengthUnit } from "./units.js";
 /** Every string the ruler shows or announces, in English; each is its own key in `messages`. */
-export declare const rulerMessages: readonly ["Horizontal ruler", "First line indent", "Hanging indent", "Left indent", "Right indent", "Left margin", "Right margin", "{position}, hanging {by}", "{position}, first line {by}", "Left tab", "Center tab", "Right tab", "Decimal tab", "Bar tab", "Tab stop to add: {kind}"];
+export declare const rulerMessages: readonly ["Horizontal ruler", "First line indent", "Hanging indent", "Left indent", "Right indent", "Left margin", "Right margin", "{position}, hanging {by}", "{position}, first line {by}", "Left tab", "Center tab", "Right tab", "Decimal tab", "Bar tab", "Tab stop to add: {kind}", "Column {number} border"];
 /** Translations of the ruler's strings, by their English text (`rulerMessages`). */
 export type RulerMessages = Partial<Readonly<Record<(typeof rulerMessages)[number], string>>>;
 export interface FoliRulerProps {

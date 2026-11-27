@@ -194,3 +194,51 @@ test("a tab stop's double-click opens the Tabs dialog", async ({ page }) => {
   await page.locator('[data-foli-ruler="tab-0"]').dblclick();
   await expect(page.locator(".foli-tabs-dialog")).toBeVisible();
 });
+
+for (const zoom of [1, 2]) {
+  test(`at ${zoom * 100}%, a table column's border drags on the ruler, in one undo step`, async ({
+    page,
+  }) => {
+    await open(page, zoom);
+    // A 2 by 3 table at the caret, the caret in its first cell.
+    await page.evaluate(() => {
+      const { editor, commands } = window.foliEdit;
+      editor.run(commands.insertTable(2, 3));
+    });
+    const grid = () =>
+      page.evaluate(() => {
+        let found: number[] | null = null;
+        window.foliEdit.editor.state.doc.forEach((node) => {
+          if (!found && node.type.name === "table") found = node.attrs.grid as number[];
+        });
+        return found;
+      });
+    const before = (await grid()) as number[] | null;
+    if (!before) throw new Error("no table");
+    await expect(page.getByRole("slider", { name: "Column 1 border" })).toBeVisible();
+    await settled(page);
+    const g = await geometry(page);
+    const first = g?.table?.columns[0];
+    if (!g || !first) throw new Error("no columns");
+    // Grabbed at its top: the cell's right indent marker is over its lower half.
+    const border = {
+      ...(await handle(page, "column-0")),
+      y: (await handle(page, "column-0")).y - 6,
+    };
+    expect(Math.abs(border.x - first.right)).toBeLessThan(1);
+    // Half an inch right.
+    await drag(page, border, border.x + 720 * g.pxPerTwip);
+    await expect.poll(async () => ((await grid()) as number[])[0]).not.toBe(before[0]);
+    const after = (await grid()) as number[];
+    // The next column gave it: the table keeps its width.
+    expect(after[0]! + after[1]!).toBe(before[0]! + before[1]!);
+    // Snapped to the ruler's grid: within a sixteenth of where it was let go.
+    expect(Math.abs((after[0] ?? 0) - ((before[0] ?? 0) + 720))).toBeLessThanOrEqual(45);
+    const moved = await handle(page, "column-0");
+    expect(Math.abs(moved.x - (border.x + (after[0]! - before[0]!) * g.pxPerTwip))).toBeLessThan(
+      1.5,
+    );
+    await page.evaluate(() => window.foliEdit.editor.commands.undo());
+    await expect.poll(grid).toEqual(before);
+  });
+}

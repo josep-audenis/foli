@@ -7,6 +7,7 @@ import {
   requestedDialog,
   sectionAt,
   setTabStops,
+  setTrackChanges,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -82,10 +83,25 @@ function fakeView(editor: Editor, story: { id: string | null } = { id: null }) {
             alignment: tab.kind,
           })),
         },
-        table: null,
+        table: tableOf(caret, margins.left),
       };
     },
   } as never;
+}
+
+/** The top-level table around the caret as the view gives it: drawn from `left`, 0.1 px a twip. */
+function tableOf(editor: Editor, left: number): RulerGeometry["table"] {
+  const { $head } = editor.state.selection;
+  if ($head.depth < 2 || $head.node(1).type.name !== "table") return null;
+  let right = left;
+  return {
+    pos: $head.before(1),
+    left,
+    columns: ($head.node(1).attrs.grid as number[]).map((width) => {
+      right += width * K;
+      return { right, width };
+    }),
+  };
 }
 
 async function setup(indent?: Record<string, number>, disabled = false) {
@@ -327,6 +343,58 @@ describe("FoliRuler", () => {
     fireEvent.doubleClick(slider("Left tab"));
     off();
     expect(asked).toBe("tabs");
+  });
+
+  it("drags a table column's border as dragging it in the table does", async () => {
+    const cell = (text: string) => ({
+      type: "tableCell",
+      attrs: { width: { value: 2880, type: "dxa" } },
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+    const editor = createEditor({
+      document: {
+        ...doc(),
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "table",
+              attrs: { grid: [2880, 2880] },
+              content: [{ type: "tableRow", content: [cell("A"), cell("B")] }],
+            },
+            { type: "paragraph" },
+          ],
+        },
+      },
+    });
+    fakeView(editor);
+    act(() => {
+      editor.select(4, 4);
+    });
+    render(<FoliRuler editor={editor} units="in" />);
+    const first = await waitFor(() => slider("Column 1 border"));
+    expect(first.getAttribute("aria-valuetext")).toBe('2"');
+    // The first border half an inch right: the second column gives it.
+    act(() => drag(first, 244 + 288, 244 + 288 + 72));
+    const grid = () => editor.state.doc.child(0).attrs.grid;
+    expect(grid()).toEqual([3600, 2160]);
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(grid()).toEqual([2880, 2880]);
+    // The last one widens the table, by the keyboard too.
+    await waitFor(() => expect(slider("Column 2 border").getAttribute("aria-valuenow")).toBe("2"));
+    fireEvent.keyDown(slider("Column 2 border"), { key: "ArrowRight" });
+    expect(grid()).toEqual([2880, 2970]);
+    // Not while tracking: disabled.
+    act(() => {
+      editor.run(setTrackChanges(true));
+    });
+    await waitFor(() =>
+      expect(slider("Column 2 border").getAttribute("aria-disabled")).toBe("true"),
+    );
+    fireEvent.keyDown(slider("Column 2 border"), { key: "ArrowRight" });
+    expect(grid()).toEqual([2880, 2970]);
   });
 
   it("changes nothing when disabled, and is empty without a view", async () => {
