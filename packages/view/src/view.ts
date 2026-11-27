@@ -5311,7 +5311,11 @@ export class EditorView {
     )
       return false;
     const pos = selection.from;
-    if (!selection.node.attrs.story && !this.run(addShapeText(pos))) return false;
+    // No text can be made (a line, tracking): the key is not typed over the shape either.
+    if (!selection.node.attrs.story && !this.run(addShapeText(pos))) {
+      if (!composing) event.preventDefault();
+      return true;
+    }
     const id = String(this.state.doc.nodeAt(pos)?.attrs.story ?? "");
     // Never typed over the shape (which would replace it).
     if (!id || !this.openTextBox(id)) {
