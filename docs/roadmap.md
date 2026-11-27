@@ -4290,11 +4290,18 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   Built: the six commands and two queries (`paragraphFormatAt`, `runFormatAt`) in core, in
   points; `setLineSpacing(value, rule?)` keeps its one-argument form. `openDialog` comes with
   the first dialog (30.2).
-- [ ] 30.2 Paragraph dialog: Indents and Spacing (alignment, outline level, left, right, special
+- [x] 30.2 Paragraph dialog: Indents and Spacing (alignment, outline level, left, right, special
   first line or hanging, before, after, line spacing and its value, no space between paragraphs
   of the same style) and Line and Page Breaks (widow control, keep with next, keep lines
   together, page break before); a preview; mixed values blank; launcher on Home's and Layout's
-  Paragraph groups; Paragraph… in the right-click menu.
+  Paragraph groups; Paragraph… in the right-click menu. Built: `ParagraphDialog` in
+  `WordDialogs.tsx` (the toolbar's `"paragraph"` dialog; `scripts/toolbar-messages.mjs` reads
+  that file too), `toolbarItems.paragraphSettings` as both groups' launcher, `openDialog`,
+  `requestedDialog` and `chainCommands` in core, Paragraph… in `defaultContextMenuItems`. Mixed
+  checkboxes are `indeterminate`; a blank box or an untouched mixed box changes nothing. Lengths
+  in inches until 30.6; the Tabs… button comes with 30.4. `dialogs.test.tsx`, and
+  `dialogs.spec.ts` in Chromium, Firefox and WebKit with axe on both tabs; checked by hand
+  (launcher, OK, right-click Paragraph…, Escape back to the document).
 - [ ] 30.3 Font dialog: font, style, size, color, underline style and color, effects
   (strikethrough, double, superscript, subscript, small caps, all caps, hidden), Advanced
   (character spacing, scale where the model has it); a preview; launcher on Home's Font group;

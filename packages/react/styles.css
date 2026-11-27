@@ -319,6 +319,82 @@
   height: 16px;
 }
 
+/* Word's Font, Paragraph and Tabs dialogs (1.11): tabs over panels of titled sections. */
+.foli-word-dialog form {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.foli-dialog-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--foli-border-color);
+}
+
+.foli-link-dialog .foli-dialog-tabs button {
+  border-bottom: none;
+  border-radius: var(--foli-dialog-radius) var(--foli-dialog-radius) 0 0;
+}
+
+.foli-link-dialog .foli-dialog-tabs button[aria-selected="true"] {
+  background: var(--foli-dialog-primary-background);
+  color: var(--foli-dialog-primary-color);
+}
+
+.foli-dialog-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.foli-dialog-panel[hidden] {
+  display: none;
+}
+
+.foli-dialog-section {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 8px 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: var(--foli-dialog-radius);
+}
+
+.foli-dialog-section .foli-setup-field {
+  flex: 0 1 9em;
+}
+
+.foli-dialog-section .foli-setup-check {
+  flex: 1 1 100%;
+}
+
+.foli-dialog-preview {
+  flex: 1 1 100%;
+  max-width: 300px;
+  padding: 8px;
+  border: 1px solid var(--foli-border-color);
+  background: #fff;
+  color: #000;
+  font: 5px / 1.2 serif;
+  overflow: hidden;
+}
+
+.foli-dialog-preview p {
+  margin: 0 0 3px;
+}
+
+.foli-dialog-preview-other {
+  color: #767676;
+}
+
+.foli-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .foli-link-dialog button {
   height: var(--foli-dialog-input-height);
   padding: 0 12px;

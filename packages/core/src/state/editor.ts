@@ -46,6 +46,7 @@ import {
   controlValues,
   setControlValue,
 } from "./controls.js";
+import { type DialogName, openDialog } from "./dialogs.js";
 import { fieldsPlugin } from "./fields.js";
 import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupdate.js";
 import type { FindMatch, FindOptions } from "./find.js";
@@ -259,6 +260,8 @@ export interface BuiltInCommands {
    * editor): one undo step, tracked when tracking is on. False when none could take it.
    */
   setControlValue(target: string, value: ControlValueInput): boolean;
+  /** Asks the toolbar to open Word's Paragraph dialog (`openDialog`). */
+  openDialog(name: DialogName): boolean;
 }
 
 /**
@@ -432,6 +435,7 @@ function makeEditor(parts: EditorParts): Editor {
     setLink: (href) => setLink(href),
     removeLink: () => removeLink,
     setAlign: (align) => setAlign(align),
+    openDialog: (name) => openDialog(name),
     setTextColor: (color) => setTextColor(color),
     setHighlight: (color) => setHighlight(color),
     setTrackChanges: (on, name) => setTrackChanges(on, name),

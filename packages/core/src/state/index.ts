@@ -73,6 +73,13 @@ export {
 } from "./controls.js";
 export { type CountOptions, countWords, type WordCount } from "./count.js";
 export {
+  chainCommands,
+  type DialogName,
+  dialogRequest,
+  openDialog,
+  requestedDialog,
+} from "./dialogs.js";
+export {
   type BuiltInCommands,
   createEditor,
   type DocumentTarget,

@@ -157,12 +157,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * formatting marks, word count, status bar, context menu, mini toolbar and style gallery.
  * View raised in 29.6 (127.0 kB, 132.0 allowed): the format painter's pointer, formatting marks
  * (29.5) and zoom, with room for the context menu's and mini toolbar's hooks.
+ * React and FoliEditor raised in 30.2 (200.9 and 198.4 kB; 212.0 allowed): Word's Paragraph
+ * dialog (tabs, tri-state boxes, a preview, lengths typed with units), with room for Phase 30's
+ * Font and Tabs dialogs and the Layout tab's menus.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 101_376 },
   { name: "@folijs/view", entry: dist("view"), budget: 135_168 },
-  { name: "@folijs/react", entry: dist("react"), budget: 204_800 },
-  { name: "FoliEditor only", entry: appEntry, budget: 204_800 },
+  { name: "@folijs/react", entry: dist("react"), budget: 217_088 },
+  { name: "FoliEditor only", entry: appEntry, budget: 217_088 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 69_632 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 106_496 },

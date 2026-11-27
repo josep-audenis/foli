@@ -1,12 +1,16 @@
-// Collects every string of the toolbar (packages/react/src/FoliToolbar.tsx) into
-// `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and `tr("…")` calls, and the
-// built-in items', menus', palettes', tabs' and dialogs' labels. With `--check` (in `pnpm check`)
-// it fails when the list is not up to date; without it, it writes the list.
+// Collects every string of the toolbar (packages/react/src/FoliToolbar.tsx and its Word dialogs,
+// WordDialogs.tsx) into `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and
+// `tr("…")` calls, and the built-in items', menus', palettes', tabs' and dialogs' labels. With
+// `--check` (in `pnpm check`) it fails when the list is not up to date; without it, it writes
+// the list.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const source = "packages/react/src/FoliToolbar.tsx";
+const sources = ["packages/react/src/FoliToolbar.tsx", "packages/react/src/WordDialogs.tsx"];
+const source = sources.join(" and ");
 const target = "packages/react/src/messages.ts";
-const code = readFileSync(source, "utf8")
+const code = sources
+  .map((file) => readFileSync(file, "utf8"))
+  .join("\n")
   .split("\n")
   // Comments are not shown.
   .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
