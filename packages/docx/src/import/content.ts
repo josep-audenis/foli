@@ -22,6 +22,7 @@ import {
   setParagraph,
   sourceOf,
 } from "./properties.js";
+import { shapeOf } from "./shapes.js";
 import { cellProperties, grid, rowProperties, tableProperties } from "./tables.js";
 import { textBoxOf } from "./textboxes.js";
 
@@ -834,15 +835,16 @@ function run(
   // A run with properties and nothing else shows nothing; Word drops those too.
   if (out.length === before) context.report.dropped("w:r (empty)");
 
-  /** A text box (Phase 33) read into `out`; false when `el` is none Foli models. */
+  /** A text box (Phase 33) or a shape (Phase 34) read into `out`; false when `el` is neither. */
   function textBox(el: XmlElement): boolean {
-    const attrs = textBoxOf(el, context, (children) =>
-      blocks(children, { ...context, story: "textBox" }),
-    );
+    const read = (children: XmlElement["children"]) =>
+      blocks(children, { ...context, story: "textBox" });
+    const box = textBoxOf(el, context, read);
+    const attrs = box ?? shapeOf(el, context, read);
     if (!attrs) return false;
-    const leaf = valid(node("textBox", marks, attrs), el, context);
+    const leaf = valid(node(box ? "textBox" : "shape", marks, attrs), el, context);
     if (!leaf) {
-      context.textBoxes?.stories.delete(String(attrs.story));
+      if (attrs.story) context.textBoxes?.stories.delete(String(attrs.story));
       return false;
     }
     out.push(leaf);

@@ -129,8 +129,8 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
     if (node.type === "table") properties(attrs);
     if (node.type === "tableRow") properties((attrs as { exceptions?: Properties }).exceptions);
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
-    if (node.type === "noteReference" || node.type === "textBox")
-      noteStories.add(String(node.attrs?.story));
+    if (node.type === "noteReference" || node.type === "textBox" || node.type === "shape")
+      if (node.attrs?.story) noteStories.add(String(node.attrs.story));
     if (node.type === "picture") resourceKeys.add(String(node.attrs?.resource));
     marks(node.marks);
   };
@@ -583,7 +583,9 @@ function fit(
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
     let next: Json | undefined = attrs;
-    if (node.type === "textBox") {
+    // A shape goes where a text box may: not into a story (shortcut: a header could hold one).
+    if (node.type === "shape" && inStory) return null;
+    if (node.type === "textBox" || (node.type === "shape" && attrs?.story)) {
       // A copy is a box of its own: its text a new story (Word's too). Not into a story (shortcut:
       // a header could hold it), and not without its text (HTML).
       const story = String(attrs?.story);

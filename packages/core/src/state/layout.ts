@@ -53,13 +53,17 @@ export interface ObjectPlacement {
 
 /** EMU per CSS px. */
 const EMU_PER_PX = 9525;
+/** What Layout Options, Size and Arrange work on: pictures, text boxes, shapes (Phase 34). */
+const OBJECTS = new Set(["picture", "textBox", "shape"]);
+/** Those that turn (a text box that turns is a shape, ADR-0017). */
+const ROTATES = new Set(["picture", "shape"]);
 const emu = (px: number) => Math.round(px * EMU_PER_PX);
 
-/** The selected picture or text box (a node selection of one) and its position, if any. */
+/** The selected picture, text box or shape (a node selection of one) and its position, if any. */
 export function selectedObject(state: EditorState): { node: Node; pos: number } | null {
   const { selection } = state;
   const name = selection instanceof NodeSelection ? selection.node.type.name : "";
-  return name === "picture" || name === "textBox"
+  return name === "picture" || name === "textBox" || name === "shape"
     ? { node: (selection as NodeSelection).node, pos: selection.from }
     : null;
 }
@@ -79,7 +83,7 @@ export function objectMovesWithText(node: Node): boolean {
 
 const objectAt = (state: EditorState, pos: number) => {
   const node = pos >= 0 && pos < state.doc.content.size ? state.doc.nodeAt(pos) : null;
-  return node && (node.type.name === "picture" || node.type.name === "textBox") ? node : null;
+  return node && OBJECTS.has(node.type.name) ? node : null;
 };
 
 /** The object at `pos` with `float` (null: in line), kept selected if it was. */
@@ -289,7 +293,7 @@ export function setObjectFloat(
   const more = (node: Node): Record<string, unknown> => {
     if (!size || !validSize(size.width) || !validSize(size.height)) return {};
     const rotation =
-      size.rotation === undefined || node.type.name !== "picture" || !Number.isFinite(size.rotation)
+      size.rotation === undefined || !ROTATES.has(node.type.name) || !Number.isFinite(size.rotation)
         ? undefined
         : ((Math.round(size.rotation) % TURN) + TURN) % TURN;
     return {
@@ -346,7 +350,7 @@ export function setObjectSize(
     if (!node || trackState(state)?.on === true) return false;
     if (!validSize(width) || !validSize(height)) return false;
     const turn =
-      rotation === undefined || node.type.name !== "picture" || !Number.isFinite(rotation)
+      rotation === undefined || !ROTATES.has(node.type.name) || !Number.isFinite(rotation)
         ? undefined
         : ((Math.round(rotation) % TURN) + TURN) % TURN;
     const same =
@@ -427,7 +431,7 @@ function stacking(state: EditorState): { pos: number; z: number }[] {
   const out: { pos: number; z: number }[] = [];
   state.doc.descendants((node, pos) => {
     const float = node.attrs.float as { zOrder?: number } | null | undefined;
-    if ((node.type.name === "picture" || node.type.name === "textBox") && float)
+    if (OBJECTS.has(node.type.name) && float)
       out.push({ pos, z: float.zOrder ?? Z_BASE + out.length * Z_STEP });
     return true;
   });

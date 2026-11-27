@@ -418,6 +418,110 @@ const rotation = int(0, 21_599_999);
  * must have a size: left + right and top + bottom stay under 100 000. All sides 0 (or none
  * given) is no crop, said so; missing (null) is "as its `ext` has it", as for `rotation`.
  */
+/** DrawingML's coordinates and guide values (ST_Coordinate, ST_GeomGuideFormula's numbers). */
+const coordinate = int(-27_273_042_316_900, 27_273_042_316_900);
+
+/** A shape's adjust values (`a:avLst`: `adj` → 25 000), by guide name (schema 11, ADR-0017). */
+const checkAdjust: Check = (v) => {
+  if (!isRecord(v)) return "must be an object";
+  const entries = Object.entries(v);
+  if (entries.length > 32) return "must have at most 32 values";
+  for (const [name, value] of entries) {
+    if (text(64)(name)) return `${JSON.stringify(name)} is not a guide name`;
+    const error = coordinate(value);
+    if (error) return `${name} ${error}`;
+  }
+  return undefined;
+};
+
+/** How many arguments a path command takes (`M x y`…; `A wR hR stAng swAng`). */
+const ARITY: Record<string, number> = { M: 2, L: 2, C: 6, Q: 4, A: 4, Z: 0 };
+const pathCommand: Check = (v) => {
+  const error = shape({ op: oneOf(Object.keys(ARITY)), args: listOf(text(64), 6) }, ["op"])(v);
+  if (error || !isRecord(v)) return error;
+  const count = Array.isArray(v.args) ? v.args.length : 0;
+  const wanted = ARITY[v.op as string] ?? 0;
+  return count === wanted ? undefined : `${v.op} takes ${wanted} arguments, not ${count}`;
+};
+
+/** DrawingML's preset geometries (ST_ShapeType), and `custom` for a custom geometry. */
+const GEOMETRIES =
+  `line lineInv triangle rtTriangle rect diamond parallelogram trapezoid nonIsoscelesTrapezoid pentagon hexagon heptagon octagon decagon dodecagon star4 star5 star6 star7 star8 star10 star12 star16 star24 star32 roundRect round1Rect round2SameRect round2DiagRect snipRoundRect snip1Rect snip2SameRect snip2DiagRect plaque ellipse teardrop homePlate chevron pieWedge pie blockArc donut noSmoking rightArrow leftArrow upArrow downArrow stripedRightArrow notchedRightArrow bentUpArrow leftRightArrow upDownArrow leftUpArrow leftRightUpArrow quadArrow leftArrowCallout rightArrowCallout upArrowCallout downArrowCallout leftRightArrowCallout upDownArrowCallout quadArrowCallout bentArrow uturnArrow circularArrow leftCircularArrow leftRightCircularArrow curvedRightArrow curvedLeftArrow curvedUpArrow curvedDownArrow swooshArrow cube can lightningBolt heart sun moon smileyFace irregularSeal1 irregularSeal2 foldedCorner bevel frame halfFrame corner diagStripe chord arc leftBracket rightBracket leftBrace rightBrace bracketPair bracePair straightConnector1 bentConnector2 bentConnector3 bentConnector4 bentConnector5 curvedConnector2 curvedConnector3 curvedConnector4 curvedConnector5 callout1 callout2 callout3 accentCallout1 accentCallout2 accentCallout3 borderCallout1 borderCallout2 borderCallout3 accentBorderCallout1 accentBorderCallout2 accentBorderCallout3 wedgeRectCallout wedgeRoundRectCallout wedgeEllipseCallout cloudCallout cloud ribbon ribbon2 ellipseRibbon ellipseRibbon2 leftRightRibbon verticalScroll horizontalScroll wave doubleWave plus flowChartProcess flowChartDecision flowChartInputOutput flowChartPredefinedProcess flowChartInternalStorage flowChartDocument flowChartMultidocument flowChartTerminator flowChartPreparation flowChartManualInput flowChartManualOperation flowChartConnector flowChartPunchedCard flowChartPunchedTape flowChartSummingJunction flowChartOr flowChartCollate flowChartSort flowChartExtract flowChartMerge flowChartOfflineStorage flowChartOnlineStorage flowChartMagneticTape flowChartMagneticDisk flowChartMagneticDrum flowChartDisplay flowChartDelay flowChartAlternateProcess flowChartOffpageConnector actionButtonBlank actionButtonHome actionButtonHelp actionButtonInformation actionButtonForwardNext actionButtonBackPrevious actionButtonEnd actionButtonBeginning actionButtonReturn actionButtonDocument actionButtonSound actionButtonMovie gear6 gear9 funnel mathPlus mathMinus mathMultiply mathDivide mathEqual mathNotEqual cornerTabs squareTabs plaqueTabs chartX chartStar chartPlus custom`.split(
+    " ",
+  );
+
+/** Word's preset dashes (ST_PresetLineDashVal). */
+const DASHES = [
+  "solid",
+  "dot",
+  "dash",
+  "lgDash",
+  "dashDot",
+  "lgDashDot",
+  "lgDashDotDot",
+  "sysDash",
+  "sysDot",
+  "sysDashDot",
+  "sysDashDotDot",
+];
+
+/**
+ * A custom geometry (`a:custGeom`, schema 11): its guides (`a:gdLst`: a name and a DrawingML
+ * formula, `*\/ w adj 100000`) and its paths, each a list of commands whose arguments are
+ * numbers or guide names, as the file has them: `M x y`, `L x y`, `C x1 y1 x2 y2 x y`,
+ * `Q x1 y1 x y`, `A wR hR stAng swAng` (`a:arcTo`), `Z`. A path's `width` and `height` are its
+ * own coordinate space (missing: the shape's); `fill` and `stroke` say how it is drawn.
+ */
+const checkCustomGeometry: Check = shape(
+  {
+    guides: listOf(shape({ name: text(64), formula: text(1024) }, ["name", "formula"]), 1000),
+    paths: listOf(
+      shape(
+        {
+          width: emu,
+          height: emu,
+          fill: oneOf(["norm", "none", "lighten", "lightenLess", "darken", "darkenLess"]),
+          stroke: bool,
+          commands: listOf(pathCommand, 100_000),
+        },
+        ["commands"],
+      ),
+      100,
+    ),
+    /** The text's rectangle (`a:rect`): left, top, right, bottom as numbers or guide names. */
+    text: shape({ l: text(64), t: text(64), r: text(64), b: text(64) }, ["l", "t", "r", "b"]),
+  },
+  ["paths"],
+);
+
+/** A line end (`a:headEnd`, `a:tailEnd`): its kind and size. */
+const lineEnd = shape(
+  {
+    type: oneOf(["triangle", "stealth", "diamond", "oval", "arrow"]),
+    width: oneOf(["sm", "med", "lg"]),
+    length: oneOf(["sm", "med", "lg"]),
+  },
+  ["type"],
+);
+
+/**
+ * A gradient fill (`a:gradFill`): its stops (position in 1000ths of a percent, 0 to 100 000, and
+ * color), linear at `angle` (60 000ths of a degree, clockwise from left to right) or from the
+ * center (`path`: circle, rect, shape).
+ */
+const checkGradient: Check = shape(
+  {
+    // DrawingML's stop list holds two at least (CT_GradientStopList).
+    stops: (v) =>
+      Array.isArray(v) && v.length < 2
+        ? "must have at least 2 stops"
+        : listOf(shape({ position: int(0, 100_000), color }, ["position", "color"]), 32)(v),
+    angle: rotation,
+    path: oneOf(["circle", "rect", "shape"]),
+  },
+  ["stops"],
+);
+
 const cropSide = int(-1_000_000, 99_999);
 const cropShape = shape(
   { left: cropSide, top: cropSide, right: cropSide, bottom: cropSide },
@@ -864,7 +968,59 @@ export const schema = new Schema({
         ext: nullableAttr(xml),
       },
     },
-    /** Inline content Foli does not model yet (fields, charts, shapes, symbols…), kept verbatim. */
+    /**
+     * A shape (schema 11, ADR-0017): Word's drawn shape (`wps:wsp`), inline or floating as a
+     * picture is. `geometry` is DrawingML's preset (`a:prstGeom/@prst`: `rect`, `ellipse`,
+     * `rightArrow`…) with its `adjust` values, or `custom` with `custom`'s paths; its size,
+     * `float` and `rotation` are a picture's, `flipH`/`flipV` mirror it. `fill` (RRGGBB, null for
+     * none) or `gradient`, and `outline` (null for none) are what it is drawn with, a theme's
+     * style resolved; effects (shadows, glow, 3-D) stay in `ext`, the run content it was read
+     * from (`mc:AlternateContent` or `w:drawing`). Text in it is the envelope's `stories[story]`
+     * (kind `textBox`, as a text box's), drawn with `inset`, `verticalAlign`, `autoFit` and
+     * `textColor` (the style's font color) inside the geometry's text rectangle.
+     */
+    shape: {
+      group: "inline",
+      inline: true,
+      attrs: {
+        geometry: { default: "rect", validate: oneOf(GEOMETRIES) },
+        adjust: nullableAttr(checkAdjust),
+        custom: nullableAttr(checkCustomGeometry),
+        /** In EMU. */
+        width: { validate: emu },
+        height: { validate: emu },
+        float: nullableAttr(checkFloat),
+        /** Clockwise, in 60 000ths of a degree (null: none). */
+        rotation: nullableAttr(rotation),
+        flipH: nullableAttr(bool),
+        flipV: nullableAttr(bool),
+        /** RRGGBB, or null for no fill (`gradient` wins when set). */
+        fill: nullableAttr(color),
+        gradient: nullableAttr(checkGradient),
+        /**
+         * The line: color RRGGBB, width in EMU, Word's dash (`a:prstDash`: `dash`, `sysDot`…,
+         * missing: solid), its ends (arrows); null for no line.
+         */
+        outline: nullableAttr(
+          shape({ color, width: emu, dash: oneOf(DASHES), head: lineEnd, tail: lineEnd }, [
+            "color",
+            "width",
+          ]),
+        ),
+        /** Its text (`wps:txbx`): a story of kind `textBox`; null for none. */
+        story: nullableAttr(text()),
+        inset: nullableAttr(shape({ left: emu, top: emu, right: emu, bottom: emu })),
+        verticalAlign: nullableAttr(oneOf(["top", "center", "bottom"])),
+        autoFit: nullableAttr(bool),
+        /** The color of its text where the text sets none (the style's `a:fontRef`). */
+        textColor: nullableAttr(color),
+        alt: nullableAttr(str(65_535)),
+        title: nullableAttr(str(65_535)),
+        decorative: nullableAttr(bool),
+        ext: nullableAttr(xml),
+      },
+    },
+    /** Inline content Foli does not model yet (fields, charts, groups, symbols…), kept verbatim. */
     opaqueInline: {
       group: "inline",
       inline: true,

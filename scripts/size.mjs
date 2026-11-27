@@ -175,15 +175,19 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, React and FoliEditor raised in 33.4 (102.7, 227.2 and 223.9 kB; 106.0, 240.0 and 240.0
  * allowed): text box editing and insertion (33.3), Layout Options' commands, menus and button,
  * with room for the Layout and Size dialogs and the Picture Format tab (33.4–33.6).
+ * Core, agent, docx and `@folijs/pdf` raised in 34.1 (105.5, 106.3, 81.9 and 21.6 kB; 108.0, 108.0, 84.0 and 22.5
+ * allowed): shapes (schema 11's node and its checks, DrawingML's 187 preset names among them,
+ * which pdf carries with core's schema; DrawingML shapes read with their theme styles and written
+ * in place), with room for 34.3's new shapes.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 108_544 },
+  { name: "@folijs/core", entry: dist("core"), budget: 110_592 },
   { name: "@folijs/view", entry: dist("view"), budget: 141_312 },
   { name: "@folijs/react", entry: dist("react"), budget: 245_760 },
   { name: "FoliEditor only", entry: appEntry, budget: 245_760 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 81_920 },
-  { name: "@folijs/pdf", entry: dist("pdf"), budget: 20_480 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 108_544 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 86_016 },
+  { name: "@folijs/pdf", entry: dist("pdf"), budget: 23_040 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 110_592 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */

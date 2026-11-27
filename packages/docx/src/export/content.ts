@@ -40,7 +40,12 @@ export interface WriteContext {
    * A text box's run content (Phase 33): its story's blocks written with `context` (the run's
    * scope) into what it was read from, or a new one.
    */
-  readonly textBox: (attrs: Record<string, unknown>, context: WriteContext) => string;
+  /** A text box, or a shape (`shape`: Phase 34), its story's text written into it. */
+  readonly textBox: (
+    attrs: Record<string, unknown>,
+    context: WriteContext,
+    shape?: boolean,
+  ) => string;
   /** A watermark's `w:pict`: as read while it says what it did, else written anew. */
   readonly watermark: (attrs: Record<string, unknown>) => string;
   /** The kind of note being written: what its `noteMark` is. */
@@ -362,6 +367,7 @@ function inRun(node: NodeJSON): boolean {
     "noteMark",
     "picture",
     "textBox",
+    "shape",
     "fieldStart",
     "fieldCode",
     "fieldSeparator",
@@ -504,6 +510,8 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return context.picture(a);
     case "textBox":
       return context.textBox(a, context);
+    case "shape":
+      return context.textBox(a, context, true);
     default:
       return notYet(node);
   }

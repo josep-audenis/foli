@@ -22,7 +22,9 @@ function boxesInBlock(block: Node): readonly string[] {
   if (!found) {
     const list: string[] = [];
     block.descendants((node) => {
-      if (node.type.name === "textBox") list.push(String(node.attrs.story));
+      // A shape's text too (Phase 34, ADR-0017).
+      if ((node.type.name === "textBox" || node.type.name === "shape") && node.attrs.story)
+        list.push(String(node.attrs.story));
       return true;
     });
     found = list.length ? list : NONE;

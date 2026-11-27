@@ -38,7 +38,7 @@ checklist in [testing/ime.md](testing/ime.md)):
   content controls and notes, 11.3): paragraphs in styles (headings are Word's heading styles),
   lists as Word's numbering, run formatting, line and page breaks, links, tables, inline and
   floating pictures, sections with columns, headers, footers, footnotes and endnotes, fields,
-  content controls and bookmarks (see below); everything else Word has (charts, shapes...) is
+  content controls and bookmarks (see below); everything else Word has (charts, SmartArt, groups of shapes...) is
   kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.5.0 are
   migrated when loaded (a v4 document's opaque headers, notes and fields stay so until its
   `.docx` is imported again); 0.5.0 cannot read documents saved by 0.6.0, and 0.6.0 cannot read
@@ -255,7 +255,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 - Pictures are inline or floating (wrapped square and top-and-bottom, behind and in front of
   text); tight and through wrapping are shown as square, and text goes on one side of a square
-  picture only (the side with more room). Charts, shapes and linked images stay
+  picture only (the side with more room). Charts, SmartArt and linked images stay
   opaque, and so do floating pictures positioned by `simplePos`, hidden, or sized relative to
   the page.
 - Text boxes (Phase 33) are modeled: their text a story, the box a floating anchor (ADR-0016).
@@ -275,13 +275,25 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   black line, not drawn by dragging. A copy pasted is a box of its own (its text copied, a new
   id); a box pasted into a header, footer, note or box is left out. The word count's "include
   notes" counts the body's text boxes too (not one deleted as a tracked change), as Word's option
-  does, and counts them whole when only the selection is counted, as it does notes. A rotated box,
-  a linked box (text flowing from one box to the next), a box in a group or filled with a
-  picture, and a shape other than a rectangle holding text stay opaque, and so does a box in a
+  does, and counts them whole when only the selection is counted, as it does notes. A rotated box
+  and text in another geometry are shapes (Phase 34). A linked box (text flowing from one box to
+  the next), a box in a group or filled with a picture stay opaque, and so does a box in a
   note, a comment or another box (Word allows none of these three). Theme colors of a box's fill
   and line are read as plain colors (the file's theme link stays while unchanged). A changed box
   loses its VML copy for Word 2007, and a VML-only box that changed is written as DrawingML.
   The agent reads a box's paragraph without the box's text.
+- Shapes (Phase 34, ADR-0017) are read from Word's DrawingML (`wps:wsp`) with their geometry,
+  turn, flips, fill, gradient, line, dashes and arrow ends, a theme's style as plain colors and
+  widths. Effects (shadows, glow, soft edges, reflections, 3-D) are kept in the file, not drawn;
+  a custom dash is drawn solid (and kept in the file while the line's dash is not changed).
+  Colors are read without their transparency, saturation or hue changes (`alpha`, `satMod`,
+  `hueMod`): a semi-transparent fill is drawn opaque, the Office theme's gradients slightly off.
+  A line that came from the theme's style, once changed, is written without the theme's corner
+  join and cap (Word's defaults then). A group, a drawing canvas, a shape filled with a picture or a
+  pattern, a linked text box, vertical text in a shape, a VML-only shape (Word 2007), and a shape
+  in a note, a comment or a text box stay opaque. A changed shape loses its VML copy for Word
+  2007. Until 34.2 a shape is read and written back but not drawn. The agent reads a shape's
+  paragraph without its text.
 - A picture whose resource is a web `url` is fetched by the view as soon as it is shown (with
   no referrer) unless the app's `resource` resolver returns `null` for it: for JSON documents
   from untrusted sources, resolve or block such URLs.
@@ -349,7 +361,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   right corner has a handle (33.5: a picture keeps its ratio, as Word's locked one; a text box's
   sides follow the pointer, Shift keeps its ratio). The Layout dialog's Size tab (33.5) scales
   from the size the object has when it opens, not its image's original size, and rotates
-  pictures only (a rotated text box stays opaque). Alt text changes
+  pictures and shapes (a turned text box is read as a shape). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
   else the image the source view shows, as a `data:` URL; one shown from an object URL (a
@@ -644,7 +656,7 @@ Details in the [package README](../packages/docx/README.md).
   cannot be exported without it (`DocxError`).
 - The theme is read-only: export keeps the original part; a new package has none, so Word's
   default theme applies.
-- Elements Foli does not model (charts, shapes, equations...) are
+- Elements Foli does not model (charts, groups of shapes, equations...) are
   kept verbatim and exported, but are not editable. A value the model cannot hold (out of
   range, a unit such as `1.5cm`) stays in its element and is exported, but is not editable
   (`report.unmodeled`).

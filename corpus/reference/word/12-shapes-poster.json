@@ -1,0 +1,138 @@
+{
+    "document":  "12-shapes-poster.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "comments":  0,
+    "revisionsAccepted":  0,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "Shapes poster",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. ",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "More shapes",
+                           "page":  2,
+                           "line":  2,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. ",
+                           "page":  2,
+                           "line":  3,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. The shapes below are Word\u0027s own, drawn by Word in this file. Each sits on the page where it was put, in front of the text, so the words around them do not move them. ",
+                           "page":  2,
+                           "line":  9,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+
+                 ],
+    "textBoxes":  [
+
+                  ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1,
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "Northwind Design",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+
+               ],
+    "bookmarks":  [
+
+                  ],
+    "controls":  [
+
+                 ]
+}

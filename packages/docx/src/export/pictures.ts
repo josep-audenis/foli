@@ -168,7 +168,10 @@ export class Media {
       if (key === "xml" && typeof value === "string") reserve(value);
       // A text box's ids are its own (claimed as it is written), above the new ones.
       const box = value as { type?: unknown; attrs?: { ext?: unknown } } | null;
-      if (box?.type === "textBox" && typeof box.attrs?.ext === "string") {
+      if (
+        (box?.type === "textBox" || box?.type === "shape") &&
+        typeof box.attrs?.ext === "string"
+      ) {
         for (const id of docPrIds(box.attrs.ext)) max = Math.max(max, id);
         for (const match of box.attrs.ext.matchAll(/_x0000_s(\d+)/g))
           this.#nextShape = Math.max(this.#nextShape, Number(match[1]) + 1);

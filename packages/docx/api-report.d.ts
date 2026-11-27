@@ -113,6 +113,13 @@ export {};
  */
 export {};
 
+// export/shapes.d.ts
+/**
+ * Shapes back to WordprocessingML (Phase 34, ADR-0017): what `textBoxXml` writes into a shape
+ * read from a file (its transform, geometry, fill and line), and a new shape as DrawingML.
+ */
+export {};
+
 // export/tables.d.ts
 /**
  * Table, row and cell attributes back to `w:tblPr`, `w:tblPrEx`, `w:trPr`, `w:tcPr` and
@@ -248,6 +255,9 @@ export interface ImportReport {
      */
     readonly picturesWithoutAlt: number;
 }
+
+// import/shapes.d.ts
+export {};
 
 // import/stories.d.ts
 export {};
