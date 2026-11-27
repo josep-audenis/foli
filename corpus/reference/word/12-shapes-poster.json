@@ -93,7 +93,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -120,7 +122,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.1667,
                        "text":  ""
@@ -147,7 +151,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -174,7 +180,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -201,7 +209,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -228,7 +238,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -255,7 +267,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -282,7 +296,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -309,7 +325,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  1.0515,
                        "text":  ""
@@ -336,7 +354,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -363,7 +383,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.2929,
                        "text":  ""
@@ -390,7 +412,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -417,7 +441,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -444,7 +470,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -471,7 +499,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""
@@ -498,7 +528,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.1667,
                        "text":  ""
@@ -525,7 +557,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -552,7 +586,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -579,7 +615,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -606,7 +644,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -633,7 +673,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -660,7 +702,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.225,
                        "text":  ""
@@ -687,7 +731,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -714,7 +760,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.5,
                        "text":  ""
@@ -741,7 +789,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.191,
                        "text":  ""
@@ -768,7 +818,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.125,
                        "text":  ""
@@ -795,7 +847,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -822,7 +876,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -849,7 +905,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  -0.2083,
                        "text":  ""
@@ -876,7 +934,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  -0.2083,
                        "text":  ""
@@ -903,7 +963,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  -0.2083,
                        "text":  ""
@@ -930,7 +992,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.1667,
                        "text":  ""
@@ -957,7 +1021,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.35,
                        "text":  ""
@@ -984,7 +1050,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1011,7 +1079,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1038,7 +1108,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1065,7 +1137,9 @@
                        "line":  {
                                     "color":  "FF0000",
                                     "weight":  2,
-                                    "dash":  4
+                                    "dash":  4,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1092,7 +1166,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.1667,
                        "text":  "Open day"
@@ -1119,7 +1195,9 @@
                        "line":  {
                                     "color":  "156082",
                                     "weight":  1.5,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  2
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1146,7 +1224,9 @@
                        "line":  {
                                     "color":  "156082",
                                     "weight":  0.5,
-                                    "dash":  3
+                                    "dash":  3,
+                                    "begin":  3,
+                                    "end":  5
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1173,7 +1253,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  null,
                        "text":  ""
@@ -1200,7 +1282,9 @@
                        "line":  {
                                     "color":  "042433",
                                     "weight":  1,
-                                    "dash":  1
+                                    "dash":  1,
+                                    "begin":  1,
+                                    "end":  1
                                 },
                        "adjust":  0.25,
                        "text":  ""

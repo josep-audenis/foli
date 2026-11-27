@@ -4,5 +4,5 @@
 "@folijs/react": patch
 ---
 
-Theme colors with a shade or tint (`a:shade`, `a:tint`) are read as Word draws them, in linear
-light; new shapes' lines and the shape styles' are shaded so too.
+Theme colors with a shade (`a:shade`, and `a:tint` likewise) are read as Word draws them, in
+linear light; new shapes' lines and the shape styles' are shaded so too.

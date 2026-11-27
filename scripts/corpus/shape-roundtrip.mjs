@@ -7,9 +7,9 @@
 //
 // `make` exports the corpus documents with shapes to <dir>/foli: as imported (<name>.docx) and
 // edited (<name>-edited.docx): a rectangle turned 30° and flipped, refilled; a rounded
-// rectangle's corners adjusted; an oval's line recolored and dotted; a hexagon moved; a line
-// given an arrow at its start; a shape's text replaced; and new shapes added (a star, an arrow
-// line, a rounded rectangle holding text). `check` reads what Word made of them (its `shapes`):
+// rectangle's corners adjusted; an oval's line recolored, thickened and dotted; a hexagon moved;
+// a line given arrows at both ends; a shape's text replaced; and new shapes added (a star, a
+// rounded rectangle holding text). `check` reads what Word made of them (its `shapes`):
 // each file opened, the unchanged one's shapes as Word's reference of the corpus file, the edited
 // one's as Foli wrote them. Prints one line per document; exits 1 on any difference.
 
@@ -63,7 +63,8 @@ const EDITS = {
         tail: { type: "triangle" },
       },
     },
-    word: { line: { color: "156082", weight: 1.5 } },
+    // msoArrowheadTriangle at both ends.
+    word: { line: { color: "156082", weight: 1.5, begin: 2, end: 2 } },
   },
 };
 const NEW = [

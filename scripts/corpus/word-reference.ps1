@@ -20,7 +20,7 @@
 #     its text;
 #   - shapes: each shape of the main text (Phase 34; msoAutoShape, msoLine, msoFreeform): as text
 #     boxes, with its AutoShapeType, rotation, flips, fill (shown, RGB as RRGGBB), line (shown,
-#     weight, dash style, RRGGBB), first adjustment and text;
+#     weight, dash style, RRGGBB, arrowheads), first adjustment and text;
 #   - sections: each section's first page, column count, section start, different first page,
 #     and its headers and footers (default, first, even): whether they exist, are linked to the
 #     previous section, and their text as Word has it open (page fields recomputed, a picture
@@ -242,6 +242,14 @@ try {
         if ($s.Anchor.Start -eq $doc.Paragraphs.Item($anchorParagraph).Range.End) { $anchorParagraph++ }
         $text = ""
         try { if ($s.TextFrame.HasText) { $text = Clean ([string]$s.TextFrame.TextRange.Text).Replace("`r", "`n") } } catch {}
+        # A shape Word cannot describe (an odd freeform) keeps the rest of the record.
+        $fill = $null; $line = $null
+        try { if ($s.Fill.Visible -ne 0) { $fill = Hex $s.Fill.ForeColor.RGB } } catch {}
+        try {
+          if ($s.Line.Visible -ne 0) {
+            $line = [ordered]@{ color = Hex $s.Line.ForeColor.RGB; weight = [math]::Round([double]$s.Line.Weight, 2); dash = [int]$s.Line.DashStyle; begin = [int]$s.Line.BeginArrowheadStyle; end = [int]$s.Line.EndArrowheadStyle }
+          }
+        } catch {}
         $adjust = $null
         try { if ($s.Adjustments.Count -gt 0) { $adjust = [math]::Round([double]$s.Adjustments.Item(1), 4) } } catch {}
         $shapes.Add([ordered]@{
@@ -262,8 +270,8 @@ try {
             rotation = [math]::Round([double]$s.Rotation, 1)
             flipH = [bool]($s.HorizontalFlip -ne 0)
             flipV = [bool]($s.VerticalFlip -ne 0)
-            fill = if ($s.Fill.Visible -ne 0) { Hex $s.Fill.ForeColor.RGB } else { $null }
-            line = if ($s.Line.Visible -ne 0) { [ordered]@{ color = Hex $s.Line.ForeColor.RGB; weight = [math]::Round([double]$s.Line.Weight, 2); dash = [int]$s.Line.DashStyle } } else { $null }
+            fill = $fill
+            line = $line
             adjust = $adjust
             text = $text
           })
