@@ -696,11 +696,12 @@ const HIGHLIGHTS: readonly ToolbarColor[] = [
   { name: "Gray 25%", color: "#c0c0c0" },
   { name: "Black", color: "#000000" },
 ];
-/** Cell shadings: Word's grid, as the text color's. */
+/** Page colors (Design ▸ Page Color): Word's grid, as the text color's. */
 const PAGE_COLORS = (state: EditorState): readonly ToolbarColor[] => [
   { name: "No Color", color: null },
   ...themeColors(state),
 ];
+/** Cell shadings: Word's grid, as the text color's. */
 const SHADINGS = (state: EditorState): readonly ToolbarColor[] => [
   { name: "None", color: null },
   ...themeColors(state),

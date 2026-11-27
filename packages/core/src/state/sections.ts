@@ -412,9 +412,12 @@ export function setPageColor(color: string | null): Command {
     if (color !== null && !/^[0-9A-Fa-f]{6}$/.test(color)) return false;
     const { background, ...rest } = context.envelope.settings ?? {};
     const now = background?.color === "auto" ? undefined : background?.color;
-    if ((now?.toUpperCase() ?? null) === (color?.toUpperCase() ?? null) && !background?.themeColor)
+    if (
+      color === null
+        ? !background
+        : now?.toUpperCase() === color.toUpperCase() && !background?.themeColor && !background?.ext
+    )
       return false;
-    if (color === null && !background) return false;
     if (dispatch) {
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       // Picked anew: the theme color and Fill Effects it had go (Word's Page Color does that).

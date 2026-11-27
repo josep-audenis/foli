@@ -1060,7 +1060,8 @@ section's own (undefined removes them).
 Page decoration (Phase 32, schema 9): `setPageColor(color)` (`#`-less RRGGBB, or null for none:
 the document's `settings.background`; a theme color or Fill Effects it had go; not tracked, as
 in Word), `pageColorOf(state)`; `setPageBorders(borders, applyTo?)` (`PageBordersJSON` or null;
-the caret's section, or `"document"` for every section; one undo step, recorded as a page setup
+the caret's section, or `"document"` for every section, one whose setup leaves no room for text
+skipped; one undo step, recorded as a page setup
 change of each section while tracking).
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):

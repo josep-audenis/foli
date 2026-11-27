@@ -89,6 +89,7 @@ export function PageBordersDialog({
         : "custom";
     const display = borders?.display;
     return {
+      borders,
       setting,
       style: line?.style ?? "single",
       color: line?.color && line.color !== "auto" ? `#${line.color.toLowerCase()}` : "auto",
@@ -112,12 +113,17 @@ export function PageBordersDialog({
   const [from, setFrom] = useState(initial.from);
   const [distance, setDistance] = useState(initial.distance);
   const [error, setError] = useState(false);
+  // Whether the line (style, color, width, distance) was changed: untouched, each side keeps its own.
+  const [lineChanged, setLineChanged] = useState(false);
+  const [touched, setTouched] = useState(false);
   const first = useRef<HTMLInputElement>(null);
   const distanceBox = useRef<HTMLInputElement>(null);
   useEffect(() => first.current?.focus(), []);
 
   const apply = (event: FormEvent) => {
     event.preventDefault();
+    // OK with nothing changed changes nothing (no tracked change either).
+    if (!touched) return onClose(false);
     const space = Number(distance.trim());
     if (setting !== "none" && (!/^\d+$/.test(distance.trim()) || space > 31)) {
       setError(true);
@@ -131,13 +137,21 @@ export function PageBordersDialog({
       space,
       color: color === "auto" ? "auto" : color.slice(1).toUpperCase(),
     };
+    const before = initial.borders;
     const borders =
       setting === "none" || !shown.length
         ? null
         : {
             ...(from === "page" ? { offsetFrom: "page" as const } : {}),
             ...(applyTo === "firstPage" || applyTo === "notFirstPage" ? { display: applyTo } : {}),
-            ...Object.fromEntries(shown.map((side) => [side, line])),
+            // What the dialog does not show stays.
+            ...(before?.zOrder ? { zOrder: before.zOrder } : {}),
+            ...Object.fromEntries(
+              shown.map((side) => {
+                const own = before?.[side];
+                return [side, !lineChanged && own && isLine(own.style) ? own : line];
+              }),
+            ),
           };
     const scope = applyTo === "document" ? "document" : "section";
     onClose(editor.run(setPageBorders(borders, scope)));
@@ -168,7 +182,7 @@ export function PageBordersDialog({
         onClose(false);
       }}
     >
-      <form onSubmit={apply} noValidate>
+      <form onSubmit={apply} onChange={() => setTouched(true)} noValidate>
         <div className="foli-dialog-panel">
           <fieldset className="foli-dialog-section">
             <legend>{t("Setting")}</legend>
@@ -177,7 +191,14 @@ export function PageBordersDialog({
           <fieldset className="foli-dialog-section" disabled={off}>
             <legend>{t("Line")}</legend>
             <Field id={`${id}-style`} label={t("Style")}>
-              <select id={`${id}-style`} value={style} onChange={(e) => setStyle(e.target.value)}>
+              <select
+                id={`${id}-style`}
+                value={style}
+                onChange={(e) => {
+                  setStyle(e.target.value);
+                  setLineChanged(true);
+                }}
+              >
                 {!BORDER_STYLE_NAMES.some(([value]) => value === style) && (
                   <option value={style}>{style}</option>
                 )}
@@ -189,10 +210,17 @@ export function PageBordersDialog({
               </select>
             </Field>
             <Field id={`${id}-color`} label={t("Color")}>
-              <select id={`${id}-color`} value={color} onChange={(e) => setColor(e.target.value)}>
+              <select
+                id={`${id}-color`}
+                value={color}
+                onChange={(e) => {
+                  setColor(e.target.value);
+                  setLineChanged(true);
+                }}
+              >
                 <option value="auto">{t("Automatic")}</option>
                 {colors.map((c) => (
-                  <option key={c.color} value={c.color}>
+                  <option key={c.name} value={c.color}>
                     {t(c.name)}
                   </option>
                 ))}
@@ -205,7 +233,10 @@ export function PageBordersDialog({
               <select
                 id={`${id}-width`}
                 value={String(width)}
-                onChange={(e) => setWidth(Number(e.target.value))}
+                onChange={(e) => {
+                  setWidth(Number(e.target.value));
+                  setLineChanged(true);
+                }}
               >
                 {!(BORDER_WIDTHS as readonly number[]).includes(width) && (
                   <option value={String(width)}>{`${width / 8} pt`}</option>
@@ -243,7 +274,7 @@ export function PageBordersDialog({
               </div>
             ))}
           </fieldset>
-          <fieldset className="foli-dialog-section" disabled={off}>
+          <fieldset className="foli-dialog-section">
             <legend>{t("Options")}</legend>
             <Field id={`${id}-apply`} label={t("Apply to")}>
               <select
@@ -259,7 +290,12 @@ export function PageBordersDialog({
               </select>
             </Field>
             <Field id={`${id}-from`} label={t("Measure from")}>
-              <select id={`${id}-from`} value={from} onChange={(e) => setFrom(e.target.value)}>
+              <select
+                id={`${id}-from`}
+                disabled={off}
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              >
                 <option value="page">{t("Edge of page")}</option>
                 <option value="text">{t("Text")}</option>
               </select>
@@ -268,6 +304,7 @@ export function PageBordersDialog({
               <input
                 ref={distanceBox}
                 id={`${id}-distance`}
+                disabled={off}
                 type="text"
                 inputMode="numeric"
                 value={distance}
@@ -275,6 +312,7 @@ export function PageBordersDialog({
                 aria-describedby={error ? `${id}-error` : undefined}
                 onChange={(e) => {
                   setDistance(e.target.value);
+                  setLineChanged(true);
                   setError(false);
                 }}
               />

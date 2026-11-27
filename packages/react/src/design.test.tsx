@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createEditor, type FoliDocument, undo } from "@folijs/core";
+import { createEditor, type FoliDocument, setPageBorders, undo } from "@folijs/core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { FoliToolbar, toolbarItems, wordRibbonTabs } from "./index.js";
@@ -112,5 +112,49 @@ describe("Page Borders dialog", () => {
     fireEvent.click(box.getByLabelText("None"));
     submit();
     expect(editor.getDocument().section.pageBorders).toBeUndefined();
+  });
+});
+
+describe("Page Borders dialog keeps what it does not show", () => {
+  const dialog = () => screen.getByRole("dialog", { name: "Page Borders" });
+  const submit = () => fireEvent.submit(dialog().querySelector("form") as HTMLFormElement);
+
+  it("changes nothing on OK untouched; keeps zOrder and each side's own line", () => {
+    const red = { style: "single", size: 4, space: 4, color: "FF0000" };
+    const blue = { style: "dotted", size: 8, space: 4, color: "0000FF" };
+    const borders = { zOrder: "back", top: red, bottom: blue };
+    const editor = open({ pageBorders: borders });
+    editor.select(7);
+    const before = editor.state;
+    fireEvent.click(screen.getByRole("button", { name: /^Page borders/i }));
+    submit();
+    expect(editor.state).toBe(before);
+    fireEvent.click(screen.getByRole("button", { name: /^Page borders/i }));
+    const box = within(dialog());
+    fireEvent.click(box.getByLabelText("Left border"));
+    fireEvent.change(box.getByLabelText("Apply to"), { target: { value: "section" } });
+    submit();
+    expect(editor.getDocument().section.pageBorders).toEqual({
+      zOrder: "back",
+      top: red,
+      bottom: blue,
+      left: { style: "single", size: 4, space: 4, color: "FF0000" },
+    });
+  });
+
+  it("None with Apply to this section removes only this section's borders", () => {
+    const line = { style: "single", size: 4, space: 24, color: "auto" };
+    const editor = open({ pageBorders: { offsetFrom: "page", top: line } });
+    editor.run(setPageBorders({ offsetFrom: "page", top: line }, "document"));
+    editor.select(7);
+    fireEvent.click(screen.getByRole("button", { name: /^Page borders/i }));
+    const box = within(dialog());
+    fireEvent.click(box.getByLabelText("None"));
+    fireEvent.change(box.getByLabelText("Apply to"), { target: { value: "section" } });
+    submit();
+    expect(editor.getDocument().section.pageBorders).toBeUndefined();
+    expect(editor.state.doc.child(0).attrs.section).toEqual({
+      pageBorders: { offsetFrom: "page", top: line },
+    });
   });
 });
