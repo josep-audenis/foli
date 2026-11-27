@@ -334,6 +334,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       {miniAt && (
         <FoliMiniToolbar
           {...(miniToolbar === true || miniToolbar === false ? {} : miniToolbar)}
+          units={toolbarProps?.units}
           editor={editor}
           at={miniAt}
           commentOnly={commentOnly}

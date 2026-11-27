@@ -745,6 +745,9 @@ Details in the [package README](../packages/docx/README.md).
   the model) and no Last Custom Setting; Orientation swaps the page's sides but leaves the
   margins as they are (Word turns them with the page); Size checks an entry within a millimetre of its paper. Breaks has Remove
   section break, which Word's has not, for the Section menu it replaces in the ribbon.
+- The default unit comes from `navigator.language`, not from the operating system's
+  measurement setting (a browser does not expose it). Rendered on the server, the Layout tab's
+  Indent boxes show centimetres until the page runs in the browser.
 - Tab stops set in the Tabs dialog are kept and saved, but the pages lay text out with the
   default stops every half inch (custom stops are not drawn yet, see architecture.md). The
   dialog has no Default tab stops box: Foli keeps `w:defaultTabStop` in the settings part as the

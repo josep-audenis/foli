@@ -3,7 +3,7 @@ import { createEditor, type FoliDocument, openDialog, undo } from "@folijs/core"
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { FoliToolbar, wordRibbonTabs } from "./index.js";
-import { formatLength, parseLength } from "./units.js";
+import { defaultUnit, formatLength, parseLength } from "./units.js";
 
 const paragraph = (text: string, attrs?: Record<string, unknown>) => ({
   type: "paragraph",
@@ -421,5 +421,69 @@ describe("Layout tab review cases", () => {
     fireEvent.blur(left);
     expect(left.value).toBe('0"');
     expect(editor.state.doc.child(0).attrs.indent).toBeNull();
+  });
+});
+
+describe("units", () => {
+  it("follow the locale, or the toolbar's units", () => {
+    expect(defaultUnit("en-US")).toBe("in");
+    expect(defaultUnit("en")).toBe("in");
+    expect(defaultUnit("en-GB")).toBe("cm");
+    expect(defaultUnit("es-ES")).toBe("cm");
+    expect(defaultUnit("my-MM")).toBe("in");
+    expect(defaultUnit("")).toBe("cm");
+    expect(defaultUnit("not a locale")).toBe("cm");
+    expect(formatLength(1000, "cm", "up")).toBe("1.77 cm");
+    expect(formatLength(1000, "cm", "down")).toBe("1.76 cm");
+  });
+
+  it("show the Paragraph dialog, the boxes and Page setup in centimetres", () => {
+    const editor = createEditor({
+      document: documentOf(paragraph("one", { indent: { left: 567 } })),
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" units="cm" />);
+    editor.select(2);
+    expect((screen.getByRole("textbox", { name: "Indent left" }) as HTMLInputElement).value).toBe(
+      "1 cm",
+    );
+    act(() => {
+      editor.run(openDialog("paragraph"));
+    });
+    const dialog = screen.getByRole("dialog", { name: "Paragraph" });
+    const left = within(dialog).getByLabelText("Left") as HTMLInputElement;
+    expect(left.value).toBe("1 cm");
+    fireEvent.change(left, { target: { value: "2" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(0).attrs.indent).toEqual({ left: 1134 });
+    fireEvent.click(screen.getByRole("button", { name: "Page setup…" }));
+    const setup = screen.getByRole("dialog", { name: "Page setup" });
+    expect((within(setup).getByLabelText("Page width") as HTMLInputElement).value).toBe("21.59 cm");
+    fireEvent.change(within(setup).getByLabelText("Left margin"), { target: { value: '1"' } });
+    fireEvent.submit(setup.querySelector("form") as HTMLFormElement);
+    expect(editor.getDocument().section.margins?.left).toBe(1440);
+  });
+});
+
+describe("units review cases", () => {
+  it("turns an A4 page in Page setup without rounding it, in inches", () => {
+    const editor = createEditor({
+      document: {
+        ...documentOf(paragraph("one")),
+        section: { pageSize: { width: 11906, height: 16838 } },
+      },
+    });
+    render(<FoliToolbar editor={editor} tabs={wordRibbonTabs} tab="layout" units="in" />);
+    editor.select(2);
+    fireEvent.click(screen.getByRole("button", { name: "Page setup…" }));
+    const setup = screen.getByRole("dialog", { name: "Page setup" });
+    fireEvent.change(within(setup).getByLabelText("Orientation"), {
+      target: { value: "landscape" },
+    });
+    fireEvent.submit(setup.querySelector("form") as HTMLFormElement);
+    expect(editor.getDocument().section.pageSize).toEqual({
+      width: 16838,
+      height: 11906,
+      orientation: "landscape",
+    });
   });
 });

@@ -157,7 +157,14 @@ import {
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
 import { StyleGallery } from "./StyleGallery.js";
-import { FontDialog, ParagraphBox, ParagraphDialog, TabsDialog } from "./WordDialogs.js";
+import { defaultUnit, formatLength, type LengthUnit, parseLength } from "./units.js";
+import {
+  FontDialog,
+  ParagraphBox,
+  ParagraphDialog,
+  TabsDialog,
+  UnitContext,
+} from "./WordDialogs.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -189,6 +196,14 @@ export interface FoliToolbarProps {
    * the first time asks the browser's permission. Default true; false never asks.
    */
   localFonts?: boolean | undefined;
+  /**
+   * The unit of the dialogs' and boxes' lengths (Page setup, Paragraph, Tabs, column width,
+   * Layout's Indent boxes): inches or centimetres. Default: the locale's, as Word's (inches in
+   * the United States, Liberia and Myanmar, by `navigator.language`), else centimetres. Points
+   * stay points where Word shows points (spacing, line spacing, character spacing). A box also
+   * takes a length typed with its unit (`2 cm`, `1"`, `12 pt`). (1.11)
+   */
+  units?: LengthUnit | undefined;
   /**
    * Where an inserted picture's image file goes (`EditorViewOptions.upload`): with it, "Picture"
    * inserts one from a file; without it, it only edits a selected picture.
@@ -1903,25 +1918,25 @@ const RIBBON_ITEMS: readonly Item[] = [
     key: "indentLeft",
     label: "Indent left",
     enabled: isWord,
-    render: (props) => <ParagraphBox {...props} field="left" label="Indent left" unit="in" />,
+    render: (props) => <ParagraphBox {...props} field="left" label="Indent left" />,
   },
   {
     key: "indentRight",
     label: "Indent right",
     enabled: isWord,
-    render: (props) => <ParagraphBox {...props} field="right" label="Indent right" unit="in" />,
+    render: (props) => <ParagraphBox {...props} field="right" label="Indent right" />,
   },
   {
     key: "spaceBefore",
     label: "Spacing before",
     enabled: isWord,
-    render: (props) => <ParagraphBox {...props} field="before" label="Spacing before" unit="in" />,
+    render: (props) => <ParagraphBox {...props} field="before" label="Spacing before" />,
   },
   {
     key: "spaceAfter",
     label: "Spacing after",
     enabled: isWord,
-    render: (props) => <ParagraphBox {...props} field="after" label="Spacing after" unit="in" />,
+    render: (props) => <ParagraphBox {...props} field="after" label="Spacing after" />,
   },
   // Word's Font group (29.3).
   {
@@ -2607,6 +2622,7 @@ export function FoliToolbar({
   className,
   comments = false,
   localFonts = true,
+  units,
   upload,
   items: givenGroups,
   tabs: allTabs,
@@ -2620,6 +2636,7 @@ export function FoliToolbar({
   overflow = "wrap",
   messages,
 }: FoliToolbarProps) {
+  const unit = units ?? defaultUnit();
   // A collapsed ribbon's panel shown over the document: a command run from it puts it away.
   const [floating, setFloating] = useState(false);
   const onClickCommand = () => {
@@ -3744,228 +3761,259 @@ export function FoliToolbar({
   let index = 0;
   return (
     <MessagesContext.Provider value={messages}>
-      {panel(
-        <div
-          role="toolbar"
-          aria-label={label}
-          ref={bar}
-          // With tabs, `className` is the ribbon's.
-          className={[
-            "foli-toolbar",
-            overflowing && "foli-toolbar-overflow",
-            // Measuring: every group in the row, what does not fit cut off for now.
-            overflowing && fit === null && "foli-toolbar-measuring",
-            !tab && className,
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onKeyDown={onKeyDown}
-        >
-          {overflowed(
-            groups.map((group, g) => {
-              const controls = group.items.map((item) => {
-                const i = index++;
-                const state = states[i];
-                const launcher = item === group.launcher;
-                const drawn = smallGroups.has(g) ? undefined : item.size;
-                const large = drawn === "large";
-                const medium = drawn === "medium" && item.icon !== undefined;
-                // Inserting a picture needs the app's upload; editing a selected one does not.
-                // A menu without entries (or colors) cannot open, whatever its `enabled` says.
-                const off =
-                  disabled ||
-                  !state?.enabled ||
-                  (item.dialog === "picture" && state?.value === "insert" && !upload) ||
-                  (item.actions !== undefined && actionsOf(item, body).length === 0) ||
-                  (item.colors !== undefined && paletteOf(item.colors, editor.state).length === 0);
-                if (item.render) {
-                  return (
-                    <CustomItem
-                      key={item.key}
-                      render={item.render}
-                      editor={editor}
-                      disabled={off}
-                      tabIndex={i === active ? 0 : -1}
-                      setRef={(element) => {
-                        buttons.current[i] = element;
-                      }}
-                      onFocus={() => setActive(i)}
-                    />
-                  );
-                }
-                if (item.select) {
-                  const { select } = item;
-                  const value = state?.value ?? "";
-                  const held = pending?.key === item.key ? pending.value : null;
-                  const apply = () => {
-                    setPending(null);
-                    if (held !== null && held !== value && !off) editor.run(select.pick(held));
-                  };
-                  // Read now: the list may come from outside the editor (the state's copy of it
-                  // only makes the toolbar render again when it changes with the document).
-                  const options = select.options(editor.state);
-                  return (
-                    <select
+      <UnitContext.Provider value={unit}>
+        {panel(
+          <div
+            role="toolbar"
+            aria-label={label}
+            ref={bar}
+            // With tabs, `className` is the ribbon's.
+            className={[
+              "foli-toolbar",
+              overflowing && "foli-toolbar-overflow",
+              // Measuring: every group in the row, what does not fit cut off for now.
+              overflowing && fit === null && "foli-toolbar-measuring",
+              !tab && className,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onKeyDown={onKeyDown}
+          >
+            {overflowed(
+              groups.map((group, g) => {
+                const controls = group.items.map((item) => {
+                  const i = index++;
+                  const state = states[i];
+                  const launcher = item === group.launcher;
+                  const drawn = smallGroups.has(g) ? undefined : item.size;
+                  const large = drawn === "large";
+                  const medium = drawn === "medium" && item.icon !== undefined;
+                  // Inserting a picture needs the app's upload; editing a selected one does not.
+                  // A menu without entries (or colors) cannot open, whatever its `enabled` says.
+                  const off =
+                    disabled ||
+                    !state?.enabled ||
+                    (item.dialog === "picture" && state?.value === "insert" && !upload) ||
+                    (item.actions !== undefined && actionsOf(item, body).length === 0) ||
+                    (item.colors !== undefined &&
+                      paletteOf(item.colors, editor.state).length === 0);
+                  if (item.render) {
+                    return (
+                      <CustomItem
+                        key={item.key}
+                        render={item.render}
+                        editor={editor}
+                        disabled={off}
+                        tabIndex={i === active ? 0 : -1}
+                        setRef={(element) => {
+                          buttons.current[i] = element;
+                        }}
+                        onFocus={() => setActive(i)}
+                      />
+                    );
+                  }
+                  if (item.select) {
+                    const { select } = item;
+                    const value = state?.value ?? "";
+                    const held = pending?.key === item.key ? pending.value : null;
+                    const apply = () => {
+                      setPending(null);
+                      if (held !== null && held !== value && !off) editor.run(select.pick(held));
+                    };
+                    // Read now: the list may come from outside the editor (the state's copy of it
+                    // only makes the toolbar render again when it changes with the document).
+                    const options = select.options(editor.state);
+                    return (
+                      <select
+                        key={item.key}
+                        ref={(element) => {
+                          buttons.current[i] = element;
+                        }}
+                        className={`foli-toolbar-select foli-toolbar-${item.key}`}
+                        aria-label={trLabel(item.label)}
+                        title={trLabel(item.label)}
+                        // Still focusable when it cannot apply, like the buttons.
+                        aria-disabled={off || undefined}
+                        tabIndex={i === active ? 0 : -1}
+                        value={held ?? value}
+                        onFocus={() => setActive(i)}
+                        // Leaving it another way than Tab (a click in the document) drops it: the
+                        // selection it was stepped on may be gone.
+                        onBlur={() => setPending(null)}
+                        onMouseDown={() => {
+                          pointer.current = true;
+                          stepped.current = false;
+                          // Opening the built-in Font box asks for the machine's fonts (a gesture).
+                          if (localFonts && select.options === fontOptions)
+                            void loadLocalFonts(true);
+                        }}
+                        onKeyDown={(event) => {
+                          pointer.current = false;
+                          // Keys that open the list (Alt+Down too), not the arrows that step it: a
+                          // prompt taking the focus would drop the stepped value.
+                          if (
+                            localFonts &&
+                            select.options === fontOptions &&
+                            (OPEN_KEYS.has(event.key) ||
+                              (event.altKey && event.key === "ArrowDown"))
+                          )
+                            void loadLocalFonts(true);
+                          // Alt+Down opens the list, and on Apple platforms the arrows do: a pick
+                          // there is a pick, applied at once.
+                          stepped.current = STEP_KEYS.has(event.key) && !event.altKey && !IS_APPLE;
+                          if (event.key === "Tab") apply();
+                          if (event.key === "Escape" && held !== null) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setPending(null);
+                          }
+                        }}
+                        // After the change an open list's Enter makes.
+                        onKeyUp={(event) => {
+                          if (event.key === "Enter") apply();
+                        }}
+                        onChange={(event) => {
+                          if (off) return;
+                          if (stepped.current) {
+                            setPending({ key: item.key, value: event.target.value });
+                            return;
+                          }
+                          setPending(null);
+                          editor.run(select.pick(event.target.value));
+                          if (pointer.current) onClickCommand?.();
+                        }}
+                      >
+                        {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
+                        {value === "" && <option value="" />}
+                        {value !== "" && !options.some((o) => o.value === value) && (
+                          <option value={value}>{value}</option>
+                        )}
+                        {options.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {DATA_BOXES.has(item.key) ? o.label : trLabel(o.label)}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  }
+                  const button = (
+                    <button
                       key={item.key}
                       ref={(element) => {
                         buttons.current[i] = element;
                       }}
-                      className={`foli-toolbar-select foli-toolbar-${item.key}`}
-                      aria-label={trLabel(item.label)}
+                      type="button"
+                      className={`foli-toolbar-button foli-toolbar-${item.key}${launcher ? " foli-toolbar-launcher" : large ? " foli-toolbar-large" : medium ? " foli-toolbar-medium" : ""}`}
+                      // Speech input users say what they see: "H1", "Undo"; symbols get a name.
+                      // A large button shows its text, which names it.
+                      aria-label={
+                        launcher || (item.icon !== undefined && !large && !medium)
+                          ? trLabel(item.label)
+                          : undefined
+                      }
                       title={trLabel(item.label)}
-                      // Still focusable when it cannot apply, like the buttons.
+                      aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
+                      aria-haspopup={
+                        item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
+                      }
+                      aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
                       aria-disabled={off || undefined}
                       tabIndex={i === active ? 0 : -1}
-                      value={held ?? value}
+                      // Keep the focus (and the selection) in the document on click.
+                      onMouseDown={(event) => event.preventDefault()}
                       onFocus={() => setActive(i)}
-                      // Leaving it another way than Tab (a click in the document) drops it: the
-                      // selection it was stepped on may be gone.
-                      onBlur={() => setPending(null)}
-                      onMouseDown={() => {
-                        pointer.current = true;
-                        stepped.current = false;
-                        // Opening the built-in Font box asks for the machine's fonts (a gesture).
-                        if (localFonts && select.options === fontOptions) void loadLocalFonts(true);
-                      }}
+                      onClick={(event) => run(i, event)}
                       onKeyDown={(event) => {
-                        pointer.current = false;
-                        // Keys that open the list (Alt+Down too), not the arrows that step it: a
-                        // prompt taking the focus would drop the stepped value.
-                        if (
-                          localFonts &&
-                          select.options === fontOptions &&
-                          (OPEN_KEYS.has(event.key) || (event.altKey && event.key === "ArrowDown"))
-                        )
-                          void loadLocalFonts(true);
-                        // Alt+Down opens the list, and on Apple platforms the arrows do: a pick
-                        // there is a pick, applied at once.
-                        stepped.current = STEP_KEYS.has(event.key) && !event.altKey && !IS_APPLE;
-                        if (event.key === "Tab") apply();
-                        if (event.key === "Escape" && held !== null) {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setPending(null);
-                        }
-                      }}
-                      // After the change an open list's Enter makes.
-                      onKeyUp={(event) => {
-                        if (event.key === "Enter") apply();
-                      }}
-                      onChange={(event) => {
-                        if (off) return;
-                        if (stepped.current) {
-                          setPending({ key: item.key, value: event.target.value });
+                        // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
+                        if (!(item.colors || item.actions) || off || event.key !== "ArrowDown")
                           return;
-                        }
-                        setPending(null);
-                        editor.run(select.pick(event.target.value));
-                        if (pointer.current) onClickCommand?.();
+                        event.preventDefault();
+                        setMenu(item.key);
                       }}
                     >
-                      {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
-                      {value === "" && <option value="" />}
-                      {value !== "" && !options.some((o) => o.value === value) && (
-                        <option value={value}>{value}</option>
-                      )}
-                      {options.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {DATA_BOXES.has(item.key) ? o.label : trLabel(o.label)}
-                        </option>
-                      ))}
-                    </select>
-                  );
-                }
-                const button = (
-                  <button
-                    key={item.key}
-                    ref={(element) => {
-                      buttons.current[i] = element;
-                    }}
-                    type="button"
-                    className={`foli-toolbar-button foli-toolbar-${item.key}${launcher ? " foli-toolbar-launcher" : large ? " foli-toolbar-large" : medium ? " foli-toolbar-medium" : ""}`}
-                    // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                    // A large button shows its text, which names it.
-                    aria-label={
-                      launcher || (item.icon !== undefined && !large && !medium)
-                        ? trLabel(item.label)
-                        : undefined
-                    }
-                    title={trLabel(item.label)}
-                    aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                    aria-haspopup={
-                      item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
-                    }
-                    aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
-                    aria-disabled={off || undefined}
-                    tabIndex={i === active ? 0 : -1}
-                    // Keep the focus (and the selection) in the document on click.
-                    onMouseDown={(event) => event.preventDefault()}
-                    onFocus={() => setActive(i)}
-                    onClick={(event) => run(i, event)}
-                    onKeyDown={(event) => {
-                      // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
-                      if (!(item.colors || item.actions) || off || event.key !== "ArrowDown")
-                        return;
-                      event.preventDefault();
-                      setMenu(item.key);
-                    }}
-                  >
-                    {/* A letter for an icon (B for bold) is a message too. */}
-                    {launcher ? (
-                      LAUNCHER_ICON
-                    ) : large ? (
-                      <>
-                        {item.icon !== undefined && (
-                          <span className="foli-toolbar-large-icon" aria-hidden="true">
+                      {/* A letter for an icon (B for bold) is a message too. */}
+                      {launcher ? (
+                        LAUNCHER_ICON
+                      ) : large ? (
+                        <>
+                          {item.icon !== undefined && (
+                            <span className="foli-toolbar-large-icon" aria-hidden="true">
+                              {typeof item.icon === "string" ? trLabel(item.icon) : item.icon}
+                            </span>
+                          )}
+                          <span className="foli-toolbar-large-text">
+                            {trLabel(item.text ?? item.label)}
+                          </span>
+                        </>
+                      ) : medium ? (
+                        <>
+                          <span className="foli-toolbar-medium-icon" aria-hidden="true">
                             {typeof item.icon === "string" ? trLabel(item.icon) : item.icon}
                           </span>
+                          <span className="foli-toolbar-medium-text">
+                            {trLabel(item.text ?? item.label)}
+                          </span>
+                        </>
+                      ) : typeof item.icon === "string" ? (
+                        trLabel(item.icon)
+                      ) : (
+                        (item.icon ?? trLabel(item.text ?? item.label))
+                      )}
+                      {item.colors && (
+                        <span
+                          className="foli-toolbar-swatch"
+                          aria-hidden="true"
+                          style={{ background: state?.value ?? "transparent" }}
+                        />
+                      )}
+                    </button>
+                  );
+                  if (item.actions) {
+                    const actions = actionsOf(item, body);
+                    return (
+                      <span key={item.key} className="foli-toolbar-menu">
+                        {button}
+                        {menu === item.key && !disabled && actions.length > 0 && (
+                          <ActionMenu
+                            label={trLabel(item.label)}
+                            actions={actions}
+                            editor={editor}
+                            state={editor.state}
+                            onPick={(action, pointer) => {
+                              setMenu(null);
+                              if (action.dialog) {
+                                openBuiltIn(action.dialog, buttons.current[i] ?? null);
+                                return;
+                              }
+                              editor.run(action.command);
+                              if (action.movesFocus) return;
+                              if (pointer) onClickCommand?.();
+                              else buttons.current[i]?.focus();
+                            }}
+                            onClose={(refocus) => {
+                              setMenu(null);
+                              if (refocus) buttons.current[i]?.focus();
+                            }}
+                          />
                         )}
-                        <span className="foli-toolbar-large-text">
-                          {trLabel(item.text ?? item.label)}
-                        </span>
-                      </>
-                    ) : medium ? (
-                      <>
-                        <span className="foli-toolbar-medium-icon" aria-hidden="true">
-                          {typeof item.icon === "string" ? trLabel(item.icon) : item.icon}
-                        </span>
-                        <span className="foli-toolbar-medium-text">
-                          {trLabel(item.text ?? item.label)}
-                        </span>
-                      </>
-                    ) : typeof item.icon === "string" ? (
-                      trLabel(item.icon)
-                    ) : (
-                      (item.icon ?? trLabel(item.text ?? item.label))
-                    )}
-                    {item.colors && (
-                      <span
-                        className="foli-toolbar-swatch"
-                        aria-hidden="true"
-                        style={{ background: state?.value ?? "transparent" }}
-                      />
-                    )}
-                  </button>
-                );
-                if (item.actions) {
-                  const actions = actionsOf(item, body);
+                      </span>
+                    );
+                  }
+                  const options = item.colors && paletteOf(item.colors, editor.state);
+                  if (!options || !item.colors) return button;
+                  const { pick } = item.colors;
                   return (
                     <span key={item.key} className="foli-toolbar-menu">
                       {button}
-                      {menu === item.key && !disabled && actions.length > 0 && (
-                        <ActionMenu
+                      {menu === item.key && !disabled && (
+                        <ColorMenu
                           label={trLabel(item.label)}
-                          actions={actions}
-                          editor={editor}
-                          state={editor.state}
-                          onPick={(action, pointer) => {
+                          options={options}
+                          columns={item.colors.columns}
+                          current={state?.value ?? null}
+                          onPick={(color, pointer) => {
+                            editor.run(pick(color));
                             setMenu(null);
-                            if (action.dialog) {
-                              openBuiltIn(action.dialog, buttons.current[i] ?? null);
-                              return;
-                            }
-                            editor.run(action.command);
-                            if (action.movesFocus) return;
                             if (pointer) onClickCommand?.();
                             else buttons.current[i]?.focus();
                           }}
@@ -3973,280 +4021,261 @@ export function FoliToolbar({
                             setMenu(null);
                             if (refocus) buttons.current[i]?.focus();
                           }}
+                          onCustom={
+                            item.colors.custom
+                              ? (pointer) => {
+                                  setMenu(null);
+                                  // The entry goes with the menu: its button keeps the focus, also
+                                  // when the user leaves the field without choosing.
+                                  buttons.current[i]?.focus();
+                                  const field = colorFields.current[item.key];
+                                  if (!field) return;
+                                  customColor.current = { pointer, editor, state: editor.state };
+                                  // It opens on the color at the selection.
+                                  field.value = state?.value ?? "#000000";
+                                  try {
+                                    field.showPicker();
+                                  } catch {
+                                    // No `showPicker` (older browsers), or it refused: a click opens it.
+                                    field.click();
+                                  }
+                                }
+                              : undefined
+                          }
+                        />
+                      )}
+                      {item.colors.custom && !disabled && (
+                        <ColorField
+                          setRef={(element) => {
+                            colorFields.current[item.key] = element;
+                          }}
+                          onPick={(color) => {
+                            const opened = customColor.current;
+                            // The color is for the selection the field opened on: a click in the
+                            // document that closed the field may have moved it since.
+                            if (
+                              opened?.editor === editor &&
+                              opened.state.doc === editor.state.doc &&
+                              !opened.state.selection.eq(editor.state.selection)
+                            )
+                              editor.dispatch(editor.state.tr.setSelection(opened.state.selection));
+                            editor.run(pick(color));
+                            if (opened?.pointer) onClickCommand?.();
+                          }}
                         />
                       )}
                     </span>
                   );
-                }
-                const options = item.colors && paletteOf(item.colors, editor.state);
-                if (!options || !item.colors) return button;
-                const { pick } = item.colors;
+                });
+                // Word's two-row groups: the items before `wrapBefore`, then the rest (the
+                // launcher stays last, in the caption's corner).
+                const wrap = group.items.findIndex((item) => item.key === group.wrapBefore);
+                const rows = (row: ReactNode[]) =>
+                  wrap > 0 ? (
+                    <>
+                      <div className="foli-toolbar-row">{row.slice(0, wrap)}</div>
+                      <div className="foli-toolbar-row">{row.slice(wrap)}</div>
+                    </>
+                  ) : (
+                    row
+                  );
                 return (
-                  <span key={item.key} className="foli-toolbar-menu">
-                    {button}
-                    {menu === item.key && !disabled && (
-                      <ColorMenu
-                        label={trLabel(item.label)}
-                        options={options}
-                        columns={item.colors.columns}
-                        current={state?.value ?? null}
-                        onPick={(color, pointer) => {
-                          editor.run(pick(color));
-                          setMenu(null);
-                          if (pointer) onClickCommand?.();
-                          else buttons.current[i]?.focus();
-                        }}
-                        onClose={(refocus) => {
-                          setMenu(null);
-                          if (refocus) buttons.current[i]?.focus();
-                        }}
-                        onCustom={
-                          item.colors.custom
-                            ? (pointer) => {
-                                setMenu(null);
-                                // The entry goes with the menu: its button keeps the focus, also
-                                // when the user leaves the field without choosing.
-                                buttons.current[i]?.focus();
-                                const field = colorFields.current[item.key];
-                                if (!field) return;
-                                customColor.current = { pointer, editor, state: editor.state };
-                                // It opens on the color at the selection.
-                                field.value = state?.value ?? "#000000";
-                                try {
-                                  field.showPicker();
-                                } catch {
-                                  // No `showPicker` (older browsers), or it refused: a click opens it.
-                                  field.click();
-                                }
-                              }
-                            : undefined
-                        }
-                      />
-                    )}
-                    {item.colors.custom && !disabled && (
-                      <ColorField
-                        setRef={(element) => {
-                          colorFields.current[item.key] = element;
-                        }}
-                        onPick={(color) => {
-                          const opened = customColor.current;
-                          // The color is for the selection the field opened on: a click in the
-                          // document that closed the field may have moved it since.
-                          if (
-                            opened?.editor === editor &&
-                            opened.state.doc === editor.state.doc &&
-                            !opened.state.selection.eq(editor.state.selection)
-                          )
-                            editor.dispatch(editor.state.tr.setSelection(opened.state.selection));
-                          editor.run(pick(color));
-                          if (opened?.pointer) onClickCommand?.();
-                        }}
-                      />
-                    )}
-                  </span>
-                );
-              });
-              // Word's two-row groups: the items before `wrapBefore`, then the rest (the
-              // launcher stays last, in the caption's corner).
-              const wrap = group.items.findIndex((item) => item.key === group.wrapBefore);
-              const rows = (row: ReactNode[]) =>
-                wrap > 0 ? (
-                  <>
-                    <div className="foli-toolbar-row">{row.slice(0, wrap)}</div>
-                    <div className="foli-toolbar-row">{row.slice(wrap)}</div>
-                  </>
-                ) : (
-                  row
-                );
-              return (
-                <Fragment key={group.items[0]?.key}>
-                  {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
-                  {group.label === undefined ? (
-                    controls
-                  ) : group.launcher ? (
-                    // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
-                    <div
-                      role="group"
-                      aria-label={trLabel(group.label)}
-                      className="foli-toolbar-group"
-                    >
+                  <Fragment key={group.items[0]?.key}>
+                    {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
+                    {group.label === undefined ? (
+                      controls
+                    ) : group.launcher ? (
+                      // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
                       <div
-                        className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
+                        role="group"
+                        aria-label={trLabel(group.label)}
+                        className="foli-toolbar-group"
                       >
-                        {rows(controls.slice(0, -1))}
+                        <div
+                          className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
+                        >
+                          {rows(controls.slice(0, -1))}
+                        </div>
+                        <div className="foli-toolbar-group-foot">
+                          <div className="foli-toolbar-group-label" aria-hidden="true">
+                            {trLabel(group.label)}
+                          </div>
+                          {controls.at(-1)}
+                        </div>
                       </div>
-                      <div className="foli-toolbar-group-foot">
+                    ) : (
+                      // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
+                      <div
+                        role="group"
+                        aria-label={trLabel(group.label)}
+                        className="foli-toolbar-group"
+                      >
+                        <div
+                          className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
+                        >
+                          {rows(controls)}
+                        </div>
                         <div className="foli-toolbar-group-label" aria-hidden="true">
                           {trLabel(group.label)}
                         </div>
-                        {controls.at(-1)}
                       </div>
-                    </div>
-                  ) : (
-                    // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
-                    <div
-                      role="group"
-                      aria-label={trLabel(group.label)}
-                      className="foli-toolbar-group"
-                    >
-                      <div
-                        className={`foli-toolbar-group-items${wrap > 0 ? " foli-toolbar-group-rows" : ""}`}
-                      >
-                        {rows(controls)}
-                      </div>
-                      <div className="foli-toolbar-group-label" aria-hidden="true">
-                        {trLabel(group.label)}
-                      </div>
-                    </div>
-                  )}
-                </Fragment>
-              );
-            }),
+                    )}
+                  </Fragment>
+                );
+              }),
+            )}
+          </div>,
+        )}
+        {appDialog &&
+          typeof appDialogItem?.dialog === "function" &&
+          !disabled &&
+          !builtInDialog && (
+            <AppDialog
+              // Each item's dialog is its own component: its hooks are not another dialog's.
+              key={appDialogItem.key}
+              label={trLabel(appDialogItem.label)}
+              name={appDialogItem.key}
+              content={appDialogItem.dialog}
+              editor={editor}
+              close={(applied) => {
+                setAppDialog(null);
+                // Its button as it is now: the items may have changed while it was open.
+                closed(
+                  applied,
+                  buttons.current[
+                    shown.current.findIndex((item) => item.key === appDialogItem.key)
+                  ],
+                );
+              }}
+            />
           )}
-        </div>,
-      )}
-      {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && !builtInDialog && (
-        <AppDialog
-          // Each item's dialog is its own component: its hooks are not another dialog's.
-          key={appDialogItem.key}
-          label={trLabel(appDialogItem.label)}
-          name={appDialogItem.key}
-          content={appDialogItem.dialog}
-          editor={editor}
-          close={(applied) => {
-            setAppDialog(null);
-            // Its button as it is now: the items may have changed while it was open.
-            closed(
-              applied,
-              buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
-            );
-          }}
-        />
-      )}
-      {pictureDialog && !disabled && (
-        <PictureDialog
-          editor={editor}
-          pos={pictureDialog.pos}
-          upload={upload}
-          onClose={(done) => {
-            const { restore } = pictureDialog;
-            setPictureDialog(null);
-            closed(done, restore);
-          }}
-        />
-      )}
-      {setupDialog && !disabled && (
-        <PageSetupDialog
-          editor={editor}
-          onClose={(applied) => {
-            const { restore } = setupDialog;
-            setSetupDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {wordDialog?.name === "paragraph" && !disabled && (
-        <ParagraphDialog
-          editor={editor}
-          unit="in"
-          onClose={(applied) => {
-            const { restore } = wordDialog;
-            setWordDialog(null);
-            closed(applied, restore);
-          }}
-          onTabs={() =>
-            // After this dialog's changes (which close it): the Tabs dialog, for the same focus.
-            setWordDialog({ ...wordDialog, name: "tabs", selection: editor.state.selection })
-          }
-        />
-      )}
-      {wordDialog?.name === "tabs" && !disabled && (
-        <TabsDialog
-          editor={editor}
-          unit="in"
-          onClose={(applied) => {
-            const { restore } = wordDialog;
-            setWordDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {wordDialog?.name === "font" && !disabled && (
-        <FontDialog
-          editor={editor}
-          fonts={fontOptions(editor.state).map((option) => option.value)}
-          sizes={SIZES}
-          colors={themeColors(editor.state).filter(
-            (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
-              c.shade === undefined && c.color !== null,
-          )}
-          onClose={(applied) => {
-            const { restore } = wordDialog;
-            setWordDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {referenceDialog && !disabled && (
-        <CrossReferenceDialog
-          editor={editor}
-          layout={() => body.storyView?.fieldLayout ?? null}
-          onClose={(inserted) => {
-            const { restore } = referenceDialog;
-            setReferenceDialog(null);
-            closed(inserted, restore);
-          }}
-        />
-      )}
-      {columnDialog && !disabled && (
-        <ColumnWidthDialog
-          editor={editor}
-          onClose={(applied) => {
-            const { restore } = columnDialog;
-            setColumnDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {noteDialog && !disabled && (
-        <NoteOptionsDialog
-          editor={body}
-          onClose={(applied) => {
-            const { restore } = noteDialog;
-            setNoteDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {controlDialog && !disabled && (
-        <ControlDialog
-          editor={editor}
-          onClose={(applied) => {
-            const { restore } = controlDialog;
-            setControlDialog(null);
-            closed(applied, restore);
-          }}
-        />
-      )}
-      {tableDialog && !disabled && (
-        <InsertTableDialog
-          editor={editor}
-          request={tableDialog.request}
-          onClose={(inserted) => {
-            const { restore } = tableDialog;
-            setTableDialog(null);
-            closed(inserted, restore);
-          }}
-        />
-      )}
-      {dialog && !disabled && (
-        <LinkDialog
-          editor={editor}
-          href={dialog.href}
-          request={dialog.request}
-          onClose={closeDialog}
-        />
-      )}
+        {pictureDialog && !disabled && (
+          <PictureDialog
+            editor={editor}
+            pos={pictureDialog.pos}
+            upload={upload}
+            onClose={(done) => {
+              const { restore } = pictureDialog;
+              setPictureDialog(null);
+              closed(done, restore);
+            }}
+          />
+        )}
+        {setupDialog && !disabled && (
+          <PageSetupDialog
+            editor={editor}
+            unit={unit}
+            onClose={(applied) => {
+              const { restore } = setupDialog;
+              setSetupDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "paragraph" && !disabled && (
+          <ParagraphDialog
+            editor={editor}
+            unit={unit}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+            onTabs={() =>
+              // After this dialog's changes (which close it): the Tabs dialog, for the same focus.
+              setWordDialog({ ...wordDialog, name: "tabs", selection: editor.state.selection })
+            }
+          />
+        )}
+        {wordDialog?.name === "tabs" && !disabled && (
+          <TabsDialog
+            editor={editor}
+            unit={unit}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "font" && !disabled && (
+          <FontDialog
+            editor={editor}
+            fonts={fontOptions(editor.state).map((option) => option.value)}
+            sizes={SIZES}
+            colors={themeColors(editor.state).filter(
+              (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
+                c.shade === undefined && c.color !== null,
+            )}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {referenceDialog && !disabled && (
+          <CrossReferenceDialog
+            editor={editor}
+            layout={() => body.storyView?.fieldLayout ?? null}
+            onClose={(inserted) => {
+              const { restore } = referenceDialog;
+              setReferenceDialog(null);
+              closed(inserted, restore);
+            }}
+          />
+        )}
+        {columnDialog && !disabled && (
+          <ColumnWidthDialog
+            editor={editor}
+            unit={unit}
+            onClose={(applied) => {
+              const { restore } = columnDialog;
+              setColumnDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {noteDialog && !disabled && (
+          <NoteOptionsDialog
+            editor={body}
+            onClose={(applied) => {
+              const { restore } = noteDialog;
+              setNoteDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {controlDialog && !disabled && (
+          <ControlDialog
+            editor={editor}
+            onClose={(applied) => {
+              const { restore } = controlDialog;
+              setControlDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {tableDialog && !disabled && (
+          <InsertTableDialog
+            editor={editor}
+            request={tableDialog.request}
+            onClose={(inserted) => {
+              const { restore } = tableDialog;
+              setTableDialog(null);
+              closed(inserted, restore);
+            }}
+          />
+        )}
+        {dialog && !disabled && (
+          <LinkDialog
+            editor={editor}
+            href={dialog.href}
+            request={dialog.request}
+            onClose={closeDialog}
+          />
+        )}
+      </UnitContext.Provider>
     </MessagesContext.Provider>
   );
 }
@@ -4934,17 +4963,19 @@ const NOTE_FORMATS = [
   ["chicago", "*, †, ‡"],
 ] as const;
 
-/** The width of the selection's table column, in cm (19.4): what dragging its border sets. */
+/** The width of the selection's table column (19.4), in the toolbar's unit: what dragging its border sets. */
 function ColumnWidthDialog({
   editor,
+  unit,
   onClose,
 }: {
   editor: Editor;
+  unit: LengthUnit;
   onClose: (applied: boolean) => void;
 }) {
   const t = useT();
   const [at] = useState(() => columnAt(editor.state));
-  const [width, setWidth] = useState(() => (at ? toCm(at.width) : ""));
+  const [width, setWidth] = useState(() => (at ? formatLength(at.width, unit) : ""));
   const [invalid, setInvalid] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const id = useId();
@@ -4954,12 +4985,12 @@ function ColumnWidthDialog({
   }, []);
   const apply = (event: FormEvent) => {
     event.preventDefault();
-    // The width shown, unchanged: nothing to do (cm round to a few twips).
-    if (at && width === toCm(at.width)) {
+    // The width shown, unchanged: nothing to do (the unit rounds to a few twips).
+    if (at && width === formatLength(at.width, unit)) {
       onClose(false);
       return;
     }
-    const twips = at && toTwips(width, at.min);
+    const twips = at && toTwips(width, at.min, unit);
     if (
       !at ||
       twips === null ||
@@ -4984,7 +5015,7 @@ function ColumnWidthDialog({
       }}
     >
       <form onSubmit={apply} noValidate>
-        <label htmlFor={`${id}-width`}>{t("Column width (cm)")}</label>
+        <label htmlFor={`${id}-width`}>{t("Column width")}</label>
         <input
           ref={field}
           id={`${id}-width`}
@@ -5005,10 +5036,10 @@ function ColumnWidthDialog({
         {invalid && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {at && at.max >= at.min
-              ? t("Enter a width in cm from {min} to {max}.", {
+              ? t("Enter a width from {min} to {max}.", {
                   // Rounded inwards: each end, typed back, is in range.
-                  min: String(Math.ceil((at.min / TWIPS_PER_CM) * 100) / 100),
-                  max: String(Math.floor((at.max / TWIPS_PER_CM) * 100) / 100),
+                  min: formatLength(at.min, unit, "up"),
+                  max: formatLength(at.max, unit, "down"),
                 })
               : t("This column cannot be made wider or narrower.")}
           </p>
@@ -5308,16 +5339,13 @@ function ControlDialog({
   );
 }
 
-const TWIPS_PER_CM = 1440 / 2.54;
 const MAX_TWIPS = 31_680;
 /** Word's limit on a section's columns. */
 const MAX_SECTION_COLUMNS = 45;
-const toCm = (twips: number) => String(Number((twips / TWIPS_PER_CM).toFixed(2)));
-/** A length in cm as whole twips (a decimal comma too), or null when it is not one in range. */
-function toTwips(text: string, min: number): number | null {
-  const value = Number(text.trim().replace(",", "."));
-  const twips = Math.round(value * TWIPS_PER_CM);
-  return text.trim() && Number.isFinite(value) && twips >= min && twips <= MAX_TWIPS ? twips : null;
+/** A length typed in `unit` (or with a unit of its own) as twips, or null when not one in range. */
+function toTwips(text: string, min: number, unit: LengthUnit): number | null {
+  const twips = parseLength(text, unit);
+  return twips !== null && twips >= min && twips <= MAX_TWIPS ? twips : null;
 }
 
 const SECTION_STARTS = [
@@ -5338,15 +5366,15 @@ type SetupField =
   | "space"
   | "widths";
 const SETUP_LABELS: Record<SetupField, ToolbarMessage> = {
-  width: "Page width (cm)",
-  height: "Page height (cm)",
-  top: "Top margin (cm)",
-  bottom: "Bottom margin (cm)",
-  left: "Left margin (cm)",
-  right: "Right margin (cm)",
+  width: "Page width",
+  height: "Page height",
+  top: "Top margin",
+  bottom: "Bottom margin",
+  left: "Left margin",
+  right: "Right margin",
   count: "Columns",
-  space: "Space between columns (cm)",
-  widths: "Set column widths (cm, separated by ;)",
+  space: "Space between columns",
+  widths: "Set column widths (separated by ;)",
 };
 
 /**
@@ -5356,9 +5384,11 @@ const SETUP_LABELS: Record<SetupField, ToolbarMessage> = {
  */
 function PageSetupDialog({
   editor,
+  unit,
   onClose,
 }: {
   editor: Editor;
+  unit: LengthUnit;
   /** `applied`: the setup changed (the focus may go to the document). */
   onClose: (applied: boolean) => void;
 }) {
@@ -5375,16 +5405,18 @@ function PageSetupDialog({
       orientation: setup.pageSize?.orientation ?? (width > height ? "landscape" : "portrait"),
       separator: setup.columns?.separator === true,
       columns: setup.columns,
+      width,
+      height,
       fields: {
-        width: toCm(width),
-        height: toCm(height),
-        top: toCm(Math.abs(m.top ?? 1440)),
-        bottom: toCm(Math.abs(m.bottom ?? 1440)),
-        left: toCm(m.left ?? 1440),
-        right: toCm(m.right ?? 1440),
+        width: formatLength(width, unit),
+        height: formatLength(height, unit),
+        top: formatLength(Math.abs(m.top ?? 1440), unit),
+        bottom: formatLength(Math.abs(m.bottom ?? 1440), unit),
+        left: formatLength(m.left ?? 1440, unit),
+        right: formatLength(m.right ?? 1440, unit),
         count: String(set.length || (setup.columns?.count ?? 1)),
-        space: toCm(setup.columns?.space ?? 720),
-        widths: set.map((column) => toCm(column.width)).join("; "),
+        space: formatLength(setup.columns?.space ?? 720, unit),
+        widths: set.map((column) => formatLength(column.width, unit)).join("; "),
       } satisfies Record<SetupField, string>,
     };
   });
@@ -5409,7 +5441,13 @@ function PageSetupDialog({
     const lengths: Partial<Record<SetupField, number>> = {};
     for (const field of ["width", "height", "top", "bottom", "left", "right"] as const) {
       if (!changed(field)) continue;
-      const twips = toTwips(fields[field], field === "width" || field === "height" ? 1 : 0);
+      // A side swapped by the orientation, untouched: its exact twips, not the rounded text.
+      const other = field === "width" ? "height" : field === "height" ? "width" : null;
+      if (other && fields[field] === initial.fields[other]) {
+        lengths[field] = other === "width" ? initial.width : initial.height;
+        continue;
+      }
+      const twips = toTwips(fields[field], field === "width" || field === "height" ? 1 : 0, unit);
       if (twips === null) return wrong(field);
       lengths[field] = twips;
     }
@@ -5440,15 +5478,17 @@ function PageSetupDialog({
       // What was not changed stays exactly as it is, each column's own space included.
       const before = initial.columns;
       const set = before?.equalWidth === false ? (before.widths ?? []) : [];
-      const space = changed("space") ? toTwips(fields.space, 0) : (before?.space ?? 720);
+      const space = changed("space") ? toTwips(fields.space, 0, unit) : (before?.space ?? 720);
       if (space === null) return wrong("space");
       let widths: (number | null)[] = set.map((column) => column.width);
       if (changed("widths"))
         widths = fields.widths.trim()
           ? fields.widths
               .trim()
-              .split(/[;\s]+/)
-              .map((width) => toTwips(width, 1))
+              .split(";")
+              .map((width) => width.trim())
+              .filter(Boolean)
+              .map((width) => toTwips(width, 1, unit))
           : [];
       if (widths.includes(null)) return wrong("widths");
       const asked = Number(fields.count);

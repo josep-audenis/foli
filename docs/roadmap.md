@@ -4329,8 +4329,13 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   and the default toolbar). Changed: no Mirrored margins (no `w:mirrorMargins` in the model);
   Breaks keeps Remove section break. `dialogs.test.tsx`, `layout.spec.ts` in Chromium, Firefox
   and WebKit with axe; checked by hand.
-- [ ] 30.6 Units: inches or centimetres in every dialog (the locale's, `units` on the toolbar),
-  the Page setup dialog included.
+- [x] 30.6 Units: inches or centimetres in every dialog (the locale's, `units` on the toolbar),
+  the Page setup dialog included. Built: `FoliToolbarProps.units`
+  (`LengthUnit`, also through `FoliEditor`'s `toolbarProps`), by default `navigator.language`'s
+  (changed from the plan: no `locale` prop, the browser's language decides); the Paragraph and
+  Tabs dialogs, Layout's Indent boxes, Page setup and the column width dialog all show and take
+  it. Page setup's and the column width dialog's labels lose "(cm)" (new strings, in the
+  changeset). `dialogs.test.tsx` (inches and centimetres), the 19.4 test in centimetres.
 - [ ] 30.7 e2e in three engines with axe for each dialog and menu; docs (api.md, keyboard.md,
   limitations.md); changesets.
 
