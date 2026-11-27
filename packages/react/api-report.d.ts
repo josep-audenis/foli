@@ -305,13 +305,15 @@ export interface FoliLayoutOptionsProps {
     units?: LengthUnit | undefined;
     /** Only shown when the document can change. */
     disabled?: boolean | undefined;
+    /** After a pick: the document takes the focus back. */
+    onClickCommand?: (() => void) | undefined;
 }
 /**
  * Word's Layout Options button beside the selected picture or text box (33.4,
  * `.foli-layout-options`): its wrapping, and whether it moves with its paragraph, in a menu.
  * Follows the object as the pages scroll and change; gone when no object is selected.
  */
-export declare function FoliLayoutOptions({ editor, messages, units, disabled }: FoliLayoutOptionsProps): import("react").JSX.Element;
+export declare function FoliLayoutOptions({ editor, messages, units, disabled, onClickCommand, }: FoliLayoutOptionsProps): import("react").JSX.Element;
 
 // FoliMiniToolbar.d.ts
 import type { Editor } from "@folijs/core";

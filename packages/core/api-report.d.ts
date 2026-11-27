@@ -1301,6 +1301,8 @@ export interface StoryView {
      * it at. Null when it is not drawn. Optional: a view made before Phase 33 has none.
      */
     objectPlacement?(pos: number): ObjectPlacement | null;
+    /** Where that object is on the screen (viewport px), or null. Optional, as `objectPlacement`. */
+    objectRect?(pos: number): DOMRect | null;
     /** Back from the note being edited to its reference, the caret after it. */
     toReference(): boolean;
     close(): void;

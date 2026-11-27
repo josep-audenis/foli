@@ -881,9 +881,14 @@ const POSITION_LABELS: Readonly<Record<ObjectPosition, { label: string }>> = {
   bottomRight: { label: "Bottom right" },
 };
 
-/** The selected object's place on its page, as the view draws it. */
+/**
+ * The selected object's place on its page, as the view draws it: the body's only (an object in an
+ * open header, footer or box is not measured; its layout changes keep its offsets).
+ */
 const placementOf = (editor: Editor, pos: number) =>
-  editor.storyView?.objectPlacement?.(pos) ?? undefined;
+  editor.storyView && !editor.storyView.open
+    ? (editor.storyView.objectPlacement?.(pos) ?? undefined)
+    : undefined;
 
 /** Wrap Text (Layout ▸ Arrange, Picture Format, Layout Options): the selected object's wrapping. */
 function wrapActions(editor: Editor): readonly Action[] {
@@ -898,10 +903,11 @@ function wrapActions(editor: Editor): readonly Action[] {
         },
         command: (state, dispatch) => {
           const object = selectedObject(state);
-          return (
-            !!object &&
-            setObjectWrap(object.pos, wrap, placementOf(editor, object.pos))(state, dispatch)
-          );
+          if (!object || trackState(state)?.on === true) return false;
+          // The current choice stays enabled, as Word's; measured only when it runs.
+          if (objectWrap(object.node) === wrap) return true;
+          if (!dispatch) return setObjectWrap(object.pos, wrap)(state);
+          return setObjectWrap(object.pos, wrap, placementOf(editor, object.pos))(state, dispatch);
         },
       }),
     ),
@@ -922,6 +928,7 @@ function wrapActions(editor: Editor): readonly Action[] {
           const object = selectedObject(state);
           if (!object?.node.attrs.float || trackState(state)?.on === true) return false;
           if (objectMovesWithText(object.node) === moves) return true;
+          if (!dispatch) return true;
           return setObjectMovesWithText(
             object.pos,
             moves,
@@ -945,7 +952,9 @@ function positionActions(editor: Editor): readonly Action[] {
       },
       command: (state, dispatch) => {
         const object = selectedObject(state);
-        return !!object && setObjectWrap(object.pos, "inline")(state, dispatch);
+        if (!object || trackState(state)?.on === true) return false;
+        if (!object.node.attrs.float) return true;
+        return setObjectWrap(object.pos, "inline")(state, dispatch);
       },
     },
     ...(Object.keys(POSITION_LABELS) as ObjectPosition[]).map(
@@ -958,7 +967,9 @@ function positionActions(editor: Editor): readonly Action[] {
         },
         command: (state, dispatch) => {
           const object = selectedObject(state);
-          return !!object && setObjectPosition(object.pos, position)(state, dispatch);
+          if (!object || trackState(state)?.on === true) return false;
+          if (objectPosition(object.node) === position) return true;
+          return setObjectPosition(object.pos, position)(state, dispatch);
         },
       }),
     ),

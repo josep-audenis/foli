@@ -165,7 +165,8 @@ host.addEventListener("mouseup", (event) => {
     const rect = getSelection()?.rangeCount
       ? getSelection()?.getRangeAt(0).getClientRects()[0]
       : null;
-    if (editor.state.selection.empty || !rect) return;
+    // Text selected: a selected picture or text box has its Layout Options instead.
+    if (editor.state.selection.empty || "node" in editor.state.selection || !rect) return;
     mini.render(
       <FoliMiniToolbar
         key={event.timeStamp}

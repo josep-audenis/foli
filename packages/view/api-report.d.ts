@@ -663,6 +663,8 @@ export declare class EditorView {
      * corner, its paragraph's top and its column's left edge; null when it is not drawn.
      */
     objectPlacement(pos: number): ObjectPlacement | null;
+    /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
+    objectRect(pos: number): DOMRect | null;
     /** Marks the selected picture and gives it a resize handle (when the document is editable). */
     private showSelectedPicture;
     /** Marks the cells of a cell selection (their table cell elements, on every page). */

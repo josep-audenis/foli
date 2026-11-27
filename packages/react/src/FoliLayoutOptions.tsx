@@ -13,17 +13,22 @@ export interface FoliLayoutOptionsProps {
   units?: LengthUnit | undefined;
   /** Only shown when the document can change. */
   disabled?: boolean | undefined;
+  /** After a pick: the document takes the focus back. */
+  onClickCommand?: (() => void) | undefined;
 }
-
-/** The selected object as the view marks it (in this editor's pages: the one with the focus). */
-const SELECTED = "[data-foli-picture-selected]";
 
 /**
  * Word's Layout Options button beside the selected picture or text box (33.4,
  * `.foli-layout-options`): its wrapping, and whether it moves with its paragraph, in a menu.
  * Follows the object as the pages scroll and change; gone when no object is selected.
  */
-export function FoliLayoutOptions({ editor, messages, units, disabled }: FoliLayoutOptionsProps) {
+export function FoliLayoutOptions({
+  editor,
+  messages,
+  units,
+  disabled,
+  onClickCommand,
+}: FoliLayoutOptionsProps) {
   const selected = useEditorState((state) => selectedObject(state)?.pos ?? null, { editor });
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ x: number; y: number } | null>(null);
@@ -36,10 +41,11 @@ export function FoliLayoutOptions({ editor, messages, units, disabled }: FoliLay
     let frame = 0;
     const place = () => {
       frame = 0;
-      const element = doc.querySelector(SELECTED);
-      const rect = element?.getBoundingClientRect();
+      // This editor's own object, as its view draws it.
+      const rect = editor.storyView?.objectRect?.(selected);
+      const width = doc.defaultView?.innerWidth ?? Number.POSITIVE_INFINITY;
       setAt((old) => {
-        const next = rect ? { x: rect.right + 6, y: rect.top } : null;
+        const next = rect ? { x: Math.min(rect.right + 6, width - 40), y: rect.top } : null;
         return old && next && old.x === next.x && old.y === next.y ? old : next;
       });
     };
@@ -76,6 +82,7 @@ export function FoliLayoutOptions({ editor, messages, units, disabled }: FoliLay
           label="Layout Options"
           messages={messages}
           units={units}
+          onClickCommand={onClickCommand}
         />
       )}
     </div>

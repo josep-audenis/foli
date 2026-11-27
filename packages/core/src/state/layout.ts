@@ -143,11 +143,12 @@ export function setObjectMovesWithText(
     if (!node?.attrs.float || objectMovesWithText(node) === moves) return false;
     return setFloat(pos, (n) => {
       const float = n.attrs.float as Record<string, unknown>;
-      const top = placement ? (moves ? placement.top - placement.paragraphTop : placement.top) : 0;
-      return {
-        ...float,
-        vertical: { relativeTo: moves ? "paragraph" : "page", offset: emu(top) },
-      };
+      const vertical = float.vertical as ObjectAxis;
+      // Not drawn (no placement): its offset as it is, only what it is from changes.
+      const top = placement
+        ? emu(moves ? placement.top - placement.paragraphTop : placement.top)
+        : (vertical.offset ?? 0);
+      return { ...float, vertical: { relativeTo: moves ? "paragraph" : "page", offset: top } };
     })(state, dispatch);
   };
 }
@@ -173,15 +174,15 @@ export function setObjectLayout(pos: number, layout: ObjectLayout): Command {
     if (!node?.attrs.float) return false;
     return setFloat(pos, (n) => {
       const float = n.attrs.float as Record<string, unknown>;
-      const axis = (a: ObjectAxis | undefined) =>
+      const axis = (a: ObjectAxis | undefined, start: string) =>
         a &&
         (typeof a.offset === "number"
           ? { relativeTo: a.relativeTo, offset: Math.round(a.offset) }
-          : { relativeTo: a.relativeTo, align: a.align ?? "left" });
+          : { relativeTo: a.relativeTo, align: a.align ?? start });
       return {
         ...float,
-        ...(layout.horizontal ? { horizontal: axis(layout.horizontal) } : {}),
-        ...(layout.vertical ? { vertical: axis(layout.vertical) } : {}),
+        ...(layout.horizontal ? { horizontal: axis(layout.horizontal, "left") } : {}),
+        ...(layout.vertical ? { vertical: axis(layout.vertical, "top") } : {}),
         ...(layout.side ? { side: layout.side } : {}),
         ...(layout.distance
           ? {

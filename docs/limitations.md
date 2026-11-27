@@ -300,7 +300,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   Position moves it sideways only on the page; behind and in front of text it goes where
   Word puts it. Not while tracking changes (Foli does not record a layout change, nor Word
   in a way Foli reads).
-- A picture behind text cannot be clicked where text covers it (select it with the keyboard).
+- A picture or text box behind text cannot be clicked where text covers it (select it with the
+  keyboard). A picture or box in an open header, footer or text box changes its layout without
+  being measured: made floating, it starts at its paragraph's top left; fixed on the page, it
+  keeps its offset. One made floating in a paragraph split across pages is measured from the
+  part on its page.
 - A floating picture in a table cell is placed against the page, not its cell.
 - Screen readers meet a floating picture at the start of its paragraph (or of the part on that
   page, for a paragraph split across pages), where it is drawn, not at its place in the text (not tried with a screen reader; see "Not verified by hand").

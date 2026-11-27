@@ -313,6 +313,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
             const anchor = selection?.anchorNode;
             const element = anchor instanceof Element ? anchor : anchor?.parentElement;
             if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+            // A selected picture or text box has its Layout Options instead.
+            if ("node" in activeEditor.state.selection) return;
             if (!element?.closest(".foli-content") || !body.contains(element)) return;
             const rect = selection.getRangeAt(0).getClientRects?.()[0];
             if (rect) setMiniAt({ x: rect.left, y: rect.top });
@@ -370,7 +372,9 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         <FoliLayoutOptions
           editor={editor}
           units={toolbarProps?.units}
+          messages={toolbarProps?.messages}
           disabled={readOnly || commentOnly}
+          onClickCommand={() => canvasRef.current?.focus()}
         />
       )}
       {miniAt && (

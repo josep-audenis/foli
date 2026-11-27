@@ -2076,6 +2076,7 @@ export class EditorView {
     editNote: (id) => view.openNote(id),
     editTextBox: (id) => view.openTextBox(id),
     objectPlacement: (pos) => view.objectPlacement(pos),
+    objectRect: (pos) => view.objectRect(pos),
     toReference: () => view.toReference(),
     close: () => view.closeStory(),
     get fieldLayout() {
@@ -4016,10 +4017,11 @@ export class EditorView {
     const drawn = span?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`);
     const page = span?.closest<HTMLElement>(".foli-page");
     const anchor = span && (FLOAT_ANCHORS.get(span) ?? span);
-    const block = (
-      span?.hasAttribute(FLOAT_ATTR) ? span.parentElement : anchor
-    )?.closest<HTMLElement>(".foli-page > *, .foli-column > *");
-    if (!drawn || !page || !block) return null;
+    const inText = span?.hasAttribute(FLOAT_ATTR) ? span.parentElement : anchor;
+    // Its paragraph (in a table, the cell's: Word measures from it), and the column's block.
+    const paragraph = inText?.closest<HTMLElement>("p, h1, h2, h3, h4, h5, h6");
+    const block = inText?.closest<HTMLElement>(".foli-page > *, .foli-column > *");
+    if (!drawn || !page || !block || !paragraph) return null;
     const scale = this.scale();
     const box = page.getBoundingClientRect();
     const at = drawn.getBoundingClientRect();
@@ -4031,9 +4033,19 @@ export class EditorView {
     return {
       left: (at.left - box.left) / scale,
       top: (at.top - box.top) / scale,
-      paragraphTop: (block.getBoundingClientRect().top - box.top) / scale,
+      paragraphTop: (paragraph.getBoundingClientRect().top - box.top) / scale,
       columnLeft: (column.left + padding - box.left) / scale,
     };
+  }
+
+  /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
+  objectRect(pos: number): DOMRect | null {
+    const span = this.pictureSpan(pos);
+    return (
+      span
+        ?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`)
+        ?.getBoundingClientRect() ?? null
+    );
   }
 
   /** Marks the selected picture and gives it a resize handle (when the document is editable). */
