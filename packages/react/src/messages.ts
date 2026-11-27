@@ -462,6 +462,7 @@ export const toolbarMessages = [
   "Shape Format",
   "Shape height",
   "Shape width",
+  "Shapes",
   "Show",
   "Show changes as",
   "Show field codes",

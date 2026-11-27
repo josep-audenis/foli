@@ -1029,6 +1029,18 @@ selected box node. A box's text is the story its `story` attribute names (`edito
 `storyView.editTextBox(id)` opens it where it is drawn. Deleting a box deletes its story in
 the same transaction.
 
+Shapes (Phase 34, ADR-0017): `insertShape(geometry, { width?, height?, horizontal?, vertical?,
+flipH?, flipV?, pos? })` adds a shape of DrawingML preset `geometry` (`"rect"`, `"ellipse"`,
+`"rightArrow"`…; sizes and offsets in EMU, default an inch square at its paragraph's top left),
+in front of the text, filled with the theme's first accent and lined with its dark shade (a line:
+the accent, 0.5 pt, an arrow end for `straightConnector1`), anchored at `pos` (default the
+selection's end), one undo step, selected; not in a story, and only DrawingML's preset names.
+`storyView.drawShape(geometry)` (optional; the view's `drawShape` and `stopDrawing`) lets the next
+press and drag on the pages give its box (Shift: a square, a line at 45°; a press without a drag:
+an inch square), Escape stopping it. `@folijs/view` exports `SHAPE_GALLERY` (Word's gallery's
+groups: each shape's preset and Word's name) and `shapePreview(geometry, size?)` (its paths in a
+square, for an icon); `toolbarItems.shapes` is Insert ▸ Shapes.
+
 Layout Options (33.4) for a picture or text box: `selectedObject(state)` gives the selected one
 and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `topAndBottom`,
 `behind`, `inFront`), `objectMovesWithText(node)` and `objectPosition(node)` (one of

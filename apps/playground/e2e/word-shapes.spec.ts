@@ -110,3 +110,108 @@ test("renderDocument draws the shapes too (print, exportPdf)", async ({ page }) 
   expect(drawn.shapes).toBe(44);
   expect(drawn.text).toContain("Open day");
 });
+
+/** The editing page with its ribbon, an empty paragraph to draw beside. */
+async function ribbon(page: Page): Promise<void> {
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => "foliEdit" in window);
+  await page.getByRole("tab", { name: "Insert" }).click();
+}
+
+const drawn = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll("section.foli-page [data-foli-shape]")].map((shape) => {
+      const r = shape.getBoundingClientRect();
+      const p = (shape.closest("section.foli-page") as HTMLElement).getBoundingClientRect();
+      return {
+        geometry: shape.getAttribute("data-foli-shape"),
+        left: Math.round(r.left - p.left),
+        top: Math.round(r.top - p.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+        selected: !!shape.closest("[data-foli-picture-selected]"),
+      };
+    }),
+  );
+
+test("Insert ▸ Shapes: a shape drawn by dragging on the page, Shift for a square (34.3)", async ({
+  page,
+}) => {
+  await ribbon(page);
+  await page.getByRole("button", { name: "Shapes" }).click();
+  const menu = page.getByRole("menu", { name: "Shapes" });
+  await expect(menu).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).include(".foli-shape-gallery-menu").analyze()).violations,
+  ).toEqual([]);
+  await menu.getByRole("menuitem", { name: "Arrow: Right", exact: true }).click();
+  await expect(menu).toBeHidden();
+  const box = (await page.locator("section.foli-page").first().boundingBox()) as {
+    x: number;
+    y: number;
+  };
+  await page.mouse.move(box.x + 200, box.y + 300);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 300, box.y + 340, { steps: 4 });
+  await page.mouse.move(box.x + 400, box.y + 380, { steps: 4 });
+  await page.mouse.up();
+  // Where it was dragged, at its size (a pixel of rounding either way).
+  await expect.poll(async () => (await drawn(page)).length).toBe(1);
+  const [arrow] = await drawn(page);
+  expect(arrow?.geometry).toBe("rightArrow");
+  expect(arrow?.selected).toBe(true);
+  for (const [key, value] of [
+    ["left", 200],
+    ["top", 300],
+    ["width", 200],
+    ["height", 80],
+  ] as const)
+    expect(Math.abs((arrow?.[key] ?? 0) - value), key).toBeLessThanOrEqual(1);
+  // Undo takes it away in one step.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect.poll(async () => (await drawn(page)).length).toBe(0);
+  // Shift keeps it square.
+  await page.getByRole("button", { name: "Shapes" }).click();
+  await page.getByRole("menuitem", { name: "Oval", exact: true }).click();
+  await page.mouse.move(box.x + 200, box.y + 300);
+  await page.mouse.down();
+  await page.keyboard.down("Shift");
+  await page.mouse.move(box.x + 330, box.y + 340, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect.poll(async () => (await drawn(page))[0]).toMatchObject({ width: 130, height: 130 });
+});
+
+test("Insert ▸ Shapes from the keyboard: an inch square at the selection; Escape stops drawing", async ({
+  page,
+}) => {
+  await ribbon(page);
+  const button = page.getByRole("button", { name: "Shapes" });
+  await button.focus();
+  await page.keyboard.press("ArrowDown");
+  const menu = page.getByRole("menu", { name: "Shapes" });
+  await expect(menu.getByRole("menuitem", { name: "Line", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(button).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  // Line, Line Arrow, … Rectangle is the first of the second group: the fifth.
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
+  await expect(menu.getByRole("menuitem", { name: "Rectangle", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() => drawn(page))
+    .toEqual([
+      expect.objectContaining({ geometry: "rect", width: 96, height: 96, selected: true }),
+    ]);
+  // A click starts drawing; Escape stops it: nothing is drawn.
+  await button.click();
+  await menu.getByRole("menuitem", { name: "Oval", exact: true }).click();
+  await page.keyboard.press("Escape");
+  const box = (await page.locator("section.foli-page").first().boundingBox()) as {
+    x: number;
+    y: number;
+  };
+  await page.mouse.click(box.x + 300, box.y + 500);
+  expect((await drawn(page)).map((s) => s.geometry)).toEqual(["rect"]);
+});

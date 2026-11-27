@@ -191,6 +191,7 @@ import {
   useT,
 } from "./messages.js";
 import { shade, shadesOf } from "./palette.js";
+import { ShapeGallery } from "./ShapeGallery.js";
 import { StyleGallery } from "./StyleGallery.js";
 import { defaultUnit, formatLength, type LengthUnit, parseLength } from "./units.js";
 import {
@@ -2400,6 +2401,8 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Insert ▸ Shapes (34.3): Word's gallery; a shape is drawn on the pages.
+  { key: "shapes", label: "Shapes", text: "Shapes", enabled: isWord, render: ShapeGallery },
   // Word's Design tab (Phase 32): its Page Background group.
   {
     key: "pageColor",
@@ -2628,6 +2631,7 @@ export type ToolbarItemName =
   | "pageSetup"
   | "controlProperties"
   | "textBox"
+  | "shapes"
   | "footnote"
   | "endnote"
   | "goToNote"
@@ -2913,7 +2917,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       items: [
         group("Pages", t.pageBreak, t.horizontalRule),
         group("Tables", large(t.table)),
-        group("Illustrations", large(t.picture)),
+        group("Illustrations", large(t.picture), large(t.shapes)),
         group("Links", t.link, t.crossReference),
         group("Header & Footer", t.headerFooter, t.pageNumber),
         group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.date),

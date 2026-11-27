@@ -33,7 +33,7 @@ const INCH = 914_400;
 const shade = (hex: string, factor: number) =>
   [0, 2, 4]
     .map((i) =>
-      Math.round(Number.parseInt(hex.slice(i, i + 2), 16) * factor)
+      Math.floor(Number.parseInt(hex.slice(i, i + 2), 16) * factor)
         .toString(16)
         .padStart(2, "0"),
     )

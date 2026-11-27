@@ -299,7 +299,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   rectangle with its fill and line. A turned shape turns its text with it; flips mirror the
   drawing, not the text. A path gradient is drawn round from the middle (its fill-to rectangle
   not followed). A line end is never drawn smaller than a 1.5 pt line's. Until 34.4 a shape's
-  text is drawn but not edited. The agent reads a shape's
+  text is drawn but not edited. Insert ▸ Shapes (34.3) offers the shapes Foli draws (Word's
+  gallery has more), named in English whatever the toolbar's language, and puts a shape in the
+  body only (shortcut, as text boxes), anchored at the start of the paragraph pressed; drawn from
+  a paragraph's second page, its offset counts from the paragraph's first. The agent reads a shape's
   paragraph without its text.
 - A picture whose resource is a web `url` is fetched by the view as soon as it is shown (with
   no referrer) unless the app's `resource` resolver returns `null` for it: for JSON documents

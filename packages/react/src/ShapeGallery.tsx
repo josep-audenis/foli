@@ -2,6 +2,7 @@ import { insertShape } from "@folijs/core";
 import { SHAPE_GALLERY, shapePreview } from "@folijs/view";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import type { ToolbarCustomProps } from "./FoliToolbar.js";
+import { toolbarIcons } from "./icons.js";
 import { type ToolbarMessage, useT } from "./messages.js";
 
 const SHAPES = SHAPE_GALLERY.flatMap((group) => group.shapes);
@@ -63,7 +64,8 @@ export function ShapeGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
     const view = editor.storyView;
     if (!byKeyboard && view?.drawShape?.(geometry)) return;
     editor.run(insertShape(geometry));
-    editor.focus();
+    // From the keyboard the focus comes back to the button, as the toolbar's menus do.
+    button.current?.focus();
   };
   const onMenuKey = (event: KeyboardEvent) => {
     const at = items.current.indexOf(event.target as HTMLButtonElement);
@@ -113,7 +115,7 @@ export function ShapeGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
           }
         }}
       >
-        <Icon geometry="roundRect" />
+        <span className="foli-toolbar-large-icon">{toolbarIcons.shapes}</span>
         <span>{t("Shapes" as ToolbarMessage)}</span>
       </button>
       {open && (
@@ -127,6 +129,7 @@ export function ShapeGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
           onKeyDown={onMenuKey}
         >
           {SHAPE_GALLERY.map((group) => (
+            // biome-ignore lint/a11y/useSemanticElements: a menu's group (ARIA), not a form's fieldset.
             <div key={group.name} role="group" aria-label={t(group.name as ToolbarMessage)}>
               <div className="foli-shape-gallery-heading" aria-hidden="true">
                 {t(group.name as ToolbarMessage)}
