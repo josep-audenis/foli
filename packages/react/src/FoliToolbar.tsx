@@ -959,7 +959,9 @@ function refitted(current: SectionJSON, change: SectionSetup): SectionSetup {
     width: Math.max(1, Math.floor(c.width * scale)),
     ...(c.space === undefined ? {} : { space: Math.floor(c.space * scale) }),
   }));
-  return { ...change, columns: { ...columns, widths } };
+  // The columns' own space, for those without one, scales too.
+  const space = columns.space === undefined ? {} : { space: Math.floor(columns.space * scale) };
+  return { ...change, columns: { ...columns, ...space, widths } };
 }
 
 const BREAK_ACTIONS: readonly Action[] = [
