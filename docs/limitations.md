@@ -303,7 +303,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   selected shape moves by its body (floating ones; one in line moves with its text), turns by
   its handle (Shift by 15°), resizes by its corner (Shift keeps the ratio) and has its preset's
   yellow adjustment handles (none for a custom geometry); a touch selects it but does not drag
-  it. Moving, turning and adjusting are refused while tracking (Word records none of them).
+  it. A press on a shape's text selects the shape; a press in the selected shape's text, or
+  typing on it, writes there (the first character typed is undone apart from the text made for
+  it: two steps). Moving, turning, adjusting and giving a shape text are refused while tracking
+  (Word records none of them). Adjustment handles have no keyboard way; turning has the Layout
+  dialog's Size tab.
   Insert ▸ Shapes (34.3) offers the shapes Foli draws (Word's
   gallery has more), named in English whatever the toolbar's language, and puts a shape in the
   body only (shortcut, as text boxes), anchored at the start of the paragraph pressed; drawn from

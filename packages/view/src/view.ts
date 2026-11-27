@@ -1104,6 +1104,7 @@ export class EditorView {
     // The pointer on a column border, no drag: the cursor is the view's.
     if (this.resizeCursor) host.style.removeProperty("cursor");
     this.stopDrawing();
+    this.endShapeGesture();
     this.endResize();
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
@@ -3327,7 +3328,14 @@ export class EditorView {
     const pressed = event.target instanceof Element ? event.target : null;
     const inBox = pressed?.closest(`[${TEXT_BOX_ATTR}]`);
     const pressedId = inBox?.getAttribute(TEXT_BOX_ATTR);
-    const boxId = pressedId && this.textBoxElement(pressedId) === inBox ? pressedId : null;
+    const shapeOf = inBox?.parentElement?.closest<HTMLElement>(`[${SHAPE_ATTR}]`);
+    // A shape's text (34.4): a press selects the shape (to drag it) unless it is selected already.
+    const shapeSelected =
+      !shapeOf ||
+      (this.state.selection instanceof NodeSelection &&
+        this.pictureSpan(this.state.selection.from)?.contains(shapeOf) === true);
+    const boxId =
+      pressedId && shapeSelected && this.textBoxElement(pressedId) === inBox ? pressedId : null;
     this.closeStory(false);
     if (boxId && event.button === 0 && !event.shiftKey && this.editable) {
       event.preventDefault();
@@ -4055,7 +4063,11 @@ export class EditorView {
     if (!drawn || !page || !block || !paragraph) return null;
     const scale = this.scale();
     const box = page.getBoundingClientRect();
+    // Its unturned box (a turned one's rect is its turned bounds).
+    const turned = drawn.style.transform;
+    drawn.style.transform = "";
     const at = drawn.getBoundingClientRect();
+    drawn.style.transform = turned;
     const column = (block.parentElement ?? page).getBoundingClientRect();
     const padding =
       block.parentElement === page
@@ -5076,6 +5088,7 @@ export class EditorView {
     cy: number;
     scale: number;
     attrs: Record<string, unknown>;
+    node: ModelNode;
     style: string;
     svg: SVGSVGElement | null;
     /** What the gesture gives on release. */
@@ -5103,6 +5116,7 @@ export class EditorView {
       cy: rect.top + rect.height / 2,
       scale: this.scale(),
       attrs: node.attrs,
+      node,
       style: img.getAttribute("style") ?? "",
       svg: img.querySelector(":scope > svg"),
     };
@@ -5123,7 +5137,8 @@ export class EditorView {
     if (g.kind === "move") {
       // A jiggle of a press is not a move.
       if (!g.result && Math.hypot(dx, dy) < 3) return;
-      g.img.style.translate = `${dx}px ${dy}px`;
+      // In the page's own px (it may be zoomed).
+      g.img.style.translate = `${dx / (g.scale || 1)}px ${dy / (g.scale || 1)}px`;
       g.result = { dx, dy };
       return;
     }
@@ -5160,6 +5175,13 @@ export class EditorView {
     const g = this.endShapeGesture();
     if (!g) return;
     const result = g.result;
+    // The preview gone before the shape is measured (a move would count it twice).
+    g.img.style.translate = "";
+    // The shape changed or moved under the gesture (a remote edit): nothing applied.
+    if (this.state.doc.nodeAt(g.pos) !== g.node) {
+      this.restoreShape(g);
+      return;
+    }
     let applied = false;
     if (result && "dx" in result) {
       const scale = g.scale || 1;
@@ -5258,8 +5280,7 @@ export class EditorView {
       !["picture", "textBox", "shape"].includes(selection.node.type.name)
     )
       return false;
-    event.preventDefault();
-    this.run(
+    const moved = this.run(
       moveObject(
         selection.from,
         move[0],
@@ -5267,7 +5288,8 @@ export class EditorView {
         this.objectPlacement(selection.from) ?? undefined,
       ),
     );
-    return true;
+    if (moved) event.preventDefault();
+    return moved;
   }
 
   /**
@@ -5276,8 +5298,9 @@ export class EditorView {
    */
   private typeInShape(event: KeyboardEvent): boolean {
     const { selection } = this.state;
+    const composing = event.key === "Process" || event.key === "Dead";
     if (
-      event.key.length !== 1 ||
+      ([...event.key].length !== 1 && !composing) ||
       event.ctrlKey ||
       event.metaKey ||
       event.altKey ||
@@ -5290,13 +5313,16 @@ export class EditorView {
     const pos = selection.from;
     if (!selection.node.attrs.story && !this.run(addShapeText(pos))) return false;
     const id = String(this.state.doc.nodeAt(pos)?.attrs.story ?? "");
-    if (!id || !this.openTextBox(id)) return false;
-    event.preventDefault();
-    const view = this.mount?.view;
-    if (view) {
-      view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
-      view.run(insertText(event.key));
+    // Never typed over the shape (which would replace it).
+    if (!id || !this.openTextBox(id)) {
+      if (!composing) event.preventDefault();
+      return true;
     }
+    const view = this.mount?.view;
+    if (view) view.dispatch(view.state.tr.setSelection(Selection.atEnd(view.state.doc)));
+    if (composing) return true;
+    event.preventDefault();
+    view?.run(insertText(event.key));
     return true;
   }
 

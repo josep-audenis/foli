@@ -130,12 +130,19 @@ export function setShapeAdjust(pos: number, adjust: Readonly<Record<string, numb
 /**
  * Gives the shape at `pos` text (34.4: typing on a selected shape, as Word does): a story of kind
  * `textBox` with an empty paragraph, the text centered in the shape as Word's new shapes have it,
- * in the style's light color. One undo step; false when it has text, is a line, or is in a story.
+ * white on its fill (black without one). One undo step; false when it has text, is a line, is in
+ * a story, or while tracking.
  */
 export function addShapeText(pos: number): Command {
   return (state, dispatch) => {
     const node = shapeAt(state, pos);
-    if (!node || node.attrs.story || LINES.has(String(node.attrs.geometry)) || storyBody(state))
+    if (
+      !node ||
+      node.attrs.story ||
+      LINES.has(String(node.attrs.geometry)) ||
+      storyBody(state) ||
+      trackState(state)?.on === true
+    )
       return false;
     if (!dispatch) return true;
     const id = freshTextBoxId(state);
@@ -144,7 +151,8 @@ export function addShapeText(pos: number): Command {
       ...node.attrs,
       story: id,
       verticalAlign: node.attrs.verticalAlign ?? "center",
-      textColor: node.attrs.textColor ?? "FFFFFF",
+      // Light on its fill, as Word's style has it; dark on none.
+      textColor: node.attrs.textColor ?? (node.attrs.fill ? "FFFFFF" : "000000"),
     });
     if (state.selection instanceof NodeSelection && state.selection.from === pos)
       tr.setSelection(NodeSelection.create(tr.doc, pos));

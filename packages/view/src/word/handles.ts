@@ -78,12 +78,15 @@ export function adjustAt(
     };
     // Coarse steps, then finer ones around the best.
     let best = lo;
+    let nearest = distance(lo);
     let step = (hi - lo) / 64;
     for (let round = 0; round < 4 && step > 0; round++) {
-      let found = best;
-      for (let v = Math.max(lo, best - step * 64); v <= Math.min(hi, best + step * 64); v += step)
-        if (distance(v) < distance(found)) found = v;
-      best = found;
+      const from = Math.max(lo, best - step * 64);
+      const to = Math.min(hi, best + step * 64);
+      for (let v = from; v <= to; v += step) {
+        const d = distance(v);
+        if (d < nearest) [best, nearest] = [v, d];
+      }
       step /= 16;
     }
     out[ref] = Math.round(best);

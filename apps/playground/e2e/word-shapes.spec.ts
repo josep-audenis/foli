@@ -314,6 +314,41 @@ test("a selected shape is moved, nudged, turned, adjusted and written in, one un
   await expect(page.locator("[data-foli-shape] [data-foli-text-box]")).toHaveText("Go");
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await shape()).selected).toBe(true);
+  // Not selected, a press on its text selects it and drags it (Word's second press writes).
+  await page.mouse.click(box.x + 150, box.y + 150);
+  await expect.poll(async () => (await shape()).selected).toBe(false);
+  const at = await shape();
+  const middle = (await page.locator("[data-foli-shape] [data-foli-text-box]").boundingBox()) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  await page.mouse.move(middle.x + middle.width / 2, middle.y + middle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(middle.x + middle.width / 2 + 40, middle.y + middle.height / 2, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => near((await shape()).left, at.left + 40)).toBe(true);
+  // Centred on the page's text (aligned), a drag moves it by the drag, once.
+  await page.getByRole("tab", { name: "Layout" }).click();
+  await page.getByRole("button", { name: "Position" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Top center" }).click();
+  const centred = await shape();
+  const body = (await page.locator("[data-foli-shape]").boundingBox()) as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  // On the arrow's head, outside its text (a press in the selected shape's text writes).
+  const tip = { x: body.x + body.width - 12, y: body.y + body.height / 2 };
+  await page.mouse.move(tip.x, tip.y);
+  await page.mouse.down();
+  await page.mouse.move(tip.x + 50, tip.y, { steps: 4 });
+  await page.mouse.up();
+  await expect.poll(async () => near((await shape()).left, centred.left + 50)).toBe(true);
   expect(
     (await new AxeBuilder({ page }).include("section.foli-page").analyze()).violations,
   ).toEqual([]);
