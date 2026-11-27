@@ -14,6 +14,7 @@ import {
   type ResourceJSON,
   type SectionJSON,
   type StoryJSON,
+  type WatermarkJSON,
 } from "@folijs/core";
 import { backgroundXml, withBackground } from "../background.js";
 import { customToWord } from "../custom.js";
@@ -22,6 +23,7 @@ import { child, isW, REL, W } from "../import/ooxml.js";
 import { noteIds } from "../import/stories.js";
 import { DocxError, type DocxPackage, type NewPart, readPackage } from "../package.js";
 import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
+import { readWatermark, watermarkXml } from "../watermark.js";
 import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
 import { balanced } from "./balance.js";
@@ -41,6 +43,7 @@ import {
   DEFAULT_NAMESPACES,
   declarationsOf,
   escapeAttribute,
+  fragment,
   type Namespaces,
   NEW_ROOT_ATTRIBUTES,
   namespacesOf,
@@ -91,6 +94,11 @@ class Relationships {
     this.#ids = new Set(existing.map((r) => r.id));
     for (const r of existing)
       if (r.type === REL.hyperlink && r.external) this.#byTarget.set(r.target, r.id);
+  }
+
+  /** Relationship `id` as the part had it, if it did. */
+  relationship(id: string): { type: string; external: boolean; partName?: string } | undefined {
+    return this.#existing.get(id);
   }
 
   /** The part relationship `id` points to (one it had, or one added), if internal. */
@@ -181,6 +189,27 @@ function contextFor(
         namespaces,
         media,
       ),
+    watermark: (attrs) => {
+      const wanted = attrs.watermark as WatermarkJSON;
+      const xml = String(attrs.xml ?? "");
+      if (xml) {
+        const { element } = fragment(xml, namespaces);
+        const read = readWatermark(element, {
+          relationship: (id) => relationships.relationship(id),
+          partOf: (name) => media.pkg?.part(name),
+        });
+        if (read && same(read, wanted)) return xml;
+      }
+      return watermarkXml(
+        wanted,
+        namespaces,
+        (key) => {
+          const part = media.part(key);
+          return relationships.image(part, relative(source, part), undefined);
+        },
+        media.shapeNumber(),
+      );
+    },
   };
 }
 

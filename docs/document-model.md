@@ -199,9 +199,13 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `offsetFrom` text or page, `display` allPages, firstPage or notFirstPage, `zOrder` front or
   back) and `lineNumbers` (v9, `w:lnNumType`: `countBy`, required, `start` as Word writes it, one
   less than its "Start at", `distance` in twips, `restart` newPage, newSection or continuous)
-  were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`, `previous`) is
-  a tracked change of the setup; accepting drops it, rejecting restores `previous` with the
-  section's header and footer references.
+  were kept only in `ext` before. `change` (`w:sectPrChange`: `id`, `author`, `date`,
+  `previous`) is a tracked change of the setup; accepting drops it, rejecting restores
+  `previous` with the section's header and footer references.
+- **Watermarks** (v9): an opaque run (`opaqueInline`, `run: true`) holding Word's watermark shape
+  (`w:pict`) has `watermark` (`WatermarkJSON`): `kind` text or picture, `text`, `font`, `color`,
+  `semitransparent`, `rotation` (315: Word's diagonal), `picture` (a key of `resources`),
+  `washout`, and `width` and `height` in twips. `xml` is written back while it still says that.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.

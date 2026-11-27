@@ -345,6 +345,9 @@ export {};
  */
 export {};
 
+// watermark.d.ts
+export {};
+
 // xml.d.ts
 /**
  * An XML reader that keeps the exact source text: every node records where it is in the source

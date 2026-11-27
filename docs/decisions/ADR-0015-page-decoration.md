@@ -35,13 +35,16 @@
    that says 8 or less holding one is refused. v8 → v9 changes the version only. Phase 32's
    later tasks add to v9 before it is released (a watermark node, 32.3; a paragraph's
    `suppressLineNumbers`, 32.5); nothing of v9 is published before the phase ends.
-4. **Watermarks (built in 32.3).** Recognised on import: a header run whose VML shape is Word's
-   watermark (`PowerPlusWaterMarkObject…`, a `v:textpath` text; `WordPictureWatermark…`, a
-   `v:imagedata` picture) becomes a `watermark` inline node with what Word's dialog sets (text,
-   font, color, size, layout, semitransparent; or the picture, scale, washout) and the run
-   verbatim, written back as it was while those values match, else as Word writes one. Every
-   other shape stays opaque. Drawn by the view on every page of the header's sections, under
-   the text.
+4. **Watermarks (built in 32.3).** Recognised on import: a header run's `w:pict` whose VML shape
+   is Word's watermark (`PowerPlusWaterMarkObject…`, a `v:textpath` text; `WordPictureWatermark…`,
+   a `v:imagedata` picture) stays the opaque run it was and gains a `watermark` attribute
+   (`WatermarkJSON`: the text, font, color, semitransparent and rotation, or the picture and
+   washout, and the box's size): not a node type of its own, so everything that already handles
+   an opaque run (selection, deletion, the clipboard, the agent's reading) handles it. Written
+   back verbatim while the shape still says those values, else as Word writes one (its shape
+   types, centered on the margins, behind the text). Every other shape stays opaque. Drawn on
+   every page whose header holds it, behind the text. `setWatermark` puts one in each header
+   the pages show, as Word's gallery does.
 5. **Drawing.** The view and `renderDocument` draw both on each page from the same helpers
    (`view/src/word/decoration.ts`): the color as the page's background (printed: `print-color-
    adjust: exact`), the borders as one element over the page that pointer events pass through,

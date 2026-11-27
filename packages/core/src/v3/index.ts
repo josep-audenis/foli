@@ -32,6 +32,7 @@ export {
   type TableConditionJSON,
   type TablePropertiesJSON,
   type ThemeJSON,
+  type WatermarkJSON,
   type WordSettingsJSON,
 } from "./document.js";
 export {

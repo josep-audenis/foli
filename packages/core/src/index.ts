@@ -345,6 +345,7 @@ export {
   setTrackChanges,
   setUnderline,
   setVerticalAlign,
+  setWatermark,
   sinkListItem,
   splitBlock,
   splitCell,
@@ -380,6 +381,7 @@ export {
   type VerticalAlign,
   verticalAlignAt,
   type WordCount,
+  watermarkOf,
   wordKeymap,
   wrapInList,
 } from "./state/index.js";
@@ -456,5 +458,6 @@ export {
   twipsToMm,
   twipsToPt,
   twipsToPx,
+  type WatermarkJSON,
   type WordSettingsJSON,
 } from "./v3/index.js";

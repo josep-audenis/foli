@@ -12,9 +12,15 @@
  */
 import { deepEqual } from "../model/attrs.js";
 import type { Node } from "../model/index.js";
-import type { PageBordersJSON, SectionJSON, StoryJSON } from "../v3/document.js";
-import { parseContent } from "../v3/document.js";
-import { checkSection } from "../v3/schema.js";
+import type {
+  PageBordersJSON,
+  ResourceJSON,
+  SectionJSON,
+  StoryJSON,
+  WatermarkJSON,
+} from "../v3/document.js";
+import { checkResource, parseContent } from "../v3/document.js";
+import { checkSection, checkWatermark } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
 import { freshId } from "./ids.js";
 import { keepLastMark } from "./mark.js";
@@ -30,6 +36,7 @@ import {
   storyAfter,
   storyBody,
   storyState,
+  withEnvelope,
   wordContext,
 } from "./word.js";
 
@@ -676,4 +683,129 @@ export function resolveSectionChange(section: SectionJSON, accept: boolean): Sec
     footers: section.footers,
     ext: section.ext,
   });
+}
+
+/** A story's tree without its watermarks, and with `watermark` (when given) at its start. */
+function watermarked(state: EditorState, doc: Node, watermark: WatermarkJSON | null): Node {
+  const tr = storyState(state, doc).tr;
+  const found: number[] = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name === "opaqueInline" && node.attrs.watermark) found.push(pos);
+    return true;
+  });
+  for (const pos of found.reverse()) tr.delete(pos, pos + 1);
+  if (watermark) {
+    let at = -1;
+    tr.doc.descendants((node, pos) => {
+      if (at < 0 && node.isTextblock) at = pos + 1;
+      return at < 0;
+    });
+    const type = state.schema.nodes.opaqueInline;
+    if (at >= 0 && type) tr.insert(at, type.create({ xml: "<w:pict/>", run: true, watermark }));
+  }
+  return tr.doc;
+}
+
+/**
+ * Sets Word's watermark (Design ▸ Watermark) in every header the document's pages show (each
+ * section's default one, its first page's and its even pages' where it has them), making the
+ * headers it needs; null removes every watermark. Replaces the ones there; one undo step; not
+ * tracked. False when nothing would change. A picture watermark gives its image as `image` (a
+ * new resource, its key then `picture`) or names one of the document's resources.
+ */
+export function setWatermark(given: WatermarkJSON | null, image?: ResourceJSON): Command {
+  const command: Command = (state, dispatch) => {
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
+    const context = wordContext(state);
+    if (!context) return false;
+    const resources = context.envelope.resources ?? {};
+    let key: string | undefined;
+    if (image && given?.kind === "picture") {
+      if (checkResource(image) !== undefined) return false;
+      let n = freshId(state, Object.keys(resources).length);
+      while (Object.hasOwn(resources, `foli-picture-${n}`)) n = freshId(state, n);
+      key = `foli-picture-${n}`;
+    }
+    const watermark = given && key ? { ...given, picture: key } : given;
+    if (watermark && checkWatermark(watermark)) return false;
+    if (watermark?.kind === "picture" && !key && !Object.hasOwn(resources, watermark.picture ?? ""))
+      return false;
+    const sections = documentSections(state);
+    const setups = sections.map((s) => s.setup);
+    const even = context.envelope.settings?.evenAndOddHeaders === true;
+    const shown = new Set<string>();
+    const missing: { index: number; variant: StoryVariant }[] = [];
+    setups.forEach((setup, index) => {
+      const variants: StoryVariant[] = ["default"];
+      if (setup.titlePage) variants.push("first");
+      if (even) variants.push("even");
+      for (const variant of variants) {
+        const found = storyOfSection(setups, index, "header", variant);
+        if (found && context.stories.has(found.id)) shown.add(found.id);
+        else if (!missing.some((m) => m.variant === variant)) missing.push({ index, variant });
+      }
+    });
+    const ids = watermark ? [...shown] : [...context.stories.keys()];
+    const changes = ids.flatMap((id) => {
+      const story = context.stories.get(id) as Story;
+      if (story.kind !== "header") return [];
+      const doc = watermarked(state, story.doc, watermark);
+      return doc.eq(story.doc) ? [] : [{ id, story, doc }];
+    });
+    if (!changes.length && !(watermark && missing.length)) return false;
+    if (dispatch) {
+      const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
+      if (key && image)
+        withEnvelope(tr, { ...context.envelope, resources: { ...resources, [key]: image } });
+      for (const { id, story, doc } of changes)
+        tr.step(new StoryStep(id, story, { ...story, doc }));
+      if (watermark) {
+        // A header for each variant no section has: on the first section that shows it, so the
+        // later ones, linked, show it too.
+        const added = new Map<number, Record<string, string>>();
+        for (const { index, variant } of missing) {
+          const id = freshStoryId(state, tr);
+          const empty = emptyStory(state, "header");
+          tr.step(
+            new StoryStep(id, null, { ...empty, doc: watermarked(state, empty.doc, watermark) }),
+          );
+          added.set(index, { ...added.get(index), [variant]: id });
+        }
+        for (const [index, refs] of added) {
+          const at = sections[index] as { setup: SectionJSON; pos: number | null };
+          const holder =
+            at.pos === null ? null : { pos: at.pos, node: tr.doc.nodeAt(at.pos) as Node };
+          const setup =
+            at.pos === null ? lastSection(state, tr) : (holder?.node.attrs.section as SectionJSON);
+          writeSection(
+            state,
+            tr,
+            holder,
+            clean({ ...setup, headers: { ...setup.headers, ...refs } }),
+          );
+        }
+      }
+      dispatch(tr);
+    }
+    return true;
+  };
+  return command;
+}
+
+/** The watermark the caret's page shows (its section's default header's), null for none. */
+export function watermarkOf(state: EditorState): WatermarkJSON | null {
+  const body = storyBody(state)?.state ?? state;
+  const context = wordContext(body);
+  const at = sectionAt(body);
+  if (!context || !at) return null;
+  const setups = documentSections(body).map((s) => s.setup);
+  const found = storyOfSection(setups, at.index, "header", "default");
+  let watermark: WatermarkJSON | null = null;
+  context.stories.get(found?.id ?? "")?.doc.descendants((node) => {
+    if (!watermark && node.type.name === "opaqueInline" && node.attrs.watermark)
+      watermark = node.attrs.watermark as WatermarkJSON;
+    return !watermark;
+  });
+  return watermark;
 }

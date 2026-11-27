@@ -4530,9 +4530,19 @@ XML.
   of `wordRibbonTabs` (Page Background group, KeyTip G; 32.6 fills the tab). `pagedesign.test.ts`,
   `design.test.tsx`, `design.spec.ts` in Chromium, Firefox and WebKit (axe on the dialog and the
   pages); checked by hand. limitations.md (the dialog's settings, RGB page colors).
-- [ ] 32.3 Watermark: read Word's text and picture watermarks from headers, draw them on every
+- [x] 32.3 Watermark: read Word's text and picture watermarks from headers, draw them on every
   page under the text, Design ▸ Watermark menu (Confidential, Draft, Do not copy…, Custom…,
-  Remove), written back as Word writes them.
+  Remove), written back as Word writes them. Built: a header's opaque run gains `watermark`
+  (schema 9; ADR-0015 decision 4 says why an attribute, not a node), read by `@folijs/docx`
+  from Word's VML (`watermark.ts`, checked against what Word 16's gallery saves), written back
+  verbatim while unchanged, else as Word writes it (its shape types; the VML namespaces declared
+  where a part lacks them; a picture's image related and packaged); drawn on every page whose
+  header holds it, behind the text, by the view and `renderDocument` (print, `exportPdf`).
+  `setWatermark(watermark, image?)` and `watermarkOf` in core (every header the pages show,
+  made where missing; one undo step); `toolbarItems.watermark` (Word's diagonal presets, Custom
+  watermark… opening `WatermarkDialog`, Remove) in the Design tab. `watermark.test.ts` (docx),
+  `pagedesign.test.ts`, `watermark.spec.ts` in three engines (axe on the page and the dialog);
+  checked by a screenshot. limitations.md.
 - [ ] 32.4 Borders and Shading for paragraphs: Home's Borders menu (bottom, top, left, right,
   none, all, outside, horizontal line), the Borders and Shading dialog (style, color, width,
   shading fill and pattern), tracked as paragraph formatting.

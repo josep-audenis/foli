@@ -7,6 +7,7 @@
 import type { ControlJSON, MarkJSON, NodeJSON, ResourceJSON } from "@folijs/core";
 import { schema } from "@folijs/core/internal";
 import type { DocxPackage, Relationship } from "../package.js";
+import { readWatermark } from "../watermark.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { controlProperties } from "./controls.js";
 import { attr, child, deepText, elements, integer, isW, R, REL, textOf, W } from "./ooxml.js";
@@ -785,6 +786,30 @@ function run(
         const leaf = valid(node("noteReference", marks, attrs), el, context);
         if (leaf) out.push(leaf);
         else opaqueRun(el);
+        break;
+      }
+      case "pict": {
+        // Word's watermark (in a header): what its dialog sets, beside the shape kept verbatim.
+        const image: [string?, ResourceJSON?] = [];
+        const watermark = readWatermark(
+          el,
+          { relationship: context.relationship, partOf: (name) => context.pkg.part(name) },
+          image,
+        );
+        const leaf =
+          watermark &&
+          valid(
+            node("opaqueInline", marks, { xml: sourceOf(context, el), run: true, watermark }),
+            el,
+            context,
+          );
+        if (!leaf) {
+          opaqueRun(el);
+          break;
+        }
+        out.push(leaf);
+        const [key, entry] = image;
+        if (key && entry && !context.resources.has(key)) context.resources.set(key, entry);
         break;
       }
       case "footnoteRef":

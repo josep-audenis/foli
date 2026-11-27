@@ -105,6 +105,7 @@ import {
   setTextColor,
   setTrackChanges,
   setUnderline,
+  setWatermark,
   splitCell,
   stepFontSize,
   stopFormatPainter,
@@ -126,6 +127,7 @@ import {
   undoDepth,
   updateFields,
   verticalAlignAt,
+  watermarkOf,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
@@ -142,7 +144,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { PageBordersDialog } from "./DesignDialogs.js";
+import { PageBordersDialog, textWatermark, WatermarkDialog } from "./DesignDialogs.js";
 import {
   development,
   sameItems,
@@ -461,10 +463,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
  * `"columnWidth"` (the width of the selection's column, 19.4), `"paragraph"`, `"font"` and
  * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11), `"pageBorders"`
- * (Word's Page Borders, the caret's section or the document).
+ * (Word's Page Borders, the caret's section or the document), `"watermark"` (its Printed
+ * Watermark dialog, every header).
  */
 export type ToolbarDialogName =
   | "pageBorders"
+  | "watermark"
   | "paragraph"
   | "font"
   | "tabs"
@@ -824,6 +828,37 @@ const MARGIN_ACTIONS: readonly Action[] = [
     command: (state) => sectionAt(state) !== null,
     dialog: "pageSetup",
   },
+];
+
+/** Design ▸ Watermark: Word's gallery (its diagonal ones), Custom…, Remove. */
+const WATERMARK_ACTIONS: readonly Action[] = [
+  ...(
+    [
+      ["CONFIDENTIAL", "Confidential"],
+      ["DO NOT COPY", "Do not copy"],
+      ["DRAFT", "Draft"],
+      ["SAMPLE", "Sample"],
+      ["ASAP", "ASAP"],
+      ["URGENT", "Urgent"],
+    ] as const
+  ).map(
+    ([text, label]): Action => ({
+      key: `watermark-${text.toLowerCase().replace(/ /g, "-")}`,
+      label,
+      command: (state, dispatch) => setWatermark(textWatermark(state, { text }))(state, dispatch),
+      checked: (state) => {
+        const now = watermarkOf(state);
+        return now?.kind === "text" && now.text === text;
+      },
+    }),
+  ),
+  {
+    key: "customWatermark",
+    label: "Custom watermark…",
+    command: (state) => wordContext(state) !== null,
+    dialog: "watermark",
+  },
+  { key: "removeWatermark", label: "Remove watermark", command: setWatermark(null) },
 ];
 
 const ORIENTATION_ACTIONS: readonly Action[] = (
@@ -1940,6 +1975,13 @@ const RIBBON_ITEMS: readonly Item[] = [
     },
   },
   {
+    key: "watermark",
+    label: "Watermark",
+    text: "Watermark",
+    enabled: isWord,
+    actions: WATERMARK_ACTIONS,
+  },
+  {
     key: "pageBorders",
     label: "Page borders",
     text: "Page Borders",
@@ -2146,10 +2188,12 @@ export type ToolbarItemName =
   | "spaceBefore"
   | "spaceAfter"
   | "pageColor"
-  | "pageBorders";
+  | "pageBorders"
+  | "watermark";
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "watermark"
   | "margins"
   | "orientation"
   | "pageSize"
@@ -2385,7 +2429,9 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
     {
       key: "design",
       label: "Design",
-      items: [group("Page Background", large(t.pageColor), large(t.pageBorders))],
+      items: [
+        group("Page Background", large(t.watermark), large(t.pageColor), large(t.pageBorders)),
+      ],
     },
     {
       key: "layout",
@@ -2530,6 +2576,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   font: isWord,
   tabs: isWord,
   pageBorders: isWord,
+  watermark: isWord,
 };
 
 /** The built-in items a comment-only toolbar keeps: commenting, review navigation, the view. */
@@ -3252,7 +3299,7 @@ export function FoliToolbar({
   }, [disabled]);
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
-    name: "paragraph" | "font" | "tabs" | "pageBorders";
+    name: "paragraph" | "font" | "tabs" | "pageBorders" | "watermark";
     restore: HTMLElement | null;
     selection: EditorState["selection"];
   } | null>(null);
@@ -3355,7 +3402,13 @@ export function FoliToolbar({
       }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
-      else if (name === "paragraph" || name === "font" || name === "tabs" || name === "pageBorders")
+      else if (
+        name === "paragraph" ||
+        name === "font" ||
+        name === "tabs" ||
+        name === "pageBorders" ||
+        name === "watermark"
+      )
         setWordDialog({ name, restore, selection });
       else if (name === "columnWidth") setColumnDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });
@@ -4261,6 +4314,22 @@ export function FoliToolbar({
               (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
                 c.shade === undefined && c.color !== null,
             )}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "watermark" && !disabled && (
+          <WatermarkDialog
+            editor={editor}
+            fonts={fontOptions(editor.state).map((option) => option.value)}
+            colors={themeColors(editor.state).filter(
+              (c): c is ToolbarColor & { color: string; name: ToolbarMessage } =>
+                c.shade === undefined && c.color !== null,
+            )}
+            upload={upload ?? undefined}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

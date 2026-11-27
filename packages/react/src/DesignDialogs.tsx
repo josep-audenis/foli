@@ -3,7 +3,16 @@
  * filled from the caret's section, applied in one transaction (one undo step).
  */
 
-import { type Editor, sectionAt, setPageBorders } from "@folijs/core";
+import {
+  type Editor,
+  type EditorState,
+  sectionAt,
+  setPageBorders,
+  setWatermark,
+  type WatermarkJSON,
+  watermarkOf,
+} from "@folijs/core";
+import { measureImageFile } from "@folijs/view";
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { type ToolbarMessage, useT } from "./messages.js";
 
@@ -328,6 +337,345 @@ export function PageBordersDialog({
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {t("Check this value: {field}.", { field: t("Distance (pt)") })}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+// ---------- Design ▸ Watermark (32.3) ----------
+
+/** The caret's section's text width, in twips. */
+function textWidthOf(state: EditorState): number {
+  const setup = sectionAt(state)?.setup ?? {};
+  const m = setup.margins ?? {};
+  return (setup.pageSize?.width ?? 12_240) - (m.left ?? 1440) - (m.right ?? 1440) - (m.gutter ?? 0);
+}
+
+/**
+ * What Word's text watermark dialog sets.
+ * @internal
+ */
+export interface TextWatermarkOptions {
+  text: string;
+  font?: string | undefined;
+  /** In points; undefined: Auto (as wide as the text area allows). */
+  size?: number | undefined;
+  /** RRGGBB; Word's default is its light gray. */
+  color?: string | undefined;
+  semitransparent?: boolean | undefined;
+  layout?: "diagonal" | "horizontal" | undefined;
+}
+
+/**
+ * A text watermark sized as Word sizes it for the caret's section: its box a third as tall as
+ * it is wide per letter (Word's WordArt in Calibri capitals); Auto as wide as the text area, or
+ * on the diagonal as wide as fits it turned.
+ * @internal
+ */
+export function textWatermark(state: EditorState, options: TextWatermarkOptions): WatermarkJSON {
+  const letters = Math.max([...options.text].length, 1);
+  const diagonal = options.layout !== "horizontal";
+  const area = textWidthOf(state);
+  let width: number;
+  let height: number;
+  if (options.size) {
+    height = Math.round(options.size * 20);
+    width = Math.round((letters * height) / 3);
+  } else {
+    width = Math.round(diagonal ? (area * Math.SQRT2) / (1 + 3 / letters) : area);
+    height = Math.round((3 * width) / letters);
+  }
+  return {
+    kind: "text",
+    text: options.text,
+    font: options.font || "Calibri",
+    color: options.color ?? "C0C0C0",
+    ...(options.semitransparent === false ? {} : { semitransparent: true }),
+    ...(diagonal ? { rotation: 315 } : {}),
+    width: Math.max(1, Math.min(width, 31_680)),
+    height: Math.max(1, Math.min(height, 31_680)),
+  };
+}
+
+const WATERMARK_TEXTS = [
+  "ASAP",
+  "CONFIDENTIAL",
+  "DO NOT COPY",
+  "DRAFT",
+  "ORIGINAL",
+  "PERSONAL",
+  "SAMPLE",
+  "TOP SECRET",
+  "URGENT",
+];
+const WATERMARK_SIZES = [36, 40, 44, 48, 54, 60, 66, 72, 80, 90, 96, 105, 120, 144];
+const SCALES = [50, 100, 150, 200, 500];
+const KIND_NAMES = [
+  ["none", "No watermark"],
+  ["picture", "Picture watermark"],
+  ["text", "Text watermark"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+const LAYOUT_NAMES = [
+  ["diagonal", "Diagonal"],
+  ["horizontal", "Horizontal"],
+] as const satisfies readonly (readonly [string, ToolbarMessage])[];
+
+/**
+ * Word's Printed Watermark dialog: none, a picture (its scale, washed out or not; with the
+ * toolbar's `upload`) or a text (text, font, size, color, semitransparent, diagonal or
+ * horizontal), for every header of the document (`setWatermark`), in one undo step.
+ * @internal
+ */
+export function WatermarkDialog({
+  editor,
+  fonts,
+  colors,
+  upload,
+  onClose,
+}: {
+  editor: Editor;
+  fonts: readonly string[];
+  colors: readonly { name: ToolbarMessage; color: string }[];
+  upload: ((file: File) => Promise<string | { src: string }>) | undefined;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [initial] = useState(() => watermarkOf(editor.state));
+  const [kind, setKind] = useState<"none" | "picture" | "text">(initial?.kind ?? "text");
+  const [text, setText] = useState(
+    initial?.kind === "text" ? (initial.text ?? "") : "CONFIDENTIAL",
+  );
+  const [font, setFont] = useState(initial?.font ?? "Calibri");
+  const [size, setSize] = useState("auto");
+  const [color, setColor] = useState(`#${(initial?.color ?? "C0C0C0").toLowerCase()}`);
+  const [semitransparent, setSemitransparent] = useState(initial?.semitransparent ?? true);
+  const [layout, setLayout] = useState<"diagonal" | "horizontal">(
+    initial && !initial.rotation ? "horizontal" : "diagonal",
+  );
+  const [file, setFile] = useState<File | null>(null);
+  const [scale, setScale] = useState("auto");
+  const [washout, setWashout] = useState(initial?.kind === "picture" ? !!initial.washout : true);
+  const [error, setError] = useState<ToolbarMessage | null>(null);
+  const [busy, setBusy] = useState(false);
+  const open = useRef(true);
+  useEffect(
+    () => () => {
+      open.current = false;
+    },
+    [],
+  );
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+
+  const apply = async (event: FormEvent) => {
+    event.preventDefault();
+    if (kind === "none") return onClose(editor.run(setWatermark(null)));
+    if (kind === "text") {
+      if (!text.trim()) return setError("Text");
+      const watermark = textWatermark(editor.state, {
+        text,
+        font,
+        size: size === "auto" ? undefined : Number(size),
+        color: color.slice(1).toUpperCase(),
+        semitransparent,
+        layout,
+      });
+      return onClose(editor.run(setWatermark(watermark)));
+    }
+    if (!file) {
+      // The picture it has, with the scale and washout changed.
+      if (initial?.kind !== "picture") return setError("Select picture…");
+      return onClose(editor.run(setWatermark({ ...initial, washout })));
+    }
+    if (!upload || !file.type.startsWith("image/")) return setError("Select picture…");
+    setBusy(true);
+    try {
+      const measured = await measureImageFile(file, document);
+      const answer = measured ? await upload(file) : null;
+      const src = typeof answer === "string" ? answer : answer?.src;
+      if (!open.current) return;
+      if (!measured || !src) throw new Error("no image");
+      // A pixel is 15 twips; Auto fills the text area's width.
+      const natural = measured.width * 15;
+      const width = scale === "auto" ? textWidthOf(editor.state) : (natural * Number(scale)) / 100;
+      const height = (width * measured.height) / measured.width;
+      const type = /^data:([^;,]+)/i.exec(src)?.[1]?.toLowerCase() ?? file.type;
+      const done = editor.run(
+        setWatermark(
+          {
+            kind: "picture",
+            ...(washout ? { washout: true } : {}),
+            width: Math.max(1, Math.min(Math.round(width), 31_680)),
+            height: Math.max(1, Math.min(Math.round(height), 31_680)),
+          },
+          { contentType: type, ...(src.startsWith("data:") ? { data: src } : { url: src }) },
+        ),
+      );
+      onClose(done);
+    } catch {
+      if (!open.current) return;
+      setBusy(false);
+      setError("Select picture…");
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Watermark")}
+      className="foli-link-dialog foli-word-dialog foli-watermark-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <fieldset className="foli-dialog-section">
+            <legend>{t("Watermark")}</legend>
+            {KIND_NAMES.map(([value, label]) => (
+              <div key={value} className="foli-setup-field foli-setup-check">
+                <input
+                  ref={value === kind ? first : undefined}
+                  id={`${id}-kind-${value}`}
+                  type="radio"
+                  name={`${id}-kind`}
+                  checked={kind === value}
+                  disabled={value === "picture" && !upload && initial?.kind !== "picture"}
+                  onChange={() => {
+                    setKind(value);
+                    setError(null);
+                  }}
+                />
+                <label htmlFor={`${id}-kind-${value}`}>{t(label)}</label>
+              </div>
+            ))}
+          </fieldset>
+          <fieldset className="foli-dialog-section" disabled={kind !== "picture" || busy}>
+            <legend>{t("Picture watermark")}</legend>
+            <Field id={`${id}-file`} label={t("Select picture…")}>
+              <input
+                id={`${id}-file`}
+                type="file"
+                accept="image/*"
+                aria-invalid={error === "Select picture…" || undefined}
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] ?? null);
+                  setError(null);
+                }}
+              />
+            </Field>
+            <Field id={`${id}-scale`} label={t("Scale")}>
+              <select id={`${id}-scale`} value={scale} onChange={(e) => setScale(e.target.value)}>
+                <option value="auto">{t("Auto")}</option>
+                {SCALES.map((s) => (
+                  <option key={s} value={String(s)}>{`${s}%`}</option>
+                ))}
+              </select>
+            </Field>
+            <div className="foli-setup-field foli-setup-check">
+              <input
+                id={`${id}-washout`}
+                type="checkbox"
+                checked={washout}
+                onChange={(e) => setWashout(e.target.checked)}
+              />
+              <label htmlFor={`${id}-washout`}>{t("Washout")}</label>
+            </div>
+          </fieldset>
+          <fieldset className="foli-dialog-section" disabled={kind !== "text"}>
+            <legend>{t("Text watermark")}</legend>
+            <Field id={`${id}-text`} label={t("Text")}>
+              <input
+                id={`${id}-text`}
+                type="text"
+                list={`${id}-texts`}
+                value={text}
+                aria-invalid={error === "Text" || undefined}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setError(null);
+                }}
+              />
+              <datalist id={`${id}-texts`}>
+                {WATERMARK_TEXTS.map((value) => (
+                  <option key={value} value={value} />
+                ))}
+              </datalist>
+            </Field>
+            <Field id={`${id}-font`} label={t("Font")}>
+              <select id={`${id}-font`} value={font} onChange={(e) => setFont(e.target.value)}>
+                {!fonts.includes(font) && <option value={font}>{font}</option>}
+                {fonts.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id={`${id}-size`} label={t("Size")}>
+              <select id={`${id}-size`} value={size} onChange={(e) => setSize(e.target.value)}>
+                <option value="auto">{t("Auto")}</option>
+                {WATERMARK_SIZES.map((s) => (
+                  <option key={s} value={String(s)}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id={`${id}-color`} label={t("Color")}>
+              <select id={`${id}-color`} value={color} onChange={(e) => setColor(e.target.value)}>
+                {colors.map((c) => (
+                  <option key={c.name} value={c.color}>
+                    {t(c.name)}
+                  </option>
+                ))}
+                {!colors.some((c) => c.color === color) && (
+                  <option value={color}>{t("Other color {color}", { color })}</option>
+                )}
+              </select>
+            </Field>
+            <div className="foli-setup-field foli-setup-check">
+              <input
+                id={`${id}-semi`}
+                type="checkbox"
+                checked={semitransparent}
+                onChange={(e) => setSemitransparent(e.target.checked)}
+              />
+              <label htmlFor={`${id}-semi`}>{t("Semitransparent")}</label>
+            </div>
+            <fieldset className="foli-dialog-section">
+              <legend>{t("Layout")}</legend>
+              {LAYOUT_NAMES.map(([value, label]) => (
+                <div key={value} className="foli-setup-field foli-setup-check">
+                  <input
+                    id={`${id}-layout-${value}`}
+                    type="radio"
+                    name={`${id}-layout`}
+                    checked={layout === value}
+                    onChange={() => setLayout(value)}
+                  />
+                  <label htmlFor={`${id}-layout-${value}`}>{t(label)}</label>
+                </div>
+              ))}
+            </fieldset>
+          </fieldset>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit" disabled={busy}>
+            {t("OK")}
+          </button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p className="foli-link-error" role="alert">
+            {t("Check this value: {field}.", { field: t(error) })}
           </p>
         )}
       </form>

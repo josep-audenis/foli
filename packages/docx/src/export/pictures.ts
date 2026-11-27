@@ -29,12 +29,15 @@ const EXTENSIONS: Record<string, string> = {
   "image/x-wmf": "wmf",
 };
 
-/** Every picture node of the document (body, comments and stories). */
+/** Every picture node of the document (body, comments and stories), and picture watermarks'. */
 function picturesOf(doc: FoliDocument): Json[] {
   const out: Json[] = [];
   const visit = (nodes: readonly NodeJSON[] | undefined) => {
     for (const node of nodes ?? []) {
       if (node.type === "picture") out.push((node.attrs ?? {}) as Json);
+      const watermark = node.attrs?.watermark as { picture?: string } | null | undefined;
+      if (node.type === "opaqueInline" && watermark?.picture)
+        out.push({ resource: watermark.picture });
       visit(node.content);
     }
   };
@@ -127,6 +130,8 @@ export class Media {
   /** Ids the pictures written so far took. */
   readonly #claimed = new Set<number>();
   #nextId: number;
+  /** The next VML shape number (`_x0000_s<n>`) above every one the output holds. */
+  #nextShape = 2049;
 
   constructor(
     readonly doc: FoliDocument,
@@ -141,6 +146,8 @@ export class Media {
     for (const attrs of picturesOf(doc))
       for (const id of docPrIds(String(attrs.ext ?? ""))) max = Math.max(max, id);
     const reserve = (xml: string) => {
+      for (const match of xml.matchAll(/_x0000_s(\d+)/g))
+        this.#nextShape = Math.max(this.#nextShape, Number(match[1]) + 1);
       for (const id of docPrIds(xml)) {
         this.#reserved.add(id);
         max = Math.max(max, id);
@@ -192,6 +199,11 @@ export class Media {
     if (id === undefined || this.#reserved.has(id) || this.#claimed.has(id)) return false;
     this.#claimed.add(id);
     return true;
+  }
+
+  /** A VML shape number for a new shape (a watermark). */
+  shapeNumber(): number {
+    return this.#nextShape++;
   }
 
   freshId(): number {

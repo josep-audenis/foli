@@ -36,6 +36,8 @@ export interface WriteContext {
   readonly hyperlink: (href: string, id: string | undefined) => string;
   /** A picture's `w:drawing` (its image related to the part, its media part allocated). */
   readonly picture: (attrs: Record<string, unknown>) => string;
+  /** A watermark's `w:pict`: as read while it says what it did, else written anew. */
+  readonly watermark: (attrs: Record<string, unknown>) => string;
   /** The kind of note being written: what its `noteMark` is. */
   readonly note?: "footnote" | "endnote";
   /** The document's content controls. */
@@ -491,7 +493,7 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return `<${name}${preserve}${bag}>${escapeText(value)}</${name}>`;
     }
     case "opaqueInline":
-      return verbatim(a.xml, context);
+      return a.watermark ? context.watermark(a) : verbatim(a.xml, context);
     case "picture":
       return context.picture(a);
     default:
