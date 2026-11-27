@@ -138,14 +138,16 @@ export function lnXml(
     const len = typeof e.length === "string" ? ` len="${q(e.length)}"` : "";
     return `<${p}:${local} type="${q(e.type)}"${w}${len}/>`;
   };
-  // A file's custom dash stays while the model says none (Foli draws it solid).
+  // A file's custom dash stays while the model says `custom`; no dash replaces any the line had.
   const custom = kid(was, A, "custDash");
   const dash =
-    typeof outline.dash === "string"
-      ? `<${p}:prstDash val="${q(outline.dash)}"/>`
-      : custom && source
+    outline.dash === "custom"
+      ? custom && source
         ? source.slice(custom.start, custom.end)
-        : kid(was, A, "prstDash")
+        : ""
+      : typeof outline.dash === "string"
+        ? `<${p}:prstDash val="${q(outline.dash)}"/>`
+        : custom || kid(was, A, "prstDash")
           ? `<${p}:prstDash val="solid"/>`
           : "";
   return (

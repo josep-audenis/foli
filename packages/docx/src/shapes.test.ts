@@ -287,7 +287,7 @@ describe("shapes (Phase 34)", () => {
       `<wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr/><wps:wsp><wps:cNvSpPr/><wps:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></wps:spPr><wps:bodyPr/></wps:wsp></wpg:wgp>`,
     );
     const plain = drawing(
-      `<wps:wsp><wps:cNvSpPr/><wps:spPr><a:prstGeom prst="star5"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFC000"/></a:solidFill></wps:spPr><wps:bodyPr/></wps:wsp>`,
+      `<wps:wsp><wps:cNvSpPr/><wps:spPr><a:prstGeom prst="star5"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="FFC000"/></a:solidFill><a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:custDash><a:ds d="300000" sp="100000"/></a:custDash></a:ln></wps:spPr><wps:bodyPr/></wps:wsp>`,
     );
     const ns =
       `xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ` +
@@ -296,15 +296,31 @@ describe("shapes (Phase 34)", () => {
       `xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup" ` +
       `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"`;
     const body = `<w:p>${filled}${group}${plain}</w:p>`;
-    const { document } = await importDocx(
+    const { document, package: pkg } = await importDocx(
       await docx(body, {
         root: `<w:document ${ns}><w:body>${body}<w:sectPr/></w:body></w:document>`,
       }),
     );
     const types = (document.content.content?.[0]?.content ?? []).map((n) => n.type);
     expect(types).toEqual(["opaqueInline", "opaqueInline", "shape"]);
-    expect(shapes(document)[0]).toMatchObject({ geometry: "star5", fill: "FFC000" });
-    expect(shapes(document)[0]?.outline ?? null).toBeNull();
+    expect(shapes(document)[0]).toMatchObject({
+      geometry: "star5",
+      fill: "FFC000",
+      outline: { color: "000000", width: 12_700, dash: "custom" },
+    });
+    // A custom dash is written back while it stays; made solid, it goes.
+    const kept = (await readPackage(await exportDocx(document, pkg))).text("/word/document.xml");
+    expect(kept).toContain("<a:custDash>");
+    const solid = structuredClone(document);
+    const node = (solid.content.content?.[0]?.content ?? []).find((n) => n.type === "shape") as {
+      attrs: Attrs;
+    };
+    node.attrs = { ...node.attrs, outline: { color: "000000", width: 12_700 } };
+    const written = (await readPackage(await exportDocx(parseDocument(solid), pkg))).text(
+      "/word/document.xml",
+    );
+    expect(written).not.toContain("custDash");
+    expect(written).toContain('<a:prstDash val="solid"/>');
     const note = structuredClone(document);
     note.stories = {
       "footnote:9": {

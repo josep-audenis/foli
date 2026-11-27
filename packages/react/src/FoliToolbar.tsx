@@ -1174,8 +1174,7 @@ const DASH_ACTIONS: readonly Action[] = (
   label,
   checked: (state) => (outlineOf(state)?.dash ?? "solid") === dash,
   command: (state, dispatch) =>
-    shapeSelected(state) &&
-    looks({ outline: { dash: dash === "solid" ? null : dash } })(state, dispatch),
+    shapeSelected(state) && looks({ outline: { dash } })(state, dispatch),
 }));
 
 /** Shape Outline ▸ Arrows: a line's ends. */
@@ -1247,12 +1246,12 @@ const STYLE_ACTIONS: readonly Action[] = (
         kind === "outline"
           ? {
               fill: "FFFFFF",
-              outline: { color, width: 12_700, dash: null },
+              outline: { color, width: 12_700, dash: "solid" },
               textColor: themeColor(state, "dk1"),
             }
           : {
               fill: color,
-              outline: { color: darker(color, 0.5), width: 12_700, dash: null },
+              outline: { color: darker(color, 0.5), width: 12_700, dash: "solid" },
               textColor: "FFFFFF",
             },
       )(state, dispatch);
@@ -2461,14 +2460,15 @@ const RIBBON_ITEMS: readonly Item[] = [
     key: "shapeStyles",
     label: "Shape styles",
     text: "Shape Styles",
-    enabled: shapeSelected,
+    // Not a line's (Word fills none).
+    enabled: (state) => shapeSelected(state) && !lineSelected(state),
     actions: STYLE_ACTIONS,
   },
   {
     key: "shapeFill",
     label: "Shape fill",
     text: "Shape Fill",
-    enabled: drawingSelected,
+    enabled: (state) => drawingSelected(state) && !lineSelected(state),
     colors: {
       options: SHAPE_FILLS,
       columns: 10,

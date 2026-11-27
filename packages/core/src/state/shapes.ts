@@ -217,7 +217,8 @@ export function setShapeLook(pos: number, look: ShapeLook): Command {
         >;
         const next: Record<string, unknown> = { ...was };
         for (const [key, value] of Object.entries(look.outline)) {
-          if (value === null) delete next[key];
+          // Solid is no dash.
+          if (value === null || (key === "dash" && value === "solid")) delete next[key];
           else if (value !== undefined) next[key] = value;
         }
         attrs.outline = name === "textBox" ? { color: next.color, width: next.width } : next;

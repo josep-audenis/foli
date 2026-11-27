@@ -463,6 +463,8 @@ const DASHES = [
   "sysDot",
   "sysDashDot",
   "sysDashDotDot",
+  // A file's custom dash (`a:custDash`), kept as it is.
+  "custom",
 ];
 
 /**

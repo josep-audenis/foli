@@ -1049,7 +1049,8 @@ each; moving and adjusting are refused while tracking.
 Shape Format (34.5): `setShapeLook(pos, { fill?, outline?, textColor? })` sets a shape's or text
 box's fill (RRGGBB or null; a gradient goes), line (null for none, else what changes of it:
 `color`, `width`, `dash`, `head`, `tail`, each null to remove; a text box's has a color and a width
-only) and a shape's text color, one undo step, refused while tracking. `toolbarItems` has
+only) and a shape's text color (null: as the file has it), one undo step, refused while
+tracking. `toolbarItems` has
 `shapeStyles` (Colored Outline and Colored Fill for the theme's dark and six accents),
 `shapeFill`, `shapeOutline`, `outlineWeight`, `outlineDashes` and `outlineArrows`, in the Shape
 Format tab with Insert Shapes, Arrange and Size.

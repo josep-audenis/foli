@@ -312,7 +312,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   Word's line weights and dashes, and arrows for lines; gradients, pictures, textures, patterns,
   effects (shadow, glow, 3-D), WordArt styles and the Format Shape pane are not offered (a
   file's gradient is kept until another fill is chosen). A style's text color is written into
-  the shape's style (`a:fontRef`).
+  the shape's style (`a:fontRef`) as a plain color, the theme link lost; a shape without text
+  reads none, so a style chosen for it writes its color at each save.
   Insert ▸ Shapes (34.3) offers the shapes Foli draws (Word's
   gallery has more), named in English whatever the toolbar's language, and puts a shape in the
   body only (shortcut, as text boxes), anchored at the start of the paragraph pressed; drawn from
