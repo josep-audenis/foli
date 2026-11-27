@@ -4759,8 +4759,20 @@ paths; text in shapes through Phase 33's stories.
   automation leaves a shape's rotation at 0, so turning is checked by the round trip). A v11
   format fixture. `shapes.test.ts` in core and docx. ADR-0017, document-model.md,
   limitations.md.
-- [ ] 34.2 SVG drawing of preset and custom geometries, fill (solid, gradient), outline (color,
-  width, dash, arrows), rotation, flip; on read-only pages and `exportPdf`.
+- [x] 34.2 SVG drawing of preset and custom geometries, fill (solid, gradient), outline (color,
+  width, dash, arrows), rotation, flip; on read-only pages and `exportPdf`. Built: the view's
+  `word/geometry.ts` (DrawingML's guide formulas, `a:arcTo` as SVG arcs, paths in their own
+  space, the text rectangle), `word/presets.ts` (about 50 of ECMA-376's definitions with their
+  adjust defaults, handles and text rectangles), `word/shapes.ts` (`shapeSvg`: fill, gradient,
+  darken/lighten faces, dashes, line ends as markers, flips) and `shapeElement` (`blocks.ts`:
+  the box turned, its text in the geometry's text rectangle in the style's font color), placed
+  by `floatElements` as pictures and text boxes are, in the editing view, `renderDocument`,
+  print and `exportPdf`. `shapes.test.ts` (view), `word-shapes.spec.ts` (the poster's 32 presets
+  within 1.5 px of Word's place and at their size, flips, gradient, dashes, ends, freeform, text,
+  the header's line, axe; three engines), `pdf.spec.ts` (12 exported), and
+  `apps/playground/word/shapes.word.ts` (`pnpm corpus:pages`): every one of the poster's 44
+  drawn shapes against Word's PDF of it (`corpus/reference/word/12-shapes-poster.pdf`), ink
+  agreement 0.988 to 1.0 (tolerance 0.9).
 - [ ] 34.3 Insert ▸ Shapes gallery: draw by dragging on the page, Shift for proportions.
 - [ ] 34.4 Selected shape: move, resize, rotate handles, adjustment handles for the shapes that
   have them; arrow keys move; one undo step per gesture; text in a shape.

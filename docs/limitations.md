@@ -292,7 +292,14 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   join and cap (Word's defaults then). A group, a drawing canvas, a shape filled with a picture or a
   pattern, a linked text box, vertical text in a shape, a VML-only shape (Word 2007), and a shape
   in a note, a comment or a text box stay opaque. A changed shape loses its VML copy for Word
-  2007. Until 34.2 a shape is read and written back but not drawn. The agent reads a shape's
+  2007. Shapes are drawn (34.2) as SVG from DrawingML's own definitions for about 50 presets
+  (Word's gallery's lines, rectangles, basic shapes, block arrows, stars, callouts and some
+  flowchart shapes) and from a file's custom geometry; any other preset (cloud, ribbons, scrolls,
+  action buttons, the rest of the flowchart and callout shapes…) is drawn as its bounding
+  rectangle with its fill and line. A turned shape turns its text with it; flips mirror the
+  drawing, not the text. A path gradient is drawn round from the middle (its fill-to rectangle
+  not followed). A line end is never drawn smaller than a 1.5 pt line's. Until 34.4 a shape's
+  text is drawn but not edited. The agent reads a shape's
   paragraph without its text.
 - A picture whose resource is a web `url` is fetched by the view as soon as it is shown (with
   no referrer) unless the app's `resource` resolver returns `null` for it: for JSON documents

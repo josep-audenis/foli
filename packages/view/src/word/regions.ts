@@ -207,7 +207,8 @@ export function textBoxStories(content: NodeJSON): string[] {
   if (!found) {
     const ids: string[] = [];
     const visit = (node: NodeJSON) => {
-      if (node.type === "textBox") ids.push(String(node.attrs?.story));
+      if ((node.type === "textBox" || node.type === "shape") && node.attrs?.story)
+        ids.push(String(node.attrs.story));
       for (const child of node.content ?? []) visit(child);
     };
     visit(content);

@@ -23,6 +23,7 @@ import {
   resolvedCommentIds,
 } from "@folijs/core/internal";
 import { applyAttrs, type DecorationAttrs } from "../extension.js";
+import { shapeSvg, shapeTextRect } from "./shapes.js";
 
 /**
  * Custom nodes and marks drawn by extensions' node and mark views outside the editor
@@ -276,6 +277,83 @@ export function textBoxElement(
     const blocks = renderBlocks({ ...document, content: story.content } as FoliDocument, doc, rest);
     stack(blocks, content, !!options.resolver?.addsParagraphSpacing);
     inner.append(content);
+  }
+  return box;
+}
+
+/**
+ * Marks a drawn shape (Phase 34); its value the geometry.
+ * @internal
+ */
+export const SHAPE_ATTR = "data-foli-shape";
+
+/**
+ * A shape drawn (Phase 34, ADR-0017): its geometry as SVG in a box of its size, turned about its
+ * middle, and its text (a story of kind `textBox`) in the geometry's text rectangle, laid out as
+ * a text box's (insets, vertical alignment), in the style's font color.
+ * @internal
+ */
+export function shapeElement(
+  attrs: Record<string, unknown>,
+  document: Omit<FoliDocument, "content">,
+  doc: Document,
+  options: BlockOptions,
+): HTMLElement {
+  const box = doc.createElement("span");
+  box.setAttribute(SHAPE_ATTR, String(attrs.geometry ?? "rect"));
+  const alt = typeof attrs.alt === "string" && attrs.alt ? attrs.alt : "";
+  if (attrs.decorative === true) box.setAttribute("aria-hidden", "true");
+  else {
+    box.setAttribute("role", attrs.story ? "group" : "img");
+    box.setAttribute("aria-label", alt || "Shape");
+  }
+  if (attrs.title) box.title = String(attrs.title);
+  const { style } = box;
+  style.display = "inline-block";
+  style.verticalAlign = "baseline";
+  style.position = "relative";
+  style.width = `${Number(attrs.width) / EMU_PER_PX}px`;
+  style.height = `${Number(attrs.height) / EMU_PER_PX}px`;
+  style.textIndent = "0";
+  style.textAlign = "left";
+  style.whiteSpace = "normal";
+  const turn = typeof attrs.rotation === "number" ? attrs.rotation / 60_000 : 0;
+  if (turn) style.transform = `rotate(${turn}deg)`;
+  box.append(shapeSvg(attrs, doc));
+  const id = typeof attrs.story === "string" ? attrs.story : "";
+  const stories = document.stories;
+  const story = id && stories && Object.hasOwn(stories, id) ? stories[id] : undefined;
+  if (story?.kind === "textBox") {
+    const [left, top, width, height] = shapeTextRect(attrs);
+    const text = doc.createElement("span");
+    text.setAttribute(TEXT_BOX_ATTR, id);
+    const own = text.style;
+    own.position = "absolute";
+    own.left = `${left}px`;
+    own.top = `${top}px`;
+    own.width = `${width}px`;
+    own.height = `${height}px`;
+    own.display = "flex";
+    own.flexDirection = "column";
+    own.boxSizing = "border-box";
+    if (typeof attrs.textColor === "string") own.color = `#${attrs.textColor}`;
+    const inset = (attrs.inset ?? {}) as Record<string, number | undefined>;
+    const pad = (side: string, fallback: number) => `${(inset[side] ?? fallback) / EMU_PER_PX}px`;
+    own.padding = `${pad("top", 45_720)} ${pad("right", 91_440)} ${pad("bottom", 45_720)} ${pad("left", 91_440)}`;
+    own.justifyContent =
+      attrs.verticalAlign === "center"
+        ? "center"
+        : attrs.verticalAlign === "bottom"
+          ? "flex-end"
+          : "flex-start";
+    const content = doc.createElement("span");
+    content.style.display = "block";
+    content.className = TEXT_BOX_CONTENT_CLASS;
+    const { notes: _notes, ...rest } = options;
+    const blocks = renderBlocks({ ...document, content: story.content } as FoliDocument, doc, rest);
+    stack(blocks, content, !!options.resolver?.addsParagraphSpacing);
+    text.append(content);
+    box.append(text);
   }
   return box;
 }
@@ -1311,10 +1389,14 @@ function renderInline(
         if (attrs.float) floats.push(...floatElements(attrs, doc, image, context.geometry).nodes);
         else parent.append(pictureElement(attrs, doc, image));
         continue;
-      case "textBox": {
+      case "textBox":
+      case "shape": {
         const now = rendering;
         if (!now) continue;
-        const box = textBoxElement(attrs, now.document, doc, now.options);
+        const box =
+          node.type === "shape"
+            ? shapeElement(attrs, now.document, doc, now.options)
+            : textBoxElement(attrs, now.document, doc, now.options);
         if (attrs.float)
           floats.push(...floatElements(attrs, doc, image, context.geometry, box).nodes);
         else parent.append(box);

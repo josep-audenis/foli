@@ -179,12 +179,16 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * allowed): shapes (schema 11's node and its checks, DrawingML's 187 preset names among them,
  * which pdf carries with core's schema; DrawingML shapes read with their theme styles and written
  * in place), with room for 34.3's new shapes.
+ * View, React, FoliEditor and pdf's renderer raised in 34.2 (144.9, 242.6, 239.0 and 108.8 kB;
+ * 150.0, 252.0, 252.0 and 114.0 allowed): shapes drawn (about 50 of DrawingML's preset
+ * definitions, the guide formula interpreter, SVG fills, gradients, dashes and line ends), with
+ * room for the Shapes gallery, handles and the Shape Format tab (34.3–34.5).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 110_592 },
-  { name: "@folijs/view", entry: dist("view"), budget: 141_312 },
-  { name: "@folijs/react", entry: dist("react"), budget: 245_760 },
-  { name: "FoliEditor only", entry: appEntry, budget: 245_760 },
+  { name: "@folijs/view", entry: dist("view"), budget: 153_600 },
+  { name: "@folijs/react", entry: dist("react"), budget: 258_048 },
+  { name: "FoliEditor only", entry: appEntry, budget: 258_048 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 86_016 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 23_040 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 110_592 },
@@ -195,7 +199,7 @@ const BUILT = [
   {
     name: "pdf's renderer",
     file: join(root, "packages", "pdf", "dist", "renderer.js"),
-    budget: 104_448,
+    budget: 116_736,
   },
 ];
 
