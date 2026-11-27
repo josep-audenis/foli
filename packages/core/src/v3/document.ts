@@ -1408,11 +1408,31 @@ const whole = (value: string | undefined) =>
 const compactJson = (object: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(object).filter(([, v]) => v !== undefined));
 
+/** Kept XML without its tracked change (`w:pPrChange`…): that says what was, not what is. */
+const withoutChange = (ext: string, local: "pPrChange" | "sectPrChange") =>
+  ext.replace(
+    local === "pPrChange"
+      ? /<(?:[\w.-]+:)?pPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?pPrChange>/g
+      : /<(?:[\w.-]+:)?sectPrChange\b[\s\S]*?<\/(?:[\w.-]+:)?sectPrChange>/g,
+    "",
+  );
+
+/** `w:suppressLineNumbers` a kept `w:pPr` says, when `properties` (its owner) does not. */
+function adoptParagraphProperties(properties: unknown): void {
+  if (!isRecord(properties) || properties.suppressLineNumbers != null) return;
+  const ext = withoutChange(typeof properties.ext === "string" ? properties.ext : "", "pPrChange");
+  const suppress = /<(?:[\w.-]+:)?suppressLineNumbers\b([^>]*?)\/>/.exec(ext);
+  if (suppress)
+    properties.suppressLineNumbers = !["0", "false", "off"].includes(
+      xmlAttributes(suppress[1] ?? "").val ?? "",
+    );
+}
+
 /** Page borders and line numbers a section's kept `w:sectPr` says, when its parts do not. */
 function adoptSection(section: unknown): void {
   if (!isRecord(section)) return;
   if (isRecord(section.change)) adoptSection(section.change.previous);
-  const ext = typeof section.ext === "string" ? section.ext : "";
+  const ext = withoutChange(typeof section.ext === "string" ? section.ext : "", "sectPrChange");
   if (!ext) return;
   const numbers = /<(?:[\w.-]+:)?lnNumType\b([^>]*?)\/?>/.exec(ext);
   if (numbers && section.lineNumbers === undefined) {
@@ -1468,18 +1488,20 @@ function adoptKeptDecoration(doc: FoliDocument): void {
     const attrs = isRecord(node.attrs) ? node.attrs : undefined;
     if (attrs) {
       adoptSection(attrs.section);
-      const ext = typeof attrs.ext === "string" ? attrs.ext : "";
-      const suppress =
-        node.type === "paragraph" && /<(?:[\w.-]+:)?suppressLineNumbers\b([^>]*?)\/>/.exec(ext);
-      if (suppress && attrs.suppressLineNumbers == null) {
-        const value = xmlAttributes(suppress[1] ?? "").val;
-        attrs.suppressLineNumbers = !["0", "false", "off"].includes(value ?? "");
-      }
+      if (node.type === "paragraph") adoptParagraphProperties(attrs);
     }
     if (Array.isArray(node.content)) for (const child of node.content) visit(child);
   };
   visit(doc.content);
   for (const comment of doc.comments) for (const block of comment.content) visit(block);
   for (const story of Object.values(doc.stories ?? {})) visit(story.content);
+  // Styles, the defaults and list levels hold paragraph properties too.
+  for (const style of doc.styles) adoptParagraphProperties(style.paragraph);
+  adoptParagraphProperties(doc.defaults.paragraph);
+  for (const abstract of doc.numbering.abstracts)
+    for (const level of abstract.levels) adoptParagraphProperties(level.paragraph);
+  for (const instance of doc.numbering.instances)
+    for (const override of instance.overrides ?? [])
+      adoptParagraphProperties(override.definition?.paragraph);
   doc.schemaVersion = schemaVersionOf(doc);
 }
