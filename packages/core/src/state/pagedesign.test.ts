@@ -186,8 +186,8 @@ describe("setWatermark", () => {
     const refs = (
       withFirst.getDocument().content.content?.[0]?.attrs?.section as {
         headers?: Record<string, string>;
-      }
-    ).headers;
+      } | null
+    )?.headers;
     const last = withFirst.getDocument().section.headers;
     // The first section has no first page: its default header; the last one's first page gets one.
     expect(Object.keys(refs ?? {})).toEqual(["default"]);
