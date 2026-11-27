@@ -333,14 +333,19 @@ export function shapeElement(
     own.top = `${top}px`;
     own.width = `${width}px`;
     own.height = `${height}px`;
-    own.display = "flex";
-    own.flexDirection = "column";
-    own.boxSizing = "border-box";
     if (typeof attrs.textColor === "string") own.color = `#${attrs.textColor}`;
+    // As a text box's: the laid-out span in it, the story's content in that (an open story goes
+    // there, `openTextBox`).
+    const inner = doc.createElement("span");
+    const lay = inner.style;
+    lay.display = "flex";
+    lay.flexDirection = "column";
+    lay.boxSizing = "border-box";
+    lay.height = "100%";
     const inset = (attrs.inset ?? {}) as Record<string, number | undefined>;
     const pad = (side: string, fallback: number) => `${(inset[side] ?? fallback) / EMU_PER_PX}px`;
-    own.padding = `${pad("top", 45_720)} ${pad("right", 91_440)} ${pad("bottom", 45_720)} ${pad("left", 91_440)}`;
-    own.justifyContent =
+    lay.padding = `${pad("top", 45_720)} ${pad("right", 91_440)} ${pad("bottom", 45_720)} ${pad("left", 91_440)}`;
+    lay.justifyContent =
       attrs.verticalAlign === "center"
         ? "center"
         : attrs.verticalAlign === "bottom"
@@ -352,7 +357,8 @@ export function shapeElement(
     const { notes: _notes, ...rest } = options;
     const blocks = renderBlocks({ ...document, content: story.content } as FoliDocument, doc, rest);
     stack(blocks, content, !!options.resolver?.addsParagraphSpacing);
-    text.append(content);
+    inner.append(content);
+    text.append(inner);
     box.append(text);
   }
   return box;

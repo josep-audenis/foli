@@ -505,3 +505,53 @@ export function alignObject(pos: number, align: ObjectAlign): Command {
     }))(state, dispatch);
   };
 }
+
+/** How far an arrow key moves a floating object (Word's 0.08" grid step); with Ctrl, a pixel. */
+export const NUDGE = { step: 73_152, fine: EMU_PER_PX } as const;
+
+/**
+ * Moves the floating object at `pos` by `dx`, `dy` EMU (34.4: a drag or an arrow key), one undo
+ * step. An axis with an offset gets it moved; one aligned (centered, at the margin…) is given
+ * the offset `placement` says it is drawn at, from its column or its paragraph, then moved. In
+ * line, or while tracking: nothing.
+ */
+export function moveObject(
+  pos: number,
+  dx: number,
+  dy: number,
+  placement?: ObjectPlacement,
+): Command {
+  return (state, dispatch) => {
+    const node = objectAt(state, pos);
+    if (!node?.attrs.float || (!dx && !dy) || !Number.isFinite(dx) || !Number.isFinite(dy))
+      return false;
+    const moved = (axis: ObjectAxis, by: number, drawn: number | undefined, from: string) => {
+      if (!by) return axis;
+      if (typeof axis.offset === "number")
+        return { relativeTo: axis.relativeTo, offset: Math.round(axis.offset + by) };
+      // Aligned: from where it is drawn, or (not drawn) from its reference's start.
+      return {
+        relativeTo: drawn === undefined ? axis.relativeTo : from,
+        offset: Math.round((drawn ?? 0) + by),
+      };
+    };
+    return setFloat(pos, (n) => {
+      const float = n.attrs.float as Record<string, unknown>;
+      return {
+        ...float,
+        horizontal: moved(
+          float.horizontal as ObjectAxis,
+          dx,
+          placement && emu(placement.left - placement.columnLeft),
+          "column",
+        ),
+        vertical: moved(
+          float.vertical as ObjectAxis,
+          dy,
+          placement && emu(placement.top - placement.paragraphTop),
+          "paragraph",
+        ),
+      };
+    })(state, dispatch);
+  };
+}

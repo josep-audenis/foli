@@ -60,12 +60,12 @@ export function ShapeGallery({ editor, disabled, tabIndex, ref, onFocus }: Toolb
   };
   const choose = (geometry: string, byKeyboard: boolean) => {
     setOpen(false);
+    // The focus to the button before its menu goes: the ribbon then knows when it leaves.
+    button.current?.focus();
     // The body's view draws it (a story's editor has none: a shape goes in the body).
     const view = editor.storyView;
     if (!byKeyboard && view?.drawShape?.(geometry)) return;
     editor.run(insertShape(geometry));
-    // From the keyboard the focus comes back to the button, as the toolbar's menus do.
-    button.current?.focus();
   };
   const onMenuKey = (event: KeyboardEvent) => {
     const at = items.current.indexOf(event.target as HTMLButtonElement);

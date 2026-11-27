@@ -3,9 +3,9 @@ import type { NodeJSON } from "../model/index.js";
 import { createDocument, type FoliDocument, parseDocument } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { undo } from "./history.js";
-import { selectedObject, setObjectSize } from "./layout.js";
+import { moveObject, selectedObject, setObjectSize } from "./layout.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
-import { insertShape } from "./shapes.js";
+import { addShapeText, insertShape, setShapeAdjust } from "./shapes.js";
 import { StoryStep, wordContext } from "./word.js";
 import { copiedDefinitions, fitPaste } from "./wordclip.js";
 
@@ -237,5 +237,43 @@ describe("shapes (schema 11)", () => {
     // Not a DrawingML preset; not in a story.
     expect(insertShape("circle")(editor.state)).toBe(false);
     expect(insertShape("rect")((editor.story("textbox:1") as typeof editor).state)).toBe(false);
+  });
+
+  it("moves, adjusts and gives text to a shape, one undo step each", () => {
+    const editor = createEditor({ document: shaped() });
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    editor.run(insertShape("roundRect", { horizontal: 100, vertical: 200 }));
+    const pos = selectedObject(editor.state)?.pos as number;
+    const attrs = () => editor.state.doc.nodeAt(pos)?.attrs as Record<string, any>;
+    expect(editor.run(moveObject(pos, 9525, -9525))).toBe(true);
+    expect(attrs().float.horizontal).toEqual({ relativeTo: "column", offset: 9625 });
+    expect(attrs().float.vertical).toEqual({ relativeTo: "paragraph", offset: -9325 });
+    // Aligned: given the offset it is drawn at, then moved.
+    editor.dispatch(
+      editor.state.tr.setNodeMarkup(pos, editor.state.schema.nodes.shape as never, {
+        ...attrs(),
+        float: { ...attrs().float, horizontal: { relativeTo: "margin", align: "center" } },
+      }),
+    );
+    editor.run(moveObject(pos, 9525, 0, { left: 300, top: 0, paragraphTop: 0, columnLeft: 100 }));
+    expect(attrs().float.horizontal).toEqual({ relativeTo: "column", offset: 200 * 9525 + 9525 });
+    expect(editor.run(setShapeAdjust(pos, { adj: 40_000.4 }))).toBe(true);
+    expect(attrs().adjust).toEqual({ adj: 40_000 });
+    expect(editor.run(setShapeAdjust(pos, { adj: 40_000 }))).toBe(false);
+    expect(editor.run(addShapeText(pos))).toBe(true);
+    const story = String(attrs().story);
+    expect(editor.getDocument().stories?.[story]?.kind).toBe("textBox");
+    expect(attrs()).toMatchObject({ verticalAlign: "center", textColor: "FFFFFF" });
+    expect(editor.run(addShapeText(pos))).toBe(false);
+    editor.run(undo);
+    expect(editor.getDocument().stories?.[story]).toBeUndefined();
+    expect(attrs().adjust).toEqual({ adj: 40_000 });
+    editor.run(undo);
+    expect(attrs().adjust ?? null).toBeNull();
+    // A line holds no text; an inline object does not move.
+    editor.run(insertShape("line"));
+    expect(addShapeText(selectedObject(editor.state)?.pos as number)(editor.state)).toBe(false);
+    const inline = 1 + "Before ".length;
+    expect(moveObject(inline, 9525, 0)(editor.state)).toBe(false);
   });
 });

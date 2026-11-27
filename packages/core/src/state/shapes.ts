@@ -4,10 +4,14 @@
  * draws one (the theme's first accent), selected.
  */
 
+import { parseContent } from "../v3/document.js";
+import { attempt } from "./attempt.js";
 import { closeHistory } from "./history.js";
 import { NodeSelection, Selection } from "./selection.js";
-import type { Command } from "./state.js";
-import { storyBody, wordContext } from "./word.js";
+import type { Command, EditorState } from "./state.js";
+import { freshTextBoxId } from "./textboxes.js";
+import { trackState } from "./track.js";
+import { StoryStep, storyBody, wordContext } from "./word.js";
 
 /** Lines Word draws without a fill, from corner to corner. */
 const LINES = new Set(["line", "straightConnector1", "bentConnector3", "curvedConnector3"]);
@@ -90,6 +94,72 @@ export function insertShape(geometry: string, options: InsertShapeOptions = {}):
     const tr = state.tr.setMeta(closeHistory, true);
     tr.insert($pos.pos, node);
     tr.setSelection(NodeSelection.create(tr.doc, $pos.pos));
+    dispatch(tr);
+    return true;
+  };
+}
+
+/** The shape at `pos`, or null. */
+const shapeAt = (state: EditorState, pos: number) => {
+  const node = pos >= 0 && pos < state.doc.content.size ? state.doc.nodeAt(pos) : null;
+  return node?.type.name === "shape" ? node : null;
+};
+
+/**
+ * Sets adjust values of the shape at `pos` (34.4: its yellow handles; `{ adj: 25000 }`, merged
+ * with those it has), one undo step, kept selected. Not while tracking.
+ */
+export function setShapeAdjust(pos: number, adjust: Readonly<Record<string, number>>): Command {
+  return (state, dispatch) => {
+    const node = shapeAt(state, pos);
+    if (!node || trackState(state)?.on === true) return false;
+    const now = (node.attrs.adjust ?? {}) as Record<string, number>;
+    const next = { ...now };
+    for (const [name, value] of Object.entries(adjust))
+      if (Number.isFinite(value)) next[name] = Math.round(value);
+    if (Object.entries(next).every(([name, value]) => now[name] === value)) return false;
+    return attempt(state, dispatch, (tr) => {
+      tr.setMeta(closeHistory, true);
+      tr.setNodeMarkup(pos, node.type, { ...node.attrs, adjust: next });
+      if (state.selection instanceof NodeSelection && state.selection.from === pos)
+        tr.setSelection(NodeSelection.create(tr.doc, pos));
+    });
+  };
+}
+
+/**
+ * Gives the shape at `pos` text (34.4: typing on a selected shape, as Word does): a story of kind
+ * `textBox` with an empty paragraph, the text centered in the shape as Word's new shapes have it,
+ * in the style's light color. One undo step; false when it has text, is a line, or is in a story.
+ */
+export function addShapeText(pos: number): Command {
+  return (state, dispatch) => {
+    const node = shapeAt(state, pos);
+    if (!node || node.attrs.story || LINES.has(String(node.attrs.geometry)) || storyBody(state))
+      return false;
+    if (!dispatch) return true;
+    const id = freshTextBoxId(state);
+    const tr = state.tr.setMeta(closeHistory, true);
+    tr.setNodeMarkup(pos, node.type, {
+      ...node.attrs,
+      story: id,
+      verticalAlign: node.attrs.verticalAlign ?? "center",
+      textColor: node.attrs.textColor ?? "FFFFFF",
+    });
+    if (state.selection instanceof NodeSelection && state.selection.from === pos)
+      tr.setSelection(NodeSelection.create(tr.doc, pos));
+    tr.step(
+      new StoryStep(id, null, {
+        kind: "textBox",
+        doc: parseContent(
+          {
+            type: "doc",
+            content: [{ type: "paragraph", attrs: { justification: "center" } }],
+          },
+          { schema: state.schema },
+        ),
+      }),
+    );
     dispatch(tr);
     return true;
   };

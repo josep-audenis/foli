@@ -4783,8 +4783,16 @@ paths; text in shapes through Phase 33's stories.
   and names as icons, a menu the arrow keys move in, Enter inserting an inch square at the
   selection. `shapes.test.ts` (core), `word-shapes.spec.ts` (drag, Shift, undo, keyboard,
   Escape, axe; three engines).
-- [ ] 34.4 Selected shape: move, resize, rotate handles, adjustment handles for the shapes that
-  have them; arrow keys move; one undo step per gesture; text in a shape.
+- [x] 34.4 Selected shape: move, resize, rotate handles, adjustment handles for the shapes that
+  have them; arrow keys move; one undo step per gesture; text in a shape. Built: core's
+  `moveObject` (any floating object; an aligned axis given its drawn offset), `NUDGE`,
+  `setShapeAdjust`, `addShapeText`; the view's handles on a selected shape (rotate, the preset's
+  adjustment handles from its definition, `word/handles.ts`), a press on a floating shape's body
+  dragging it, previews while dragging, one step on release, Escape putting it back; the arrow
+  keys moving any selected floating object (Ctrl a pixel); typing on a selected shape writing in
+  it, a press in its text opening it (its story opened as a text box's). `shapes.test.ts`
+  (core), `handles.test.ts` (view), `word-shapes.spec.ts` (move, nudge, undo, Shift-turn,
+  adjust, typing, Escape, axe; three engines).
 - [ ] 34.5 Shape Format tab: fill, outline, styles, size, arrange (shared with 33.6).
 - [ ] 34.6 Corpus run on files with shapes; e2e; docs; changesets.
 
