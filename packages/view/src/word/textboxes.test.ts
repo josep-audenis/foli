@@ -6,7 +6,9 @@ import {
   type NodeJSON,
   parseDocument,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 import { afterEach, describe, expect, it } from "vitest";
+import { serializeRange } from "../clipboard.js";
 import { EditorView, renderDocument } from "../index.js";
 import { FLOAT_ATTR, renderBlocks, TEXT_BOX_ATTR } from "./blocks.js";
 
@@ -136,5 +138,16 @@ describe("text boxes in the editable view", () => {
     const inBox = editor.story("textbox:1");
     inBox?.dispatch(inBox.state.tr.insertText("New ", 1));
     expect(drawn().textContent).toBe("New First lineSecond");
+  });
+
+  it("are left out of a copy's HTML (their paragraphs would break the line's)", () => {
+    const editor = createEditor({ document: boxed({ float: FLOAT }) });
+    const { state } = editor;
+    const copied = serializeRange(state.doc, 0, state.doc.content.size, document, {
+      context: wordContext(state) as NonNullable<ReturnType<typeof wordContext>>,
+      ratio: () => 1.2,
+    });
+    expect(copied.html).not.toContain("First line");
+    expect(copied.html).toContain("Before ");
   });
 });

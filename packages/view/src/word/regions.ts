@@ -18,7 +18,6 @@ import {
 import { formatNumber, type Resolver } from "@folijs/core/internal";
 import type { FlowPage, PageFacts } from "../layout/flow.js";
 import { type BlockOptions, PX_PER_TWIP, renderBlocks, stack, type WordBlock } from "./blocks.js";
-
 import { watermarksIn } from "./decoration.js";
 
 /** Each story's watermarks, read once per story object. */

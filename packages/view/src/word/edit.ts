@@ -80,13 +80,20 @@ const storySerial = (tree: object | undefined): number => {
   return found;
 };
 
-/** The stories of the text boxes in a block, in order. */
+const boxesOf = new WeakMap<ModelNode, string[]>();
+
+/** The stories of the text boxes in a block, in order (read once per node). */
 function textBoxesIn(node: ModelNode): string[] {
-  const ids: string[] = [];
-  node.descendants((child) => {
-    if (child.type.name === "textBox") ids.push(String(child.attrs.story));
-    return true;
-  });
+  let ids = boxesOf.get(node);
+  if (!ids) {
+    const found: string[] = [];
+    node.descendants((child) => {
+      if (child.type.name === "textBox") found.push(String(child.attrs.story));
+      return true;
+    });
+    ids = found;
+    boxesOf.set(node, ids);
+  }
   return ids;
 }
 
@@ -459,6 +466,12 @@ export class WordRenderer {
           // a picture is.
           const span = doc.createElement("span");
           span.setAttribute("contenteditable", "false");
+          // On the clipboard nothing: its paragraphs in the line's would break the HTML (Foli's
+          // own format carries the box and its text).
+          if (this.#clipboard) {
+            leafElement(span);
+            return;
+          }
           const box = textBoxElement(child.attrs, this.#context.envelope, doc, {
             resolver: this.#context.resolver,
             review: this.#review,

@@ -262,8 +262,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   Drawn (33.2) as Word places them, on the editing view's pages, `renderDocument`'s, in print
   and `exportPdf`: their fill, a solid line (its width and color; dashes and effects not
   drawn), their text inside at the insets, cut off at the box's height unless it grows to fit.
-  A floating box is laid out as a floating picture is, with the same limits (above). Not edited
-  yet (33.3). A rotated box,
+  A floating box is laid out as a floating picture is, with the same limits (above). A page
+  field in a header's box shows its stored result on every page; custom nodes in a box are
+  drawn by their extension in `renderDocument` and print, as their text on the editing view's
+  pages; a box deleted as a tracked change is not struck through (as a picture). A copy's HTML
+  leaves the box out (Foli's own clipboard format keeps it). Not edited yet (33.3). A rotated box,
   a linked box (text flowing from one box to the next), a box in a group or filled with a
   picture, and a shape other than a rectangle holding text stay opaque, and so does a box in a
   note, a comment or another box (Word allows none of these three). Theme colors of a box's fill

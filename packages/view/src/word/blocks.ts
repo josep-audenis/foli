@@ -235,10 +235,9 @@ export function textBoxElement(
   style.width = `${Number(attrs.width) / EMU_PER_PX}px`;
   const height = `${Number(attrs.height) / EMU_PER_PX}px`;
   if (attrs.autoFit === true) style.minHeight = height;
-  else {
-    style.height = height;
-    style.overflow = "hidden";
-  }
+  else style.height = height;
+  // Cut off at its height; and so its baseline is its bottom edge, in line as Word sets it.
+  style.overflow = "hidden";
   style.textIndent = "0";
   style.textAlign = "left";
   style.whiteSpace = "normal";
