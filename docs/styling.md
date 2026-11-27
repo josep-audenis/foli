@@ -17,28 +17,33 @@ Word's styles and direct formatting, written inline on each paragraph and run.
 The defaults live on `:root` (and `:host`, for a shadow root). Set a variable on any ancestor of
 the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it there.
 
-| Variable                           | Default                                                    | Applies to                      |
-| ---------------------------------- | ---------------------------------------------------------- | ------------------------------- |
-| `--foli-canvas-background`         | `#f3f3f1`                                                  | area around the pages           |
-| `--foli-page-background`           | `#ffffff`                                                  | pages                           |
-| `--foli-page-shadow`               | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                           |
-| `--foli-page-gap`                  | `24px`                                                     | space between pages             |
-| `--foli-text-color`                | `#1d1d1b`                                                  | text without a color of its own |
-| `--foli-formatting-marks`          | `#4a6fa5`                                                  | formatting marks (on `:root`)   |
-| `--foli-selection-color`           | `rgb(35 103 220 / 0.22)`                                   | selected text                   |
-| `--foli-border-color`              | `#e2e2df`                                                  | toolbar border and separators   |
-| `--foli-toolbar-background`        | `#ffffff`                                                  | toolbar                         |
-| `--foli-toolbar-color`             | `#1d1d1b`                                                  | toolbar text                    |
-| `--foli-toolbar-hover`             | `#f0f0ee`                                                  | hovered button                  |
-| `--foli-toolbar-pressed`           | `#dfe8f8`                                                  | pressed (active) toggle         |
-| `--foli-focus-ring`                | `#2367dc`                                                  | focus outline, pressed border   |
-| `--foli-error-color`               | `#b3261e`                                                  | link dialog: invalid URL        |
-| `--foli-ribbon-contextual`         | `#7a2e9e`                                                  | tabs of the selection (ribbon)  |
-| `--foli-dialog-input-height`       | `32px`                                                     | dialog inputs and buttons       |
-| `--foli-dialog-radius`             | `4px`                                                      | dialog inputs and buttons       |
-| `--foli-dialog-primary-background` | `transparent`                                              | dialog and panel submit button  |
-| `--foli-dialog-primary-color`      | `currentcolor`                                             | dialog main button text         |
-| `--foli-dialog-primary-border`     | `var(--foli-border-color)`                                 | dialog main button border       |
+| Variable                           | Default                                                    | Applies to                           |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------------------ |
+| `--foli-canvas-background`         | `#f3f3f1`                                                  | area around the pages                |
+| `--foli-page-background`           | `#ffffff`                                                  | pages                                |
+| `--foli-page-shadow`               | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                                |
+| `--foli-page-gap`                  | `24px`                                                     | space between pages                  |
+| `--foli-text-color`                | `#1d1d1b`                                                  | text without a color of its own      |
+| `--foli-formatting-marks`          | `#4a6fa5`                                                  | formatting marks (on `:root`)        |
+| `--foli-selection-color`           | `rgb(35 103 220 / 0.22)`                                   | selected text                        |
+| `--foli-border-color`              | `#e2e2df`                                                  | toolbar border and separators        |
+| `--foli-toolbar-background`        | `#ffffff`                                                  | toolbar                              |
+| `--foli-toolbar-color`             | `#1d1d1b`                                                  | toolbar text                         |
+| `--foli-toolbar-hover`             | `#f0f0ee`                                                  | hovered button                       |
+| `--foli-toolbar-pressed`           | `#dfe8f8`                                                  | pressed (active) toggle              |
+| `--foli-focus-ring`                | `#2367dc`                                                  | focus outline, pressed border        |
+| `--foli-error-color`               | `#b3261e`                                                  | link dialog: invalid URL             |
+| `--foli-ribbon-contextual`         | `#7a2e9e`                                                  | tabs of the selection (ribbon)       |
+| `--foli-dialog-input-height`       | `32px`                                                     | dialog inputs and buttons            |
+| `--foli-dialog-radius`             | `4px`                                                      | dialog inputs and buttons            |
+| `--foli-dialog-primary-background` | `transparent`                                              | dialog and panel submit button       |
+| `--foli-dialog-primary-color`      | `currentcolor`                                             | dialog main button text              |
+| `--foli-dialog-primary-border`     | `var(--foli-border-color)`                                 | dialog main button border            |
+| `--foli-ruler-background`          | `var(--foli-canvas-background)`                            | the ruler beside the page            |
+| `--foli-ruler-text-background`     | `#ffffff`                                                  | the ruler between the page's margins |
+| `--foli-ruler-margin-background`   | `#d6d6d2`                                                  | the ruler over the page's margins    |
+| `--foli-ruler-color`               | `#5c5c58`                                                  | the ruler's numbers and ticks        |
+| `--foli-ruler-handle`              | `#8a8a86`                                                  | the ruler's indent markers           |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change (the
 document's, or CSS over it) re-flows the pages. The document's fonts must be available (loaded web fonts or installed ones); the view
@@ -70,6 +75,7 @@ the [theming guide](guides/theming.md). This page is the reference it builds on.
 | `.foli-toolbar-dialog`                  | an app's dialog under the toolbar (`ToolbarDialog`; also `.foli-link-dialog` and `.foli-toolbar-<key>-dialog`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `.foli-toolbar-group`                   | a group with a caption (`role="group"`): its items in `.foli-toolbar-group-items`, the caption in `.foli-toolbar-group-label` (with a launcher, both in `.foli-toolbar-group-foot`, the launcher `.foli-toolbar-launcher`); a large button is `.foli-toolbar-large`, a medium one (icon beside text) `.foli-toolbar-medium`, a built-in icon `.foli-toolbar-icon`                                                                                                                                                                                                                                                                                 |
 | `.foli-status-bar`                      | Word's status bar (`FoliStatusBar`): `.foli-status-page`, `.foli-status-words`, `.foli-status-spacer` (pushes the zoom to the end), `.foli-status-track`, `.foli-status-zoom` (`.foli-status-fit-width`, `.foli-status-fit-page`, `.foli-status-zoom-out`, `.foli-status-zoom-in`, `.foli-status-percent`), the count's `.foli-status-dialog`                                                                                                                                                                                                                                                                                                     |
+| `.foli-ruler`                           | Word's ruler (`FoliRuler`; `[data-foli-dragging]` during a drag): `.foli-ruler-page` (the page, its margins' color) with `.foli-ruler-text` (between the margins) and the scale (`.foli-ruler-number`, `.foli-ruler-half`, `.foli-ruler-tick`); `.foli-ruler-handle` on each slider, with `.foli-ruler-first-line`, `.foli-ruler-hanging`, `.foli-ruler-left`, `.foli-ruler-right`, `.foli-ruler-margin` (`data-foli-ruler` names it); `.foli-ruler-value` (the value with Alt), `.foli-ruler-guide` (the line down the page). Hidden in print                                                                                                    |
 | `.foli-context-menu`                    | the right-click menu (`FoliContextMenu`), also a `.foli-menu`: entries `.foli-context-<key>`, lines between groups `.foli-menu-separator`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `.foli-mini-toolbar`                    | the mini toolbar (`FoliMiniToolbar`) around its `.foli-toolbar`: faded (`opacity: 0.55`) until `:hover` or `:focus-within`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `.foli-style-gallery`                   | the Styles gallery: `.foli-style-gallery-list` (the listbox), `.foli-style-gallery-item` (`aria-selected` for the paragraph's style, `.foli-style-gallery-active` for the arrows'), `.foli-style-gallery-more`; open: `.foli-style-gallery-open`                                                                                                                                                                                                                                                                                                                                                                                                  |

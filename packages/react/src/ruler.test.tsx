@@ -1,0 +1,178 @@
+// @vitest-environment jsdom
+import {
+  createEditor,
+  type Editor,
+  type FoliDocument,
+  type RulerGeometry,
+  sectionAt,
+} from "@folijs/core";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { FoliRuler } from "./index.js";
+
+afterEach(cleanup);
+
+const doc = (indent?: Record<string, number>): FoliDocument => ({
+  schemaVersion: 5,
+  section: {
+    pageSize: { width: 12240, height: 15840 },
+    margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+  },
+  defaults: {},
+  styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+  numbering: { abstracts: [], instances: [] },
+  comments: [],
+  content: {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        ...(indent ? { attrs: { indent } } : {}),
+        content: [{ type: "text", text: "one two three" }],
+      },
+    ],
+  },
+});
+
+/** 0.1 px a twip: a Letter page from x 100 to 1324, its margins an inch (144 px) in. */
+const K = 0.1;
+const PAGE = { left: 100, right: 100 + 12240 * K };
+
+/** Gives `editor` a view whose geometry is the page above, its paragraph's from its indents. */
+function fakeView(editor: Editor) {
+  editor.storyView = {
+    rulerGeometry: (): RulerGeometry => {
+      const setup = sectionAt(editor.state)?.setup.margins ?? {};
+      const margins = {
+        left: PAGE.left + (setup.left ?? 0) * K,
+        right: PAGE.right - (setup.right ?? 0) * K,
+        top: 0,
+        bottom: 0,
+      };
+      const indent = (editor.state.selection.$head.parent.attrs.indent ?? {}) as Record<
+        string,
+        number
+      >;
+      const left = margins.left + (indent.left ?? 0) * K;
+      return {
+        pxPerTwip: K,
+        gutter: 0,
+        page: { index: 0, ...PAGE, top: 0, bottom: 1584 },
+        margins,
+        text: { left: margins.left, right: margins.right },
+        paragraph: {
+          left,
+          firstLine: left + ((indent.firstLine ?? 0) - (indent.hanging ?? 0)) * K,
+          right: margins.right - (indent.right ?? 0) * K,
+          tabs: [],
+        },
+        table: null,
+      };
+    },
+  } as never;
+}
+
+async function setup(indent?: Record<string, number>, disabled = false) {
+  const editor = createEditor({ document: doc(indent) });
+  fakeView(editor);
+  act(() => {
+    editor.select(2, 2);
+  });
+  render(<FoliRuler editor={editor} units="in" disabled={disabled} />);
+  await waitFor(() => screen.getByRole("slider", { name: "Left indent" }));
+  return editor;
+}
+
+const indentOf = (editor: Editor) => editor.state.selection.$head.parent.attrs.indent;
+const slider = (name: string) => screen.getByRole("slider", { name });
+/** A drag from x `from` to `to` (client px) on a handle. */
+function drag(handle: HTMLElement, from: number, to: number, altKey = false) {
+  fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: from, altKey });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: (from + to) / 2, altKey });
+  fireEvent.pointerMove(handle, { pointerId: 1, clientX: to, altKey });
+  fireEvent.pointerUp(handle, { pointerId: 1, clientX: to, altKey });
+}
+
+describe("FoliRuler", () => {
+  it("shows the indents and margins as sliders in the unit", async () => {
+    await setup({ left: 720, hanging: 360, right: 1440 });
+    expect(screen.getByRole("group", { name: "Horizontal ruler" })).toBeTruthy();
+    const left = slider("Left indent");
+    expect(left.getAttribute("aria-valuenow")).toBe("0.5");
+    expect(left.getAttribute("aria-valuetext")).toBe('0.5"');
+    expect(slider("First line indent").getAttribute("aria-valuenow")).toBe("-0.25");
+    expect(slider("Hanging indent").getAttribute("aria-valuenow")).toBe("0.5");
+    expect(slider("Right indent").getAttribute("aria-valuenow")).toBe("1");
+    expect(slider("Left margin").getAttribute("aria-valuetext")).toBe('1"');
+    expect(slider("Right margin").getAttribute("aria-valuenow")).toBe("1");
+    // Placed where the geometry says, against the ruler's own left edge (0 in jsdom).
+    expect(left.style.left).toBe(`${244 + 72}px`);
+  });
+
+  it("drags the left indent by the ruler's step, in one undo step", async () => {
+    const editor = await setup();
+    // 100 px is 1000 twips: snapped to 1/16 inch (90 twips), 990.
+    act(() => drag(slider("Left indent"), 244, 344));
+    expect(indentOf(editor)).toEqual({ left: 990 });
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(indentOf(editor)).toBeNull();
+  });
+
+  it("with Alt held does not snap, and shows the value while dragging", async () => {
+    const editor = await setup();
+    const handle = slider("Left indent");
+    fireEvent.pointerDown(handle, { button: 0, pointerId: 1, clientX: 244, altKey: true });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 344, altKey: true });
+    expect(document.querySelector(".foli-ruler-value")?.textContent).toBe('0.69"');
+    // Escape cancels: nothing changes on release.
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: 344, altKey: true });
+    expect(indentOf(editor)).toBeNull();
+    act(() => drag(slider("Left indent"), 244, 344, true));
+    expect(indentOf(editor)).toEqual({ left: 1000 });
+  });
+
+  it("moves the hanging marker with the first line kept, and the first line on its own", async () => {
+    const editor = await setup({ left: 720 });
+    // The hanging marker to 1 inch: the first line stays at 0.5, a hanging indent of 0.5.
+    act(() => drag(slider("Hanging indent"), 316, 388));
+    expect(indentOf(editor)).toEqual({ left: 1440, hanging: 720 });
+    // The first line to 1.5 inches: a first-line indent of 0.5 from the left one.
+    act(() => drag(slider("First line indent"), 316, 460));
+    expect(indentOf(editor)).toEqual({ left: 1440, firstLine: 720 });
+    act(() => drag(slider("Right indent"), 1180, 1108));
+    expect(indentOf(editor)).toEqual({ left: 1440, firstLine: 720, right: 720 });
+  });
+
+  it("drags a margin of the caret's section", async () => {
+    const editor = await setup();
+    act(() => drag(slider("Left margin"), 244, 172));
+    expect(sectionAt(editor.state)?.setup.margins?.left).toBe(720);
+    act(() => drag(slider("Right margin"), 1180, 1036));
+    expect(sectionAt(editor.state)?.setup.margins?.right).toBe(2880);
+  });
+
+  it("moves a handle with the keyboard, a step an arrow, the way the arrow points", async () => {
+    const editor = await setup({ left: 720, right: 720 });
+    fireEvent.keyDown(slider("Left indent"), { key: "ArrowRight" });
+    expect(indentOf(editor)).toEqual({ left: 810, right: 720 });
+    fireEvent.keyDown(slider("Left indent"), { key: "PageDown" });
+    expect(indentOf(editor)).toEqual({ left: 90, right: 720 });
+    // The right indent grows leftwards: ArrowLeft moves it left, a larger value.
+    fireEvent.keyDown(slider("Right indent"), { key: "ArrowLeft" });
+    expect(indentOf(editor)).toEqual({ left: 90, right: 810 });
+  });
+
+  it("changes nothing when disabled, and is empty without a view", async () => {
+    const editor = await setup({ left: 720 }, true);
+    act(() => drag(slider("Left indent"), 316, 416));
+    fireEvent.keyDown(slider("Left indent"), { key: "ArrowRight" });
+    expect(indentOf(editor)).toEqual({ left: 720 });
+    expect(slider("Left indent").getAttribute("aria-disabled")).toBe("true");
+    cleanup();
+    render(<FoliRuler editor={createEditor({ document: doc() })} />);
+    expect(screen.getByRole("group", { name: "Horizontal ruler" }).childElementCount).toBe(0);
+  });
+});

@@ -25,6 +25,12 @@
   --foli-dialog-primary-background: transparent;
   --foli-dialog-primary-color: currentcolor;
   --foli-dialog-primary-border: var(--foli-border-color);
+  /* The ruler (FoliRuler): its page's text area, its margins, its numbers and handles. */
+  --foli-ruler-background: var(--foli-canvas-background);
+  --foli-ruler-text-background: #ffffff;
+  --foli-ruler-margin-background: #d6d6d2;
+  --foli-ruler-color: #5c5c58;
+  --foli-ruler-handle: #8a8a86;
 }
 
 .foli-canvas {
@@ -1082,6 +1088,123 @@
   .foli-editor-body {
     display: block;
     background: none;
+  }
+}
+
+/*
+ * Word's ruler (FoliRuler): the caret's page as a strip (its margins shaded), numbers from the
+ * left margin, and handles placed in client px by the ruler (each centred on its position).
+ */
+.foli-ruler {
+  position: relative;
+  height: 24px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--foli-border-color);
+  background: var(--foli-ruler-background);
+  color: var(--foli-ruler-color);
+  font-size: 10px;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.foli-ruler-page {
+  position: absolute;
+  top: 4px;
+  height: 16px;
+  background: var(--foli-ruler-margin-background);
+}
+.foli-ruler-text {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--foli-ruler-text-background);
+}
+.foli-ruler-number,
+.foli-ruler-half,
+.foli-ruler-tick {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.foli-ruler-number {
+  top: 3px;
+}
+.foli-ruler-half,
+.foli-ruler-tick {
+  width: 1px;
+  background: currentcolor;
+}
+.foli-ruler-half {
+  top: 5px;
+  height: 6px;
+}
+.foli-ruler-tick {
+  top: 7px;
+  height: 2px;
+}
+.foli-ruler-handle {
+  position: absolute;
+  z-index: 1;
+  width: 9px;
+  transform: translateX(-50%);
+  background: var(--foli-ruler-handle);
+  cursor: default;
+  touch-action: none;
+}
+.foli-ruler-handle:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+.foli-ruler-handle[aria-disabled="true"] {
+  opacity: 0.5;
+}
+/* The first line's marker points down from the top; the hanging and right ones up from below. */
+.foli-ruler-first-line {
+  top: 0;
+  height: 8px;
+  clip-path: polygon(0 0, 100% 0, 100% 45%, 50% 100%, 0 45%);
+}
+.foli-ruler-hanging,
+.foli-ruler-right {
+  top: 12px;
+  height: 7px;
+  clip-path: polygon(50% 0, 100% 50%, 100% 100%, 0 100%, 0 50%);
+}
+.foli-ruler-left {
+  top: 19px;
+  height: 5px;
+}
+/* A margin is dragged at its edge, under the indent markers. */
+.foli-ruler-margin {
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 7px;
+  background: transparent;
+  cursor: ew-resize;
+}
+.foli-ruler-value {
+  position: absolute;
+  bottom: 0;
+  z-index: 2;
+  padding: 1px 3px;
+  transform: translateX(-50%);
+  border: 1px solid var(--foli-border-color);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.foli-ruler-guide {
+  position: fixed;
+  z-index: 2147483647;
+  width: 0;
+  border-left: 1px dashed GrayText;
+  pointer-events: none;
+}
+@media print {
+  .foli-ruler {
+    display: none;
   }
 }
 

@@ -149,6 +149,22 @@ before the page sees them (Cmd+H hides the browser, Cmd+Option+D the Dock, F3 is
 Control): bind other keys there with a keymap. Not checked on a Mac
 ([ADR-0003](decisions/ADR-0003-rendering-and-input.md), [limitations](limitations.md)).
 
+### The ruler (`FoliRuler`)
+
+Each handle of the ruler is a slider in the page's Tab order (the document keeps the focus
+while one is dragged with the pointer). On a focused handle:
+
+| Key                   | What it does                                             |
+| --------------------- | -------------------------------------------------------- |
+| Right, Up             | moves it right by 1/16 inch or 0.25 cm (the unit's step) |
+| Left, Down            | moves it left by that step                               |
+| Page Up, Page Down    | right or left by half an inch or a centimetre            |
+| Escape (while a drag) | cancels the drag: nothing changes                        |
+
+The arrows move a handle the way they point, so on a right-hand handle (the right indent, the
+right margin) Right makes its value smaller. Each key is one change (one undo step), as a drag
+is. A drag with Alt held does not snap.
+
 ### Reserved
 
 These stay the view's whatever a keymap binds (ADR-0008):
