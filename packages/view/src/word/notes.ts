@@ -12,9 +12,9 @@ import {
 } from "@folijs/core";
 import { noteKindOf, type Resolver } from "@folijs/core/internal";
 import { arrangeNotes, type FlowNote, type FlowRules, type NotePiece } from "../layout/flow.js";
-import { type BlockOptions, FLOAT_ATTR, renderBlocks, TEXT_BOX_ATTR } from "./blocks.js";
+import { type BlockOptions, FLOAT_ATTR, renderBlocks, stack, TEXT_BOX_ATTR } from "./blocks.js";
 import { columnsPx } from "./columns.js";
-import { REGION_CLASS, REGION_CONTENT_CLASS, type RegionOptions, stack } from "./regions.js";
+import { REGION_CLASS, REGION_CONTENT_CLASS, type RegionOptions } from "./regions.js";
 
 /**
  * On a piece of a note drawn on a page: the story.
