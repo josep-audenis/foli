@@ -390,12 +390,12 @@ test("Shape Format: fill, outline color, weight, dashes, arrows and styles (34.5
   await page.getByRole("button", { name: "Weight" }).click();
   await page.getByRole("menuitemcheckbox", { name: "3 pt" }).click();
   await expect
-    .poll(async () => ((await shapeAttrs(page))?.outline as { width: number }).width)
+    .poll(async () => ((await shapeAttrs(page))?.outline as { width?: number } | undefined)?.width)
     .toBe(38_100);
   await page.getByRole("button", { name: "Dashes" }).click();
   await page.getByRole("menuitemcheckbox", { name: "Long Dash", exact: true }).click();
   await expect
-    .poll(async () => ((await shapeAttrs(page))?.outline as { dash: string }).dash)
+    .poll(async () => ((await shapeAttrs(page))?.outline as { dash?: string } | undefined)?.dash)
     .toBe("lgDash");
   // Arrows are a line's.
   await expect(page.getByRole("button", { name: "Arrows" })).toHaveAttribute(
