@@ -41,7 +41,7 @@ place that says what is in progress; check it before starting work.
 | 27 Comment history & mentions | ✅ Done                  | —                         | Merged in #293; released in 1.10.0 (2026-11-25)                                                                                                                                               |
 | 28 Strict & mc roots          | In review                | `phase-28/strict-mc-root` | 28.1–28.5 merged (#299, #303–#306); 28.6 docs and changeset in review; the release waits for the owner                                                                                        |
 | 29 Word look & commands       | In review                | `phase-29/word-look`      | 29.1–29.11 merged (#309–#319); 29.12 docs in review; the release waits for the owner                                                                                                          |
-| 30 Font & Paragraph dialogs   | In progress              | `phase-30/dialogs`        | Started 2026-11-27 on the owner's word: Phase 29 is merged on `main`, its release still waits                                                                                                 |
+| 30 Font & Paragraph dialogs   | In review                | `phase-30/dialogs`        | 30.1–30.7 merged (#322–#328); bench clean (Chromium); the release waits for the owner, with 29                                                                                                |
 | 31 Ruler                      | Blocked by 30            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 32 Page decoration            | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 33 Text boxes & layout        | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4348,6 +4348,14 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   this phase too): `04-board-report` and `08-newsletter`, which end in landscape, print one
   blank page more than `exportPdf` gives. Axe runs on each dialog's tabs, on the Layout tab's
   Margins menu and (`contextmenu.spec.ts`) on the right-click menu with its new entries.
+
+Closed 2026-11-27: 30.1–30.7 merged (#322–#328), each reviewed by a subagent and fixed before
+merging. `pnpm bench --engines chromium` (2026-11-27, `main` after #328): no regression past a
+threshold (layout at 100 and 200 sections about 20% faster than the baseline, typing and Enter
+within ±17%, find and `exportPdf` within 3%; the collaboration case has no baseline yet).
+Firefox and WebKit not benched. Not done: `pdf.spec.ts`'s two landscape-ending corpus files
+(one blank page more, from before this phase), mirrored margins, Scale and Position in the Font
+dialog, the default tab stop, custom tab stops on the page (limitations.md, "Word's dialogs").
 
 ### Acceptance
 
