@@ -163,6 +163,23 @@ export {
   undoDepth,
 } from "./history.js";
 export {
+  OBJECT_POSITIONS,
+  OBJECT_WRAPS,
+  type ObjectAxis,
+  type ObjectLayout,
+  type ObjectPlacement,
+  type ObjectPosition,
+  type ObjectWrap,
+  objectMovesWithText,
+  objectPosition,
+  objectWrap,
+  selectedObject,
+  setObjectLayout,
+  setObjectMovesWithText,
+  setObjectPosition,
+  setObjectWrap,
+} from "./layout.js";
+export {
   autolinkHref,
   insertLink,
   linkAt,

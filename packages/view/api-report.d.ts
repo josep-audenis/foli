@@ -129,7 +129,7 @@ export {};
 export {};
 
 // view.d.ts
-import { type DocumentTarget, type Editor, type EditorState, type FieldsReport, type FoundMatches, type ResourceJSON, type RulerGeometry, type StorySide, type UpdateFieldsOptions } from "@folijs/core";
+import { type DocumentTarget, type Editor, type EditorState, type FieldsReport, type FoundMatches, type ObjectPlacement, type ResourceJSON, type RulerGeometry, type StorySide, type UpdateFieldsOptions } from "@folijs/core";
 interface DomPoint {
     node: Node;
     offset: number;
@@ -658,6 +658,13 @@ export declare class EditorView {
     private selectedBlock;
     /** The span of the picture a node selection selects, if it selects one. */
     private pictureSpan;
+    /**
+     * Where the picture or text box at `pos` is drawn (33.4): CSS px from its page's top left
+     * corner, its paragraph's top and its column's left edge; null when it is not drawn.
+     */
+    objectPlacement(pos: number): ObjectPlacement | null;
+    /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
+    objectRect(pos: number): DOMRect | null;
     /** Marks the selected picture and gives it a resize handle (when the document is editable). */
     private showSelectedPicture;
     /** Marks the cells of a cell selection (their table cell elements, on every page). */

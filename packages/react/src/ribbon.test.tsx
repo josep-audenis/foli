@@ -51,11 +51,15 @@ describe("wordRibbonTabs", () => {
         : g.map((i) => i.key);
     const all = new Set(groups.flatMap(keysOf));
     // The Styles gallery stands for the style box there, as in Word; Layout's Breaks, Margins…
-    // and Page setup for the Section menu.
+    // and Page setup for the Section menu; Layout Options is the button beside a selected object.
     for (const item of Object.values(toolbarItems))
-      expect(all.has(item.key) || item.key === "style" || item.key === "section", item.key).toBe(
-        true,
-      );
+      expect(
+        all.has(item.key) ||
+          item.key === "style" ||
+          item.key === "section" ||
+          item.key === "layoutOptions",
+        item.key,
+      ).toBe(true);
     // An item twice in one tab would share a key.
     for (const tab of wordRibbonTabs) {
       const keys = tab.items.flatMap(keysOf);

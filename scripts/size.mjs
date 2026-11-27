@@ -172,12 +172,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Docx, agent, view and pdf's renderer raised in 33.1 (76.2, 104.3, 132.1 and 98.3 kB; 80.0,
  * 106.0, 138.0 and 102.0 allowed): text boxes (schema 10's node and story checks; DrawingML and VML text boxes read and
  * written, frames edited in place for pictures too), with room for 33.2's drawing and 33.4–33.6.
+ * Core, React and FoliEditor raised in 33.4 (102.7, 227.2 and 223.9 kB; 106.0, 240.0 and 240.0
+ * allowed): text box editing and insertion (33.3), Layout Options' commands, menus and button,
+ * with room for the Layout and Size dialogs and the Picture Format tab (33.4–33.6).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 104_448 },
+  { name: "@folijs/core", entry: dist("core"), budget: 108_544 },
   { name: "@folijs/view", entry: dist("view"), budget: 141_312 },
-  { name: "@folijs/react", entry: dist("react"), budget: 233_472 },
-  { name: "FoliEditor only", entry: appEntry, budget: 233_472 },
+  { name: "@folijs/react", entry: dist("react"), budget: 245_760 },
+  { name: "FoliEditor only", entry: appEntry, budget: 245_760 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 81_920 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 20_480 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 108_544 },

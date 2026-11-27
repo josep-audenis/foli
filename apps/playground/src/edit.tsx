@@ -28,6 +28,7 @@ import {
 import {
   FoliComments,
   FoliContextMenu,
+  FoliLayoutOptions,
   FoliMiniToolbar,
   FoliNavigation,
   FoliRuler,
@@ -164,7 +165,8 @@ host.addEventListener("mouseup", (event) => {
     const rect = getSelection()?.rangeCount
       ? getSelection()?.getRangeAt(0).getClientRects()[0]
       : null;
-    if (editor.state.selection.empty || !rect) return;
+    // Text selected: a selected picture or text box has its Layout Options instead.
+    if (editor.state.selection.empty || "node" in editor.state.selection || !rect) return;
     mini.render(
       <FoliMiniToolbar
         key={event.timeStamp}
@@ -216,14 +218,18 @@ const showStatus = () => {
 const ribbon = !new URLSearchParams(location.search).has("toolbar");
 const showToolbar = () => {
   toolbar.render(
-    <FoliToolbar
-      editor={editor}
-      comments
-      commentOnly={commenting}
-      upload={upload}
-      onClickCommand={() => view.focus()}
-      {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
-    />,
+    <>
+      <FoliToolbar
+        editor={editor}
+        comments
+        commentOnly={commenting}
+        upload={upload}
+        onClickCommand={() => view.focus()}
+        {...(ribbon ? { tabs: wordRibbonTabs, overflow: "menu" as const } : {})}
+      />
+      {/* Word's Layout Options beside a selected picture or text box (33.4). */}
+      <FoliLayoutOptions editor={editor} disabled={commenting} />
+    </>,
   );
   commentsPane.render(
     <FoliComments

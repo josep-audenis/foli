@@ -58,6 +58,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `ruler`           | `boolean \| Pick<FoliRulerProps, "units" \| "messages">`                                                 | —             | Word's rulers (`FoliRuler`) above and beside the pages while the View tab's Ruler is on (`rulerShown`, off at first); `true` also turns it on when the editor is made, `false` never draws them. |
 | `contextMenu`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's right-click menu on the document (1.11, `FoliContextMenu`); Shift+right-click keeps the browser's.                                                                                        |
 | `miniToolbar`     | `boolean \| { items?, messages? }`                                                                       | `false`       | Word's mini toolbar above a selection made with the pointer (1.11, `FoliMiniToolbar`).                                                                                                           |
+| `layoutOptions`   | `boolean`                                                                                                | `true`        | Word's Layout Options button beside a selected picture or text box (33.4, `FoliLayoutOptions`): its wrapping, moving with text or fixed.                                                         |
 | `onlyOwnComments` | `boolean`                                                                                                | `commentOnly` | The comments pane edits and deletes only `author`'s comments (`FoliComments`).                                                                                                                   |
 | `readOnly`        | `boolean`                                                                                                | `false`       | Read, select, copy; no editing. Disables the toolbar.                                                                                                                                            |
 | `commentOnly`     | `boolean`                                                                                                | `false`       | Select, copy, find and comment; no other change. Read-only canvas, a toolbar of comment and review items, core's `commentOnly()` plugin. 1.10.                                                   |
@@ -1027,6 +1028,16 @@ selection, one undo step, the box selected; not in a story. `selectedTextBox(sta
 selected box node. A box's text is the story its `story` attribute names (`editor.story(id)`);
 `storyView.editTextBox(id)` opens it where it is drawn. Deleting a box deletes its story in
 the same transaction.
+
+Layout Options (33.4) for a picture or text box: `selectedObject(state)` gives the selected one
+and its position; `objectWrap(node)` (`inline`, `square`, `tight`, `through`, `topAndBottom`,
+`behind`, `inFront`), `objectMovesWithText(node)` and `objectPosition(node)` (one of
+`OBJECT_POSITIONS`' nine, or null) read it. `setObjectWrap(pos, wrap, placement?)`,
+`setObjectMovesWithText(pos, moves, placement?)`, `setObjectPosition(pos, preset)` and
+`setObjectLayout(pos, { horizontal?, vertical?, side?, distance?, allowOverlap?, layoutInCell?
+})` change it, one undo step each, refused while tracking. `placement` is where the object is
+drawn (`storyView.objectPlacement(pos)`, CSS px from its page's corner, with its paragraph's top
+and its column's left): an object made floating, or fixed on the page, stays there.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering

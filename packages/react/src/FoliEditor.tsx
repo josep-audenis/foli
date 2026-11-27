@@ -24,6 +24,7 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments, type MentionEvent, type MentionSource } from "./FoliComments.js";
 import { FoliContextMenu, type FoliContextMenuProps } from "./FoliContextMenu.js";
+import { FoliLayoutOptions } from "./FoliLayoutOptions.js";
 import { FoliMiniToolbar, type FoliMiniToolbarProps } from "./FoliMiniToolbar.js";
 import { FoliNavigation } from "./FoliNavigation.js";
 import { FoliRuler, type FoliRulerProps } from "./FoliRuler.js";
@@ -125,6 +126,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   miniToolbar?: boolean | Pick<FoliMiniToolbarProps, "items" | "messages"> | undefined;
   /**
+   * Word's Layout Options button beside a selected picture or text box (`FoliLayoutOptions`,
+   * 33.4): its wrapping. Default true.
+   */
+  layoutOptions?: boolean | undefined;
+  /**
    * The comments pane edits and deletes only `author`'s comments (`FoliComments`). Default:
    * `commentOnly`'s value.
    */
@@ -181,6 +187,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     ruler,
     contextMenu = false,
     miniToolbar = false,
+    layoutOptions = true,
     ...canvas
   },
   ref,
@@ -306,6 +313,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
             const anchor = selection?.anchorNode;
             const element = anchor instanceof Element ? anchor : anchor?.parentElement;
             if (!selection || selection.isCollapsed || !selection.rangeCount) return;
+            // A selected picture or text box has its Layout Options instead.
+            if ("node" in activeEditor.state.selection) return;
             if (!element?.closest(".foli-content") || !body.contains(element)) return;
             const rect = selection.getRangeAt(0).getClientRects?.()[0];
             if (rect) setMiniAt({ x: rect.left, y: rect.top });
@@ -359,6 +368,15 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           />
         )}
       </div>
+      {layoutOptions !== false && (
+        <FoliLayoutOptions
+          editor={editor}
+          units={toolbarProps?.units}
+          messages={toolbarProps?.messages}
+          disabled={readOnly || commentOnly}
+          onClickCommand={() => canvasRef.current?.focus()}
+        />
+      )}
       {miniAt && (
         <FoliMiniToolbar
           {...(miniToolbar === true || miniToolbar === false ? {} : miniToolbar)}

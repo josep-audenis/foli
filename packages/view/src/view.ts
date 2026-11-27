@@ -47,6 +47,7 @@ import {
   noteNumbers,
   noteProperties,
   noteTexts,
+  type ObjectPlacement,
   type OpenStory,
   type PageBordersJSON,
   pageVariant,
@@ -138,6 +139,7 @@ import { printStyles, SHEET_ATTR } from "./print.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
 import {
   EMU_PER_PX,
+  FLOAT_ATTR,
   imageSource,
   NOTE_NUMBER_ATTR,
   NOTE_REF_ATTR,
@@ -2073,6 +2075,8 @@ export class EditorView {
     edit: (side, page) => view.openStory(side, page),
     editNote: (id) => view.openNote(id),
     editTextBox: (id) => view.openTextBox(id),
+    objectPlacement: (pos) => view.objectPlacement(pos),
+    objectRect: (pos) => view.objectRect(pos),
     toReference: () => view.toReference(),
     close: () => view.closeStory(),
     get fieldLayout() {
@@ -3994,7 +3998,9 @@ export class EditorView {
 
   /** The span of the picture a node selection selects, if it selects one. */
   private pictureSpan(pos: number): HTMLElement | null {
-    for (const img of this.host.querySelectorAll(`[${PICTURE_ATTR}]`)) {
+    for (const img of this.host.querySelectorAll(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`)) {
+      // The body's own: not a picture in a box's or a header's drawing.
+      if (img.parentElement?.closest(`[${TEXT_BOX_ATTR}], .${REGION_CLASS}`)) continue;
       const span = img.parentElement;
       // A floating picture's place in the text is its anchor.
       if (span && this.posFromDOM(FLOAT_ANCHORS.get(span) ?? span, 0) === pos) return span;
@@ -4002,13 +4008,51 @@ export class EditorView {
     return null;
   }
 
+  /**
+   * Where the picture or text box at `pos` is drawn (33.4): CSS px from its page's top left
+   * corner, its paragraph's top and its column's left edge; null when it is not drawn.
+   */
+  objectPlacement(pos: number): ObjectPlacement | null {
+    const span = this.pictureSpan(pos);
+    const drawn = span?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`);
+    const page = span?.closest<HTMLElement>(".foli-page");
+    const anchor = span && (FLOAT_ANCHORS.get(span) ?? span);
+    const inText = span?.hasAttribute(FLOAT_ATTR) ? span.parentElement : anchor;
+    // Its paragraph (in a table, the cell's: Word measures from it), and the column's block.
+    const paragraph = inText?.closest<HTMLElement>("p, h1, h2, h3, h4, h5, h6");
+    const block = inText?.closest<HTMLElement>(".foli-page > *, .foli-column > *");
+    if (!drawn || !page || !block || !paragraph) return null;
+    const scale = this.scale();
+    const box = page.getBoundingClientRect();
+    const at = drawn.getBoundingClientRect();
+    const column = (block.parentElement ?? page).getBoundingClientRect();
+    const padding =
+      block.parentElement === page
+        ? Number.parseFloat(getComputedStyle(page).paddingLeft) * scale
+        : 0;
+    return {
+      left: (at.left - box.left) / scale,
+      top: (at.top - box.top) / scale,
+      paragraphTop: (paragraph.getBoundingClientRect().top - box.top) / scale,
+      columnLeft: (column.left + padding - box.left) / scale,
+    };
+  }
+
+  /** Where the picture or text box at `pos` is drawn on the screen (viewport px), or null. */
+  objectRect(pos: number): DOMRect | null {
+    const span = this.pictureSpan(pos);
+    return (
+      span
+        ?.querySelector<HTMLElement>(`[${PICTURE_ATTR}], [${TEXT_BOX_ATTR}]`)
+        ?.getBoundingClientRect() ?? null
+    );
+  }
+
   /** Marks the selected picture and gives it a resize handle (when the document is editable). */
   private showSelectedPicture(): void {
     const { selection } = this.state;
-    const span =
-      selection instanceof NodeSelection && selection.node.type.name === "picture"
-        ? this.pictureSpan(selection.from)
-        : null;
+    const name = selection instanceof NodeSelection ? selection.node.type.name : "";
+    const span = name === "picture" || name === "textBox" ? this.pictureSpan(selection.from) : null;
     const handled = !!span?.querySelector("[data-foli-resize]");
     if (span === this.selectedPicture && (!span || handled === this.editable)) return;
     this.selectedPicture?.removeAttribute(PICTURE_SELECTED_ATTR);
@@ -4017,7 +4061,8 @@ export class EditorView {
     if (!span) return;
     injectStyles(this.host);
     span.setAttribute(PICTURE_SELECTED_ATTR, "");
-    if (!this.editable) return;
+    // shortcut: a text box has no resize handle yet (33.5's Size dialog sizes it).
+    if (!this.editable || name !== "picture") return;
     const handle = this.host.ownerDocument.createElement("span");
     handle.setAttribute("data-foli-resize", "");
     handle.setAttribute("aria-hidden", "true");
