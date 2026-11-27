@@ -4244,9 +4244,12 @@ export class EditorView {
     const height = clicked ? (line ? 0 : INCH_PX * scale) : box.height;
     const left = clicked ? start.x : box.left;
     const top = clicked ? start.y : box.top;
-    // The paragraph pressed (or the selection's), its start the shape's anchor.
-    const at = pressed ?? this.state.selection.to;
-    const $at = this.state.doc.resolve(Math.min(at, this.state.doc.content.size));
+    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+    // The paragraph pressed, read again now (a remote edit may have moved it; else as pressed,
+    // else the selection's), its start the shape's anchor; not in one: the nearest.
+    const at = this.posAtPoint(start.x, start.y) ?? pressed ?? this.state.selection.to;
+    const $found = this.state.doc.resolve(Math.min(at, this.state.doc.content.size));
+    const $at = $found.parent.inlineContent ? $found : Selection.near($found).$to;
     if (!$at.parent.inlineContent) return;
     const anchor = $at.start();
     const { node } = this.domFromPos(anchor);
@@ -4270,7 +4273,6 @@ export class EditorView {
       ...(line && !clicked && box.flipH ? { flipH: true } : {}),
       ...(line && !clicked && box.flipV ? { flipV: true } : {}),
     };
-    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
     insertShape(geometry, options)(this.state, (tr) => this.editor.dispatch(tr));
   }
 
