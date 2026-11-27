@@ -7,6 +7,7 @@ import {
   objectPosition,
   objectWrap,
   selectedObject,
+  setObjectFloat,
   setObjectLayout,
   setObjectMovesWithText,
   setObjectPosition,
@@ -111,5 +112,33 @@ describe("Layout Options (33.4)", () => {
     const editor = pictured();
     editor.run(setTrackChanges(true));
     expect(editor.run(setObjectWrap(2, "square"))).toBe(false);
+  });
+
+  it("sets a whole layout from the dialog in one step, or puts it in line", () => {
+    const editor = pictured();
+    expect(
+      editor.run(
+        setObjectFloat(2, {
+          horizontal: { relativeTo: "page", offset: 914_400.4 },
+          vertical: { relativeTo: "margin", align: "bottom" },
+          wrap: "tight",
+          side: "largest",
+          distance: { left: 0, right: -3 },
+        }),
+      ),
+    ).toBe(true);
+    expect(float(editor)).toEqual({
+      horizontal: { relativeTo: "page", offset: 914_400 },
+      vertical: { relativeTo: "margin", align: "bottom" },
+      wrap: "tight",
+      side: "largest",
+      distance: { top: 0, bottom: 0, left: 0, right: 0 },
+      allowOverlap: true,
+      layoutInCell: true,
+    });
+    editor.run(setObjectFloat(2, null));
+    expect(float(editor) ?? null).toBeNull();
+    editor.run(undo);
+    expect(float(editor)).toMatchObject({ wrap: "tight" });
   });
 });
