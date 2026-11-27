@@ -4346,6 +4346,10 @@ context menu and `editor.commands`); how mixed values show (Word: blank).
   right-click menu and the mini toolbar printed (Phase 29; their display rule came after the
   print one), which broke 7 of `pdf.spec.ts`'s print comparisons. Not fixed (on `main` before
   this phase too): `04-board-report` and `08-newsletter`, which end in landscape, print one
+  blank page more than `exportPdf` gives. Found on the way and fixed: the status bar, the
+  right-click menu and the mini toolbar printed (Phase 29; their display rule came after the
+  print one), which broke 7 of `pdf.spec.ts`'s print comparisons. Not fixed (on `main` before
+  this phase too): `04-board-report` and `08-newsletter`, which end in landscape, print one
   blank page more than `exportPdf` gives.
 
 ### Acceptance
