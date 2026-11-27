@@ -1315,6 +1315,19 @@
     background: transparent;
     color: CanvasText;
   }
+  .foli-ruler-tab-decimal.foli-ruler-tab,
+  .foli-ruler-tab-kind .foli-ruler-tab-decimal {
+    background: radial-gradient(circle at 88% 35%, CanvasText 1px, transparent 1.6px);
+  }
+  .foli-ruler-tab-kind {
+    forced-color-adjust: none;
+    border-color: ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+  .foli-ruler-tab-kind .foli-ruler-tab-decimal {
+    background: radial-gradient(circle at 88% 35%, ButtonText 1px, transparent 1.6px);
+  }
 }
 
 /* Word's status bar (FoliStatusBar): page, words, tracking on the left; zoom on the right. */

@@ -46,6 +46,7 @@ function fakeView(editor: Editor, story: { id: string | null } = { id: null }) {
     get open() {
       return story.id ? { id: story.id, side: "header", variant: "default", section: 0 } : null;
     },
+    focus: () => {},
     rulerGeometry: (): RulerGeometry => {
       const caret = (story.id && editor.story(story.id)) || editor;
       const setup = sectionAt(editor.state)?.setup.margins ?? {};
@@ -284,6 +285,33 @@ describe("FoliRuler", () => {
     expect(tabs()).toEqual([{ position: 2880, kind: "center" }]);
     fireEvent.keyDown(slider("Center tab"), { key: "Delete" });
     expect(tabs()).toBeNull();
+  });
+
+  it("steps a tab stop over another with the keys, the focus on it; Delete focuses the one before", async () => {
+    const editor = await setup();
+    act(() => {
+      editor.run(
+        setTabStops({
+          set: [
+            { position: 72, alignment: "left" },
+            { position: 76.5, alignment: "center" },
+          ],
+        }),
+      );
+    });
+    const tabs = () => editor.state.selection.$head.parent.attrs.tabs;
+    await waitFor(() => slider("Center tab"));
+    slider("Left tab").focus();
+    // 1440 + 90 is the center stop's place: stepped over it, to 1620; now second.
+    fireEvent.keyDown(slider("Left tab"), { key: "ArrowRight" });
+    expect(tabs()).toEqual([
+      { position: 1530, kind: "center" },
+      { position: 1620, kind: "left" },
+    ]);
+    await waitFor(() => expect(document.activeElement?.ariaLabel).toBe("Left tab"));
+    fireEvent.keyDown(slider("Left tab"), { key: "Delete" });
+    expect(tabs()).toEqual([{ position: 1530, kind: "center" }]);
+    await waitFor(() => expect(document.activeElement?.ariaLabel).toBe("Center tab"));
   });
 
   it("opens the Tabs dialog on a tab stop's double-click", async () => {

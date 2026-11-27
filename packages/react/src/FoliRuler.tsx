@@ -370,6 +370,8 @@ export function FoliRuler({
     setDragState(next);
   };
   const handles = geometry ? [...horizontalHandles(geometry), ...tabHandles(geometry)] : [];
+  /** A tab stop to focus after the next render (its value), or the document. */
+  const refocus = useRef<number | "document" | null>(null);
   // The tab selector: the kind a click on the ruler adds.
   const [tabKind, setTabKind] = useState<TabAlignment>("left");
   const k = geometry?.pxPerTwip ?? 1;
@@ -477,14 +479,44 @@ export function FoliRuler({
     };
     if ((event.key === "Delete" || event.key === "Backspace") && handle.remove) {
       event.preventDefault();
-      if (editor.run(handle.remove())) measureNow();
+      // The focus goes to the stop before it, else the document.
+      const stops = handles.filter((h) => h.remove);
+      const before = stops[stops.indexOf(handle) - 1];
+      if (!editor.run(handle.remove())) return;
+      refocus.current = before ? before.value : "document";
+      measureNow();
       return;
     }
     const move = moves[event.key];
     if (move === undefined) return;
     event.preventDefault();
-    apply(handle, clamp(Math.round(handle.value + move), handle.min, handle.max));
+    let value = clamp(Math.round(handle.value + move), handle.min, handle.max);
+    if (handle.remove) {
+      // A tab stop steps over the others: one at the same place would replace it.
+      const taken = new Set(handles.filter((h) => h.remove && h !== handle).map((h) => h.value));
+      while (taken.has(value) && value > handle.min && value < handle.max)
+        value = clamp(Math.round(value + move), handle.min, handle.max);
+      if (taken.has(value)) return;
+      // Its place among the stops may change: the focus follows it.
+      refocus.current = value;
+    }
+    apply(handle, value);
   };
+  // After a stop moved or went with the keyboard: the focus on it where it is now (by its
+  // value), or on the one before it, or the document.
+  useEffect(() => {
+    const target = refocus.current;
+    if (target === null) return;
+    refocus.current = null;
+    if (target === "document") {
+      body.storyView?.focus();
+      return;
+    }
+    const stop = handles.find((h) => h.remove && h.value === target);
+    const element =
+      stop && root.current?.querySelector<HTMLElement>(`[data-foli-ruler="${stop.key}"]`);
+    element?.focus();
+  });
 
   const shown = (handle: Handle) =>
     drag?.key === handle.key ? drag.value : clamp(handle.value, handle.min, handle.max);
@@ -572,7 +604,9 @@ export function FoliRuler({
                 onLostPointerCapture={cancel}
                 onKeyDown={onKeyDown(handle)}
                 // A tab stop's double-click opens the Tabs dialog (the toolbar's).
-                onDoubleClick={handle.remove ? () => editor.run(openDialog("tabs")) : undefined}
+                onDoubleClick={
+                  handle.remove && !disabled ? () => editor.run(openDialog("tabs")) : undefined
+                }
               />
             );
           })}
