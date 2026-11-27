@@ -18,6 +18,9 @@
 #   - textBoxes: each text box of the main text (Phase 33; msoTextBox shapes): page, anchor
 #     paragraph, position and size in points as for floating pictures, alt text, wrapping, and
 #     its text;
+#   - shapes: each shape of the main text (Phase 34; msoAutoShape, msoLine, msoFreeform): as text
+#     boxes, with its AutoShapeType, rotation, flips, fill (shown, RGB as RRGGBB), line (shown,
+#     weight, dash style, RRGGBB), first adjustment and text;
 #   - sections: each section's first page, column count, section start, different first page,
 #     and its headers and footers (default, first, even): whether they exist, are linked to the
 #     previous section, and their text as Word has it open (page fields recomputed, a picture
@@ -116,6 +119,7 @@ try {
       paragraphs = @()
       pictures = @()
       textBoxes = @()
+      shapes = @()
       evenAndOddHeaders = $null
       pageSections = @()
       sections = @()
@@ -228,6 +232,43 @@ try {
           })
       }
       $result.textBoxes = $boxes.ToArray()
+      # BGR (Word's RGB property) as RRGGBB.
+      function Hex($bgr) { $n = [int]$bgr; return "{0:X2}{1:X2}{2:X2}" -f ($n -band 255), (($n -shr 8) -band 255), (($n -shr 16) -band 255) }
+      $shapes = New-Object System.Collections.Generic.List[object]
+      foreach ($s in $doc.Shapes) {
+        if (@(1, 5, 9) -notcontains [int]$s.Type) { continue }   # msoAutoShape, msoFreeform, msoLine
+        $left = [double]$s.Left; $top = [double]$s.Top
+        $anchorParagraph = $doc.Range(0, $s.Anchor.Start).Paragraphs.Count
+        if ($s.Anchor.Start -eq $doc.Paragraphs.Item($anchorParagraph).Range.End) { $anchorParagraph++ }
+        $text = ""
+        try { if ($s.TextFrame.HasText) { $text = Clean ([string]$s.TextFrame.TextRange.Text).Replace("`r", "`n") } } catch {}
+        $adjust = $null
+        try { if ($s.Adjustments.Count -gt 0) { $adjust = [math]::Round([double]$s.Adjustments.Item(1), 4) } } catch {}
+        $shapes.Add([ordered]@{
+            page = [int]$s.Anchor.Information($INFO_PAGE)
+            paragraph = $anchorParagraph
+            left = if ($ALIGNED.ContainsKey([int]$left)) { $null } else { [math]::Round($left, 1) }
+            top = if ($ALIGNED.ContainsKey([int]$top)) { $null } else { [math]::Round($top, 1) }
+            horizontalAlign = $ALIGNED[[int]$left]
+            verticalAlign = $ALIGNED[[int]$top]
+            width = [math]::Round([double]$s.Width, 1)
+            height = [math]::Round([double]$s.Height, 1)
+            alt = [string]$s.AlternativeText
+            wrap = [int]$s.WrapFormat.Type
+            horizontalTo = [int]$s.RelativeHorizontalPosition
+            verticalTo = [int]$s.RelativeVerticalPosition
+            type = [int]$s.Type
+            autoShapeType = [int]$s.AutoShapeType
+            rotation = [math]::Round([double]$s.Rotation, 1)
+            flipH = [bool]($s.HorizontalFlip -ne 0)
+            flipV = [bool]($s.VerticalFlip -ne 0)
+            fill = if ($s.Fill.Visible -ne 0) { Hex $s.Fill.ForeColor.RGB } else { $null }
+            line = if ($s.Line.Visible -ne 0) { [ordered]@{ color = Hex $s.Line.ForeColor.RGB; weight = [math]::Round([double]$s.Line.Weight, 2); dash = [int]$s.Line.DashStyle } } else { $null }
+            adjust = $adjust
+            text = $text
+          })
+      }
+      $result.shapes = $shapes.ToArray()
       $result.evenAndOddHeaders = [bool]$doc.PageSetup.OddAndEvenPagesHeaderFooter
       $pageSections = New-Object System.Collections.Generic.List[object]
       for ($n = 1; $n -le $result.pages; $n++) {

@@ -80,6 +80,7 @@ One `<name>.json` per document:
 | `pages`             | Word's page count                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `paragraphs`        | One per `w:p` of the main text, in order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows: "1.1", "(a)"), `inTable`                                                                                                                                                                                                                                                                                          |
 | `pictures`          | Each picture of the main text (inline ones first, then floating ones; headers' and footers' are left out): `page`, `left`/`top` (an inline one from the page's corner; a floating one from what it is `horizontalTo`/`verticalTo`, Word's WdRelative…Position; null when aligned, the alignment then in `horizontalAlign`/`verticalAlign`), `width`, `height` (points), `alt`, `wrap` (a floating one's WdWrapType), `paragraph` (a floating one's anchor, numbered from 1)  |
+| `shapes`            | Each shape of the main text (Phase 34: AutoShapes, lines, freeforms), placed as `pictures`, with `type`, `autoShapeType` (MsoAutoShapeType), `rotation` (degrees), `flipH`, `flipV`, `fill` (RRGGBB or null), `line` (`color`, `weight` in points, `dash` MsoLineDashStyle, or null), `adjust` (its first adjustment), `text`                                                                                                                                                |
 | `evenAndOddHeaders` | Whether even pages have their own headers and footers                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `pageSections`      | The section each page starts in, from page 1 (not meaningful for the blank page before an even or odd page section: 08's page 4 says 1)                                                                                                                                                                                                                                                                                                                                      |
 | `sections`          | Each section: `page` it starts on, `start` (WdSectionStart), `columns`, `differentFirstPage`, and `headers` and `footers`, each with `default`, `first`, `even`: `exists`, `linked` (to the previous section), `tables`, `text` (as Word has it open: page fields recomputed, so not what the part stores, and a picture as `/`). `exists` says the variant is in effect (`first` needs a different first page, `even` even and odd headers), not that the file has the part |
@@ -127,6 +128,24 @@ Word build than the reference's, not the export).
 node scripts/corpus/textbox-roundtrip.mjs make <folder>
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder>/foli -Out <folder>/word
 node scripts/corpus/textbox-roundtrip.mjs check <folder>
+```
+
+Shapes (Phase 34): `scripts/corpus/shape-roundtrip.mjs make` writes the documents with shapes
+back unchanged and edited (a rectangle turned 30° and flipped and refilled, a rounded
+rectangle's corners adjusted, an oval's line recolored, thickened and dotted, a hexagon moved, a
+line given arrows at both ends, a shape's text replaced, and new shapes: a star and a rounded
+rectangle holding text), `word-reference.ps1` records what Word makes of them (its `shapes`), and
+`check` compares. On 2026-11-28 Word 16.0.20625 opened both without repair, the unchanged one's
+shapes as Word reads the corpus file, the edited one's as Foli wrote them. Word's automation sets
+no shape's rotation (16.0.20625), so the corpus file has no turned shape and the round trip turns
+one. Word's PDF of `12-shapes-poster.docx` is committed beside its reference
+(`12-shapes-poster.pdf`): `apps/playground/word/shapes.word.ts` (`pnpm corpus:pages`) compares
+every shape Foli draws with it by ink (each 0.988 or more, against 0.9).
+
+```bash
+node scripts/corpus/shape-roundtrip.mjs make <folder>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder>/foli -Out <folder>/word
+node scripts/corpus/shape-roundtrip.mjs check <folder>
 ```
 
 ## Review content with Word (`reference/review/`)

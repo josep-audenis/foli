@@ -33,14 +33,17 @@ export interface InsertShapeOptions {
 
 const INCH = 914_400;
 
-/** `hex` darkened to `factor` of each channel (DrawingML's `a:shade`, sRGB). */
+/** `hex` darkened to `factor` of its light (DrawingML's `a:shade`, in linear light as Word's). */
 const shade = (hex: string, factor: number) =>
   [0, 2, 4]
-    .map((i) =>
-      Math.floor(Number.parseInt(hex.slice(i, i + 2), 16) * factor)
+    .map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      const l = (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4) * factor;
+      const s = l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055;
+      return Math.round(s * 255)
         .toString(16)
-        .padStart(2, "0"),
-    )
+        .padStart(2, "0");
+    })
     .join("")
     .toUpperCase();
 
