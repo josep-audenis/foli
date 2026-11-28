@@ -979,7 +979,7 @@ export function TableOfFiguresDialog({
 
 // ---------- Insert ▸ Equation (35.5) ----------
 
-/** Word's equation gallery: its built-in equations' names and linear forms. */
+/** Word's equation gallery: its built-in equations' names and linear forms. @internal */
 export const EQUATION_GALLERY: readonly { name: ToolbarMessage; linear: string }[] = [
   { name: "Area of Circle", linear: "A=πr^2" },
   { name: "Binomial Theorem", linear: "(x+a)^n=∑_(k=0)^n▒(n¦k) x^k a^(n-k)" },
@@ -995,7 +995,7 @@ export const EQUATION_GALLERY: readonly { name: ToolbarMessage; linear: string }
   { name: "Trig Identity 2", linear: "cos⁡α+cos⁡β=2 cos⁡〖1/2(α+β)〗 cos⁡〖1/2(α-β)〗" },
 ];
 
-/** Whether an equation inserted at the selection is a display one: alone in its paragraph. */
+/** Whether an equation inserted at the selection is a display one: alone in its paragraph. @internal */
 export const displayHere = (state: EditorState) => {
   const { $from, $to } = state.selection;
   return (

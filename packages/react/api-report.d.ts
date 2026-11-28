@@ -849,15 +849,7 @@ export {};
  * Word's Insert tab dialogs (Phase 35), opened by the toolbar as its other built-in dialogs:
  * each inserts at the selection it opened on, in one undo step.
  */
-import { type EditorState } from "@folijs/core";
-import { type ToolbarMessage } from "./messages.js";
-/** Word's equation gallery: its built-in equations' names and linear forms. */
-export declare const EQUATION_GALLERY: readonly {
-    name: ToolbarMessage;
-    linear: string;
-}[];
-/** Whether an equation inserted at the selection is a display one: alone in its paragraph. */
-export declare const displayHere: (state: EditorState) => boolean;
+export {};
 
 // ShapeGallery.d.ts
 export {};
