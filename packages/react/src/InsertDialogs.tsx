@@ -4,14 +4,30 @@
  */
 
 import {
+  type CaptionNumbering,
   type Command,
   type Editor,
+  type FieldLayout,
+  fieldsIn,
   formatDatePicture,
+  insertCaption,
   insertDate,
   insertSymbol,
   insertText,
+  parseFieldInstruction,
+  sequenceName,
+  type TableOfFiguresOptions,
 } from "@folijs/core";
-import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { formatNumber } from "@folijs/core/internal";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type ToolbarMessage, useT } from "./messages.js";
 import { Field, Tabs } from "./WordDialogs.js";
 
@@ -632,6 +648,316 @@ export function DateTimeDialog({
               onChange={(event) => setField(event.target.checked)}
             />
             <label htmlFor={`${id}-update`}>{t("Update automatically")}</label>
+          </div>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------- References ▸ Insert Caption, Insert Table of Figures (35.3) ----------
+
+/** Word's own labels, then the document's (its captions' `SEQ` names). */
+// As [value, label] pairs: the toolbar's messages are collected from those.
+const CAPTION_LABELS: string[] = (
+  [
+    ["Equation", "Equation"],
+    ["Figure", "Figure"],
+    ["Table", "Table"],
+  ] as const
+).map(([label]) => label);
+
+const CAPTION_NUMBERINGS = [
+  ["ARABIC", "1, 2, 3, …"],
+  ["alphabetic", "a, b, c, …"],
+  ["ALPHABETIC", "A, B, C, …"],
+  ["roman", "i, ii, iii, …"],
+  ["ROMAN", "I, II, III, …"],
+] as const satisfies readonly (readonly [CaptionNumbering, ToolbarMessage])[];
+
+/** The labels a document's captions use, Word's own first. */
+function captionLabels(editor: Editor): string[] {
+  const found = [...CAPTION_LABELS];
+  for (const field of fieldsIn(editor.state.doc))
+    if (field.name === "SEQ") {
+      const name = parseFieldInstruction(field.instruction).args[0];
+      // Word's own labels once ("figure" is Figure); a label's words as Word wrote them.
+      if (name && !found.some((l) => sequenceName(l).toLowerCase() === name.toLowerCase()))
+        found.push(name.replace(/_/g, " "));
+    }
+  return found;
+}
+
+/** Whether the caption has something to go above or below (a selected object, a table). */
+function captionHasObject(editor: Editor): boolean {
+  const { selection } = editor.state;
+  const node = "node" in selection ? (selection.node as { type: { name: string } }) : null;
+  if (node && ["picture", "shape", "textBox"].includes(node.type.name)) return true;
+  const { $from } = selection;
+  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === "table") return true;
+  return false;
+}
+
+/**
+ * Word's Caption dialog: the caption (its label and number shown, the rest typed), Label (Word's
+ * and the document's, New Label…), Position (above or below the selected object or table),
+ * Exclude label from caption, Numbering. OK inserts it (`insertCaption`), one undo step.
+ * @internal
+ */
+export function CaptionDialog({
+  editor,
+  layout,
+  onClose,
+}: {
+  editor: Editor;
+  layout: () => FieldLayout | null;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [labels, setLabels] = useState(() => captionLabels(editor));
+  const [label, setLabel] = useState("Figure");
+  const [text, setText] = useState("");
+  const [position, setPosition] = useState<"above" | "below">("below");
+  const [exclude, setExclude] = useState(false);
+  const [numbering, setNumbering] = useState<CaptionNumbering>("ARABIC");
+  const [newLabel, setNewLabel] = useState<string | null>(null);
+  const [hasObject] = useState(() => captionHasObject(editor));
+  const first = useRef<HTMLInputElement>(null);
+  const newBox = useRef<HTMLInputElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  useEffect(() => {
+    if (newLabel !== null) newBox.current?.focus();
+  }, [newLabel]);
+  // What Word's box shows before the typed text: the label and the number the caption gets, as
+  // inserting it would give it (a dry run of the command, once per label and numbering).
+  const state = editor.state;
+  const shownNumber = useMemo(() => {
+    let shown = formatNumber(1, NUMBER_FORMATS[numbering]);
+    insertCaption({ label, numbering, excludeLabel: true })(state, (tr) => {
+      const end = tr.selection.from;
+      const placed = fieldsIn(tr.doc).find((f) => f.name === "SEQ" && f.to === end);
+      if (placed) shown = placed.result;
+    });
+    return shown;
+  }, [state, label, numbering]);
+  const lead = exclude ? shownNumber : `${label} ${shownNumber}`;
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (newLabel !== null) return addLabel();
+    onClose(
+      editor.run(
+        insertCaption({
+          label,
+          text,
+          position,
+          numbering,
+          excludeLabel: exclude,
+          layout: layout(),
+        }),
+      ),
+    );
+  };
+  const labelBox = useRef<HTMLSelectElement>(null);
+  const endNewLabel = (name: string) => {
+    if (name) {
+      if (!labels.includes(name)) setLabels([...labels, name]);
+      setLabel(name);
+    }
+    setNewLabel(null);
+    // The box it went to keeps the focus (its field is gone).
+    queueMicrotask(() => labelBox.current?.focus());
+  };
+  const addLabel = () => endNewLabel(sequenceName(newLabel ?? "") ? (newLabel ?? "").trim() : "");
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Caption")}
+      className="foli-link-dialog foli-word-dialog foli-caption-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        if (newLabel !== null) endNewLabel("");
+        else onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <div className="foli-setup-field foli-caption-text">
+            <label htmlFor={`${id}-text`}>{t("Caption")}</label>
+            <span className="foli-caption-lead" aria-hidden="true">
+              {lead}
+            </span>
+            <input
+              ref={first}
+              id={`${id}-text`}
+              type="text"
+              value={text}
+              aria-describedby={`${id}-lead`}
+              onChange={(event) => setText(event.target.value)}
+            />
+            <span id={`${id}-lead`} hidden>
+              {lead}
+            </span>
+          </div>
+          <Field id={`${id}-label`} label={t("Label")}>
+            <select
+              ref={labelBox}
+              id={`${id}-label`}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            >
+              {labels.map((name) => (
+                <option key={name} value={name}>
+                  {CAPTION_LABELS.includes(name) ? t(name as ToolbarMessage) : name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field id={`${id}-position`} label={t("Position")}>
+            <select
+              id={`${id}-position`}
+              value={position}
+              disabled={!hasObject}
+              onChange={(e) => setPosition(e.target.value as "above" | "below")}
+            >
+              <option value="above">{t("Above selected item")}</option>
+              <option value="below">{t("Below selected item")}</option>
+            </select>
+          </Field>
+          <div className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-exclude`}
+              type="checkbox"
+              checked={exclude}
+              onChange={(e) => setExclude(e.target.checked)}
+            />
+            <label htmlFor={`${id}-exclude`}>{t("Exclude label from caption")}</label>
+          </div>
+          <Field id={`${id}-numbering`} label={t("Numbering")}>
+            <select
+              id={`${id}-numbering`}
+              value={numbering}
+              onChange={(e) => setNumbering(e.target.value as CaptionNumbering)}
+            >
+              {CAPTION_NUMBERINGS.map(([value, name]) => (
+                <option key={value} value={value}>
+                  {t(name)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {newLabel === null ? (
+            <button type="button" onClick={() => setNewLabel("")}>
+              {t("New Label…")}
+            </button>
+          ) : (
+            <Field id={`${id}-new`} label={t("New label")}>
+              <input
+                ref={newBox}
+                id={`${id}-new`}
+                type="text"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+              />
+              <button type="button" onClick={addLabel}>
+                {t("Add label")}
+              </button>
+              <button type="button" onClick={() => endNewLabel("")}>
+                {t("Cancel")}
+              </button>
+            </Field>
+          )}
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** `formatNumber`'s names for the Numbering box's switches. */
+const NUMBER_FORMATS: Record<CaptionNumbering, string> = {
+  ARABIC: "decimal",
+  alphabetic: "lowerLetter",
+  ALPHABETIC: "upperLetter",
+  roman: "lowerRoman",
+  ROMAN: "upperRoman",
+};
+
+/**
+ * Word's Table of Figures dialog: the caption label it lists and whether entries link to their
+ * captions. OK inserts it (`insertTableOfFigures`) and lists the captions, one undo step.
+ * @internal
+ */
+export function TableOfFiguresDialog({
+  editor,
+  onInsert,
+  onClose,
+}: {
+  editor: Editor;
+  /** Inserts and fills it (the toolbar updates it with its pages). */
+  onInsert: (options: TableOfFiguresOptions) => boolean;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [labels] = useState(() => captionLabels(editor));
+  const [label, setLabel] = useState("Figure");
+  const [hyperlinks, setHyperlinks] = useState(true);
+  const first = useRef<HTMLSelectElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Table of Figures")}
+      className="foli-link-dialog foli-word-dialog foli-figures-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          onClose(onInsert({ label, hyperlinks }));
+        }}
+        noValidate
+      >
+        <div className="foli-dialog-panel">
+          <Field id={`${id}-label`} label={t("Caption label")}>
+            <select
+              ref={first}
+              id={`${id}-label`}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            >
+              {labels.map((name) => (
+                <option key={name} value={name}>
+                  {CAPTION_LABELS.includes(name) ? t(name as ToolbarMessage) : name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-links`}
+              type="checkbox"
+              checked={hyperlinks}
+              onChange={(e) => setHyperlinks(e.target.checked)}
+            />
+            <label htmlFor={`${id}-links`}>{t("Use hyperlinks instead of page numbers")}</label>
           </div>
         </div>
         <div className="foli-dialog-buttons">

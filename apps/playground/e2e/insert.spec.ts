@@ -102,3 +102,36 @@ test.describe("Insert ▸ Date & Time (35.2)", () => {
     expect(await firstText(page)).not.toMatch(new RegExp(`^${today}`));
   });
 });
+
+test.describe("References ▸ Captions (35.3)", () => {
+  test("Insert Caption and Insert Table of Figures, axe on both dialogs", async ({ page }) => {
+    await open(page);
+    await page.getByRole("tab", { name: "References" }).click();
+    await page.evaluate(() => window.foliEdit.editor.select(1));
+    await page.getByRole("button", { name: "Insert Caption" }).click();
+    const caption = page.getByRole("dialog", { name: "Caption" });
+    await caption.getByLabel("Caption", { exact: true }).fill(": Overview");
+    let results = await new AxeBuilder({ page }).include(".foli-caption-dialog").analyze();
+    expect(results.violations).toEqual([]);
+    await caption.getByRole("button", { name: "OK" }).click();
+    await expect(caption).toHaveCount(0);
+    const texts = () =>
+      page.evaluate(() => {
+        const out: string[] = [];
+        window.foliEdit.editor.state.doc.forEach((n) => {
+          out.push(`${String(n.attrs.style)}|${n.textContent}`);
+        });
+        return out;
+      });
+    expect(await texts()).toContain("Caption|Figure 1: Overview");
+    await page.evaluate(() => window.foliEdit.editor.select(1));
+    await page.getByRole("button", { name: "Insert Table of Figures" }).click();
+    const figures = page.getByRole("dialog", { name: "Table of Figures" });
+    results = await new AxeBuilder({ page }).include(".foli-figures-dialog").analyze();
+    expect(results.violations).toEqual([]);
+    await figures.getByRole("button", { name: "OK" }).click();
+    await expect
+      .poll(texts)
+      .toContainEqual(expect.stringMatching(/^TableofFigures\|Figure 1: Overview\d+$/));
+  });
+});

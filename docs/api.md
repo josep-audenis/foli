@@ -1038,6 +1038,18 @@ for now (Word 16's own for English (United States); the language's own, CLDR's t
 for the others), and Update automatically (a `DATE` field in that picture, `insertDate`) or the
 text; one undo step.
 
+Captions (35.3): `insertCaption({ label?, text?, position?, numbering?, excludeLabel?, layout? })`
+writes Word's caption, a paragraph in the Caption style (Word 16's definition, added when the
+document has none) with the label, `SEQ <label> \* ARABIC` (or `alphabetic`, `ALPHABETIC`,
+`roman`, `ROMAN`) numbered where it stands and the text, above (kept with the next paragraph) or
+below the selected picture, shape or text box or the caret's table, else after the caret's
+paragraph; `sequenceName(label)` is the label as `SEQ` names it (words joined by `_`).
+`insertTableOfFigures({ label?, hyperlinks?, layout? })` writes `TOC \h \z \c "Figure"` in a
+paragraph of its own, each caption of the label an entry in the Table of Figures style; updating
+fields lists them again (`\c` is followed). `toolbarItems.caption` and `toolbarItems.tableOfFigures`
+are References ▸ Captions, Word's Caption dialog (`"caption"`: label, New Label…, position,
+exclude label, numbering) and Table of Figures dialog (`"tableOfFigures"`: the label, links).
+
 Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
 inches, floating, wrapped square, white with a thin black line) and its story at the end of the
 selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the

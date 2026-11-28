@@ -892,10 +892,10 @@ describe("tables of contents", () => {
     const editor = editorOf([p(...field("TOC")), p(), numbered], { numbering } as never);
     updateFields(editor, { layout: pagesEvery(1000) });
     expect(tocText(editor)).toBe("1.\tNumbered\t1");
-    const other = editorOf([p(...field("TOC \\c Figure", "kept")), p()]);
+    const other = editorOf([p(...field("TOC \\f Figure", "kept")), p()]);
     const report = updateFields(other);
     expect(tocText(other)).toBe("kept");
-    expect(report.skipped).toMatchObject([{ reason: "unsupported-switch", detail: "\\c" }]);
+    expect(report.skipped).toMatchObject([{ reason: "unsupported-switch", detail: "\\f" }]);
   });
 
   it("keeps its entries in the content control it stands in", () => {

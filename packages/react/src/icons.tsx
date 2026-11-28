@@ -442,6 +442,17 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["line", { x1: "10", x2: "8", y1: "3", y2: "21" }],
     ["line", { x1: "16", x2: "14", y1: "3", y2: "21" }],
   ],
+  caption: /* captions */ [
+    ["rect", { width: "18", height: "14", x: "3", y: "5", rx: "2", ry: "2" }],
+    ["path", { d: "M7 15h4M15 15h2M7 11h2M13 11h4" }],
+  ],
+  tableOfFigures: /* list-image-ish: lines beside a picture */ [
+    ["rect", { width: "7", height: "7", x: "3", y: "4", rx: "1" }],
+    ["path", { d: "M14 6h7" }],
+    ["path", { d: "M14 10h7" }],
+    ["path", { d: "M3 16h18" }],
+    ["path", { d: "M3 20h18" }],
+  ],
   symbol: /* omega */ [
     [
       "path",

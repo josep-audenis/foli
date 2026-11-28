@@ -965,3 +965,13 @@ Details in the [package README](../packages/docx/README.md).
   date: a field names months and days in the language picked when inserted, but in English when
   Foli updates it later, while Word names them in the run's language. AM and PM are written as
   `AM/PM` in every language's pictures.
+- Insert Caption numbers the new caption where it stands; the captions of its label after it
+  keep their numbers until fields are updated (Word renumbers them). Its dialog has no Numbering
+  "Include chapter number" and no AutoCaption; a new label lasts for the dialog (Word keeps it in
+  the user's settings), though the document's own labels are offered again from their `SEQ`
+  fields. The Table of Figures dialog has the label and links only (no tab leader, format or
+  "Include label and number" choice); a table of figures by style (`\t "Caption" \c`) or by
+  entry fields (`\f`) is kept, not updated. A caption of a floating picture, shape or text box
+  goes in the text after its anchor paragraph (Word 2013 and later put it in a text box grouped
+  with the object), and captions inside text boxes are not listed in a table of figures (Word's
+  are).

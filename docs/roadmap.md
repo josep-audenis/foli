@@ -46,7 +46,7 @@ place that says what is in progress; check it before starting work.
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 34 Shapes                     | In review                | `phase-34/shapes`         | 34.1–34.6 merged (#351–#356); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
-| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1 merged (#360); 35.2 in review                                                                                         |
+| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1–35.2 merged (#360, #361); 35.3 in review                                                                              |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 38 Proofing & AutoFormat      | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4880,8 +4880,17 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   the other languages' made from their own (CLDR's) patterns, Update automatically as `DATE \@
   "…"` (`insertDate`) or as text, one undo step. `symbols.test.ts` (core), `insert.test.tsx`,
   `insert.spec.ts` (field, undo, axe; three engines).
-- [ ] 35.3 Caption: Insert Caption (label, numbering, position above or below) as Word writes it
-  (`SEQ` field in a Caption-style paragraph); Table of Figures from References.
+- [x] 35.3 Caption: Insert Caption (label, numbering, position above or below) as Word writes it
+  (`SEQ` field in a Caption-style paragraph); Table of Figures from References. Built: core's
+  `insertCaption` (Word 16's Caption style; the label, `SEQ Label \* ARABIC` numbered, the text;
+  above a table kept with it; Word's underscores for a label's spaces) and
+  `insertTableOfFigures` (`TOC \h \z \c "Figure"`, the Table of Figures style), the table of
+  contents' update following `\c` (the label's captions, each paragraph an entry, Word's "No
+  table of figures entries found."); React's `toolbarItems.caption` and `tableOfFigures`
+  (References ▸ Captions) with Word's Caption and Table of Figures dialogs. Word 16 opens Foli's
+  file with its captions as `SEQ` fields in the Caption style and the table of figures as one
+  (`TablesOfFigures`), and its own update gives the same entries. `captions.test.ts` (core,
+  docx), `insert.test.tsx`, `insert.spec.ts` (both dialogs, axe; three engines).
 - [ ] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on
   pages, read-only pages and `exportPdf` (the PDF is printed by a browser, so MathML prints as
   shown; checked here); the text of an equation for find and screen readers. Own converter, or
