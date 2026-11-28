@@ -475,7 +475,8 @@ const placeholderText = (control: ControlJSON): string =>
     : BLANK_PLACEHOLDER);
 
 /** The placeholder's run, and the envelope with its style added when it was missing. */
-function placeholderRun(
+/** @internal */
+export function placeholderRun(
   state: EditorState,
   control: ControlJSON,
   envelope: WordEnvelope,

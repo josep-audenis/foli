@@ -461,6 +461,16 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
       },
     ],
   ],
+  coverPage: /* book-open-ish: a page with a band and a title */ [
+    ["rect", { width: "16", height: "20", x: "4", y: "2", rx: "2" }],
+    ["path", { d: "M4 8h16" }],
+    ["path", { d: "M8 12h8" }],
+    ["path", { d: "M8 16h5" }],
+  ],
+  blankPage: /* file */ [
+    ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
+    ["path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }],
+  ],
   symbol: /* omega */ [
     [
       "path",

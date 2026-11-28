@@ -992,3 +992,8 @@ Details in the [package README](../packages/docx/README.md).
   shows it. An edited equation loses its runs' own formatting and Word's run properties
   (written anew in Cambria Math). Equations are not inserted or edited while tracking changes.
   Insert ▸ Equation has Word's nine gallery equations, not its Office.com ones or saved ones.
+- Insert ▸ Cover Page has three designs of Foli's own, not Word's (Whisp, Banded, Ion…: those are
+  Microsoft's content); Word lists Foli's cover as the document's cover (it is Word's Cover Pages
+  building block), but its fields are plain content controls, not bound to the document's
+  properties as Word's are (filling the title does not set the file's title). A cover Word made
+  is kept and replaced or removed as one; its look is drawn as its shapes and text boxes are.

@@ -74,6 +74,14 @@ export {
 } from "./controls.js";
 export { type CountOptions, countWords, type WordCount } from "./count.js";
 export {
+  COVER_PAGES,
+  type CoverPageDesign,
+  coverPageId,
+  insertBlankPage,
+  insertCoverPage,
+  removeCoverPage,
+} from "./cover.js";
+export {
   chainCommands,
   type DialogName,
   dialogRequest,

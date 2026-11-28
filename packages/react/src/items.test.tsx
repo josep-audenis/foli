@@ -182,6 +182,8 @@ const NAMES = {
   lineNumbers: 1,
   symbol: 1,
   dateTime: 1,
+  coverPage: 1,
+  blankPage: 1,
   equation: 1,
   caption: 1,
   tableOfFigures: 1,
