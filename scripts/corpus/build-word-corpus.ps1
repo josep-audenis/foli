@@ -15,7 +15,7 @@ param([string]$PdfDir = "", [string]$Only = "")
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
 $wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
-$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12")
+$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13")
 foreach ($number in $wanted) {
   if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
 }
@@ -1083,6 +1083,42 @@ try {
   $hline.Line.Weight = 2
   $hline.AlternativeText = "Header rule"
   Save-Doc $doc "12-shapes-poster.docx"
+  }
+
+  # ---------------------------------------------------------------- 13: equations (Phase 35)
+  if (Want "13") {
+  Set-Author "Maths" "MA"
+  $doc = New-Doc
+  # Each display equation typed in Word's linear format (UnicodeMath) and built up by Word.
+  $c = { param([int]$code) [string][char]$code }
+  $eqs = @(
+    ("x=(-b" + (& $c 0x00B1) + (& $c 0x221A) + "(b^2-4ac))/2a"),
+    ((& $c 0x2211) + "_(k=1)^n" + (& $c 0x2592) + "k=(n(n+1))/2"),
+    ((& $c 0x222B) + "_0^" + (& $c 0x221E) + (& $c 0x2592) + "e^(-x^2) dx=" + (& $c 0x221A) + (& $c 0x03C0) + "/2"),
+    ("lim_(n" + (& $c 0x2192) + (& $c 0x221E) + ") " + (& $c 0x2592) + "(1+1/n)^n=e"),
+    ("[" + (& $c 0x25A0) + "(a&b@c&d)]"),
+    ("f(x)={" + (& $c 0x25A0) + "(x&x" + (& $c 0x2265) + "0@-x&x<0)" + (& $c 0x2524)),
+    ("(n" + (& $c 0x00A6) + "k)"),
+    ((& $c 0x221A) + "(3&x+1)"),
+    ("sin^2" + (& $c 0x2061) + (& $c 0x03B8) + "+cos^2" + (& $c 0x2061) + (& $c 0x03B8) + "=1"),
+    ("|x|+a_i^2")
+  )
+  $inline = "The sides of a right triangle give a^2+b^2=c^2, as Pythagoras showed."
+  $all = @("Equations") + $eqs + @($inline)
+  $doc.Content.Text = ($all -join "`r")
+  $doc.Paragraphs.Item(1).Style = $doc.Styles.Item($S_TITLE)
+  # From the end: building one up does not move the paragraphs before it.
+  for ($i = $doc.Paragraphs.Count; $i -ge 2; $i--) {
+    $r = $doc.Paragraphs.Item($i).Range
+    $r.MoveEnd(1, -1) | Out-Null
+    if ($i -eq $doc.Paragraphs.Count) {
+      $at = $r.Text.IndexOf("a^2")
+      $r.SetRange($r.Start + $at, $r.Start + $at + 11)
+    }
+    $math = $doc.OMaths.Add($r)
+    $math.OMaths.Item(1).BuildUp()
+  }
+  Save-Doc $doc "13-equations.docx"
   }
 }
 finally {

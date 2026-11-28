@@ -263,6 +263,23 @@ function hiddenRanges(tree: Node, scope: Scope, story: boolean): Hidden[] {
 
 const known = new WeakMap<Node, { key: string; scope: Scope; lines: Line[] }>();
 
+const MATH = /^<(?:[\w.-]+:)?oMath(?:Para)?[\s>]/;
+const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+
+/** An OMML equation's characters: its runs' text (`m:t`), structure left out. @internal */
+export function equationText(xml: string): string {
+  let out = "";
+  for (const m of xml.matchAll(/<(?:[\w.-]+:)?t(?:\s[^>]*)?>([^<]*)<\/(?:[\w.-]+:)?t>/g))
+    out += String(m[1]).replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/gi, (_, e: string) =>
+      e[0] === "#"
+        ? String.fromCodePoint(
+            Number.parseInt(e.slice(e[1] === "x" ? 2 : 1), e[1] === "x" ? 16 : 10),
+          )
+        : (ENTITIES[e.toLowerCase()] ?? ""),
+    );
+  return out;
+}
+
 /** The lines of `tree`, kept while the tree and what shows stay the same (typing in the panel). */
 function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
   const key = `${scope.codes}|${scope.hideDeleted}`;
@@ -299,6 +316,9 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       else if (name === "fieldCode" && scope.codes) add(String(child.attrs.text ?? ""), at, true);
       // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
       else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
+      // Word's equation kept as its OMML (35.4): found by its characters, never replaced.
+      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? "")))
+        add(equationText(String(child.attrs.xml)), at, true);
       else if (!isUnseen(child)) text += BARRIER;
     });
     if (text) lines.push({ text, pieces });

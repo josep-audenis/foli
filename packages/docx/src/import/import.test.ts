@@ -26,6 +26,13 @@ function text(paragraph: NodeJSON): string {
       // Word's Range.Text shows an inline picture as "/" (a floating one as nothing).
       if (n.type === "picture") return n.attrs?.float ? "" : "/";
       if (n.type === "opaqueInline" && String(n.attrs?.xml).includes("<wp:inline")) return "/";
+      // An equation's characters, as Word's Range.Text gives them (its structure left out).
+      if (n.type === "opaqueInline" && /^<m:oMath/.test(String(n.attrs?.xml)))
+        return [...String(n.attrs?.xml).matchAll(/<m:t(?:\s[^>]*)?>([^<]*)<\/m:t>/g)]
+          .map((m) =>
+            String(m[1]).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),
+          )
+          .join("");
       return n.type === "tab" ? "\t" : n.type === "hardBreak" ? "\n" : "";
     })
     .join("");
@@ -42,8 +49,9 @@ describe("importing the Word corpus", () => {
       const reference = JSON.parse(
         readFileSync(new URL(name.replace(".docx", ".json"), REFERENCE), "utf8"),
       );
+      // Word gives an equation's letters as math italic ones (𝑥) and its minus as U+2212.
       const expected = (reference.paragraphs as { text: string }[]).map((p) =>
-        p.text.toLowerCase(),
+        p.text.normalize("NFKC").replace(/−/g, "-").toLowerCase(),
       );
       // In Word's order: depth first, row by row, nested tables inside their cell. A cell a
       // vertical merge covers (`vMerge` continue) is part of the merged cell: Word lists none of

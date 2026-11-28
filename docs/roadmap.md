@@ -46,7 +46,7 @@ place that says what is in progress; check it before starting work.
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 34 Shapes                     | In review                | `phase-34/shapes`         | 34.1–34.6 merged (#351–#356); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
-| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1–35.2 merged (#360, #361); 35.3 in review                                                                              |
+| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1–35.3 merged (#360–#362); 35.4 in review                                                                               |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 38 Proofing & AutoFormat      | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4891,10 +4891,21 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   file with its captions as `SEQ` fields in the Caption style and the table of figures as one
   (`TablesOfFigures`), and its own update gives the same entries. `captions.test.ts` (core,
   docx), `insert.test.tsx`, `insert.spec.ts` (both dialogs, axe; three engines).
-- [ ] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on
+- [x] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on
   pages, read-only pages and `exportPdf` (the PDF is printed by a browser, so MathML prints as
   shown; checked here); the text of an equation for find and screen readers. Own converter, or
-  a dependency with its license checked; no editor engine.
+  a dependency with its license checked; no editor engine. Built: the view's own converter
+  (`word/math.ts`, no dependency): runs as identifiers, numbers and operators (Word's hyphen as
+  the minus sign, `m:sty`, normal text), fractions (bar, no bar, linear), scripts and pre-scripts,
+  radicals, n-ary operators with their limits, delimiters, functions, limits, accents, bars,
+  group characters, matrices and equation arrays; a display equation (`m:oMathPara`) a centered
+  block, in Word's math font; its characters as the MathML's `alttext`. Drawn on the editing
+  pages (`edit.ts`) and by `renderDocument` (`blocks.ts`): print and `exportPdf` print it as shown
+  (`pdf.spec.ts`: 13's print and export give the same pages and characters). Core's find sees an
+  equation's characters (never replacing them). A Word-made corpus document,
+  `13-equations.docx` (`build-word-corpus.ps1`, Word's reference with its text): its eleven
+  equations written back byte for byte. `math.test.ts` (view), `equations.test.ts` (docx),
+  `word-equations.spec.ts` (editing and read-only pages, placement, axe; three engines).
 - [ ] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
   OMML (an equation node in the model: schema bump with migration); Insert ▸ Equation with
   Word's common ones. Own parser and writer, or a dependency with its license checked; no

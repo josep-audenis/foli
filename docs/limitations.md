@@ -975,3 +975,10 @@ Details in the [package README](../packages/docx/README.md).
   goes in the text after its anchor paragraph (Word 2013 and later put it in a text box grouped
   with the object), and captions inside text boxes are not listed in a table of figures (Word's
   are).
+- Equations (35.4) are drawn by the browser's MathML from Word's OMML: the layout is the
+  browser's, close to Word's but not the same (spacing, the size of operators, where a long
+  equation breaks: Word breaks one over lines, the browser does not). Delimiters around a matrix
+  or cases may not stretch to their height in every engine. A box, border box and phantom are
+  drawn as their content; an equation's own run formatting (color, size) inside it is not
+  drawn, the paragraph's is. Until 35.5 an equation is kept whole as the file's OMML: it is
+  shown and found, not edited.

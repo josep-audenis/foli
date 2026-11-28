@@ -1,0 +1,180 @@
+{
+    "document":  "13-equations.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "comments":  0,
+    "revisionsAccepted":  0,
+    "pages":  1,
+    "paragraphs":  [
+                       {
+                           "text":  "Equations",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑘=1𝑛𝑘=𝑛𝑛+12",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "0∞𝑒−𝑥2𝑑𝑥=𝜋2",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "lim𝑛→∞1+1𝑛𝑛=𝑒",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑎𝑏𝑐𝑑",
+                           "page":  1,
+                           "line":  6,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑓𝑥=𝑥𝑥≥0−𝑥𝑥\u003c0",
+                           "page":  1,
+                           "line":  7,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑛𝑘",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "3𝑥+1",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "sin2𝜃+cos2𝜃=1",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "𝑥+𝑎𝑖2",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The sides of a right triangle give 𝑎2+𝑏2=𝑐2, as Pythagoras showed.",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+
+                 ],
+    "textBoxes":  [
+
+                  ],
+    "shapes":  [
+
+               ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "",
+                                                         "tables":  0
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  "",
+                                                       "tables":  0
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  "",
+                                                      "tables":  0
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+
+               ],
+    "bookmarks":  [
+
+                  ],
+    "controls":  [
+
+                 ]
+}

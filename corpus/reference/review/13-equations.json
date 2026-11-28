@@ -1,0 +1,112 @@
+{
+    "document":  "13-equations.docx",
+    "word":  "16.0.20625",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+
+                  ],
+    "comments":  [
+
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "Equations",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑘=1𝑛𝑘=𝑛𝑛+12",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "0∞𝑒−𝑥2𝑑𝑥=𝜋2",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "lim𝑛→∞1+1𝑛𝑛=𝑒",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑎𝑏𝑐𝑑",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑓𝑥=𝑥𝑥≥0−𝑥𝑥\u003c0",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑛𝑘",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "3𝑥+1",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "sin2𝜃+cos2𝜃=1",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑥+𝑎𝑖2",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The sides of a right triangle give 𝑎2+𝑏2=𝑐2, as Pythagoras showed.",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "Equations",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑥=−𝑏±𝑏2−4𝑎𝑐2𝑎",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑘=1𝑛𝑘=𝑛𝑛+12",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "0∞𝑒−𝑥2𝑑𝑥=𝜋2",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "lim𝑛→∞1+1𝑛𝑛=𝑒",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑎𝑏𝑐𝑑",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑓𝑥=𝑥𝑥≥0−𝑥𝑥\u003c0",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑛𝑘",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "3𝑥+1",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "sin2𝜃+cos2𝜃=1",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "𝑥+𝑎𝑖2",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The sides of a right triangle give 𝑎2+𝑏2=𝑐2, as Pythagoras showed.",
+                         "inTable":  false
+                     }
+                 ]
+}

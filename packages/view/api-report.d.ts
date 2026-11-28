@@ -1066,6 +1066,25 @@ export {};
 // word/matches.d.ts
 export {};
 
+// word/math.d.ts
+/**
+ * Word's equations (OMML, `m:oMath` and `m:oMathPara`) drawn as MathML (35.4): the browser lays
+ * them out, on pages, read-only pages, print and `exportPdf` alike. Elements are read by their
+ * local names, so a Strict file's namespace reads the same. What MathML Core has no element for
+ * (a box, a border box, a phantom) is drawn as its content.
+ */
+/** Word's math font, then the platform's (`math`, CSS Fonts 4). */
+export declare const MATH_FONT = "\"Cambria Math\", \"STIX Two Math\", math";
+/**
+ * Builds the MathML of an OMML `m:oMath` or `m:oMathPara` (null for anything else). `display`
+ * comes from `m:oMathPara` (Word's display equation, on a line of its own) unless given.
+ */
+export declare function mathElement(omml: Element, doc: Document): Element | null;
+/** An equation's characters (its runs' text, structure left out): for find and its `alttext`. */
+export declare function mathText(omml: Element): string;
+/** Whether opaque XML is one of Word's equations. */
+export declare const isMath: (element: Element | null) => element is Element;
+
 // word/notes.d.ts
 export {};
 
