@@ -937,6 +937,16 @@ Details in the [package README](../packages/docx/README.md).
 - A file whose `w:background` Word hides (no `w:displayBackgroundShape` in its settings) shows
   the color in Foli; its settings stay as they are unless the color is changed.
 
+## Insert extras (Phase 35)
+
+- Insert ▸ Symbol inserts a character of a font as text in that font (`w:rFonts`), as Word does
+  for a Unicode font. A symbol font's own characters (Symbol, Wingdings: Word's `w:sym`) are not
+  offered: the dialog's subsets are Unicode blocks, drawn in the font chosen, and a file's
+  `w:sym` stays opaque. The fonts are the font box's. The recent symbols are kept while the page
+  is open, not across visits (Word keeps them in the user's settings). En Dash, Optional Hyphen
+  and the other special characters without a key in the dialog have none in Foli: Word's
+  Ctrl+Num - and Ctrl+- are the browser's zoom out.
+
 - The docs site's search matches headings and API names, not body text. The API pages show
   each declaration's `.d.ts` text; code is not highlighted.
 - The guides' TypeScript samples are compiled and mostly run by `pnpm test`; their CSS samples

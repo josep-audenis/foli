@@ -205,6 +205,7 @@ export {
   insertRow,
   insertSectionBreak,
   insertShape,
+  insertSymbol,
   insertTab,
   insertTable,
   insertTableOfContents,

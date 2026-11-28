@@ -20,7 +20,7 @@ as a US keyboard types them, whatever the layout types there: `Mod-=`, `Mod-Shif
 
 Option on macOS and AltGr (Ctrl+Alt) on Windows type characters on many layouts (`@`, `[`, `€`,
 accented letters): an app should not bind `Alt-` plus a letter or digit, nor `Mod-Alt-` plus one,
-or those users cannot type the character. The built-in `Mod-Alt-f`, `Mod-Alt-d` and `Alt-Shift-n`
+or those users cannot type the character. The built-in `Mod-Alt-f`, `Mod-Alt-d`, `Mod-Alt-c`, `Mod-Alt-r`, `Mod-Alt-t` and `Alt-Shift-n`
 are Word's; AltGr characters pass them by.
 
 | Name          | Windows and Linux         | macOS                                                       |
@@ -78,6 +78,11 @@ command that applies wins.
 | Ctrl+Shift+=, Ctrl+=       | Cmd+Shift+=, Cmd+=       | `Mod-Shift-+`, `Mod-=`       | `toggleVerticalAlign("superscript")`, `toggleVerticalAlign("subscript")`  |
 | Ctrl+Space                 | Ctrl+Space               | `Mod- `, `Ctrl- `            | `clearFormatting()`: direct character formatting off                      |
 | Ctrl+Shift+>, Ctrl+Shift+< | Cmd+Shift+>, Cmd+Shift+< | `Mod-Shift->`, `Mod-Shift-<` | `stepFontSize(1)`, `stepFontSize(-1)`                                     |
+| Ctrl+Alt+Num -             | Cmd+Option+Num -         | `Mod-Alt--`                  | `insertText("—")`: an em dash (Word's special characters, 35.1)           |
+| Ctrl+Shift+\_              | Cmd+Shift+\_             | `Mod-Shift-_`                | `insertText("‑")`: a nonbreaking hyphen                                   |
+| Ctrl+Shift+Space           | Cmd+Shift+Space          | `Mod-Shift- `                | `insertText(" ")`: a nonbreaking space                                    |
+| Ctrl+Alt+C, R, T           | Cmd+Option+C, R, T       | `Mod-Alt-c`, `-r`, `-t`      | `insertText("©")`, `"®"`, `"™"`                                           |
+| Ctrl+Alt+.                 | Cmd+Option+.             | `Mod-Alt-.`                  | `insertText("…")`: an ellipsis                                            |
 | Ctrl+K                     | Cmd+K                    | `Mod-k`                      | `openLinkEditor` (the app's link dialog: `FoliToolbar` answers it)        |
 | Ctrl+A                     | Cmd+A                    | `Mod-a`                      | `selectAll`                                                               |
 | Left, Right                | the same                 | `ArrowLeft`, `ArrowRight`    | `arrowAcrossLeaf(±1, "char")`: over a picture or an opaque leaf           |

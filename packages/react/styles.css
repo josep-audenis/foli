@@ -1738,3 +1738,55 @@
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: -2px;
 }
+
+/* Insert ▸ Symbol (35.1): the characters of a subset, the recent ones, Word's special characters. */
+.foli-symbol-grid {
+  display: grid;
+  flex: 1 1 100%;
+  max-height: 14em;
+  overflow-y: auto;
+  border: 1px solid var(--foli-border-color);
+  font-size: 1.25em;
+}
+
+.foli-symbol-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  min-height: 1.6em;
+  border: 1px solid var(--foli-border-color);
+  margin: -0.5px;
+  cursor: default;
+  user-select: none;
+}
+
+.foli-symbol-cell[aria-selected="true"] {
+  background: var(--foli-dialog-primary-background);
+  color: var(--foli-dialog-primary-color);
+}
+
+.foli-symbol-recent {
+  flex: 1 1 100%;
+  gap: 0;
+}
+
+.foli-special-list {
+  flex: 1 1 100%;
+  max-height: 16em;
+  overflow-y: auto;
+  border: 1px solid var(--foli-border-color);
+}
+
+.foli-special-row {
+  display: grid;
+  grid-template-columns: 2em 1fr auto;
+  gap: 8px;
+  padding: 1px 6px;
+  cursor: default;
+}
+
+.foli-special-row[aria-selected="true"] {
+  background: var(--foli-dialog-primary-background);
+  color: var(--foli-dialog-primary-color);
+}

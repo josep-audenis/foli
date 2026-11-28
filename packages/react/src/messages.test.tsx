@@ -208,7 +208,9 @@ describe("the toolbar's messages", () => {
       for (const color of (typeof colors === "function" ? colors(editor.state) : colors) ?? [])
         expect(listed).toContain(color.name);
       const actions = typeof item.actions === "function" ? item.actions(editor) : item.actions;
-      for (const action of actions ?? []) expect(listed).toContain(action.label);
+      // A recent symbol shows itself, not a message.
+      for (const action of actions ?? [])
+        if (!action.key.startsWith("symbol-")) expect(listed).toContain(action.label);
     }
   });
 });

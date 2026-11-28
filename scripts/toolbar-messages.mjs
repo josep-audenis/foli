@@ -1,5 +1,5 @@
 // Collects every string of the toolbar (packages/react/src/FoliToolbar.tsx and its Word dialogs,
-// WordDialogs.tsx and DesignDialogs.tsx) into `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and
+// WordDialogs.tsx, DesignDialogs.tsx and InsertDialogs.tsx) into `toolbarMessages` (packages/react/src/messages.ts): the `t("…")` and
 // `tr("…")` calls, and the built-in items', menus', palettes', tabs' and dialogs' labels. With
 // `--check` (in `pnpm check`) it fails when the list is not up to date; without it, it writes
 // the list.
@@ -9,6 +9,7 @@ const sources = [
   "packages/react/src/FoliToolbar.tsx",
   "packages/react/src/WordDialogs.tsx",
   "packages/react/src/DesignDialogs.tsx",
+  "packages/react/src/InsertDialogs.tsx",
 ];
 const source = sources.join(" and ");
 const target = "packages/react/src/messages.ts";
@@ -47,11 +48,12 @@ const from = code.indexOf("const SETUP_LABELS");
 for (const match of code.slice(from, code.indexOf("};", from)).matchAll(new RegExp(string, "g")))
   found.add(JSON.parse(`"${match[1]}"`));
 
-// Shown text starts with a capital, a digit or a symbol (`1, 2, 3`, `*, †, ‡`), or is a list of
+// Shown text starts with a capital, a digit, a symbol (`1, 2, 3`, `*, †, ‡`) or a parenthesis
+// (`(normal text)`), or is a list of
 // letters (`a, b, c`); keys and values (`"nextPage"`, `"#c00000"`) are not.
 // Word's Change Case entries show their own case.
 const CASES = new Set(["lowercase", "tOGGLE cASE"]);
-const shown = (text) => /^[A-Z0-9*…]/.test(text) || /^[a-z], [a-z]/.test(text) || CASES.has(text);
+const shown = (text) => /^[A-Z0-9*…(]/.test(text) || /^[a-z], [a-z]/.test(text) || CASES.has(text);
 // By code point: the same order on every machine.
 const list = [...found].filter(shown).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 

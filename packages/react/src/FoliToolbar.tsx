@@ -184,6 +184,7 @@ import {
   useEditorState,
   useIsomorphicLayoutEffect,
 } from "./editor.js";
+import { insertingSymbol, recentSymbols, SymbolDialog, symbolCommand } from "./InsertDialogs.js";
 import { toolbarIcons } from "./icons.js";
 import { loadLocalFonts, localFontFamilies, subscribeLocalFonts } from "./localFonts.js";
 import {
@@ -499,9 +500,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * `"tabs"` (Word's Paragraph, Font and Tabs dialogs for the selection, 1.11), `"pageBorders"`
  * (Word's Page Borders, the caret's section or the document), `"watermark"` (its Printed
  * Watermark dialog, every header), `"bordersShading"` (its Borders and Shading dialog for the
- * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section).
+ * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section),
+ * `"symbol"` (its Symbol dialog: symbols by font and subset, special characters).
  */
 export type ToolbarDialogName =
+  | "symbol"
   | "layout"
   | "layoutWrapping"
   | "layoutSize"
@@ -629,6 +632,8 @@ interface Item extends ToolbarItemBase {
   colors?: ToolbarColorMenu["colors"] | undefined;
   /** An action menu button (the table menu): its commands, in order. */
   actions?: readonly Action[] | ((editor: Editor) => readonly Action[]) | undefined;
+  /** An action menu whose single-character entries show as a grid this wide (the symbols). */
+  columns?: number | undefined;
   /** A button opening a dialog: the picture's, or an app's. */
   dialog?: ToolbarDialog["dialog"] | undefined;
   render?: ToolbarCustom["render"] | undefined;
@@ -2633,6 +2638,27 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Insert ▸ Symbol (35.1): Word's recent symbols, then its Symbol dialog.
+  {
+    key: "symbol",
+    label: "Symbol",
+    text: "Symbol",
+    enabled: (state) => isWord(state) && insertPageBreak(state),
+    columns: 10,
+    actions: () => [
+      ...recentSymbols().map((symbol) => ({
+        key: `symbol-${symbol.font ?? ""}-${symbol.text}`,
+        label: symbol.text,
+        command: symbolCommand(symbol),
+      })),
+      {
+        key: "moreSymbols",
+        label: "More Symbols…",
+        command: (state) => isWord(state) && insertPageBreak(state),
+        dialog: "symbol",
+      },
+    ],
+  },
   // Insert ▸ Shapes (34.3): Word's gallery; a shape is drawn on the pages.
   {
     key: "shapes",
@@ -2885,6 +2911,7 @@ export type ToolbarItemName =
   | "updateFields"
   | "pageNumber"
   | "date"
+  | "symbol"
   | "crossReference"
   | "fieldCodes"
   | "navigationPane"
@@ -2931,6 +2958,7 @@ export type ToolbarItemName =
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "symbol"
   | "lineNumbers"
   | "watermark"
   | "borders"
@@ -3166,6 +3194,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         group("Links", t.link, t.crossReference),
         group("Header & Footer", t.headerFooter, t.pageNumber),
         group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.date),
+        group("Symbols", t.symbol),
       ],
     },
     {
@@ -3367,6 +3396,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   watermark: isWord,
   bordersShading: (state) => paragraphBordersAt(state) !== null,
   lineNumbers: (state) => sectionAt(state) !== null,
+  symbol: (state) => isWord(state) && insertPageBreak(state),
   layout: (state) => objectLayoutEnabled(state),
   layoutWrapping: (state) => objectLayoutEnabled(state),
   layoutSize: (state) => objectLayoutEnabled(state),
@@ -3977,14 +4007,18 @@ export function FoliToolbar({
               ? null
               : current,
           );
-          // So is the paragraph dialog: its paragraphs may have changed.
+          // So is the paragraph dialog: its paragraphs may have changed. The Symbol dialog stays
+          // open over its own inserts, as Word's, for the selection they leave.
+          const symbolInsert = insertingSymbol();
           setWordDialog((current) =>
-            current &&
-            (!transactions.length ||
-              transactions.some((tr) => tr.docChanged) ||
-              !state.selection.eq(current.selection))
-              ? null
-              : current,
+            current?.name === "symbol" && symbolInsert
+              ? { ...current, selection: state.selection }
+              : current &&
+                  (!transactions.length ||
+                    transactions.some((tr) => tr.docChanged) ||
+                    !state.selection.eq(current.selection))
+                ? null
+                : current,
           );
           // So is the page setup dialog: its section may have changed.
           setSetupDialog((current) =>
@@ -4093,6 +4127,7 @@ export function FoliToolbar({
   // Word's Paragraph or Font dialog, for the selection it opened on.
   const [wordDialog, setWordDialog] = useState<{
     name:
+      | "symbol"
       | "paragraph"
       | "font"
       | "tabs"
@@ -4206,6 +4241,7 @@ export function FoliToolbar({
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
       else if (
+        name === "symbol" ||
         name === "paragraph" ||
         name === "font" ||
         name === "tabs" ||
@@ -4894,6 +4930,7 @@ export function FoliToolbar({
                           <ActionMenu
                             label={trLabel(item.label)}
                             actions={actions}
+                            columns={item.columns}
                             editor={editor}
                             state={editor.state}
                             onPick={(action, pointer) => {
@@ -5150,6 +5187,17 @@ export function FoliToolbar({
               }}
             />
           )}
+        {wordDialog?.name === "symbol" && !disabled && (
+          <SymbolDialog
+            editor={editor}
+            fonts={fontOptions(editor.state).map((option) => option.value)}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
         {wordDialog?.name === "lineNumbers" && !disabled && (
           <LineNumbersDialog
             editor={editor}
@@ -5639,6 +5687,7 @@ function LinkDialog({
 function ActionMenu({
   label,
   actions,
+  columns,
   editor,
   state,
   onPick,
@@ -5646,6 +5695,8 @@ function ActionMenu({
 }: {
   label: string;
   actions: readonly Action[];
+  /** Its leading single-character entries as a grid this wide (the symbols), the arrows moving in it. */
+  columns?: number | undefined;
   /** For `checked`, with `state`. */
   editor: Editor;
   state: EditorState;
@@ -5662,6 +5713,9 @@ function ActionMenu({
     items.current[0]?.focus();
   }, []);
 
+  let cells = 0;
+  if (columns)
+    while (cells < actions.length && [...(actions[cells]?.label ?? "")].length === 1) cells++;
   const onKeyDown = (event: KeyboardEvent) => {
     const count = actions.length;
     const at = items.current.indexOf(event.target as HTMLButtonElement);
@@ -5671,6 +5725,12 @@ function ActionMenu({
       Home: 0,
       End: count - 1,
     };
+    if (columns && at < cells) {
+      moves.ArrowRight = Math.min(cells - 1, at + 1);
+      moves.ArrowLeft = Math.max(0, at - 1);
+      moves.ArrowDown = Math.min(at + columns, cells) % count;
+      if (at >= columns) moves.ArrowUp = at - columns;
+    } else if (columns && at === cells) moves.ArrowUp = Math.max(0, cells - 1);
     const next = moves[event.key];
     event.stopPropagation();
     if (next !== undefined) {
@@ -5692,33 +5752,48 @@ function ActionMenu({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose(false);
       }}
     >
-      {actions.map((action, i) => {
-        const props = {
-          ref: (element: HTMLButtonElement | null) => {
-            items.current[i] = element;
-          },
-          type: "button" as const,
-          "aria-disabled": enabled[i] ? undefined : true,
-          tabIndex: -1,
-          className: "foli-menu-item",
-          onMouseDown: (event: MouseEvent) => event.preventDefault(),
-          onClick: (event: MouseEvent) => {
-            if (enabled[i]) onPick(action, event.detail > 0);
-          },
-        };
-        return action.checked ? (
-          <button
-            key={action.key}
-            {...props}
-            role="menuitemcheckbox"
-            aria-checked={action.checked(state, editor)}
+      {(cells ? [actions.slice(0, cells), actions.slice(cells)] : [actions]).map((part, p) => {
+        const entries = part.map((action, j) => {
+          const i = p ? cells + j : j;
+          const props = {
+            ref: (element: HTMLButtonElement | null) => {
+              items.current[i] = element;
+            },
+            type: "button" as const,
+            "aria-disabled": enabled[i] ? undefined : true,
+            tabIndex: -1,
+            className: "foli-menu-item",
+            onMouseDown: (event: MouseEvent) => event.preventDefault(),
+            onClick: (event: MouseEvent) => {
+              if (enabled[i]) onPick(action, event.detail > 0);
+            },
+          };
+          return action.checked ? (
+            <button
+              key={action.key}
+              {...props}
+              role="menuitemcheckbox"
+              aria-checked={action.checked(state, editor)}
+            >
+              {t(action.label as ToolbarMessage)}
+            </button>
+          ) : (
+            <button key={action.key} {...props} role="menuitem">
+              {t(action.label as ToolbarMessage)}
+            </button>
+          );
+        });
+        return cells && !p ? (
+          <div
+            key="grid"
+            role="none"
+            className="foli-menu-grid"
+            style={{ gridTemplateColumns: `repeat(${columns}, auto)` }}
           >
-            {t(action.label as ToolbarMessage)}
-          </button>
+            {entries}
+          </div>
         ) : (
-          <button key={action.key} {...props} role="menuitem">
-            {t(action.label as ToolbarMessage)}
-          </button>
+          entries
         );
       })}
     </div>
