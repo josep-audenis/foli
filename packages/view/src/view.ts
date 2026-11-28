@@ -4721,6 +4721,7 @@ export class EditorView {
   /** The pointer over a column border shows that it can be dragged. */
   private onMouseMove = (event: MouseEvent): void => {
     if (this.drag) return;
+    if (event.buttons === 1) this.dragOverEquation(event);
     if (event.buttons === 0) this.controlChrome.hover(event.target);
     const near = event.buttons === 0 && this.columnBorder(event) !== null;
     if (near === this.resizeCursor) return;
@@ -5597,6 +5598,56 @@ export class EditorView {
     return geometry;
   }
 
+  /**
+   * A press on an equation (35.4) puts the caret before or after it, by the side of its glyphs it
+   * landed on: a display equation fills its line, and the browser would put the caret in the
+   * drawing, where nothing can be typed.
+   */
+  private equationMouseDown(event: MouseEvent): boolean {
+    if (event.shiftKey || event.button !== 0) return false;
+    const side = this.equationSide(event);
+    if (!side) return false;
+    event.preventDefault();
+    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+    this.dispatch(this.state.tr.setSelection(TextSelection.create(this.state.doc, side.pos)));
+    this.writeSelection(true);
+    return true;
+  }
+
+  /**
+   * A drag (the browser's selection) over an equation: the selection's head goes before or after
+   * it, as a press does; the browser cannot put it in the drawing.
+   */
+  private dragOverEquation(event: MouseEvent): void {
+    const side = this.equationSide(event);
+    if (!side) return;
+    const selection = this.host.ownerDocument.getSelection();
+    const { span } = side;
+    const parent = span.parentNode;
+    if (!selection?.anchorNode || !parent) return;
+    const index = Array.prototype.indexOf.call(parent.childNodes, span) as number;
+    selection.extend(parent, side.before ? index : index + 1);
+  }
+
+  /** The equation under a pointer event, and the position on the side of its glyphs it is on. */
+  private equationSide(event: MouseEvent): { span: Element; pos: number; before: boolean } | null {
+    const span = (event.target as Element | null)?.closest?.("[data-foli-math]");
+    if (!span || !this.host.contains(span)) return null;
+    const pos = this.posFromDOM(span, 0);
+    if (pos === null) return null;
+    let left = Number.POSITIVE_INFINITY;
+    let right = Number.NEGATIVE_INFINITY;
+    for (const child of span.querySelector("math")?.children ?? []) {
+      const r = child.getBoundingClientRect();
+      left = Math.min(left, r.left);
+      right = Math.max(right, r.right);
+    }
+    const box = span.getBoundingClientRect();
+    const middle = left <= right ? (left + right) / 2 : (box.left + box.right) / 2;
+    const before = event.clientX < middle;
+    return { span, pos: before ? pos : pos + 1, before };
+  }
+
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that
@@ -5609,6 +5660,7 @@ export class EditorView {
     if (event.timeStamp - this.touchedResize < 1000 && target?.closest?.("[data-foli-resize]"))
       return;
     if (this.pictureMouseDown(event)) return;
+    if (this.equationMouseDown(event)) return;
     // A click puts a caret where it lands, even on the one a cell selection wrote.
     if (!event.shiftKey) this.cellCaret = null;
     // A header row drawn again is not document content: the caret goes below it.

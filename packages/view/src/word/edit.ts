@@ -67,6 +67,7 @@ import {
   WORD_COLUMN_BREAK_ATTR,
   WORD_PAGE_BREAK_ATTR,
 } from "./blocks.js";
+import { isMath, MATH_FONT, mathElement } from "./math.js";
 
 /** A number per story tree, new for each tree: what a block's key holds of its text boxes. */
 const serials = new WeakMap<object, number>();
@@ -518,6 +519,17 @@ export class WordRenderer {
         case "opaqueInline": {
           const span = this.#run(run, child.marks, line);
           const xml = parseOpaque(String(child.attrs.xml ?? ""), doc);
+          // Word's equation (35.4): drawn as MathML, one position as the opaque run it is.
+          const math = isMath(xml) ? mathElement(xml, doc) : null;
+          if (math) {
+            span.style.fontFamily = MATH_FONT;
+            span.append(math);
+            span.dataset.foliMath = xml?.localName === "oMathPara" ? "display" : "inline";
+            span.dataset.foliOpaque = String(child.attrs.label ?? "");
+            span.setAttribute("contenteditable", "false");
+            leafElement(span);
+            return;
+          }
           span.textContent = xml ? opaqueText(xml) : "";
           span.dataset.foliOpaque = String(child.attrs.label ?? "");
           span.setAttribute("contenteditable", "false");

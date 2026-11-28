@@ -23,6 +23,7 @@ import {
   resolvedCommentIds,
 } from "@folijs/core/internal";
 import { applyAttrs, type DecorationAttrs } from "../extension.js";
+import { isMath, MATH_FONT, mathElement } from "./math.js";
 import { shapeSvg, shapeTextRect } from "./shapes.js";
 
 /**
@@ -1444,6 +1445,19 @@ function renderInline(
       const separator = separatorElement(xml, doc);
       if (separator) {
         parent.append(separator);
+        continue;
+      }
+      // Word's equation (35.4): drawn as MathML, in the run's color and size.
+      const math = isMath(xml) ? mathElement(xml, doc) : null;
+      if (math) {
+        const span = doc.createElement("span");
+        const run = resolver.run(paragraphRun, marks);
+        styleRun(span, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
+        // Word's math font, else the platform's.
+        span.style.fontFamily = MATH_FONT;
+        span.dataset.foliMath = xml?.localName === "oMathPara" ? "display" : "inline";
+        span.append(math);
+        parent.append(span);
         continue;
       }
       // A run's content (a drawing, a field character) shows as nothing; a content control or

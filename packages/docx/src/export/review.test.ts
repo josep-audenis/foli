@@ -20,8 +20,10 @@ describe("a new package", () => {
       // Without its stories: a story read from a part needs no package.
       const { stories: _stories, ...document } = (await load(name)).document;
       const exported = exportDocx(document);
-      // 06 refers to none (no header, footer, picture or linked content): a new package holds it.
-      if (name.startsWith("06-")) await expect(exported, name).resolves.toBeInstanceOf(Uint8Array);
+      // 06 and 13 refer to none (no header, footer, picture or linked content): a new package
+      // holds them.
+      if (name.startsWith("06-") || name.startsWith("13-"))
+        await expect(exported, name).resolves.toBeInstanceOf(Uint8Array);
       else
         await expect(exported, name).rejects.toMatchObject({
           name: "DocxError",

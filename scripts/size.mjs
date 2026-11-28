@@ -189,9 +189,11 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React and FoliEditor raised in 35.1 (252.5 and 248.3 kB; 264.0 and 264.0 allowed): the Symbol
  * menu and dialog (24 Unicode subsets, Special Characters), with room for Phase 35's Date and
  * Time, Caption, Table of Figures, Equation and Cover Page.
+ * Core raised in 35.4 (108.1 kB; 112.0 allowed): find reading an equation's characters, Phase 35's
+ * captions, dates and symbols, with room for 35.5's equation node (schema 12) and its checks.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 110_592 },
+  { name: "@folijs/core", entry: dist("core"), budget: 114_688 },
   { name: "@folijs/view", entry: dist("view"), budget: 159_744 },
   { name: "@folijs/react", entry: dist("react"), budget: 270_336 },
   { name: "FoliEditor only", entry: appEntry, budget: 270_336 },

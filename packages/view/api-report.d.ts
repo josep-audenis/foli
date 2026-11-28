@@ -876,6 +876,19 @@ export declare class EditorView {
      * table. Null without pages (`paged: false`) or before the first layout.
      */
     rulerGeometry(): RulerGeometry | null;
+    /**
+     * A press on an equation (35.4) puts the caret before or after it, by the side of its glyphs it
+     * landed on: a display equation fills its line, and the browser would put the caret in the
+     * drawing, where nothing can be typed.
+     */
+    private equationMouseDown;
+    /**
+     * A drag (the browser's selection) over an equation: the selection's head goes before or after
+     * it, as a press does; the browser cannot put it in the drawing.
+     */
+    private dragOverEquation;
+    /** The equation under a pointer event, and the position on the side of its glyphs it is on. */
+    private equationSide;
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
@@ -1064,6 +1077,16 @@ export {};
 export {};
 
 // word/matches.d.ts
+export {};
+
+// word/math.d.ts
+/**
+ * Word's equations (OMML, `m:oMath` and `m:oMathPara`) drawn as MathML (35.4): the browser lays
+ * them out, on pages, read-only pages, print and `exportPdf` alike. Elements are read by their
+ * local names, so a Strict file's namespace reads the same. Only MathML Core is written (what
+ * Chromium, Firefox and WebKit draw): styled letters as Unicode's mathematical alphanumerics, a
+ * box or border box as its content. Text a tracked change deleted is not drawn.
+ */
 export {};
 
 // word/notes.d.ts

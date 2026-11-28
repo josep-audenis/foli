@@ -263,6 +263,40 @@ function hiddenRanges(tree: Node, scope: Scope, story: boolean): Hidden[] {
 
 const known = new WeakMap<Node, { key: string; scope: Scope; lines: Line[] }>();
 
+const MATH = /^<(?:[\w.-]+:)?oMath(?:Para)?[\s>]/;
+const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+
+/**
+ * An OMML equation's characters: its runs' text (`m:t`), structure left out, without Word's
+ * alignment marks (`&` in an equation array) and, with `hideDeleted`, without text a tracked
+ * change deleted (`w:del`, `w:moveFrom`). @internal
+ */
+export function equationText(xml: string, hideDeleted = false): string {
+  let source = xml;
+  if (hideDeleted)
+    // Not a self-closing one (`m:ctrlPr`'s deletion mark): it holds no text.
+    source = source.replace(
+      /<((?:[\w.-]+:)?(?:del|moveFrom))(?:\s[^>]*?)?(?<!\/)>[\s\S]*?<\/\1>/g,
+      "",
+    );
+  // In an equation array, `&` (written `&amp;`) marks where the lines align.
+  source = source.replace(/<(?:[\w.-]+:)?eqArr[\s>][\s\S]*?<\/(?:[\w.-]+:)?eqArr>/g, (array) =>
+    array.replace(/&amp;/g, ""),
+  );
+  let out = "";
+  for (const m of source.matchAll(/<(?:[\w.-]+:)?t(?:\s[^>]*)?>([^<]*)<\/(?:[\w.-]+:)?t>/g))
+    out += String(m[1]).replace(
+      /&(lt|gt|amp|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);/g,
+      (_, e: string) => {
+        if (e[0] !== "#") return ENTITIES[e] ?? "";
+        const code =
+          e[1] === "x" ? Number.parseInt(e.slice(2), 16) : Number.parseInt(e.slice(1), 10);
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+      },
+    );
+  return out;
+}
+
 /** The lines of `tree`, kept while the tree and what shows stay the same (typing in the panel). */
 function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
   const key = `${scope.codes}|${scope.hideDeleted}`;
@@ -299,7 +333,13 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       else if (name === "fieldCode" && scope.codes) add(String(child.attrs.text ?? ""), at, true);
       // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
       else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
-      else if (!isUnseen(child)) text += BARRIER;
+      // Word's equation kept as its OMML (35.4): found by its characters, never replaced.
+      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? ""))) {
+        const value = equationText(String(child.attrs.xml), scope.hideDeleted);
+        // An empty one still parts the words around it, as any other object.
+        if (value) add(value, at, true);
+        else text += BARRIER;
+      } else if (!isUnseen(child)) text += BARRIER;
     });
     if (text) lines.push({ text, pieces });
     return false;
