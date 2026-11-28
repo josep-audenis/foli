@@ -27,7 +27,9 @@ async function read(page: Page, pdf: Uint8Array): Promise<PdfContents> {
   return page.evaluate(
     (data) =>
       (
-        window as unknown as { foliWord: { readPdf(d: string): Promise<PdfContents> } }
+        window as unknown as {
+          foliWord: { readPdf(d: string): Promise<PdfContents> };
+        }
       ).foliWord.readPdf(data),
     Buffer.from(pdf).toString("base64"),
   );
@@ -42,7 +44,8 @@ async function exportCorpus(context: BrowserContext, name: string) {
   const printing = await context.newPage();
   const exported = await exportPdf(document, {
     page: printing,
-    resources: (_key, resource) => (resource.part ? pkg.part(`/${resource.part}`) : undefined),
+    resources: (_key, resource) =>
+      resource.part ? pkg.part(`/${resource.part}`) : undefined,
   });
   await printing.close();
   return exported;
@@ -61,7 +64,9 @@ test("04 exported: Word's four pages, the landscape one too, its text and headin
   // Every field already shows what Foli's pages give: the table of contents' page numbers too.
   expect(exported.fields).toMatchObject({ updated: 0, skipped: [] });
   const pdf = await read(page, exported.pdf);
-  expect(pdf.pages.map((p) => [Math.round(p.width), Math.round(p.height)])).toEqual([
+  expect(
+    pdf.pages.map((p) => [Math.round(p.width), Math.round(p.height)]),
+  ).toEqual([
     [595, 842],
     [595, 842],
     [595, 842],
@@ -133,7 +138,9 @@ test("a document makes the exporting page request nothing: no picture, font or s
     schemaVersion: 5,
     section: { pageSize: { width: 11906, height: 16838 } },
     defaults: {},
-    styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+    styles: [
+      { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+    ],
     numbering: { abstracts: [], instances: [] },
     comments: [],
     resources: {
@@ -142,7 +149,9 @@ test("a document makes the exporting page request nothing: no picture, font or s
     },
     content: {
       type: "doc",
-      content: [{ type: "paragraph", content: [picture("own"), picture("given")] }],
+      content: [
+        { type: "paragraph", content: [picture("own"), picture("given")] },
+      ],
     },
   };
   const printing = await context.newPage();
@@ -161,11 +170,16 @@ test("a document makes the exporting page request nothing: no picture, font or s
   expect(requests).toEqual([]);
 });
 
-test("custom nodes and marks print with the app's extensions (19.3)", async ({ page, context }) => {
+test("custom nodes and marks print with the app's extensions (19.3)", async ({
+  page,
+  context,
+}) => {
   const document = {
     schemaVersion: 5,
     section: {},
-    styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+    styles: [
+      { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+    ],
     defaults: {},
     numbering: { abstracts: [], instances: [] },
     comments: [],
@@ -196,13 +210,18 @@ test("custom nodes and marks print with the app's extensions (19.3)", async ({ p
     },
   }];`;
   const printing = await context.newPage();
-  const drawn = await exportPdf(document as never, { page: printing, extensions });
+  const drawn = await exportPdf(document as never, {
+    page: printing,
+    extensions,
+  });
   const plain = await exportPdf(document as never, { page: printing });
   await printing.close();
   const text = words((await read(page, drawn.pdf)).pages[0]?.text ?? "");
   expect(text).toContain("Ask Mention of Ada");
   expect(text).toContain("Drawn card c-1");
-  expect(words((await read(page, plain.pdf)).pages[0]?.text ?? "")).not.toContain("Mention of");
+  expect(
+    words((await read(page, plain.pdf)).pages[0]?.text ?? ""),
+  ).not.toContain("Mention of");
 });
 
 test("fields are updated from the pages first; links are links, internal ones too", async ({
@@ -303,7 +322,10 @@ test("fields are updated from the pages first; links are links, internal ones to
  * their ink is not: a table's header rows repeated on a continuation page are plain text in the
  * editor (its shortcut, `table.ts`), and the editor draws change bars beside tracked changes.
  */
-const DRAWN_OTHERWISE = new Set(["02-services-agreement-redlined.docx", "06-price-schedule.docx"]);
+const DRAWN_OTHERWISE = new Set([
+  "02-services-agreement-redlined.docx",
+  "06-price-schedule.docx",
+]);
 /**
  * Where a paragraph continues in a column of another width, the read-only renderer can repeat or
  * lose a few words (its shortcut, 11.6): 08's PDF shows "the floor" twice.
@@ -311,7 +333,10 @@ const DRAWN_OTHERWISE = new Set(["02-services-agreement-redlined.docx", "06-pric
 const WORDS_OTHERWISE = new Set(["08-newsletter.docx"]);
 
 for (const name of readdirSync(CORPUS).filter((n) => n.endsWith(".docx")))
-  test(`${name}: the editor's print gives the pages exportPdf gives`, async ({ page, context }) => {
+  test(`${name}: the editor's print gives the pages exportPdf gives`, async ({
+    page,
+    context,
+  }) => {
     const exported = await exportCorpus(context, name);
     await page.goto("/edit.html?toolbar");
     await page.waitForFunction(() => "foliEdit" in window);
@@ -323,18 +348,23 @@ for (const name of readdirSync(CORPUS).filter((n) => n.endsWith(".docx")))
     // The playground's own page around the editor is not printed (styling.md, "Print").
     await page.addStyleTag({
       content:
-        "@media print{header,#toolbar,#navigation,#comments{display:none!important}#editor{display:block!important;padding:0!important}}",
+        "@media print{header,#toolbar,#ruler,#vruler,#navigation,#comments,#status,#menu,#mini{display:none!important}#body,#editor{display:block!important}#editor{padding:0!important}}",
     });
     // What `view.print()` does before the browser's dialog.
     await page.evaluate(() => window.foliEdit.view.updateFields());
-    const printed = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    const printed = await page.pdf({
+      preferCSSPageSize: true,
+      printBackground: true,
+    });
     const fromEditor = await read(page, printed);
     const fromExport = await read(page, exported.pdf);
     // Each page's size and characters (the text's order differs: the editor draws footers last).
     const shape = (pdf: PdfContents) =>
       pdf.pages.map((p) => ({
         size: [Math.round(p.width), Math.round(p.height)],
-        text: WORDS_OTHERWISE.has(name) ? "" : [...p.text.replace(/\s/g, "")].sort().join(""),
+        text: WORDS_OTHERWISE.has(name)
+          ? ""
+          : [...p.text.replace(/\s/g, "")].sort().join(""),
       }));
     expect(shape(fromEditor)).toEqual(shape(fromExport));
     if (DRAWN_OTHERWISE.has(name)) return;
@@ -351,7 +381,11 @@ for (const name of readdirSync(CORPUS).filter((n) => n.endsWith(".docx")))
             };
           }
         ).foliWord.comparePdfs(a, b),
-      [Buffer.from(printed).toString("base64"), Buffer.from(exported.pdf).toString("base64")],
+      [
+        Buffer.from(printed).toString("base64"),
+        Buffer.from(exported.pdf).toString("base64"),
+      ],
     );
-    for (const { page: score } of compared) expect(score.score).toBeGreaterThan(0.995);
+    for (const { page: score } of compared)
+      expect(score.score).toBeGreaterThan(0.995);
   });
