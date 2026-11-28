@@ -24,4 +24,9 @@ export {
   WORD_PAGE_CLASS,
 } from "./word/pages.js";
 export { SHAPE_GALLERY, type ShapeGalleryGroup, shapePreview } from "./word/shapes.js";
-export { equationElement, ommlToUnicodeMath, unicodeMathToOmml } from "./word/unicodemath.js";
+export {
+  equationElement,
+  LinearFormError,
+  ommlToUnicodeMath,
+  unicodeMathToOmml,
+} from "./word/unicodemath.js";

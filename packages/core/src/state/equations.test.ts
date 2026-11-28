@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
 import { createDocument, parseDocument, SCHEMA_VERSION } from "../v3/document.js";
+import { deleteBackward } from "./commands.js";
 import { createEditor } from "./editor.js";
 import { insertEquation, isDisplayEquation, selectedEquation, setEquation } from "./equations.js";
 import { findAll } from "./find.js";
@@ -63,6 +64,31 @@ describe("equations (35.5, schema 12)", () => {
         schemaVersion: 12,
         content: { type: "doc", content: [p({ type: "equation", attrs: { xml: "<w:r/>" } })] },
       }),
-    ).toThrow(/m:oMath or m:oMathPara/);
+    ).toThrow(/one m:oMath or m:oMathPara element/);
+  });
+});
+
+describe("equations: review cases (35.5)", () => {
+  it("are selected by Backspace before they are deleted, as Word's", () => {
+    const editor = editorOf([p({ type: "equation", attrs: { xml: OMATH } })]);
+    editor.select(2);
+    expect(editor.run(deleteBackward())).toBe(true);
+    expect(selectedEquation(editor.state)?.pos).toBe(1);
+    expect(editor.run(deleteBackward())).toBe(true);
+    expect(editor.state.doc.child(0).childCount).toBe(0);
+  });
+
+  it("hold one equation element, its end tag its start's", () => {
+    const parse = (xml: string) => () =>
+      parseDocument({
+        ...createDocument(),
+        schemaVersion: 12,
+        content: { type: "doc", content: [p({ type: "equation", attrs: { xml } })] },
+      });
+    expect(parse("<m:oMath/>")).not.toThrow();
+    expect(parse(DISPLAY)).not.toThrow();
+    expect(parse("<m:oMath/><w:p/>")).toThrow(/one m:oMath/);
+    expect(parse("<m:oMath><m:r/></m:oMathPara>")).toThrow(/one m:oMath/);
+    expect(parse(`${OMATH}${OMATH}`)).toThrow(/one m:oMath/);
   });
 });

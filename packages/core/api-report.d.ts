@@ -48,6 +48,7 @@ export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, t
 
 // internal.d.ts
 export { isCommentOnly, resolvedCommentIds } from "./state/comments.js";
+export { equationText } from "./state/find.js";
 export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryEditStep, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export { withTrackState } from "./state/track.js";
@@ -1842,6 +1843,12 @@ export interface ReplaceReport {
 }
 /** Where `query` is in a plain text, by Word's rules: `[from, to]` pairs, none overlapping. */
 export declare function findInText(text: string, query: string, options?: FindOptions): [number, number][];
+/**
+ * An OMML equation's characters: its runs' text (`m:t`), structure left out, without Word's
+ * alignment marks (`&` in an equation array) and, with `hideDeleted`, without text a tracked
+ * change deleted (`w:del`, `w:moveFrom`). For `@folijs/core/internal`.
+ */
+export declare function equationText(xml: string, hideDeleted?: boolean): string;
 /**
  * Every place `query` is, in the body then in each story, as the document shows now: a field's
  * code only while codes are shown (its result then not), text deleted as a tracked change only in

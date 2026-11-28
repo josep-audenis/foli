@@ -26,7 +26,9 @@
    replaces the whole `xml`; an equation whose linear form did not change keeps its OMML.
 3. **Commands:** `insertEquation(xml)` at the selection (then selected) and `setEquation(pos,
    xml)`, one undo step each, refused while tracking changes (Word tracks an equation's runs
-   one by one; Foli would have to track the node whole, which Word does not read back).
+   one by one). Deleting or pasting a whole equation while tracking is tracked as the whole
+   node (`w:del` or `w:ins` around its `m:oMath`), which ECMA-376 allows; a deleted equation is
+   selected first, as Word's.
    React's Insert ▸ Equation offers Word's gallery (its nine built-in equations, by their linear
    forms), Insert New Equation… and Edit Equation… (the Equation dialog: the linear form, the
    equation drawn as it will show, Display).
@@ -34,7 +36,10 @@
    v11 → v12 changes the version only: an equation an earlier release kept opaque stays so
    until the `.docx` is imported again.
 5. **Checked against Word.** Word 16 opens Foli's new equations (the gallery's and typed ones)
-   as equations (`OMaths`), and its own linear form of each is Foli's.
+   as equations (`OMaths`, inline and display as written). Their structure is checked against
+   Word's own: the quadratic formula Foli builds from Word's linear form has the elements of the
+   corpus's (Word-made) one, and the gallery's binomials, factorials and scripts are built as
+   Word builds them (`unicodemath.test.ts`).
 
 ## Options rejected
 
@@ -51,4 +56,5 @@
 
 - An edited equation loses what the linear form does not say: per-run formatting inside it,
   `m:argPr`, alignment marks, Word's own run properties (written anew in Cambria Math).
-- Equations in the agent's reading show as their characters; the agent does not edit them.
+- Equations in the agent's reading show as `[equation: …]` with their characters; the agent
+  does not edit them.

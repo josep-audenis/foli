@@ -269,7 +269,7 @@ const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"'
 /**
  * An OMML equation's characters: its runs' text (`m:t`), structure left out, without Word's
  * alignment marks (`&` in an equation array) and, with `hideDeleted`, without text a tracked
- * change deleted (`w:del`, `w:moveFrom`). @internal
+ * change deleted (`w:del`, `w:moveFrom`). For `@folijs/core/internal`.
  */
 export function equationText(xml: string, hideDeleted = false): string {
   let source = xml;

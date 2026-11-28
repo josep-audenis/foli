@@ -1033,7 +1033,13 @@ export function EquationDialog({
   const box = useRef<HTMLTextAreaElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   useEffect(() => box.current?.focus(), []);
-  const xml = linear.trim() ? unicodeMathToOmml(linear, display) : "";
+  // A linear form too deeply nested to read is an error to show, not a crash.
+  let xml = "";
+  try {
+    xml = linear.trim() ? unicodeMathToOmml(linear, display) : "";
+  } catch {
+    xml = "";
+  }
   useEffect(() => {
     const target = preview.current;
     if (!target || !doc) return;
@@ -1083,6 +1089,8 @@ export function EquationDialog({
               }}
               onKeyDown={(event) => {
                 // Enter writes it, as Word's box builds it up; Shift+Enter a new line.
+                // Not the Enter that ends an input method's composition.
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 if (event.key === "Enter" && !event.shiftKey) apply(event);
               }}
             />
@@ -1092,6 +1100,8 @@ export function EquationDialog({
               id={`${id}-display`}
               type="checkbox"
               checked={display}
+              // A new one in a sentence stays in its line (Word draws a display one there inline).
+              disabled={!selected && !displayHere(editor.state)}
               onChange={(event) => setDisplay(event.target.checked)}
             />
             <label htmlFor={`${id}-display`}>{t("Display (on its own line)")}</label>

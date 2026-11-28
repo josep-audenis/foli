@@ -115,7 +115,7 @@ export { EditorView, type EditorViewOptions, keyName, measureImageFile, textWidt
 export { EMU_PER_PX } from "./word/blocks.js";
 export { type DocumentPages, type RenderDocumentOptions, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
 export { SHAPE_GALLERY, type ShapeGalleryGroup, shapePreview } from "./word/shapes.js";
-export { equationElement, ommlToUnicodeMath, unicodeMathToOmml } from "./word/unicodemath.js";
+export { equationElement, LinearFormError, ommlToUnicodeMath, unicodeMathToOmml, } from "./word/unicodemath.js";
 
 // layout/flow.d.ts
 export {};
@@ -1238,9 +1238,13 @@ export {};
  * delimiters (`()`, `[]`, `{}`, `||`, `├ ┤`), binomials (`(n¦k)`), matrices (`■(a&b@c&d)`),
  * functions (`sin⁡x`, `lim_(n→∞)⁡…`), Word's invisible brackets (`〖…〗`) and `\name` symbols.
  */
+/** Thrown for a linear form too deeply nested to read. */
+export declare class LinearFormError extends Error {
+}
 /**
  * Reads Word's linear format into OMML as Word writes it (`<m:oMath>…</m:oMath>`, in an
- * `m:oMathPara` for a display equation): an `equation` node's `xml`.
+ * `m:oMathPara` for a display equation, one `m:oMath` a line): an `equation` node's `xml`.
+ * Throws `LinearFormError` for input nested deeper than an equation is.
  */
 export declare function unicodeMathToOmml(source: string, display?: boolean): string;
 /**

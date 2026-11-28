@@ -1,5 +1,5 @@
 import { controlsIn, type EditorState, fieldsIn, type Mark, type Node } from "@folijs/core";
-import { wordContext } from "@folijs/core/internal";
+import { equationText, wordContext } from "@folijs/core/internal";
 import type { Handles } from "./handles.js";
 
 /** A block as an agent reads it: the document as it would be with every change accepted. */
@@ -130,6 +130,8 @@ function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden
     else if (name === "tab") text += "\t";
     else if (name === "hardBreak") text += "\n";
     else if (child.type.spec.text) text += child.type.spec.text(child.attrs);
+    // An equation (35.5) as its characters: the agent reads it, it does not edit it.
+    else if (name === "equation") text += `[equation: ${equationText(String(child.attrs.xml))}]`;
     else if (name === "picture" && typeof child.attrs.alt === "string" && child.attrs.alt.trim()) {
       // Its alt text: what tells a model which picture it is (23.9's trial asked for it).
       const alt = child.attrs.alt.replace(/[\s[\]]+/g, " ").trim();

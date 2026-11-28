@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { equationElement, ommlToUnicodeMath, unicodeMathToOmml } from "./unicodemath.js";
+import {
+  equationElement,
+  LinearFormError,
+  ommlToUnicodeMath,
+  unicodeMathToOmml,
+} from "./unicodemath.js";
 
 /** Word's equation gallery's linear forms (Word 16), and a few of the corpus's. */
 const FORMS = [
@@ -10,7 +15,7 @@ const FORMS = [
   "f(x)=a_0+∑_(n=1)^∞▒(a_n cos⁡(nπx/L)+b_n sin⁡(nπx/L))",
   "a^2+b^2=c^2",
   "x=(-b±√(b^2-4ac))/2a",
-  "sin⁡α±sin⁡β=2 sin⁡(1/2(α±β)) cos⁡(1/2(α∓β))",
+  "sin⁡α±sin⁡β=2sin⁡(1/2(α±β)) cos⁡(1/2(α∓β))",
   "[■(a&b@c&d)]",
   "√(3&x+1)",
   "x_i^2/2",
@@ -48,5 +53,54 @@ describe("an equation's linear form (35.5)", () => {
   it("gives nothing for XML that is not an equation", () => {
     expect(ommlToUnicodeMath("<w:r/>")).toBe("");
     expect(equationElement("<w:r/>")).toBeNull();
+  });
+});
+
+/** OMML's structure: its elements, text runs as their text, properties and fonts left out. */
+const skeleton = (xml: string) =>
+  xml
+    .replace(/<w:rPr>.*?<\/w:rPr>/g, "")
+    .replace(/<m:r>(?:<m:rPr>.*?<\/m:rPr>)?<m:t>(.*?)<\/m:t><\/m:r>/g, "'$1'")
+    .replace(/<m:(\w+)Pr>.*?<\/m:\1Pr>/g, "")
+    .replace(/<m:(\w+)\/>/g, "$1()")
+    .replace(/<m:(\w+)>/g, "$1(")
+    .replace(/<\/m:\w+>/g, ")");
+
+describe("the linear form's structure, as Word builds it up (35.5 review)", () => {
+  it("keeps Word's structures for the gallery's equations", () => {
+    // Word's own OMML for the quadratic formula (the corpus's 13): no bracket in the numerator.
+    expect(skeleton(unicodeMathToOmml("x=(-b±√(b^2-4ac))/2a", false))).toBe(
+      "oMath('x='f(num('-b±'rad(deg()e(sSup(e('b')sup('2'))'-4ac')))den('2a')))",
+    );
+    // A binomial in an n-ary operator's argument.
+    expect(unicodeMathToOmml("∑_(k=0)^n▒(n¦k)", false)).toContain(
+      '<m:e><m:d><m:e><m:f><m:fPr><m:type m:val="noBar"/></m:fPr>',
+    );
+    // A factorial stays in the denominator.
+    expect(skeleton(unicodeMathToOmml("x/1!", false))).toBe("oMath(f(num('x')den('1!')))");
+    // A script on the run's last letter: πr^2 is π then r².
+    expect(skeleton(unicodeMathToOmml("A=πr^2", false))).toBe("oMath('A=π'sSup(e('r')sup('2')))");
+  });
+
+  it("reads scripts on functions, repeated scripts, separators and any closing bracket", () => {
+    expect(skeleton(unicodeMathToOmml("log_2⁡x", false))).toBe(
+      "oMath(func(fName(sSub(e('log')sub('2')))e('x')))",
+    );
+    expect(skeleton(unicodeMathToOmml("x^2^3", false))).toBe(
+      "oMath(sSup(e('x')sup(sSup(e('2')sup('3')))))",
+    );
+    expect(skeleton(unicodeMathToOmml("(a│b)", false))).toBe("oMath(d(e('a')e('b')))");
+    // `)` is OMML's default closing bracket: only the opening one is written.
+    expect(unicodeMathToOmml("[0,1)", false)).toContain(
+      '<m:dPr><m:begChr m:val="["/></m:dPr><m:e>',
+    );
+    expect(unicodeMathToOmml("[0,1]", false)).toContain('<m:endChr m:val="]"/>');
+    // Lines of a display equation, one m:oMath each.
+    expect(unicodeMathToOmml("a=1\nb=2").match(/<m:oMath>/g)).toHaveLength(2);
+  });
+
+  it("refuses input nested deeper than an equation is", () => {
+    expect(() => unicodeMathToOmml("(".repeat(5000))).toThrow(LinearFormError);
+    expect(() => unicodeMathToOmml("√".repeat(5000))).toThrow(LinearFormError);
   });
 });

@@ -116,169 +116,262 @@ type MathNode =
   | { kind: "script"; base: MathNode; sub: MathNode | null; sup: MathNode | null }
   | { kind: "rad"; deg: MathNode | null; e: MathNode }
   | { kind: "nary"; chr: string; sub: MathNode | null; sup: MathNode | null; e: MathNode }
-  | { kind: "delim"; open: string; close: string; items: MathNode[] }
-  | { kind: "func"; name: string; under: MathNode | null; sup: MathNode | null; e: MathNode }
+  /** A delimiter: its parts, split by its separators (`(a│b)`). */
+  | { kind: "delim"; open: string; close: string; parts: MathNode[][] }
+  | {
+      kind: "func";
+      name: string;
+      under: MathNode | null;
+      sub: MathNode | null;
+      sup: MathNode | null;
+      e: MathNode;
+    }
   | { kind: "matrix"; rows: MathNode[][] };
 
 const row = (items: MathNode[]): MathNode =>
   items.length === 1 ? (items[0] as MathNode) : { kind: "row", items };
 
+/** A delimiter's separators inside it (Word's linear format writes `│`). */
+const SEPARATORS = new Set(["│", "∣"]);
+/** Postfix marks that stay with their operand (`1!`, `f′`). */
+const POSTFIX = new Set(["!", "′", "″", "'"]);
+/** How deep brackets and operators nest at most: deeper input is refused. */
+const MAX_DEPTH = 200;
+
+/** Thrown for a linear form too deeply nested to read. */
+export class LinearFormError extends Error {}
+
 // ---------- reading UnicodeMath ----------
 
 /**
  * Reads Word's linear format into OMML as Word writes it (`<m:oMath>…</m:oMath>`, in an
- * `m:oMathPara` for a display equation): an `equation` node's `xml`.
+ * `m:oMathPara` for a display equation, one `m:oMath` a line): an `equation` node's `xml`.
+ * Throws `LinearFormError` for input nested deeper than an equation is.
  */
 export function unicodeMathToOmml(source: string, display = true): string {
+  const lines = display ? source.split(/\r?\n/).filter((line) => line.trim()) : [source];
+  const maths = (lines.length ? lines : [""]).map(
+    (line) => `<m:oMath>${joined(read(line))}</m:oMath>`,
+  );
+  return display ? `<m:oMathPara>${maths.join("")}</m:oMathPara>` : (maths[0] as string);
+}
+
+function read(source: string): MathNode[] {
   const tokens = tokenize(source);
   let at = 0;
+  let depth = 0;
   const peek = () => tokens[at];
   const next = () => tokens[at++];
+  const deeper = <T>(work: () => T): T => {
+    if (++depth > MAX_DEPTH) throw new LinearFormError("The equation is nested too deeply");
+    try {
+      return work();
+    } finally {
+      depth--;
+    }
+  };
 
   /** A sequence up to one of `stops` (not consumed). */
   function sequence(stops: ReadonlySet<string>): MathNode[] {
-    const items: MathNode[] = [];
-    while (at < tokens.length && !stops.has(peek() as string)) {
-      const token = peek() as string;
-      if (token === " ") {
-        next();
-        continue;
+    return deeper(() => {
+      const items: MathNode[] = [];
+      while (at < tokens.length && !stops.has(peek() as string)) {
+        const token = peek() as string;
+        if (token === " ") {
+          next();
+          continue;
+        }
+        if (token === "/" && items.length) {
+          next();
+          const num = unwrap(items.pop() as MathNode);
+          const den = postfix(scripted(operand()));
+          items.push({ kind: "frac", num, den, bar: true });
+          continue;
+        }
+        const item = primary();
+        if (item) items.push(...scriptedItems(item));
       }
-      if (token === "/" && items.length) {
-        next();
-        const num = items.pop() as MathNode;
-        const den = scripted(operand());
-        items.push({ kind: "frac", num, den, bar: true });
-        continue;
-      }
-      const item = primary();
-      if (item) items.push(scripted(item));
-    }
-    return items;
+      return items;
+    });
   }
 
-  /** Subscripts and superscripts after `base`. */
+  /** A bracketed group's content, its brackets left out (an argument's or a fraction's). */
+  const unwrap = (node: MathNode): MathNode =>
+    node.kind === "delim" &&
+    node.open === "(" &&
+    node.close === ")" &&
+    node.parts.length === 1 &&
+    // A binomial keeps its brackets: (n¦k).
+    !(node.parts[0]?.length === 1 && node.parts[0][0]?.kind === "frac" && !node.parts[0][0].bar)
+      ? row(node.parts[0] as MathNode[])
+      : node;
+
+  /** `node` with the postfix marks after it (`1!`). */
+  function postfix(node: MathNode): MathNode {
+    const items = [node];
+    while (POSTFIX.has(peek() as string)) {
+      const mark = next() as string;
+      items.push({ kind: "text", text: mark === "'" ? "′" : mark });
+    }
+    return row(items);
+  }
+
+  /**
+   * An item with its scripts: on a run's last letter (`πr^2`, `4ac^2`), or its trailing digits.
+   */
+  function scriptedItems(item: MathNode): MathNode[] {
+    if (peek() !== "_" && peek() !== "^") return [item];
+    if (item.kind === "text" && !item.plain && [...item.text].length > 1) {
+      const chars = [...item.text];
+      const digits = /\d+$/.exec(item.text)?.[0] ?? "";
+      const tail = digits && digits !== item.text ? digits : (chars.at(-1) as string);
+      const head = item.text.slice(0, item.text.length - tail.length);
+      if (head) return [{ kind: "text", text: head }, scripted({ kind: "text", text: tail })];
+    }
+    return [scripted(item)];
+  }
+
+  /** Subscripts and superscripts after `base`; a second of a kind nests (`x^2^3`). */
   function scripted(base: MathNode): MathNode {
     let sub: MathNode | null = null;
     let sup: MathNode | null = null;
     while (peek() === "_" || peek() === "^") {
       const mark = next();
-      const value = operand();
+      if ((mark === "_" && sub) || (mark === "^" && sup)) {
+        // The script already there takes this one: x^2^3 is x^(2^3).
+        const nested = scriptOn((mark === "_" ? sub : sup) as MathNode, mark, postfix(operand()));
+        if (mark === "_") sub = nested;
+        else sup = nested;
+        continue;
+      }
+      const value = postfix(operand());
       if (mark === "_") sub = value;
       else sup = value;
     }
     return sub || sup ? { kind: "script", base, sub, sup } : base;
   }
+  const scriptOn = (base: MathNode, mark: string, value: MathNode): MathNode => ({
+    kind: "script",
+    base,
+    sub: mark === "_" ? value : null,
+    sup: mark === "^" ? value : null,
+  });
 
   /** An operator's argument: a bracketed group without its brackets, or one primary. */
   function operand(): MathNode {
     while (peek() === " ") next();
     const token = peek();
-    if (token === "(" || token === "〖") {
+    if (token === "〖") {
       next();
-      const inner = sequence(new Set([OPEN[token] as string]));
+      const inner = sequence(new Set(["〗"]));
       next();
       return row(inner);
     }
+    if (token === "(") return unwrap(primary() as MathNode);
     return primary() ?? { kind: "row", items: [] };
   }
 
-  function primary(): MathNode | null {
-    const token = next();
-    if (token === undefined) return null;
-    if (token in OPEN) {
-      const close = OPEN[token] as string;
-      const inner = sequence(new Set([close, "¦", "┤"]));
-      if (peek() === "¦") {
-        next();
-        const den = sequence(new Set([close, "┤"]));
-        next();
-        return {
-          kind: "delim",
-          open: token,
-          close,
-          items: [{ kind: "frac", num: row(inner), den: row(den), bar: false }],
-        };
-      }
-      const end = next() ?? close;
-      if (token === "〖") return row(inner);
-      return {
-        kind: "delim",
-        open: token === "├" ? "" : token,
-        close: end === "┤" ? "" : end,
-        items: inner,
-      };
+  /** The parts of a bracket's content up to any closing bracket, and the one that closed it. */
+  function group(open: string): { parts: MathNode[][]; close: string; binomial: MathNode | null } {
+    const stops = new Set([...CLOSE, "¦", ...SEPARATORS]);
+    const parts: MathNode[][] = [sequence(stops)];
+    let binomial: MathNode | null = null;
+    while (SEPARATORS.has(peek() as string) || peek() === "¦") {
+      if (next() === "¦") {
+        const den = sequence(new Set([...CLOSE, ...SEPARATORS]));
+        binomial = { kind: "frac", num: row(parts.pop() as MathNode[]), den: row(den), bar: false };
+        parts.push([binomial]);
+      } else parts.push(sequence(stops));
     }
-    if (token === "|" || token === "‖") {
-      const inner = sequence(new Set([token]));
-      next();
-      return { kind: "delim", open: token, close: token, items: inner };
-    }
-    if (token === "√" || token === "∛" || token === "∜") {
-      if (token === "√" && peek() === "(") {
-        // √(n&x): a degree before `&`.
-        next();
-        const first = sequence(new Set([")", "&"]));
-        if (peek() === "&") {
-          next();
-          const e = sequence(new Set([")"]));
-          next();
-          return { kind: "rad", deg: row(first), e: row(e) };
-        }
-        next();
-        return { kind: "rad", deg: null, e: row(first) };
-      }
-      const e = operand();
-      const deg = token === "∛" ? "3" : token === "∜" ? "4" : null;
-      return { kind: "rad", deg: deg ? { kind: "text", text: deg } : null, e };
-    }
-    if (NARY.has(token)) {
-      let sub: MathNode | null = null;
-      let sup: MathNode | null = null;
-      while (peek() === "_" || peek() === "^") {
-        const mark = next();
-        const value = operand();
-        if (mark === "_") sub = value;
-        else sup = value;
-      }
-      if (peek() === "▒") next();
-      return { kind: "nary", chr: token, sub, sup, e: scripted(operand()) };
-    }
-    if (token === "■" || token === "█") {
-      // ■(a&b@c&d): rows by @, cells by &.
-      if (peek() !== "(") return { kind: "text", text: token };
-      next();
-      const rows: MathNode[][] = [[]];
-      for (;;) {
-        const cell = sequence(new Set(["&", "@", ")"]));
-        (rows[rows.length - 1] as MathNode[]).push(row(cell));
-        const sep = next();
-        if (sep === "@") rows.push([]);
-        else if (sep !== "&") break;
-      }
-      return { kind: "matrix", rows };
-    }
-    if (FUNCTIONS.has(token)) {
-      let under: MathNode | null = null;
-      let sup: MathNode | null = null;
-      while (peek() === "_" || peek() === "^") {
-        const mark = next();
-        const value = operand();
-        if (mark === "_") under = value;
-        else sup = value;
-      }
-      if (peek() === "⁡") next();
-      const e = scripted(operand());
-      // sin^2⁡θ: the power on the name; lim_(n→∞): the limit under it (Word's `m:limLow`).
-      return { kind: "func", name: token, under: UNDER.has(token) ? under : null, sup, e };
-    }
-    if (token === "⁡") return null;
-    return { kind: "text", text: token };
+    // Any closing bracket ends it (`[0,1)`); none at the end of the text: its own.
+    const close = CLOSE.has(peek() as string) ? (next() as string) : (OPEN[open] as string);
+    return { parts, close, binomial };
   }
 
-  const items = sequence(new Set());
-  const math = `<m:oMath>${joined(items)}</m:oMath>`;
-  return display ? `<m:oMathPara>${math}</m:oMathPara>` : math;
+  function primary(): MathNode | null {
+    return deeper(() => {
+      const token = next();
+      if (token === undefined) return null;
+      if (token in OPEN) {
+        const { parts, close } = group(token);
+        if (token === "〖") return row(parts.flat());
+        return {
+          kind: "delim",
+          open: token === "├" ? "" : token,
+          close: close === "┤" ? "" : close,
+          parts,
+        };
+      }
+      if (token === "|" || token === "‖") {
+        const inner = sequence(new Set([token]));
+        next();
+        return { kind: "delim", open: token, close: token, parts: [inner] };
+      }
+      if (token === "√" || token === "∛" || token === "∜") {
+        if (token === "√" && peek() === "(") {
+          // √(n&x): a degree before `&`.
+          next();
+          const first = sequence(new Set([")", "&"]));
+          if (peek() === "&") {
+            next();
+            const e = sequence(new Set([")"]));
+            next();
+            return { kind: "rad", deg: row(first), e: row(e) };
+          }
+          next();
+          return { kind: "rad", deg: null, e: row(first) };
+        }
+        const e = operand();
+        const deg = token === "∛" ? "3" : token === "∜" ? "4" : null;
+        return { kind: "rad", deg: deg ? { kind: "text", text: deg } : null, e };
+      }
+      if (NARY.has(token)) {
+        let sub: MathNode | null = null;
+        let sup: MathNode | null = null;
+        while (peek() === "_" || peek() === "^") {
+          const mark = next();
+          const value = operand();
+          if (mark === "_") sub = value;
+          else sup = value;
+        }
+        if (peek() === "▒") next();
+        return { kind: "nary", chr: token, sub, sup, e: scripted(operand()) };
+      }
+      if (token === "■" || token === "█") {
+        // ■(a&b@c&d): rows by @, cells by &.
+        if (peek() !== "(") return { kind: "text", text: token };
+        next();
+        const rows: MathNode[][] = [[]];
+        for (;;) {
+          const cell = sequence(new Set(["&", "@", ")"]));
+          (rows[rows.length - 1] as MathNode[]).push(row(cell));
+          const sep = next();
+          if (sep === "@") rows.push([]);
+          else if (sep !== "&") break;
+        }
+        return { kind: "matrix", rows };
+      }
+      if (FUNCTIONS.has(token)) {
+        let sub: MathNode | null = null;
+        let sup: MathNode | null = null;
+        while (peek() === "_" || peek() === "^") {
+          const mark = next();
+          const value = operand();
+          if (mark === "_") sub = value;
+          else sup = value;
+        }
+        if (peek() === "⁡") next();
+        const e = scripted(operand());
+        // lim_(n→∞): the limit under it (Word's `m:limLow`); log_2, sin^2: scripts on the name.
+        const under = UNDER.has(token) ? sub : null;
+        return { kind: "func", name: token, under, sub: under ? null : sub, sup, e };
+      }
+      if (token === "⁡") return null;
+      return { kind: "text", text: token };
+    });
+  }
+
+  return sequence(new Set());
 }
 
 /** Tokens: alphanumeric runs (a function's name alone), `\name` symbols, single characters. */
@@ -383,15 +476,21 @@ function omml(node: MathNode): string {
         node.open === "(" ? "" : `<m:begChr m:val="${escapeXml(node.open)}"/>`,
         node.close === ")" ? "" : `<m:endChr m:val="${escapeXml(node.close)}"/>`,
       ].join("");
-      return `<m:d>${props ? `<m:dPr>${props}</m:dPr>` : ""}${arg("e", row(node.items))}</m:d>`;
+      const parts = node.parts.map((part) => `<m:e>${joined(part)}</m:e>`).join("");
+      return `<m:d>${props ? `<m:dPr>${props}</m:dPr>` : ""}${parts}</m:d>`;
     }
     case "func": {
       const name = run(node.name, true);
+      const e = `<m:e>${name}</m:e>`;
       const fName = node.under
-        ? `<m:limLow><m:e>${name}</m:e>${arg("lim", node.under)}</m:limLow>`
-        : node.sup
-          ? `<m:sSup><m:e>${name}</m:e>${arg("sup", node.sup)}</m:sSup>`
-          : name;
+        ? `<m:limLow>${e}${arg("lim", node.under)}</m:limLow>`
+        : node.sub && node.sup
+          ? `<m:sSubSup>${e}${arg("sub", node.sub)}${arg("sup", node.sup)}</m:sSubSup>`
+          : node.sub
+            ? `<m:sSub>${e}${arg("sub", node.sub)}</m:sSub>`
+            : node.sup
+              ? `<m:sSup>${e}${arg("sup", node.sup)}</m:sSup>`
+              : name;
       return `<m:func><m:fName>${fName}</m:fName>${arg("e", node.e)}</m:func>`;
     }
     case "matrix":
@@ -418,7 +517,8 @@ const on = (element: Element, pr: string, name: string) => {
 
 /** Whether `text` stands as one operand without brackets. */
 const simple = (text: string) =>
-  /^[\p{L}\p{N}.]*$/u.test(text) && text.length > 0
+  // A run, its postfix marks with it (`1!`).
+  /^[\p{L}\p{N}.]+[!′″]*$/u.test(text)
     ? true
     : [...text].length === 1 || (/^[([{|〖├].*[)\]}|〗┤]$/u.test(text) && balanced(text));
 function balanced(text: string): boolean {
@@ -433,7 +533,7 @@ function balanced(text: string): boolean {
   return depth === 0;
 }
 /** What binds tighter than a fraction's `/` in the linear form. */
-const TIGHT = new Set(["sSup", "sSub", "sSubSup", "rad", "d", "m"]);
+const TIGHT = new Set(["sSup", "sSub", "sSubSup", "rad", "m"]);
 const wrap = (text: string) => (simple(text) ? text : `(${text})`);
 
 /**
@@ -463,7 +563,8 @@ function writeLinear(omml: Element): string {
       if (
         /[\p{L}\p{N}.)\]}]$/u.test(out) &&
         /^[\p{L}\p{N}.]/u.test(piece) &&
-        (structural(last) || structural(child))
+        // After a script or other structure; before one, its base is the run's last letter.
+        structural(last)
       )
         out += " ";
       out += piece;
@@ -516,7 +617,8 @@ function writeLinear(omml: Element): string {
       case "d": {
         const begin = prop(element, "dPr", "begChr") ?? "(";
         const end = prop(element, "dPr", "endChr") ?? ")";
-        const separator = prop(element, "dPr", "sepChr") ?? "|";
+        // Word's linear format separates a delimiter's parts with `│`, whatever it draws.
+        const separator = "│";
         const parts = [...element.children]
           .filter((c) => c.localName === "e")
           .map((e) => content(e));

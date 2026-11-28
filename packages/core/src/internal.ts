@@ -4,6 +4,8 @@
 // version (exact peer dependencies), so they always run with the core they were built with.
 
 export { isCommentOnly, resolvedCommentIds } from "./state/comments.js";
+// Word's equations (35.5): their characters, as find and the agent read them.
+export { equationText } from "./state/find.js";
 export { ID_SPACE, idSlotPlugin } from "./state/ids.js";
 export {
   CommentStep,

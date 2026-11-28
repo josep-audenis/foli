@@ -1056,7 +1056,7 @@ it is. `insertEquation(xml)` puts one at the selection (selected after) and `set
 xml)` changes one, one undo step each, refused while tracking; `selectedEquation(state)` and
 `isDisplayEquation(xml)`. `@folijs/view` reads and writes an equation's linear form, Word's
 UnicodeMath: `unicodeMathToOmml(text, display = true)`, `ommlToUnicodeMath(xml, doc?)`, and
-`equationElement(xml, doc?)` (its MathML). `toolbarItems.equation` is Insert ▸ Equation: Word's
+`equationElement(xml, doc?)` (its MathML); `unicodeMathToOmml` throws `LinearFormError` for input nested deeper than an equation is. `toolbarItems.equation` is Insert ▸ Equation: Word's
 gallery, Insert New Equation… and Edit Equation… (the `"equation"` dialog: the linear form, the
 equation as it will show, Display).
 

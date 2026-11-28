@@ -4924,7 +4924,9 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   Equation (Insert ▸ Symbols): Word's nine gallery equations, Insert New Equation… and Edit
   Equation…, the Equation dialog (the linear form, the equation drawn as it will show,
   Display). Word 16 opens Foli's file with its new equations (the nine and a typed inline one)
-  as ten equations (`OMaths`, the inline one inline) and linearizes each to the same structure.
+  as ten equations (`OMaths`, the inline one inline); their OMML's structure is checked against
+  Word's (the corpus's quadratic formula; binomials, factorials, scripts on a run's last
+  letter, as Word builds them up).
   `equations.test.ts` (core), `unicodemath.test.ts` (view), `insert.test.tsx`,
   `word-equations.spec.ts` (gallery, typed, edited, saved; axe; three engines).
 - [ ] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34

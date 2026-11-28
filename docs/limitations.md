@@ -990,5 +990,7 @@ Details in the [package README](../packages/docx/README.md).
   brackets and the common `\name` symbols; accents, bars, boxes, equation arrays and text in
   quotes are not read from it, and an equation holding them is written back as its linear form
   shows it. An edited equation loses its runs' own formatting and Word's run properties
-  (written anew in Cambria Math). Equations are not inserted or edited while tracking changes.
+  (written anew in Cambria Math), the spaces in its runs, and a delimiter's own separator
+  character (written as Word's default). Equations are not inserted or edited while tracking
+  changes; deleting or pasting one while tracking marks it whole (Word tracks its runs).
   Insert ▸ Equation has Word's nine gallery equations, not its Office.com ones or saved ones.
