@@ -118,9 +118,9 @@ The view adds print rules for each editor: one sheet per page at its section's p
 toolbar's dialogs, the outline, the comments pane, the status bar, the right-click menu and the
 mini toolbar in print.
 
-Everything else on your web page prints too, and anything before or after the pages, even an
-empty wrapper (the one holding a ruler or status bar the stylesheet hides), adds sheets. Hide
-it:
+Everything else on your web page prints too, and anything before the pages adds sheets. Where
+sections differ in size (named pages), so does anything after them, even an empty wrapper (one
+holding a ruler or status bar the stylesheet hides). Hide it:
 
 ```css
 @media print {
