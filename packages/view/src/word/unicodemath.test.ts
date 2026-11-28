@@ -102,5 +102,15 @@ describe("the linear form's structure, as Word builds it up (35.5 review)", () =
   it("refuses input nested deeper than an equation is", () => {
     expect(() => unicodeMathToOmml("(".repeat(5000))).toThrow(LinearFormError);
     expect(() => unicodeMathToOmml("√".repeat(5000))).toThrow(LinearFormError);
+    expect(() => unicodeMathToOmml("x^".repeat(6000))).toThrow(LinearFormError);
+    expect(() => unicodeMathToOmml("a/".repeat(6000))).toThrow(LinearFormError);
+  });
+
+  it("keeps brackets the user typed around a whole argument", () => {
+    for (const form of ["((a+b))/c", "x^((a+b))", "√((a+b))", "sin⁡((x+y))"]) {
+      const back = ommlToUnicodeMath(unicodeMathToOmml(form, false));
+      expect(unicodeMathToOmml(back, false), form).toBe(unicodeMathToOmml(form, false));
+      expect(unicodeMathToOmml(form, false), form).toContain("<m:d>");
+    }
   });
 });

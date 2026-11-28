@@ -175,6 +175,7 @@ function read(source: string): MathNode[] {
   function sequence(stops: ReadonlySet<string>): MathNode[] {
     return deeper(() => {
       const items: MathNode[] = [];
+      let fractions = 0;
       while (at < tokens.length && !stops.has(peek() as string)) {
         const token = peek() as string;
         if (token === " ") {
@@ -183,8 +184,11 @@ function read(source: string): MathNode[] {
         }
         if (token === "/" && items.length) {
           next();
+          // a/b/c… nests each fraction in the next one's numerator.
+          if (++fractions > MAX_DEPTH)
+            throw new LinearFormError("The equation is nested too deeply");
           const num = unwrap(items.pop() as MathNode);
-          const den = postfix(scripted(operand()));
+          const den = deeper(() => postfix(scripted(operand())));
           items.push({ kind: "frac", num, den, bar: true });
           continue;
         }
@@ -233,11 +237,16 @@ function read(source: string): MathNode[] {
 
   /** Subscripts and superscripts after `base`; a second of a kind nests (`x^2^3`). */
   function scripted(base: MathNode): MathNode {
+    return deeper(() => scriptedNow(base));
+  }
+  function scriptedNow(base: MathNode): MathNode {
+    let nests = 0;
     let sub: MathNode | null = null;
     let sup: MathNode | null = null;
     while (peek() === "_" || peek() === "^") {
       const mark = next();
       if ((mark === "_" && sub) || (mark === "^" && sup)) {
+        if (++nests > MAX_DEPTH) throw new LinearFormError("The equation is nested too deeply");
         // The script already there takes this one: x^2^3 is x^(2^3).
         const nested = scriptOn((mark === "_" ? sub : sup) as MathNode, mark, postfix(operand()));
         if (mark === "_") sub = nested;
@@ -552,6 +561,21 @@ export function equationElement(xml: string, doc: Document = document): Element 
 }
 
 function writeLinear(omml: Element): string {
+  /**
+   * An operator's argument (a script, a fraction's side, a root's or function's argument): its
+   * form, in brackets where it needs them; brackets of its own when it is only a bracketed
+   * group, since the reader takes one pair as the argument's.
+   */
+  const argument = (element: Element, name: string): string => {
+    const part = kid(element, name);
+    const text = content(part);
+    const kids = [...(part?.children ?? [])].filter((c) => !c.localName.endsWith("Pr"));
+    const only = kids.length === 1 ? (kids[0] as Element) : null;
+    const binomial = only && /^\(.*¦.*\)$/s.test(text);
+    if (only?.localName === "d" && (prop(only, "dPr", "begChr") ?? "(") === "(" && !binomial)
+      return `(${text})`;
+    return wrap(text);
+  };
   /** Its children's forms, a space where two would read as one operand (`x^k a`, `a_n cos`). */
   const content = (element: Element | null): string => {
     let out = "";
@@ -590,29 +614,31 @@ function writeLinear(omml: Element): string {
             (c) => !c.localName.endsWith("Pr"),
           );
           const lone = kids.length === 1 && TIGHT.has((kids[0] as Element).localName);
-          return lone ? part : wrap(part);
+          return lone ? part : argument(element, name);
         };
         if (type === "lin") return `${side(num, "num")}∕${side(den, "den")}`;
         return `${side(num, "num")}/${side(den, "den")}`;
       }
       case "sSup":
-        return `${wrap(content(kid(element, "e")))}^${wrap(content(kid(element, "sup")))}`;
+        return `${wrap(content(kid(element, "e")))}^${argument(element, "sup")}`;
       case "sSub":
-        return `${wrap(content(kid(element, "e")))}_${wrap(content(kid(element, "sub")))}`;
+        return `${wrap(content(kid(element, "e")))}_${argument(element, "sub")}`;
       case "sSubSup":
-        return `${wrap(content(kid(element, "e")))}_${wrap(content(kid(element, "sub")))}^${wrap(content(kid(element, "sup")))}`;
+        return `${wrap(content(kid(element, "e")))}_${argument(element, "sub")}^${argument(element, "sup")}`;
       case "sPre":
         return `〖_${wrap(content(kid(element, "sub")))}^${wrap(content(kid(element, "sup")))}〗${wrap(content(kid(element, "e")))}`;
       case "rad": {
         const deg = content(kid(element, "deg"));
         const e = content(kid(element, "e"));
-        return deg && !on(element, "radPr", "degHide") ? `√(${deg}&${e})` : `√${wrap(e)}`;
+        return deg && !on(element, "radPr", "degHide")
+          ? `√(${deg}&${e})`
+          : `√${argument(element, "e")}`;
       }
       case "nary": {
         const chr = prop(element, "naryPr", "chr") ?? "∫";
         const sub = on(element, "naryPr", "subHide") ? "" : content(kid(element, "sub"));
         const sup = on(element, "naryPr", "supHide") ? "" : content(kid(element, "sup"));
-        return `${chr}${sub ? `_${wrap(sub)}` : ""}${sup ? `^${wrap(sup)}` : ""}▒${wrap(content(kid(element, "e")))}`;
+        return `${chr}${sub ? `_${argument(element, "sub")}` : ""}${sup ? `^${argument(element, "sup")}` : ""}▒${argument(element, "e")}`;
       }
       case "d": {
         const begin = prop(element, "dPr", "begChr") ?? "(";
@@ -625,7 +651,7 @@ function writeLinear(omml: Element): string {
         return `${begin || "├"}${parts.join(separator)}${end || "┤"}`;
       }
       case "func":
-        return `${content(kid(element, "fName"))}⁡${wrap(content(kid(element, "e")))}`;
+        return `${content(kid(element, "fName"))}⁡${argument(element, "e")}`;
       case "limLow":
         return `${content(kid(element, "e"))}_${wrap(content(kid(element, "lim")))}`;
       case "limUpp":

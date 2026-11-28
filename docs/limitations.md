@@ -992,5 +992,9 @@ Details in the [package README](../packages/docx/README.md).
   shows it. An edited equation loses its runs' own formatting and Word's run properties
   (written anew in Cambria Math), the spaces in its runs, and a delimiter's own separator
   character (written as Word's default). Equations are not inserted or edited while tracking
-  changes; deleting or pasting one while tracking marks it whole (Word tracks its runs).
+  changes; deleting or pasting one while tracking marks it whole (Word tracks its runs). In the
+  linear form, a binomial under a root (`√(n¦k)`) is read as text, a postfix mark before `/`
+  (`a!/b!`) is not taken into the numerator, a script after a prime (`x'^2`) goes on the prime,
+  an ASCII `|` inside brackets starts an absolute value (Word's separator is `│`), and an
+  unclosed bracket is closed at the end.
   Insert ▸ Equation has Word's nine gallery equations, not its Office.com ones or saved ones.

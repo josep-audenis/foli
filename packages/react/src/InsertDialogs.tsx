@@ -1022,9 +1022,13 @@ export function EquationDialog({
   const id = useId();
   const [selected] = useState(() => selectedEquation(editor.state));
   const doc = typeof document === "undefined" ? null : document;
-  const [initial] = useState(() =>
-    selected && doc ? ommlToUnicodeMath(String(selected.node.attrs.xml), doc) : "",
-  );
+  const [initial] = useState(() => {
+    try {
+      return selected && doc ? ommlToUnicodeMath(String(selected.node.attrs.xml), doc) : "";
+    } catch {
+      return "";
+    }
+  });
   const [linear, setLinear] = useState(initial);
   const [display, setDisplay] = useState(() =>
     selected ? isDisplayEquation(String(selected.node.attrs.xml)) : displayHere(editor.state),
