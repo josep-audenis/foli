@@ -186,12 +186,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * View raised again in 34.4 (150.1 kB; 156.0 allowed): drawing shapes by dragging (34.3), a
  * selected shape's move, turn and adjustment handles, the arrow keys' nudge and typing into a
  * shape.
+ * React and FoliEditor raised in 35.1 (252.5 and 248.3 kB; 264.0 and 264.0 allowed): the Symbol
+ * menu and dialog (24 Unicode subsets, Special Characters), with room for Phase 35's Date and
+ * Time, Caption, Table of Figures, Equation and Cover Page.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 110_592 },
   { name: "@folijs/view", entry: dist("view"), budget: 159_744 },
-  { name: "@folijs/react", entry: dist("react"), budget: 258_048 },
-  { name: "FoliEditor only", entry: appEntry, budget: 258_048 },
+  { name: "@folijs/react", entry: dist("react"), budget: 270_336 },
+  { name: "FoliEditor only", entry: appEntry, budget: 270_336 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 86_016 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 23_040 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 110_592 },
