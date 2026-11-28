@@ -7,7 +7,7 @@
 
 const MATHML = "http://www.w3.org/1998/Math/MathML";
 
-/** Word's math font, then the platform's (`math`, CSS Fonts 4). */
+/** Word's math font, then the platform's (`math`, CSS Fonts 4). @internal */
 export const MATH_FONT = '"Cambria Math", "STIX Two Math", math';
 
 /** OMML's children of `element` with local name `name`. */
@@ -36,6 +36,7 @@ const OPERATOR = /[+\-−±∓×÷·∙=≠≈≡≤≥<>∝∼≪≫⊂⊃⊆�
 /**
  * Builds the MathML of an OMML `m:oMath` or `m:oMathPara` (null for anything else). `display`
  * comes from `m:oMathPara` (Word's display equation, on a line of its own) unless given.
+ * @internal
  */
 export function mathElement(omml: Element, doc: Document): Element | null {
   const name = omml.localName;
@@ -224,7 +225,7 @@ export function mathElement(omml: Element, doc: Document): Element | null {
   return math;
 }
 
-/** An equation's characters (its runs' text, structure left out): for find and its `alttext`. */
+/** An equation's characters (its runs' text, structure left out): for find and its `alttext`. @internal */
 export function mathText(omml: Element): string {
   let out = "";
   for (const t of omml.getElementsByTagName("*"))
@@ -232,6 +233,6 @@ export function mathText(omml: Element): string {
   return out;
 }
 
-/** Whether opaque XML is one of Word's equations. */
+/** Whether opaque XML is one of Word's equations. @internal */
 export const isMath = (element: Element | null): element is Element =>
   element?.localName === "oMath" || element?.localName === "oMathPara";
