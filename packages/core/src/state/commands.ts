@@ -156,6 +156,7 @@ export function insertSymbol(text: string, font?: string | null): Command {
               ...own?.attrs,
               ascii: font,
               hAnsi: font,
+              hint: null,
               asciiTheme: null,
               hAnsiTheme: null,
             };

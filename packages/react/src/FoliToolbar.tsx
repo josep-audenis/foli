@@ -48,6 +48,7 @@ import {
   insertRow,
   insertSectionBreak,
   insertShape,
+  insertSymbol,
   insertTable,
   insertTableOfContents,
   insertTextBox,
@@ -654,6 +655,8 @@ interface Action extends ToolbarAction {
   dialog?: Exclude<ToolbarDialogName, "link" | "picture">;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
+  /** Drawn in this font, which its name also says (a recent symbol's). */
+  font?: string | undefined;
 }
 
 /** Office's default theme (2023) for a document without one: its colors as `RRGGBB`. */
@@ -2643,18 +2646,19 @@ const RIBBON_ITEMS: readonly Item[] = [
     key: "symbol",
     label: "Symbol",
     text: "Symbol",
-    enabled: (state) => isWord(state) && insertPageBreak(state),
+    enabled: (state) => isWord(state) && insertSymbol(" ")(state),
     columns: 10,
     actions: () => [
       ...recentSymbols().map((symbol) => ({
         key: `symbol-${symbol.font ?? ""}-${symbol.text}`,
         label: symbol.text,
+        font: symbol.font ?? undefined,
         command: symbolCommand(symbol),
       })),
       {
         key: "moreSymbols",
         label: "More Symbols…",
-        command: (state) => isWord(state) && insertPageBreak(state),
+        command: (state) => isWord(state) && insertSymbol(" ")(state),
         dialog: "symbol",
       },
     ],
@@ -3396,7 +3400,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   watermark: isWord,
   bordersShading: (state) => paragraphBordersAt(state) !== null,
   lineNumbers: (state) => sectionAt(state) !== null,
-  symbol: (state) => isWord(state) && insertPageBreak(state),
+  symbol: (state) => isWord(state) && insertSymbol(" ")(state),
   layout: (state) => objectLayoutEnabled(state),
   layoutWrapping: (state) => objectLayoutEnabled(state),
   layoutSize: (state) => objectLayoutEnabled(state),
@@ -5763,6 +5767,13 @@ function ActionMenu({
             "aria-disabled": enabled[i] ? undefined : true,
             tabIndex: -1,
             className: "foli-menu-item",
+            ...(action.font
+              ? {
+                  style: { fontFamily: `"${action.font}"` },
+                  title: action.font,
+                  "aria-label": `${action.label} ${action.font}`,
+                }
+              : {}),
             onMouseDown: (event: MouseEvent) => event.preventDefault(),
             onClick: (event: MouseEvent) => {
               if (enabled[i]) onPick(action, event.detail > 0);

@@ -102,7 +102,7 @@ const keyText = (keys: string) =>
 
 /**
  * Word's Special Characters, in its order, with the keys Foli types them on (the base keymap's;
- * none where the browser keeps the key: Ctrl+Num - and Ctrl+- zoom out).
+ * none where the key is left to the browser: Ctrl+Num - and Ctrl+- zoom out).
  */
 const SPECIAL_CHARACTERS = [
   { char: "—", name: "Em Dash", keys: "Alt+Ctrl+Num -" },
@@ -263,7 +263,6 @@ export function SymbolDialog({
       <div
         role="listbox"
         aria-label={t("Symbols")}
-        aria-orientation="horizontal"
         className="foli-symbol-grid"
         style={{ ...fontStyle, gridTemplateColumns: `repeat(${GRID_COLUMNS}, 1fr)` }}
         onKeyDown={onGridKey}
@@ -277,7 +276,7 @@ export function SymbolDialog({
             }}
             role="option"
             aria-selected={i === at}
-            aria-label={`U+${hex(char)}`}
+            aria-label={`${char} U+${hex(char)}`}
             tabIndex={i === at ? 0 : -1}
             className="foli-symbol-cell"
             onClick={() => choose(char)}
@@ -294,7 +293,7 @@ export function SymbolDialog({
             key={`${symbol.font ?? ""}/${symbol.text}`}
             type="button"
             className="foli-symbol-cell"
-            aria-label={`U+${hex(symbol.text)}${symbol.font ? ` ${symbol.font}` : ""}`}
+            aria-label={`${symbol.text} U+${hex(symbol.text)}${symbol.font ? ` ${symbol.font}` : ""}`}
             title={symbol.font ?? undefined}
             style={symbol.font ? { fontFamily: `"${symbol.font}"` } : undefined}
             onClick={() => {

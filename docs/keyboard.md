@@ -20,8 +20,10 @@ as a US keyboard types them, whatever the layout types there: `Mod-=`, `Mod-Shif
 
 Option on macOS and AltGr (Ctrl+Alt) on Windows type characters on many layouts (`@`, `[`, `€`,
 accented letters): an app should not bind `Alt-` plus a letter or digit, nor `Mod-Alt-` plus one,
-or those users cannot type the character. The built-in `Mod-Alt-f`, `Mod-Alt-d`, `Mod-Alt-c`, `Mod-Alt-r`, `Mod-Alt-t` and `Alt-Shift-n`
-are Word's; AltGr characters pass them by.
+or those users cannot type the character. The built-in `Mod-Alt-f`, `Mod-Alt-d`, `Mod-Alt-c`,
+`Mod-Alt-r`, `Mod-Alt-t` and `Alt-Shift-n` are Word's; AltGr characters pass them by. Some are
+the system's or the browser's first on some machines: Cmd+Option+C (Chrome's Inspect element),
+Cmd+Option+R (Safari's reload) and Ctrl+Alt+T (a terminal on GNOME).
 
 | Name          | Windows and Linux         | macOS                                                       |
 | ------------- | ------------------------- | ----------------------------------------------------------- |

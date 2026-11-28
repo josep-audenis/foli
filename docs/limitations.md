@@ -937,6 +937,13 @@ Details in the [package README](../packages/docx/README.md).
 - A file whose `w:background` Word hides (no `w:displayBackgroundShape` in its settings) shows
   the color in Foli; its settings stay as they are unless the color is changed.
 
+- The docs site's search matches headings and API names, not body text. The API pages show
+  each declaration's `.d.ts` text; code is not highlighted.
+- The guides' TypeScript samples are compiled and mostly run by `pnpm test`; their CSS samples
+  are not checked, beyond the variable names existing.
+- Benchmarks run by hand on the owner's machine against its baseline (`pnpm bench`), not in a
+  hosted CI; the browser ones run on the dev server.
+
 ## Insert extras (Phase 35)
 
 - Insert ▸ Symbol inserts a character of a font as text in that font (`w:rFonts`), as Word does
@@ -945,11 +952,6 @@ Details in the [package README](../packages/docx/README.md).
   `w:sym` stays opaque. The fonts are the font box's. The recent symbols are kept while the page
   is open, not across visits (Word keeps them in the user's settings). En Dash, Optional Hyphen
   and the other special characters without a key in the dialog have none in Foli: Word's
-  Ctrl+Num - and Ctrl+- are the browser's zoom out.
-
-- The docs site's search matches headings and API names, not body text. The API pages show
-  each declaration's `.d.ts` text; code is not highlighted.
-- The guides' TypeScript samples are compiled and mostly run by `pnpm test`; their CSS samples
-  are not checked, beyond the variable names existing.
-- Benchmarks run by hand on the owner's machine against its baseline (`pnpm bench`), not in a
-  hosted CI; the browser ones run on the dev server.
+  Ctrl+Num - and Ctrl+- are left to the browser (zoom out). A character code outside the
+  dialog's 24 subsets is not taken (Word takes any code of the font). A recent symbol inserted in
+  a font shows in that font in the menu; its font is in its name.
