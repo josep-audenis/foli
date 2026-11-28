@@ -115,7 +115,7 @@ const pad = (n: number, size = 2) => String(n).padStart(size, "0");
 const names = new Map<string, readonly string[][]>();
 /** A language's month and day names, long and short (`Intl`'s, standalone); English without one. */
 function namesOf(locale: string | undefined): readonly string[][] {
-  if (!locale || /^en/i.test(locale)) return [MONTHS, DAYS];
+  if (!locale || /^en(-|$)/i.test(locale)) return [MONTHS, DAYS];
   let found = names.get(locale);
   if (!found) {
     try {
@@ -147,18 +147,17 @@ function namesOf(locale: string | undefined): readonly string[][] {
  * it; read it when the model keeps a run's language.
  */
 export function formatDatePicture(date: Date, picture: string, locale?: string): string {
-  const [months, days, shortMonths, shortDays] = namesOf(locale) as string[][];
+  const [months = MONTHS, days = DAYS, shortMonths, shortDays] = namesOf(locale);
   const hours12 = date.getHours() % 12 || 12;
   const parts: Record<string, string> = {
     d: String(date.getDate()),
     dd: pad(date.getDate()),
-    ddd: (shortDays?.[date.getDay()] ?? (days?.[date.getDay()] as string).slice(0, 3)) as string,
-    dddd: days?.[date.getDay()] as string,
+    ddd: shortDays?.[date.getDay()] ?? (days[date.getDay()] as string).slice(0, 3),
+    dddd: days[date.getDay()] as string,
     M: String(date.getMonth() + 1),
     MM: pad(date.getMonth() + 1),
-    MMM: (shortMonths?.[date.getMonth()] ??
-      (months?.[date.getMonth()] as string).slice(0, 3)) as string,
-    MMMM: months?.[date.getMonth()] as string,
+    MMM: shortMonths?.[date.getMonth()] ?? (months[date.getMonth()] as string).slice(0, 3),
+    MMMM: months[date.getMonth()] as string,
     yy: pad(date.getFullYear() % 100),
     yyyy: String(date.getFullYear()),
     h: String(hours12),
