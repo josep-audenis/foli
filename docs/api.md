@@ -1030,7 +1030,9 @@ font, a Unicode subset and its characters, the recent ones, the character code i
 Special Characters with their keys; Insert keeps it open, as Word's.
 
 Date and time (35.2): `formatDatePicture(date, picture, locale?)` writes a date in a Word date
-picture with month and day names in `locale` (English without one). `toolbarItems.dateTime` is
+picture with month and day names in `locale` (English without one, or for a language the
+platform has no names for); `insertField`'s and `insertDate`'s `locale` option names an inserted
+`DATE` or `TIME` result so. `toolbarItems.dateTime` is
 Insert ▸ Date & Time, Word's Date and Time dialog (`"dateTime"`): a language, its formats shown
 for now (Word 16's own for English (United States); the language's own, CLDR's through `Intl`,
 for the others), and Update automatically (a `DATE` field in that picture, `insertDate`) or the

@@ -116,6 +116,12 @@ const names = new Map<string, readonly string[][]>();
 /** A language's month and day names, long and short (`Intl`'s, standalone); English without one. */
 function namesOf(locale: string | undefined): readonly string[][] {
   if (!locale || /^en(-|$)/i.test(locale)) return [MONTHS, DAYS];
+  // A tag the platform has no data for would name in its default language: English instead.
+  try {
+    if (!Intl.DateTimeFormat.supportedLocalesOf(locale).length) return [MONTHS, DAYS];
+  } catch {
+    return [MONTHS, DAYS];
+  }
   let found = names.get(locale);
   if (!found) {
     try {
@@ -351,6 +357,8 @@ export interface UpdateFieldsOptions {
   data?: Readonly<Record<string, unknown>> | undefined;
   /** What `DATE` and `TIME` show (default: now). */
   now?: Date | undefined;
+  /** The language `DATE` and `TIME` name months and days in (a BCP 47 tag; default English). */
+  locale?: string | undefined;
   /**
    * Which fields: those a range of this editor's tree touches (a caret: the field around it, a
    * table of contents for a page number in it), or those a function picks. Default: every field
@@ -903,7 +911,7 @@ function work(run: Run, field: Field, sequence: Map<Field, number>): Worked | nu
     case "DATE":
     case "TIME": {
       const picture = switches.get("@")?.[0] ?? (name === "DATE" ? "M/d/yyyy" : "h:mm AM/PM");
-      return done(formatDatePicture(run.options.now ?? new Date(), picture));
+      return done(formatDatePicture(run.options.now ?? new Date(), picture, run.options.locale));
     }
     case "SEQ": {
       // Hidden, unless a format asks for it to show.
@@ -1676,6 +1684,8 @@ export interface InsertFieldOptions {
   layout?: FieldLayout | null | undefined;
   data?: UpdateFieldsOptions["data"];
   now?: Date | undefined;
+  /** The language a `DATE` or `TIME` names months and days in (Word's Date and Time dialog's). */
+  locale?: string | undefined;
 }
 
 /** Whether a field can go at the selection. */

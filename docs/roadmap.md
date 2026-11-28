@@ -4872,7 +4872,9 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   open). `symbols.test.ts` (core), `insert.test.tsx` (React), `insert.spec.ts` (menu, dialog
   from the keyboard, keys, axe; three engines).
 - [x] 35.2 Date & Time dialog: Word's formats for the document's language, update
-  automatically (a `DATE` field) or as text. Built: core's `formatDatePicture(date, picture,
+  automatically (a `DATE` field) or as text. Built (the language the browser's, not the
+  document's, which the model does not keep; Word's own formats for English (United States)
+  only): core's `formatDatePicture(date, picture,
   locale?)` (names in the language, `Intl`'s); React's `toolbarItems.dateTime` (Insert ▸ Text):
   Word's Date and Time dialog (`"dateTime"`): Word 16's seventeen English (United States) formats,
   the other languages' made from their own (CLDR's) patterns, Update automatically as `DATE \@

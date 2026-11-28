@@ -445,17 +445,17 @@ const DATE_STYLES: readonly Intl.DateTimeFormatOptions[] = [
   { year: "2-digit", month: "2-digit", day: "2-digit" },
   { year: "numeric", month: "short", day: "numeric" },
   { year: "numeric", month: "long" },
-  { year: "numeric", month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit" },
+  { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" },
   {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   },
-  { hour: "numeric", minute: "2-digit" },
-  { hour: "numeric", minute: "2-digit", second: "2-digit" },
+  { hour: "2-digit", minute: "2-digit" },
+  { hour: "2-digit", minute: "2-digit", second: "2-digit" },
 ];
 
 /** A day whose parts tell padding apart: 5 January 2026, 05:04:03. */
@@ -472,9 +472,14 @@ function pictureOf(locale: string, options: Intl.DateTimeFormatOptions): string 
       switch (type) {
         case "year":
           return value.length === 2 ? "yy" : "yyyy";
-        case "month":
+        case "month": {
           if (/^\d+$/.test(value)) return padded ? "MM" : "M";
-          return options.month === "long" ? "MMMM" : "MMM";
+          // A genitive written with the month ("de gener" in Catalan): its words kept before it.
+          const name = new Intl.DateTimeFormat(locale, { month: options.month }).format(PROBE);
+          const at = value.toLowerCase().lastIndexOf(name.toLowerCase());
+          const lead = at > 0 ? `'${value.slice(0, at).replace(/'/g, "")}'` : "";
+          return lead + (options.month === "long" ? "MMMM" : "MMM");
+        }
         case "day":
           return padded ? "dd" : "d";
         case "weekday":
@@ -539,7 +544,9 @@ export function DateTimeDialog({
     event?.preventDefault();
     onClose(
       editor.run(
-        field ? insertDate(picture) : insertText(formatDatePicture(now, picture, language)),
+        field
+          ? insertDate(picture, { locale: language })
+          : insertText(formatDatePicture(now, picture, language)),
       ),
     );
   };
@@ -551,6 +558,11 @@ export function DateTimeDialog({
       Home: 0,
       End: last,
     };
+    if (event.key === "Enter") {
+      event.preventDefault();
+      apply();
+      return;
+    }
     const next = moves[event.key];
     if (next === undefined) return;
     event.preventDefault();
@@ -578,7 +590,7 @@ export function DateTimeDialog({
             onKeyDown={onListKey}
           >
             {formats.map((format, i) => (
-              // biome-ignore lint/a11y/useKeyWithClickEvents: the listbox takes the keys (arrows); Enter submits.
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the listbox takes the keys (arrows, Enter).
               <div
                 key={format}
                 ref={(element) => {

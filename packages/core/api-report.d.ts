@@ -1637,6 +1637,8 @@ export interface UpdateFieldsOptions {
     data?: Readonly<Record<string, unknown>> | undefined;
     /** What `DATE` and `TIME` show (default: now). */
     now?: Date | undefined;
+    /** The language `DATE` and `TIME` name months and days in (a BCP 47 tag; default English). */
+    locale?: string | undefined;
     /**
      * Which fields: those a range of this editor's tree touches (a caret: the field around it, a
      * table of contents for a page number in it), or those a function picks. Default: every field
@@ -1688,6 +1690,8 @@ export interface InsertFieldOptions {
     layout?: FieldLayout | null | undefined;
     data?: UpdateFieldsOptions["data"];
     now?: Date | undefined;
+    /** The language a `DATE` or `TIME` names months and days in (Word's Date and Time dialog's). */
+    locale?: string | undefined;
 }
 /** Replaces the selection with a field; its result is worked out where that can be done here. */
 export declare function insertField(instruction: string, options?: InsertFieldOptions): Command;

@@ -959,7 +959,9 @@ Details in the [package README](../packages/docx/README.md).
   a font shows in that font in the menu; its font is in its name.
 - Insert ▸ Date & Time offers Word 16's own formats for English (United States); for its other
   languages the formats are the language's own (CLDR's, through the browser's `Intl`) rather
-  than Word's list for it. The language box starts at the browser's language (Word: the editing
-  language), and no `w:lang` is written on the date: a field Foli updates later names months and
-  days in English, while Word names them in the run's language. AM and PM are written as `AM/PM`
-  in every language's pictures.
+  than Word's list for it (Catalan's genitive "de" is written before every month, also where the
+  language says "d’abril"). The language box starts at the browser's language (Word: the
+  language at the selection, which the model does not keep), and no `w:lang` is written on the
+  date: a field names months and days in the language picked when inserted, but in English when
+  Foli updates it later, while Word names them in the run's language. AM and PM are written as
+  `AM/PM` in every language's pictures.

@@ -149,4 +149,29 @@ describe("Insert ▸ Date & Time (35.2)", () => {
     editor.run(undo);
     expect(text(editor)).toBe("ab");
   });
+
+  it("names the field's months in its language, keeps Catalan's genitive, and Enter inserts", () => {
+    const editor = openDialog();
+    fireEvent.change(within(dialog()).getByLabelText("Language"), { target: { value: "es-ES" } });
+    fireEvent.click(within(dialog()).getByLabelText("Update automatically"));
+    const list = screen.getByRole("listbox", { name: "Available formats" });
+    const long = within(list)
+      .getAllByRole("option")
+      .find((o) => o.getAttribute("title") === "dddd, d' de 'MMMM' de 'yyyy") as HTMLElement;
+    fireEvent.click(long);
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Shown as the list showed it, in Spanish.
+    expect(text(editor)).toBe(`a${long.textContent}b`);
+    expect(long.textContent).toMatch(
+      / de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre) de /,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Date & Time" }));
+    fireEvent.change(within(dialog()).getByLabelText("Language"), { target: { value: "ca-ES" } });
+    const titles = within(screen.getByRole("listbox", { name: "Available formats" }))
+      .getAllByRole("option")
+      .map((o) => o.getAttribute("title"));
+    expect(titles).toContain("d 'de 'MMMM' del 'yyyy");
+    expect(titles).toContain("HH:mm");
+  });
 });
