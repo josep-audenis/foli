@@ -3213,7 +3213,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         group("Tables", large(t.table)),
         group("Illustrations", large(t.picture), large(t.shapes)),
         group("Links", t.link, t.crossReference),
-        group("Header & Footer", t.headerFooter, t.pageNumber),
+        group("Header & Footer", t.headerFooter, t.pageNumber, t.date),
         group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.dateTime),
         group("Symbols", t.symbol),
       ],
