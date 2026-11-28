@@ -155,7 +155,9 @@ describe("captions: review cases (35.3)", () => {
     ]);
     const report = updateFields(editor, { layout: pagesEvery(1000) });
     expect(fieldsIn(editor.state.doc)[0]?.result).toBe("kept");
-    expect(report.skipped).toMatchObject([{ reason: "unsupported-switch", detail: String.raw`\c` }]);
+    expect(report.skipped).toMatchObject([
+      { reason: "unsupported-switch", detail: String.raw`\c` },
+    ]);
   });
 
   it("lists a label with quotes, as its SEQ names it", () => {
