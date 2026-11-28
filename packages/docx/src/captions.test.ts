@@ -42,8 +42,8 @@ describe("captions in .docx (35.3)", () => {
     expect(xml).toContain(' TOC \\h \\z \\c "Figure" ');
     expect(xml).toContain('<w:pStyle w:val="TableofFigures"/>');
     const styles = await part("word/styles.xml");
-    expect(styles).toMatch(/w:styleId="Caption"[^]*?<w:name w:val="caption"\/>/);
-    expect(styles).toMatch(/w:styleId="TableofFigures"[^]*?<w:name w:val="table of figures"\/>/);
+    expect(styles).toMatch(/w:styleId="Caption"[sS]*?<w:name w:val="caption"\/>/);
+    expect(styles).toMatch(/w:styleId="TableofFigures"[sS]*?<w:name w:val="table of figures"\/>/);
     const back = await importDocx(out);
     const again = createEditor({ document: back.document });
     const codes = (e: typeof editor) => fieldsIn(e.state.doc).map((f) => [f.instruction, f.result]);
