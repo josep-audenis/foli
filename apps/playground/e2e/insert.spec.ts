@@ -135,3 +135,37 @@ test.describe("References ▸ Captions (35.3)", () => {
       .toContainEqual(expect.stringMatching(/^TableofFigures\|Figure 1: Overview\d+$/));
   });
 });
+
+test.describe("Insert ▸ Pages (35.6)", () => {
+  test("a cover page on a page of its own, replaced and removed; a blank page; axe", async ({
+    page,
+  }) => {
+    await open(page);
+    const pages = page.locator("section.foli-page");
+    const before = await pages.count();
+    await page.getByRole("button", { name: "Cover Page" }).click();
+    await page.getByRole("menuitem", { name: "Banded" }).click();
+    await expect(pages).toHaveCount(before + 1);
+    const first = pages.first();
+    await expect(first.locator("[data-foli-shape]")).toHaveCount(1);
+    await expect(first).toContainText("[Document title]");
+    await expect(first).toContainText("[Date]");
+    const results = await new AxeBuilder({ page }).include("section.foli-page").analyze();
+    expect(results.violations).toEqual([]);
+    // Another design replaces it.
+    await page.getByRole("button", { name: "Cover Page" }).click();
+    await page.getByRole("menuitem", { name: "Sidebar" }).click();
+    await expect(pages).toHaveCount(before + 1);
+    await expect(first.locator("[data-foli-shape]")).toHaveCount(2);
+    await page.getByRole("button", { name: "Cover Page" }).click();
+    await page.getByRole("menuitem", { name: "Remove Current Cover Page" }).click();
+    await expect(pages).toHaveCount(before);
+    await expect(first).not.toContainText("[Document title]");
+    // Blank Page: a page with nothing on it.
+    await page.evaluate(() => window.foliEdit.editor.select(1));
+    await page.getByRole("button", { name: "Blank Page" }).click();
+    await expect(pages).toHaveCount(before + 2);
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(pages).toHaveCount(before);
+  });
+});

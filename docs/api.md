@@ -1060,6 +1060,14 @@ UnicodeMath: `unicodeMathToOmml(text, display = true)`, `ommlToUnicodeMath(xml, 
 gallery, Insert New Equation… and Edit Equation… (the `"equation"` dialog: the linear form, the
 equation as it will show, Display).
 
+Pages (35.6): `insertCoverPage(design)` puts a cover (`COVER_PAGES`: Banded, Sidebar, Simple;
+Foli's own designs) at the document's start, replacing the current one, as Word's building block
+is made: a block content control of the Cover Pages gallery (`w:docPartObj`, `w:docPartUnique`)
+holding shapes fixed on the page, the title, subtitle, author and date as content controls and a
+page break; `removeCoverPage` removes it, `coverPageId(state)` finds it; one undo step each, not
+while tracking. `insertBlankPage` puts two page breaks at the selection. `toolbarItems.coverPage`
+and `toolbarItems.blankPage` are Insert ▸ Pages.
+
 Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
 inches, floating, wrapped square, white with a thin black line) and its story at the end of the
 selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the

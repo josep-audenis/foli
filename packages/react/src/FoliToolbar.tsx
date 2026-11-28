@@ -7,6 +7,7 @@ import {
   alignAt,
   alignObject,
   CellSelection,
+  type COVER_PAGES,
   type Command,
   type ControlJSON,
   canOutdent,
@@ -19,6 +20,7 @@ import {
   controlProperties,
   convertNotes,
   copyFormat,
+  coverPageId,
   croppingAt,
   crossReferenceTargets,
   deleteColumns,
@@ -35,10 +37,12 @@ import {
   fontSizeAt,
   formatPainterState,
   formattingMarksShown,
+  insertBlankPage,
   insertCaption,
   insertColumn,
   insertColumnBreak,
   insertControl,
+  insertCoverPage,
   insertCrossReference,
   insertDate,
   insertEquation,
@@ -88,6 +92,7 @@ import {
   redoDepth,
   rejectAllChanges,
   rejectChangeAndNext,
+  removeCoverPage,
   removeLink,
   removeSectionBreak,
   requestedDialog,
@@ -2676,6 +2681,34 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Insert ▸ Pages (35.6): Word's Cover Page gallery (Foli's own designs) and Blank Page.
+  {
+    key: "coverPage",
+    label: "Cover page",
+    text: "Cover Page",
+    enabled: (state) => insertCoverPage("Simple")(state) || coverPageId(state) !== null,
+    actions: [
+      ...(
+        [
+          ["Banded", "Banded"],
+          ["Sidebar", "Sidebar"],
+          ["Simple", "Simple"],
+        ] as const satisfies readonly (readonly [(typeof COVER_PAGES)[number], string])[]
+      ).map(([design, label]) => ({
+        key: `cover-${design}`,
+        label,
+        command: insertCoverPage(design),
+      })),
+      { key: "removeCoverPage", label: "Remove Current Cover Page", command: removeCoverPage },
+    ],
+  },
+  {
+    key: "blankPage",
+    label: "Blank page",
+    text: "Blank Page",
+    enabled: (state) => insertBlankPage(state),
+    command: insertBlankPage,
+  },
   // Insert ▸ Equation (35.5): Word's gallery, a new equation or the selected one in its linear form.
   {
     key: "equation",
@@ -3000,6 +3033,8 @@ export type ToolbarItemName =
   | "updateFields"
   | "pageNumber"
   | "date"
+  | "coverPage"
+  | "blankPage"
   | "equation"
   | "dateTime"
   | "caption"
@@ -3051,6 +3086,7 @@ export type ToolbarItemName =
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "coverPage"
   | "equation"
   | "symbol"
   | "lineNumbers"
@@ -3285,7 +3321,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
       key: "insert",
       label: "Insert",
       items: [
-        group("Pages", t.pageBreak, t.horizontalRule),
+        group("Pages", large(t.coverPage), t.blankPage, t.pageBreak, t.horizontalRule),
         group("Tables", large(t.table)),
         group("Illustrations", large(t.picture), large(t.shapes)),
         group("Links", t.link, t.crossReference),
