@@ -4929,8 +4929,18 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   letter, as Word builds them up).
   `equations.test.ts` (core), `unicodemath.test.ts` (view), `insert.test.tsx`,
   `word-equations.spec.ts` (gallery, typed, edited, saved; axe; three engines).
-- [ ] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34
-  for its shapes; a text-only cover before).
+- [x] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34
+  for its shapes; a text-only cover before). Built: core's `insertCoverPage(design)` (Foli's own
+  designs, Banded, Sidebar and Simple, built as Word's building block is: a block content control
+  of the Cover Pages gallery, `w:docPartObj` with `w:docPartUnique`, at the document's start,
+  holding Phase 34's shapes fixed on the page behind the text, the title, subtitle, author and
+  date as content controls showing their placeholders, and a page break; the theme's colors;
+  replacing the current cover as Word's does; one undo step, not while tracking),
+  `removeCoverPage`, `coverPageId`, `insertBlankPage` (Word's two page breaks); React's Insert ▸
+  Pages: Cover Page (the designs, Remove Current Cover Page) and Blank Page. Word 16 opens Foli's
+  file with the cover on page 1 (its four controls showing their placeholders, the band behind
+  the text) and the document from page 2. `cover.test.ts` (core, docx), `insert.spec.ts` (insert,
+  replace, remove, blank page, undo, axe; three engines).
 - [ ] 35.7 e2e; docs; changesets.
 
 ### Acceptance

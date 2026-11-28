@@ -998,3 +998,8 @@ Details in the [package README](../packages/docx/README.md).
   an ASCII `|` inside brackets starts an absolute value (Word's separator is `│`), and an
   unclosed bracket is closed at the end.
   Insert ▸ Equation has Word's nine gallery equations, not its Office.com ones or saved ones.
+- Insert ▸ Cover Page has three designs of Foli's own, not Word's (Whisp, Banded, Ion…: those are
+  Microsoft's content); Word lists Foli's cover as the document's cover (it is Word's Cover Pages
+  building block), but its fields are plain content controls, not bound to the document's
+  properties as Word's are (filling the title does not set the file's title). A cover Word made
+  is kept and replaced or removed as one; its look is drawn as its shapes and text boxes are.
