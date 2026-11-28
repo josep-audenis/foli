@@ -28,8 +28,9 @@ const paragraphs = (d: FoliDocument) =>
   (d.content.content ?? [])
     .filter((b) => b.type === "paragraph")
     .map((p) =>
-      // Word's text shows a picture as "/"; Foli's has none: such paragraphs are not compared.
-      (p.content ?? []).some((n) => n.type === "opaqueInline" || n.type === "picture")
+      // Word's text shows a picture as "/" and an equation in math letters; Foli's has neither:
+      // such paragraphs are not compared.
+      (p.content ?? []).some((n) => ["opaqueInline", "picture", "equation"].includes(n.type))
         ? null
         : textOf(p).toLowerCase(),
     );

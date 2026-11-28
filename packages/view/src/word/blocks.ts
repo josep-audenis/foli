@@ -1440,7 +1440,7 @@ function renderInline(
     else if (CUSTOM_TYPE.test(node.type)) {
       drawn = drawing?.node(node, doc) ?? null;
       text = drawn ? "" : (foreignTextOf(node) ?? `[${node.type}]`);
-    } else if (node.type === "opaqueInline") {
+    } else if (node.type === "opaqueInline" || node.type === "equation") {
       const xml = parseOpaque(String(attrs.xml ?? ""), doc);
       const separator = separatorElement(xml, doc);
       if (separator) {

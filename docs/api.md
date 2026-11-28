@@ -1050,6 +1050,16 @@ fields lists them again (`\c` is followed). `toolbarItems.caption` and `toolbarI
 are References ▸ Captions, Word's Caption dialog (`"caption"`: label, New Label…, position,
 exclude label, numbering) and Table of Figures dialog (`"tableOfFigures"`: the label, links).
 
+Equations (35.4–35.5, schema 12, ADR-0018): an `equation` node holds Word's OMML (`xml`, an
+`m:oMath` or a display `m:oMathPara`), drawn as MathML, found by its characters, written back as
+it is. `insertEquation(xml)` puts one at the selection (selected after) and `setEquation(pos,
+xml)` changes one, one undo step each, refused while tracking; `selectedEquation(state)` and
+`isDisplayEquation(xml)`. `@folijs/view` reads and writes an equation's linear form, Word's
+UnicodeMath: `unicodeMathToOmml(text, display = true)`, `ommlToUnicodeMath(xml, doc?)`, and
+`equationElement(xml, doc?)` (its MathML). `toolbarItems.equation` is Insert ▸ Equation: Word's
+gallery, Insert New Equation… and Edit Equation… (the `"equation"` dialog: the linear form, the
+equation as it will show, Display).
+
 Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
 inches, floating, wrapped square, white with a thin black line) and its story at the end of the
 selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the

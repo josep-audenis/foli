@@ -99,6 +99,12 @@ export {
   viewKeys,
 } from "./editor.js";
 export {
+  insertEquation,
+  isDisplayEquation,
+  selectedEquation,
+  setEquation,
+} from "./equations.js";
+export {
   caretStop,
   type Field,
   type FieldDisplay,

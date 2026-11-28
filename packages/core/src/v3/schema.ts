@@ -38,6 +38,14 @@ import {
  * schema, the v3 envelope and the v2 → v3 migration exist alongside it until then.
  */
 
+/** An equation's OMML: verbatim XML whose root is `m:oMath` or `m:oMathPara` (any prefix). */
+const omml: Check = (v) =>
+  xml(v) ??
+  (/^<(?:[\w.-]+:)?oMath(?:Para)?[\s>/]/.test(v as string) &&
+  /(?:<\/(?:[\w.-]+:)?oMath(?:Para)?>|\/>)\s*$/.test(v as string)
+    ? undefined
+    : "must be an m:oMath or m:oMathPara element");
+
 const MAX_TWIPS = 31_680; // 22 inches: Word's largest page dimension
 const twips = int(-MAX_TWIPS, MAX_TWIPS);
 const positiveTwips = int(0, MAX_TWIPS);
@@ -1021,6 +1029,16 @@ export const schema = new Schema({
         decorative: nullableAttr(bool),
         ext: nullableAttr(xml),
       },
+    },
+    /**
+     * An equation (schema 12, ADR-0018): Word's OMML, `m:oMath` (in its line) or `m:oMathPara`
+     * (a display equation, on a line of its own), as the file has it or as Foli wrote it from
+     * the equation's linear form; written back as it is, drawn as MathML by the view.
+     */
+    equation: {
+      group: "inline",
+      inline: true,
+      attrs: { xml: { validate: omml } },
     },
     /** Inline content Foli does not model yet (fields, charts, groups, symbols…), kept verbatim. */
     opaqueInline: {

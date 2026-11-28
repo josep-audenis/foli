@@ -168,7 +168,7 @@ function leafText(leaf: ModelNode, doc: Document): string {
   if (name === "tab") return "\t";
   const stands = leaf.type.spec.text;
   if (stands) return leaf.isBlock ? `\n${stands(leaf.attrs)}` : stands(leaf.attrs);
-  if (name === "opaqueInline" || name === "opaqueBlock") {
+  if (name === "opaqueInline" || name === "opaqueBlock" || name === "equation") {
     const xml = parseOpaque(String(leaf.attrs.xml ?? ""), doc);
     const text = xml ? opaqueParagraphsText(xml) : "";
     return leaf.isBlock ? `\n${text}` : text;

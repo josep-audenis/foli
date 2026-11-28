@@ -115,6 +115,7 @@ export { EditorView, type EditorViewOptions, keyName, measureImageFile, textWidt
 export { EMU_PER_PX } from "./word/blocks.js";
 export { type DocumentPages, type RenderDocumentOptions, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
 export { SHAPE_GALLERY, type ShapeGalleryGroup, shapePreview } from "./word/shapes.js";
+export { equationElement, ommlToUnicodeMath, unicodeMathToOmml } from "./word/unicodemath.js";
 
 // layout/flow.d.ts
 export {};
@@ -1226,3 +1227,26 @@ export declare function shapePreview(geometry: string, size?: number): {
 
 // word/table.d.ts
 export {};
+
+// word/unicodemath.d.ts
+/**
+ * An equation's linear form (35.5): Word's UnicodeMath (its "linear format", what Word's equation
+ * box shows before building up) read into OMML as Word writes it, and OMML written back as
+ * UnicodeMath for the box. Own parser and writer (no dependency, no editor engine). The subset is
+ * what Word's equation gallery and ordinary equations use: fractions (`a/b`), scripts (`x^2`,
+ * `a_i`, `x_i^2`), roots (`√x`, `√(n&x)`, `∛x`), n-ary operators with limits (`∑_(k=1)^n▒k`),
+ * delimiters (`()`, `[]`, `{}`, `||`, `├ ┤`), binomials (`(n¦k)`), matrices (`■(a&b@c&d)`),
+ * functions (`sin⁡x`, `lim_(n→∞)⁡…`), Word's invisible brackets (`〖…〗`) and `\name` symbols.
+ */
+/**
+ * Reads Word's linear format into OMML as Word writes it (`<m:oMath>…</m:oMath>`, in an
+ * `m:oMathPara` for a display equation): an `equation` node's `xml`.
+ */
+export declare function unicodeMathToOmml(source: string, display?: boolean): string;
+/**
+ * An equation's OMML (`m:oMath` or `m:oMathPara`, as an `equation` node's `xml`) as Word's linear
+ * format, for its box; "" for XML that is not an equation.
+ */
+export declare function ommlToUnicodeMath(xml: string, doc?: Document): string;
+/** An equation's OMML drawn as MathML (as the pages draw it), or null for other XML. */
+export declare function equationElement(xml: string, doc?: Document): Element | null;

@@ -982,6 +982,13 @@ Details in the [package README](../packages/docx/README.md).
   their content (no border); an equation's own run formatting (color, size) inside it is not
   drawn, the paragraph's is; a display equation is centered whatever its `m:oMathParaPr`
   justification says. Text a tracked change deleted inside an equation is not drawn in any
-  review view (Word shows it struck through). Bold Greek and sans-serif italic letters in an equation are
-  drawn in the plain style. Until 35.5 an equation is kept whole as the file's
-  OMML: it is shown and found, not edited.
+  review view (Word shows it struck through). Bold Greek and sans-serif italic letters in an
+  equation are drawn in the plain style.
+- Equations are edited in their linear form (Word's UnicodeMath) in a box, not in place as Word
+  edits them. The linear form Foli reads is a subset: fractions, scripts, roots, n-ary operators
+  with limits, delimiters, binomials, matrices, functions (`sin`, `lim`…), Word's invisible
+  brackets and the common `\name` symbols; accents, bars, boxes, equation arrays and text in
+  quotes are not read from it, and an equation holding them is written back as its linear form
+  shows it. An edited equation loses its runs' own formatting and Word's run properties
+  (written anew in Cambria Math). Equations are not inserted or edited while tracking changes.
+  Insert ▸ Equation has Word's nine gallery equations, not its Office.com ones or saved ones.

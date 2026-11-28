@@ -191,12 +191,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Time, Caption, Table of Figures, Equation and Cover Page.
  * Core raised in 35.4 (108.1 kB; 112.0 allowed): find reading an equation's characters, Phase 35's
  * captions, dates and symbols, with room for 35.5's equation node (schema 12) and its checks.
+ * View, React and FoliEditor raised in 35.5 (156.8, 264.4 and 259.8 kB; 162.0, 272.0 and 272.0
+ * allowed): equations drawn as MathML (35.4) and their linear form read and written (Word's
+ * UnicodeMath), Insert ▸ Equation and its dialog, with room for 35.6's cover pages.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 114_688 },
-  { name: "@folijs/view", entry: dist("view"), budget: 159_744 },
-  { name: "@folijs/react", entry: dist("react"), budget: 270_336 },
-  { name: "FoliEditor only", entry: appEntry, budget: 270_336 },
+  { name: "@folijs/view", entry: dist("view"), budget: 165_888 },
+  { name: "@folijs/react", entry: dist("react"), budget: 278_528 },
+  { name: "FoliEditor only", entry: appEntry, budget: 278_528 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 86_016 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 23_040 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 110_592 },

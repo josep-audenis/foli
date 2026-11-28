@@ -1790,3 +1790,18 @@
   background: var(--foli-dialog-primary-background);
   color: var(--foli-dialog-primary-color);
 }
+
+/* Insert ▸ Equation (35.5): the linear form's box and the equation drawn as it will show. */
+.foli-equation-dialog textarea {
+  flex: 1 1 100%;
+  min-width: 24em;
+  font-family: "Cambria Math", "STIX Two Math", math, serif;
+}
+
+.foli-equation-preview {
+  flex: 1 1 100%;
+  min-height: 3em;
+  padding: 6px;
+  border: 1px solid var(--foli-border-color);
+  font-family: "Cambria Math", "STIX Two Math", math, serif;
+}

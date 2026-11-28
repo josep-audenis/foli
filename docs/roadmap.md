@@ -46,7 +46,7 @@ place that says what is in progress; check it before starting work.
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 34 Shapes                     | In review                | `phase-34/shapes`         | 34.1–34.6 merged (#351–#356); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
-| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1–35.3 merged (#360–#362); 35.4 in review                                                                               |
+| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1–35.4 merged (#360–#363); 35.5 in review                                                                               |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 38 Proofing & AutoFormat      | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4911,10 +4911,22 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   byte for byte. `math.test.ts` (view: each element and its defaults), `find-equations.test.ts`,
   `equations.test.ts` (docx), `word-equations.spec.ts` (editing and read-only pages, placement,
   pressing, typing and arrows beside equations, axe; three engines).
-- [ ] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
+- [x] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
   OMML (an equation node in the model: schema bump with migration); Insert ▸ Equation with
   Word's common ones. Own parser and writer, or a dependency with its license checked; no
-  editor engine.
+  editor engine. Built (ADR-0018): schema 12's `equation` node (`xml`: the `m:oMath` or
+  `m:oMathPara` as the file has it, checked; v11 → v12 the version only, a v12 format fixture
+  from the corpus's 13); `@folijs/docx` reads equations into it and writes them back as they are;
+  core's `insertEquation` and `setEquation` (one undo step, refused while tracking),
+  `selectedEquation`, `isDisplayEquation`; the view's own UnicodeMath reader and writer
+  (`word/unicodemath.ts`: `unicodeMathToOmml`, `ommlToUnicodeMath`, `equationElement`) writing
+  OMML as Word does (Cambria Math runs, neighbouring characters in one run); React's Insert ▸
+  Equation (Insert ▸ Symbols): Word's nine gallery equations, Insert New Equation… and Edit
+  Equation…, the Equation dialog (the linear form, the equation drawn as it will show,
+  Display). Word 16 opens Foli's file with its new equations (the nine and a typed inline one)
+  as ten equations (`OMaths`, the inline one inline) and linearizes each to the same structure.
+  `equations.test.ts` (core), `unicodemath.test.ts` (view), `insert.test.tsx`,
+  `word-equations.spec.ts` (gallery, typed, edited, saved; axe; three engines).
 - [ ] 35.6 Cover Page and Blank Page (Pages group), a cover as Word's building block (needs 34
   for its shapes; a text-only cover before).
 - [ ] 35.7 e2e; docs; changesets.

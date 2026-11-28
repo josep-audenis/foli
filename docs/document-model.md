@@ -242,6 +242,11 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   theme's style is read as plain colors and widths; effects stay in `ext`. Shapes are in the
   body, headers and footers only. Export writes a changed shape's transform, geometry, fill and
   line into its DrawingML in place (the VML copy then left out); an unchanged one as it was.
+- **Equations** (v12, ADR-0018): an `equation` is an inline atom whose `xml` is Word's OMML, an
+  `m:oMath` (in its line) or `m:oMathPara` (a display equation) element, as the file has it or as
+  Foli wrote it from the equation's linear form; written back as it is. Drawn as MathML by the
+  view, found by its characters. Saved by a release before Phase 35, an equation is an
+  `opaqueInline` holding the same XML.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.

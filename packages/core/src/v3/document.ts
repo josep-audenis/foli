@@ -44,9 +44,9 @@ import {
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
  * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
  * formatting, Phase 23 task 23.2; v9 page decoration: the page color, a section's page borders
- * and line numbers, ADR-0015; v10 text boxes, ADR-0016; v11 shapes, ADR-0017).
+ * and line numbers, ADR-0015; v10 text boxes, ADR-0016; v11 shapes, ADR-0017; v12 equations, ADR-0018).
  */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -467,9 +467,9 @@ export interface PageBackgroundJSON {
 export interface FoliDocument {
   /**
    * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
-   * added (6: a picture's rotation or crop, 1.4; 10: text boxes; 11: shapes).
+   * added (6: a picture's rotation or crop, 1.4; 10: text boxes; 11: shapes; 12: equations).
    */
-  schemaVersion: 5 | 6 | 7 | 8 | 9 | 10 | typeof SCHEMA_VERSION;
+  schemaVersion: 5 | 6 | 7 | 8 | 9 | 10 | 11 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -535,6 +535,7 @@ export function schemaVersionOf(
     ...doc.comments.map((c) => ({ content: c.content })),
     ...Object.values(doc.stories ?? {}).map((s) => s.content),
   ];
+  if (trees.some((tree) => laterNode(tree, 11))) return 12;
   if (trees.some((tree) => laterNode(tree, 10))) return 11;
   if (
     Object.values(doc.stories ?? {}).some((s) => s.kind === "textBox") ||
@@ -616,7 +617,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     version === 7 ||
     version === 8 ||
     version === 9 ||
-    version === 10
+    version === 10 ||
+    version === 11
   ) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
@@ -963,6 +965,7 @@ function laterNode(
     const decorated =
       version < 9 ? V9_SECTION_KEYS.find((key) => inSection(attrs.section, key)) : undefined;
     if (decorated) return { name: `a section's ${decorated}`, schema: 9 };
+    if (version < 12 && name === "equation") return { name, schema: 12 };
     if (version < 11 && name === "shape") return { name, schema: 11 };
     if (version < 10 && name === "textBox") return { name, schema: 10 };
     if (version < 10 && isRecord(attrs.float) && attrs.float.zOrder != null)
