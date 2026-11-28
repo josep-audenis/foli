@@ -1798,6 +1798,10 @@
   font-family: "Cambria Math", "STIX Two Math", math, serif;
 }
 
+.foli-equation-preview-box {
+  flex: 1 1 100%;
+}
+
 .foli-equation-preview {
   flex: 1 1 100%;
   min-height: 3em;

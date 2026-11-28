@@ -1096,12 +1096,10 @@ export function EquationDialog({
             />
             <label htmlFor={`${id}-display`}>{t("Display (on its own line)")}</label>
           </div>
-          <div
-            ref={preview}
-            className="foli-equation-preview"
-            role="group"
-            aria-label={t("Preview")}
-          />
+          <fieldset className="foli-dialog-section foli-equation-preview-box">
+            <legend>{t("Preview")}</legend>
+            <div ref={preview} className="foli-equation-preview" />
+          </fieldset>
         </div>
         <div className="foli-dialog-buttons">
           <button type="submit">{t("OK")}</button>
