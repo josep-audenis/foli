@@ -46,7 +46,7 @@ place that says what is in progress; check it before starting work.
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 34 Shapes                     | In review                | `phase-34/shapes`         | 34.1–34.6 merged (#351–#356); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
-| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1 in review                                                                                                             |
+| 35 Insert extras              | In progress              | `phase-35/insert-extras`  | Claimed 2026-11-28 (29 is merged, its release pending; 34 merged); 35.1 merged (#360); 35.2 in review                                                                                         |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 38 Proofing & AutoFormat      | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4871,8 +4871,13 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   that font, recently used, the code in hex; Special Characters with their keys; Insert keeps it
   open). `symbols.test.ts` (core), `insert.test.tsx` (React), `insert.spec.ts` (menu, dialog
   from the keyboard, keys, axe; three engines).
-- [ ] 35.2 Date & Time dialog: Word's formats for the document's language, update
-  automatically (a `DATE` field) or as text.
+- [x] 35.2 Date & Time dialog: Word's formats for the document's language, update
+  automatically (a `DATE` field) or as text. Built: core's `formatDatePicture(date, picture,
+  locale?)` (names in the language, `Intl`'s); React's `toolbarItems.dateTime` (Insert ▸ Text):
+  Word's Date and Time dialog (`"dateTime"`): Word 16's seventeen English (United States) formats,
+  the other languages' made from their own (CLDR's) patterns, Update automatically as `DATE \@
+  "…"` (`insertDate`) or as text, one undo step. `symbols.test.ts` (core), `insert.test.tsx`,
+  `insert.spec.ts` (field, undo, axe; three engines).
 - [ ] 35.3 Caption: Insert Caption (label, numbering, position above or below) as Word writes it
   (`SEQ` field in a Caption-style paragraph); Table of Figures from References.
 - [ ] 35.4 Equations shown: OMML converted to MathML and drawn by the browser (read-only), on

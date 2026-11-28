@@ -1029,6 +1029,13 @@ inserted first, for the page's life) and More Symbols…, Word's Symbol dialog (
 font, a Unicode subset and its characters, the recent ones, the character code in hex, and
 Special Characters with their keys; Insert keeps it open, as Word's.
 
+Date and time (35.2): `formatDatePicture(date, picture, locale?)` writes a date in a Word date
+picture with month and day names in `locale` (English without one). `toolbarItems.dateTime` is
+Insert ▸ Date & Time, Word's Date and Time dialog (`"dateTime"`): a language, its formats shown
+for now (Word 16's own for English (United States); the language's own, CLDR's through `Intl`,
+for the others), and Update automatically (a `DATE` field in that picture, `insertDate`) or the
+text; one undo step.
+
 Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
 inches, floating, wrapped square, white with a thin black line) and its story at the end of the
 selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the

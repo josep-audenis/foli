@@ -3,9 +3,16 @@
  * each inserts at the selection it opened on, in one undo step.
  */
 
-import { type Command, type Editor, insertSymbol } from "@folijs/core";
+import {
+  type Command,
+  type Editor,
+  formatDatePicture,
+  insertDate,
+  insertSymbol,
+  insertText,
+} from "@folijs/core";
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
-import { useT } from "./messages.js";
+import { type ToolbarMessage, useT } from "./messages.js";
 import { Field, Tabs } from "./WordDialogs.js";
 
 // ---------- Insert ▸ Symbol (35.1) ----------
@@ -387,6 +394,238 @@ export function SymbolDialog({
           <button type="submit">{t("Insert")}</button>
           <button type="button" onClick={() => onClose(inserted)}>
             {t("Close")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------- Insert ▸ Date & Time (35.2) ----------
+
+/** Word 16's Date and Time formats for English (United States), in its order. */
+const US_FORMATS = [
+  "M/d/yyyy",
+  "dddd, MMMM d, yyyy",
+  "MMMM d, yyyy",
+  "M/d/yy",
+  "yyyy-MM-dd",
+  "d-MMM-yy",
+  "M.d.yyyy",
+  "MMM. d, yy",
+  "d MMMM yyyy",
+  "MMMM yy",
+  "MMM-yy",
+  "M/d/yyyy h:mm AM/PM",
+  "M/d/yyyy h:mm:ss AM/PM",
+  "h:mm AM/PM",
+  "h:mm:ss AM/PM",
+  "HH:mm",
+  "HH:mm:ss",
+];
+
+/** The languages the box offers (tags and Word's names). */
+const DATE_LANGUAGES: readonly (readonly [string, string])[] = [
+  ["en-US", "English (United States)"],
+  ["en-GB", "English (United Kingdom)"],
+  ["es-ES", "Spanish (Spain)"],
+  ["ca-ES", "Catalan"],
+  ["fr-FR", "French (France)"],
+  ["de-DE", "German (Germany)"],
+  ["it-IT", "Italian (Italy)"],
+  ["pt-BR", "Portuguese (Brazil)"],
+  ["nl-NL", "Dutch (Netherlands)"],
+];
+
+/** What the other languages' formats are made from: the language's own (CLDR's, by `Intl`). */
+const DATE_STYLES: readonly Intl.DateTimeFormatOptions[] = [
+  { year: "numeric", month: "2-digit", day: "2-digit" },
+  { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+  { year: "numeric", month: "long", day: "numeric" },
+  { year: "2-digit", month: "2-digit", day: "2-digit" },
+  { year: "numeric", month: "short", day: "numeric" },
+  { year: "numeric", month: "long" },
+  { year: "numeric", month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit" },
+  {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  },
+  { hour: "numeric", minute: "2-digit" },
+  { hour: "numeric", minute: "2-digit", second: "2-digit" },
+];
+
+/** A day whose parts tell padding apart: 5 January 2026, 05:04:03. */
+const PROBE = new Date(2026, 0, 5, 5, 4, 3);
+
+/** A language's way of writing `options` as a Word date picture (`\@`). */
+function pictureOf(locale: string, options: Intl.DateTimeFormatOptions): string {
+  const format = new Intl.DateTimeFormat(locale, options);
+  const twelve = format.resolvedOptions().hourCycle?.startsWith("h1") ?? false;
+  return format
+    .formatToParts(PROBE)
+    .map(({ type, value }) => {
+      const padded = value.startsWith("0");
+      switch (type) {
+        case "year":
+          return value.length === 2 ? "yy" : "yyyy";
+        case "month":
+          if (/^\d+$/.test(value)) return padded ? "MM" : "M";
+          return options.month === "long" ? "MMMM" : "MMM";
+        case "day":
+          return padded ? "dd" : "d";
+        case "weekday":
+          return options.weekday === "long" ? "dddd" : "ddd";
+        case "hour":
+          return twelve ? (padded ? "hh" : "h") : padded ? "HH" : "H";
+        case "minute":
+          return "mm";
+        case "second":
+          return "ss";
+        case "dayPeriod":
+          return "AM/PM";
+        default:
+          // Letters are quoted (Word's `'…'`); a period after a short month stays (`MMM.`).
+          return /\p{L}/u.test(value) ? `'${value.replace(/'/g, "")}'` : value;
+      }
+    })
+    .join("");
+}
+
+/** The formats the dialog offers for `locale`: Word's own for English (United States). */
+function dateFormats(locale: string): readonly string[] {
+  if (locale === "en-US") return US_FORMATS;
+  return [...new Set([...DATE_STYLES.map((o) => pictureOf(locale, o)), "yyyy-MM-dd"])];
+}
+
+/** The box's language at first: the browser's, where offered (Word's: the editing language). */
+const defaultLanguage = () => {
+  const wanted = typeof navigator === "undefined" ? "en-US" : navigator.language;
+  const tags = DATE_LANGUAGES.map(([tag]) => tag as string);
+  return (
+    tags.find((tag) => tag.toLowerCase() === wanted.toLowerCase()) ??
+    tags.find((tag) => tag.split("-")[0] === wanted.split("-")[0]) ??
+    "en-US"
+  );
+};
+
+/**
+ * Word's Date and Time dialog: the language's formats shown for now, Update automatically (a
+ * `DATE` field in that picture, `insertDate`) or the text itself. OK inserts it in one undo step.
+ * @internal
+ */
+export function DateTimeDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [now] = useState(() => new Date());
+  const [language, setLanguage] = useState(defaultLanguage);
+  const formats = dateFormats(language);
+  const [chosen, setChosen] = useState(0);
+  const [field, setField] = useState(false);
+  const options = useRef<(HTMLDivElement | null)[]>([]);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => options.current[0]?.focus(), []);
+  const picture = formats[Math.min(chosen, formats.length - 1)] as string;
+  const apply = (event?: FormEvent) => {
+    event?.preventDefault();
+    onClose(
+      editor.run(
+        field ? insertDate(picture) : insertText(formatDatePicture(now, picture, language)),
+      ),
+    );
+  };
+  const onListKey = (event: KeyboardEvent) => {
+    const last = formats.length - 1;
+    const moves: Record<string, number> = {
+      ArrowDown: Math.min(last, chosen + 1),
+      ArrowUp: Math.max(0, chosen - 1),
+      Home: 0,
+      End: last,
+    };
+    const next = moves[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    setChosen(next);
+    options.current[next]?.focus();
+  };
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Date and Time")}
+      className="foli-link-dialog foli-word-dialog foli-date-time-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <div
+            ref={list}
+            role="listbox"
+            aria-label={t("Available formats")}
+            className="foli-special-list"
+            onKeyDown={onListKey}
+          >
+            {formats.map((format, i) => (
+              // biome-ignore lint/a11y/useKeyWithClickEvents: the listbox takes the keys (arrows); Enter submits.
+              <div
+                key={format}
+                ref={(element) => {
+                  options.current[i] = element;
+                }}
+                role="option"
+                aria-selected={i === chosen}
+                tabIndex={i === chosen ? 0 : -1}
+                className="foli-special-row foli-date-format"
+                title={format}
+                onClick={() => setChosen(i)}
+                onDoubleClick={() => apply()}
+              >
+                {formatDatePicture(now, format, language)}
+              </div>
+            ))}
+          </div>
+          <Field id={`${id}-language`} label={t("Language")}>
+            <select
+              id={`${id}-language`}
+              value={language}
+              onChange={(event) => {
+                setLanguage(event.target.value);
+                setChosen(0);
+              }}
+            >
+              {DATE_LANGUAGES.map(([tag, name]) => (
+                <option key={tag} value={tag}>
+                  {t(name as ToolbarMessage)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-update`}
+              type="checkbox"
+              checked={field}
+              onChange={(event) => setField(event.target.checked)}
+            />
+            <label htmlFor={`${id}-update`}>{t("Update automatically")}</label>
+          </div>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
           </button>
         </div>
       </form>

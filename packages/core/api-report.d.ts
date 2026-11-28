@@ -1601,10 +1601,12 @@ export interface FieldInstruction {
 }
 export declare function parseFieldInstruction(text: string): FieldInstruction;
 /**
- * A date in a Word date picture (`\@`).
- * shortcut: month and day names are English; take the field's language when a document needs it.
+ * A date in a Word date picture (`\@`); month and day names in `locale` (a BCP 47 tag; English
+ * without one).
+ * shortcut: a field's own language (`w:lang`) is not read: its names are English when Foli updates
+ * it; read it when the model keeps a run's language.
  */
-export declare function formatDatePicture(date: Date, picture: string): string;
+export declare function formatDatePicture(date: Date, picture: string, locale?: string): string;
 /**
  * A number in a Word numeric picture (`\#`), as Word 16 writes it: `0` a digit, `#` a digit or a
  * space, `x` a digit, dropping those to its left (after the point: nothing when no digit is left),
