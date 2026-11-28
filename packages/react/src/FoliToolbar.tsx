@@ -185,7 +185,13 @@ import {
   useEditorState,
   useIsomorphicLayoutEffect,
 } from "./editor.js";
-import { insertingSymbol, recentSymbols, SymbolDialog, symbolCommand } from "./InsertDialogs.js";
+import {
+  DateTimeDialog,
+  insertingSymbol,
+  recentSymbols,
+  SymbolDialog,
+  symbolCommand,
+} from "./InsertDialogs.js";
 import { toolbarIcons } from "./icons.js";
 import { loadLocalFonts, localFontFamilies, subscribeLocalFonts } from "./localFonts.js";
 import {
@@ -502,10 +508,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * (Word's Page Borders, the caret's section or the document), `"watermark"` (its Printed
  * Watermark dialog, every header), `"bordersShading"` (its Borders and Shading dialog for the
  * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section),
- * `"symbol"` (its Symbol dialog: symbols by font and subset, special characters).
+ * `"symbol"` (its Symbol dialog: symbols by font and subset, special characters), `"dateTime"`
+ * (its Date and Time dialog: the language's formats, as a field or as text).
  */
 export type ToolbarDialogName =
   | "symbol"
+  | "dateTime"
   | "layout"
   | "layoutWrapping"
   | "layoutSize"
@@ -2641,6 +2649,13 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // Insert ▸ Date & Time (35.2): Word's dialog of the language's formats.
+  {
+    key: "dateTime",
+    label: "Date and time",
+    text: "Date & Time",
+    dialog: "dateTime",
+  },
   // Insert ▸ Symbol (35.1): Word's recent symbols, then its Symbol dialog.
   {
     key: "symbol",
@@ -2915,6 +2930,7 @@ export type ToolbarItemName =
   | "updateFields"
   | "pageNumber"
   | "date"
+  | "dateTime"
   | "symbol"
   | "crossReference"
   | "fieldCodes"
@@ -2983,6 +2999,7 @@ type ToolbarMenuName =
 type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
 type ToolbarColorName = "textColor" | "highlight" | "cellShading" | "pageColor" | "shading";
 type ToolbarDialogItemName =
+  | "dateTime"
   | "pageBorders"
   | "paragraphSettings"
   | "fontSettings"
@@ -3196,8 +3213,8 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         group("Tables", large(t.table)),
         group("Illustrations", large(t.picture), large(t.shapes)),
         group("Links", t.link, t.crossReference),
-        group("Header & Footer", t.headerFooter, t.pageNumber),
-        group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.date),
+        group("Header & Footer", t.headerFooter, t.pageNumber, t.date),
+        group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.dateTime),
         group("Symbols", t.symbol),
       ],
     },
@@ -3401,6 +3418,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   bordersShading: (state) => paragraphBordersAt(state) !== null,
   lineNumbers: (state) => sectionAt(state) !== null,
   symbol: (state) => isWord(state) && insertSymbol(" ")(state),
+  dateTime: (state) => isWord(state) && insertPageBreak(state),
   layout: (state) => objectLayoutEnabled(state),
   layoutWrapping: (state) => objectLayoutEnabled(state),
   layoutSize: (state) => objectLayoutEnabled(state),
@@ -4132,6 +4150,7 @@ export function FoliToolbar({
   const [wordDialog, setWordDialog] = useState<{
     name:
       | "symbol"
+      | "dateTime"
       | "paragraph"
       | "font"
       | "tabs"
@@ -4246,6 +4265,7 @@ export function FoliToolbar({
       if (name === "noteOptions") setNoteDialog({ restore });
       else if (
         name === "symbol" ||
+        name === "dateTime" ||
         name === "paragraph" ||
         name === "font" ||
         name === "tabs" ||
@@ -5195,6 +5215,16 @@ export function FoliToolbar({
           <SymbolDialog
             editor={editor}
             fonts={fontOptions(editor.state).map((option) => option.value)}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "dateTime" && !disabled && (
+          <DateTimeDialog
+            editor={editor}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

@@ -937,6 +937,8 @@ Details in the [package README](../packages/docx/README.md).
 - A file whose `w:background` Word hides (no `w:displayBackgroundShape` in its settings) shows
   the color in Foli; its settings stay as they are unless the color is changed.
 
+## Docs and tooling
+
 - The docs site's search matches headings and API names, not body text. The API pages show
   each declaration's `.d.ts` text; code is not highlighted.
 - The guides' TypeScript samples are compiled and mostly run by `pnpm test`; their CSS samples
@@ -955,3 +957,11 @@ Details in the [package README](../packages/docx/README.md).
   Ctrl+Num - and Ctrl+- are left to the browser (zoom out). A character code outside the
   dialog's 24 subsets is not taken (Word takes any code of the font). A recent symbol inserted in
   a font shows in that font in the menu; its font is in its name.
+- Insert ▸ Date & Time offers Word 16's own formats for English (United States); for its other
+  languages the formats are the language's own (CLDR's, through the browser's `Intl`) rather
+  than Word's list for it (Catalan's genitive "de" is written before every month, also where the
+  language says "d’abril"). The language box starts at the browser's language (Word: the
+  language at the selection, which the model does not keep), and no `w:lang` is written on the
+  date: a field names months and days in the language picked when inserted, but in English when
+  Foli updates it later, while Word names them in the run's language. AM and PM are written as
+  `AM/PM` in every language's pictures.

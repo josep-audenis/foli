@@ -456,6 +456,12 @@ const SHAPES: Readonly<Record<string, readonly Shape[]>> = {
     ["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }],
     ["path", { d: "M3 9h18" }],
   ],
+  dateTime: /* calendar */ [
+    ["path", { d: "M8 2v3" }],
+    ["path", { d: "M16 2v3" }],
+    ["rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }],
+    ["path", { d: "M3 9h18" }],
+  ],
   crossReference: /* bookmark */ [
     [
       "path",

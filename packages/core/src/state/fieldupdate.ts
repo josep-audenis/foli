@@ -112,21 +112,58 @@ const MONTHS =
 const DAYS = "Sunday Monday Tuesday Wednesday Thursday Friday Saturday".split(" ");
 const pad = (n: number, size = 2) => String(n).padStart(size, "0");
 
+const names = new Map<string, readonly string[][]>();
+/** A language's month and day names, long and short (`Intl`'s, standalone); English without one. */
+function namesOf(locale: string | undefined): readonly string[][] {
+  if (!locale || /^en(-|$)/i.test(locale)) return [MONTHS, DAYS];
+  // A tag the platform has no data for would name in its default language: English instead.
+  try {
+    if (!Intl.DateTimeFormat.supportedLocalesOf(locale).length) return [MONTHS, DAYS];
+  } catch {
+    return [MONTHS, DAYS];
+  }
+  let found = names.get(locale);
+  if (!found) {
+    try {
+      const of = (options: Intl.DateTimeFormatOptions, dates: Date[]) => {
+        const format = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
+        return dates.map((d) => format.format(d));
+      };
+      const months = Array.from({ length: 12 }, (_, m) => new Date(Date.UTC(2024, m, 1)));
+      // 7 January 2024 was a Sunday.
+      const days = Array.from({ length: 7 }, (_, d) => new Date(Date.UTC(2024, 0, 7 + d)));
+      found = [
+        of({ month: "long" }, months),
+        of({ weekday: "long" }, days),
+        of({ month: "short" }, months),
+        of({ weekday: "short" }, days),
+      ];
+    } catch {
+      found = [MONTHS, DAYS];
+    }
+    names.set(locale, found);
+  }
+  return found;
+}
+
 /**
- * A date in a Word date picture (`\@`).
- * shortcut: month and day names are English; take the field's language when a document needs it.
+ * A date in a Word date picture (`\@`); month and day names in `locale` (a BCP 47 tag; English
+ * without one).
+ * shortcut: a field's own language (`w:lang`) is not read: its names are English when Foli updates
+ * it; read it when the model keeps a run's language.
  */
-export function formatDatePicture(date: Date, picture: string): string {
+export function formatDatePicture(date: Date, picture: string, locale?: string): string {
+  const [months = MONTHS, days = DAYS, shortMonths, shortDays] = namesOf(locale);
   const hours12 = date.getHours() % 12 || 12;
   const parts: Record<string, string> = {
     d: String(date.getDate()),
     dd: pad(date.getDate()),
-    ddd: (DAYS[date.getDay()] as string).slice(0, 3),
-    dddd: DAYS[date.getDay()] as string,
+    ddd: shortDays?.[date.getDay()] ?? (days[date.getDay()] as string).slice(0, 3),
+    dddd: days[date.getDay()] as string,
     M: String(date.getMonth() + 1),
     MM: pad(date.getMonth() + 1),
-    MMM: (MONTHS[date.getMonth()] as string).slice(0, 3),
-    MMMM: MONTHS[date.getMonth()] as string,
+    MMM: shortMonths?.[date.getMonth()] ?? (months[date.getMonth()] as string).slice(0, 3),
+    MMMM: months[date.getMonth()] as string,
     yy: pad(date.getFullYear() % 100),
     yyyy: String(date.getFullYear()),
     h: String(hours12),
@@ -320,6 +357,8 @@ export interface UpdateFieldsOptions {
   data?: Readonly<Record<string, unknown>> | undefined;
   /** What `DATE` and `TIME` show (default: now). */
   now?: Date | undefined;
+  /** The language `DATE` and `TIME` name months and days in (a BCP 47 tag; default English). */
+  locale?: string | undefined;
   /**
    * Which fields: those a range of this editor's tree touches (a caret: the field around it, a
    * table of contents for a page number in it), or those a function picks. Default: every field
@@ -872,7 +911,7 @@ function work(run: Run, field: Field, sequence: Map<Field, number>): Worked | nu
     case "DATE":
     case "TIME": {
       const picture = switches.get("@")?.[0] ?? (name === "DATE" ? "M/d/yyyy" : "h:mm AM/PM");
-      return done(formatDatePicture(run.options.now ?? new Date(), picture));
+      return done(formatDatePicture(run.options.now ?? new Date(), picture, run.options.locale));
     }
     case "SEQ": {
       // Hidden, unless a format asks for it to show.
@@ -1645,6 +1684,8 @@ export interface InsertFieldOptions {
   layout?: FieldLayout | null | undefined;
   data?: UpdateFieldsOptions["data"];
   now?: Date | undefined;
+  /** The language a `DATE` or `TIME` names months and days in (Word's Date and Time dialog's). */
+  locale?: string | undefined;
 }
 
 /** Whether a field can go at the selection. */

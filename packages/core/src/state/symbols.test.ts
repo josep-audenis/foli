@@ -3,6 +3,7 @@ import type { NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { insertSymbol } from "./commands.js";
 import { createEditor } from "./editor.js";
+import { formatDatePicture } from "./fieldupdate.js";
 import { undo } from "./history.js";
 
 const p = (...content: NodeJSON[]): NodeJSON => ({ type: "paragraph", content });
@@ -68,5 +69,18 @@ describe("insertSymbol (35.1)", () => {
     ])
       expect(editor.handleKey(key)).toBe(true);
     expect(first(editor)).toEqual(p({ type: "text", text: "x©®™…— ‑" }));
+  });
+});
+
+describe("formatDatePicture in a language (35.2)", () => {
+  const day = new Date(2026, 10, 28, 15, 4, 9);
+  it("names months and days in the language given, English without one", () => {
+    expect(formatDatePicture(day, "dddd, MMMM d, yyyy")).toBe("Saturday, November 28, 2026");
+    expect(formatDatePicture(day, "dddd, d' de 'MMMM' de 'yyyy", "es-ES")).toBe(
+      "sábado, 28 de noviembre de 2026",
+    );
+    expect(formatDatePicture(day, "d MMMM yyyy", "de-DE")).toBe("28 November 2026");
+    expect(formatDatePicture(day, "h:mm AM/PM")).toBe("3:04 PM");
+    expect(formatDatePicture(day, "ddd d MMM", "en-GB")).toBe("Sat 28 Nov");
   });
 });
