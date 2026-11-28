@@ -182,6 +182,8 @@ const NAMES = {
   lineNumbers: 1,
   symbol: 1,
   dateTime: 1,
+  caption: 1,
+  tableOfFigures: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */

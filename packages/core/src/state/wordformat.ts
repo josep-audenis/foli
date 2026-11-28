@@ -191,6 +191,30 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
       paragraph: { spacing: { after: 100 }, ...(indent ? { indent: { left: indent } } : {}) },
     };
   }
+  // Word 16's, as its Insert Caption and Table of Figures write them (35.3).
+  if (name === "caption")
+    return {
+      id: "Caption",
+      type: "paragraph",
+      name,
+      ...based,
+      ...(normal ? { next: normal } : {}),
+      paragraph: { spacing: { after: 200, line: 240, lineRule: "auto" } },
+      run: [
+        { type: "italic", attrs: { complexScript: true } },
+        { type: "color", attrs: { value: "0E2841", themeColor: "text2" } },
+        { type: "fontSize", attrs: { value: 18, complexScript: 18 } },
+      ],
+    };
+  if (name === "table of figures")
+    return {
+      id: "TableofFigures",
+      type: "paragraph",
+      name,
+      ...based,
+      ...(normal ? { next: normal } : {}),
+      paragraph: { spacing: { after: 0 } },
+    };
   if (name === "List Paragraph")
     return {
       id: "ListParagraph",

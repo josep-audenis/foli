@@ -23,7 +23,7 @@ import type { Editor } from "./editor.js";
 import { type Field, fieldAround, fieldsIn } from "./fields.js";
 import { closeHistory, joinHistory } from "./history.js";
 import { freshId, idsOf } from "./ids.js";
-import { marksAt, TextSelection } from "./selection.js";
+import { marksAt, NodeSelection, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { trackState, trackTransaction, untracked } from "./track.js";
 import {
@@ -116,15 +116,11 @@ const names = new Map<string, readonly string[][]>();
 /** A language's month and day names, long and short (`Intl`'s, standalone); English without one. */
 function namesOf(locale: string | undefined): readonly string[][] {
   if (!locale || /^en(-|$)/i.test(locale)) return [MONTHS, DAYS];
-  // A tag the platform has no data for would name in its default language: English instead.
-  try {
-    if (!Intl.DateTimeFormat.supportedLocalesOf(locale).length) return [MONTHS, DAYS];
-  } catch {
-    return [MONTHS, DAYS];
-  }
   let found = names.get(locale);
   if (!found) {
     try {
+      // A tag the platform has no data for would name in its default language: English instead.
+      if (!Intl.DateTimeFormat.supportedLocalesOf(locale).length) throw new RangeError(locale);
       const of = (options: Intl.DateTimeFormatOptions, dates: Date[]) => {
         const format = new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" });
         return dates.map((d) => format.format(d));
@@ -722,7 +718,7 @@ const KNOWN_SWITCHES: Record<string, string> = {
   MERGEFIELD: "bf",
   REF: "hnrwpt",
   PAGEREF: "hp",
-  TOC: "ohzutnbpwx",
+  TOC: "ohzutnbpwxc",
 };
 
 /** A position of the tree's transaction, in the document the layout was made from. */
@@ -1285,7 +1281,41 @@ function styleLevel(word: WordContext, id: string | null | undefined): number | 
 }
 
 /** The headings a table of contents lists, as its switches say. */
+/**
+ * A table of figures' entries (`\c "Figure"`): each paragraph holding a `SEQ` of that label, its
+ * whole text one entry, as Word lists captions.
+ */
+function figureEntries(tree: Node, word: WordContext, label: string): Entry[] {
+  const wanted = label.toLowerCase();
+  const holders = new Set<number>();
+  for (const field of fieldsIn(tree)) {
+    if (field.name !== "SEQ" || field.deleted) continue;
+    const id = (parseFieldInstruction(field.instruction).args[0] ?? "").toLowerCase();
+    if (id === wanted) holders.add(tree.resolve(field.from).before());
+  }
+  const out: Entry[] = [];
+  for (const paragraph of paragraphsOf(tree)) {
+    if (!holders.has(paragraph.pos)) continue;
+    const parts = entryParts(tree, word, paragraph);
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    if (!first || !last) continue;
+    out.push({
+      from: first.from,
+      to: last.to,
+      level: 1,
+      title: parts.map((part) => part.title).join(" "),
+      number: "",
+      numberGap: "",
+      bookmark: parts.find((part) => part.bookmark)?.bookmark ?? null,
+    });
+  }
+  return out;
+}
+
 function contentsEntries(tree: Node, word: WordContext, { switches }: FieldInstruction): Entry[] {
+  const figures = switches.get("c")?.[0];
+  if (figures !== undefined) return figureEntries(tree, word, figures);
   const hasSource = switches.has("o") || switches.has("u") || switches.has("t");
   const [low, high] = levelRange(switches.get("o")?.[0]) as [number, number];
   const custom = new Map<string, number>();
@@ -1367,6 +1397,7 @@ function resultStyles(tree: Node, field: Field): (string | null)[] {
 }
 
 const NO_ENTRIES = "No table of contents entries found.";
+const NO_FIGURES = "No table of figures entries found.";
 
 /** Makes the table of contents number `index` of the tree list what its headings say. */
 function rebuildContents(run: Run, index: number): void {
@@ -1382,6 +1413,8 @@ function rebuildContents(run: Run, index: number): void {
     }
   const schema = tr.doc.type.schema;
   const entries = contentsEntries(tr.doc, word, instruction);
+  const figures = switches.has("c");
+  const none = figures ? NO_FIGURES : NO_ENTRIES;
   const separator = switches.get("p")?.[0] || "\t";
   const noPages = levelRange(switches.get("n")?.[0]);
   const pagesHidden = (level: number) =>
@@ -1398,7 +1431,10 @@ function rebuildContents(run: Run, index: number): void {
     (pagesHidden(entry.level) ? "" : separator + page);
   const styles: string[] = [];
   const styleFor = (level: number): string => {
-    const known = ensureStyle({ envelope: run.envelope }, `toc ${level}`);
+    const known = ensureStyle(
+      { envelope: run.envelope },
+      figures ? "table of figures" : `toc ${level}`,
+    );
     if (!known) throw new TransformError("No table of contents style");
     run.envelope = known.envelope;
     return known.id;
@@ -1412,7 +1448,7 @@ function rebuildContents(run: Run, index: number): void {
   const wanted = lead + entries.map((entry) => line(entry, pageText(entry))).join("\r");
   const current = resultStyles(tr.doc, field).slice(startsParagraph ? 0 : 1);
   if (
-    (entries.length ? shown(wanted) === shown(field.result) : field.result === NO_ENTRIES) &&
+    (entries.length ? shown(wanted) === shown(field.result) : field.result === none) &&
     (!entries.length || styles.every((id, i) => current[i] === id))
   ) {
     report.unchanged++;
@@ -1488,11 +1524,7 @@ function rebuildContents(run: Run, index: number): void {
   if (!layout)
     report.skipped.push({ instruction: field.instruction, story: null, reason: "no-layout" });
   if (!paragraphs.length) {
-    tr.replace(
-      field.resultFrom,
-      field.resultTo,
-      new Slice(Fragment.from(schema.text(NO_ENTRIES)), 0, 0),
-    );
+    tr.replace(field.resultFrom, field.resultTo, new Slice(Fragment.from(schema.text(none)), 0, 0));
     return;
   }
   // The end goes on in a paragraph of its own, with what follows it, as in Word.
@@ -1855,6 +1887,12 @@ export interface TableOfContentsOptions {
  * its own, built from the headings. Not in a story: Word's headings are the body's.
  */
 export function insertTableOfContents(options: TableOfContentsOptions = {}): Command {
+  const { from = 1, to = 3, hyperlinks = true, layout } = options;
+  return tableOfContentsAt(`TOC \\o "${from}-${to}"${hyperlinks ? " \\h" : ""} \\z \\u`, layout);
+}
+
+/** A table of contents of field code `code` at the selection, in a paragraph of its own. */
+function tableOfContentsAt(code: string, layout: FieldLayout | null | undefined): Command {
   return (state, dispatch) => {
     if (!canInsert(state) || storyBody(state)) return false;
     // A table of contents holds its entries, not another one.
@@ -1864,7 +1902,6 @@ export function insertTableOfContents(options: TableOfContentsOptions = {}): Com
     );
     if (inContents) return false;
     if (!dispatch) return true;
-    const { from = 1, to = 3, hyperlinks = true, layout } = options;
     return attempt(state, dispatch, (tr) => {
       tr.deleteSelection();
       const $pos = tr.selection.$from;
@@ -1883,9 +1920,101 @@ export function insertTableOfContents(options: TableOfContentsOptions = {}): Com
           at = $pos.pos + 2;
         }
       }
-      const code = `TOC \\o "${from}-${to}"${hyperlinks ? " \\h" : ""} \\z \\u`;
       const end = placeField(state, tr, at, code, [], { layout });
       tr.setSelection(TextSelection.create(tr.doc, end)).setMeta(closeHistory, true);
     });
   };
+}
+
+// ---------- captions (35.3) ----------
+
+/** A caption's number formats, as Word's Numbering box writes them (`SEQ … \* ARABIC`). */
+export type CaptionNumbering = "ARABIC" | "alphabetic" | "ALPHABETIC" | "roman" | "ROMAN";
+
+export interface CaptionOptions {
+  /** Word's label: Figure (the default), Table, Equation or the document's own. */
+  label?: string;
+  /** What follows the number (`": Sales by region"`). */
+  text?: string;
+  /** Above or below the selected picture, shape, text box or the caret's table. Default below. */
+  position?: "above" | "below";
+  numbering?: CaptionNumbering;
+  /** Word's Exclude label from caption: the number alone. */
+  excludeLabel?: boolean;
+  layout?: FieldLayout | null | undefined;
+}
+
+/** A label as `SEQ`'s identifier: Word joins its words with underscores. */
+export const sequenceName = (label: string) => label.trim().replace(/\s+/g, "_");
+
+/**
+ * Word's Insert Caption: a paragraph in the Caption style holding the label, a `SEQ` field of it
+ * (`SEQ Figure \* ARABIC`, numbered where it stands) and the text, above or below the selected
+ * picture, shape or text box's paragraph or the caret's table (above keeps with the next
+ * paragraph, as Word's); with nothing selected, after the caret's paragraph. One undo step, the
+ * caret at the caption's end.
+ * shortcut: the captions after it keep their numbers until fields are updated (Word renumbers
+ * them); update them when a document needs it at once.
+ */
+export function insertCaption(options: CaptionOptions = {}): Command {
+  return (state, dispatch) => {
+    const word = wordContext(state);
+    const label = (options.label ?? "Figure").trim();
+    if (!word || !label || !state.selection.$from.parent.isTextblock) return false;
+    const style = ensureStyle(word, "caption");
+    if (!style) return false;
+    if (!dispatch) return true;
+    const { position = "below", numbering = "ARABIC", text = "", excludeLabel = false } = options;
+    return attempt(state, dispatch, (tr) => {
+      const { $from } = state.selection;
+      // The block the caption goes beside: the object's paragraph, the caret's table, or its paragraph.
+      let depth = $from.depth;
+      const object = state.selection instanceof NodeSelection ? state.selection.node : null;
+      const isObject = !!object && ["picture", "shape", "textBox"].includes(object.type.name);
+      if (!isObject)
+        for (let d = $from.depth; d > 0; d--)
+          if ($from.node(d).type.name === "table") {
+            depth = d;
+            break;
+          }
+      const beside = isObject || depth !== $from.depth;
+      const above = beside && position === "above";
+      const at = above ? $from.before(depth) : $from.after(depth);
+      const paragraph = tr.doc.type.schema.nodes.paragraph as NodeType;
+      tr.insert(at, paragraph.create({ style: style.id, ...(above ? { keepNext: true } : {}) }));
+      const schema = tr.doc.type.schema;
+      let pos = at + 1;
+      if (!excludeLabel) {
+        tr.insert(pos, schema.text(`${label} `));
+        pos += label.length + 1;
+      }
+      pos = placeField(state, tr, pos, `SEQ ${sequenceName(label)} \\* ${numbering}`, [], {
+        layout: options.layout,
+      });
+      if (text) {
+        tr.insert(pos, schema.text(text));
+        pos += text.length;
+      }
+      if (style.envelope !== word.envelope) withEnvelope(tr, style.envelope);
+      tr.setSelection(TextSelection.create(tr.doc, pos)).setMeta(closeHistory, true);
+    });
+  };
+}
+
+export interface TableOfFiguresOptions {
+  /** The captions' label it lists. Default Figure. */
+  label?: string;
+  /** Entries link to their captions (`\h`). Default true. */
+  hyperlinks?: boolean;
+  layout?: FieldLayout | null | undefined;
+}
+
+/**
+ * Word's Insert Table of Figures: `TOC \h \z \c "Figure"` in a paragraph of its own, each caption of
+ * the label an entry (the Table of Figures style, a dotted tab to its page). Not in a story.
+ */
+export function insertTableOfFigures(options: TableOfFiguresOptions = {}): Command {
+  const { label = "Figure", hyperlinks = true, layout } = options;
+  const name = sequenceName(label).replace(/"/g, "");
+  return tableOfContentsAt(`TOC${hyperlinks ? " \\h" : ""} \\z \\c "${name}"`, layout);
 }

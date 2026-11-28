@@ -27,6 +27,7 @@ import {
   documentSections,
   type Editor,
   type EditorState,
+  type Field,
   type FieldLayout,
   fieldCodesShown,
   fieldsIn,
@@ -34,6 +35,7 @@ import {
   fontSizeAt,
   formatPainterState,
   formattingMarksShown,
+  insertCaption,
   insertColumn,
   insertColumnBreak,
   insertControl,
@@ -51,6 +53,7 @@ import {
   insertSymbol,
   insertTable,
   insertTableOfContents,
+  insertTableOfFigures,
   insertTextBox,
   isHeaderRow,
   isSafeHref,
@@ -186,11 +189,13 @@ import {
   useIsomorphicLayoutEffect,
 } from "./editor.js";
 import {
+  CaptionDialog,
   DateTimeDialog,
   insertingSymbol,
   recentSymbols,
   SymbolDialog,
   symbolCommand,
+  TableOfFiguresDialog,
 } from "./InsertDialogs.js";
 import { toolbarIcons } from "./icons.js";
 import { loadLocalFonts, localFontFamilies, subscribeLocalFonts } from "./localFonts.js";
@@ -509,10 +514,13 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * Watermark dialog, every header), `"bordersShading"` (its Borders and Shading dialog for the
  * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section),
  * `"symbol"` (its Symbol dialog: symbols by font and subset, special characters), `"dateTime"`
- * (its Date and Time dialog: the language's formats, as a field or as text).
+ * (its Date and Time dialog: the language's formats, as a field or as text), `"caption"` (its
+ * Caption dialog) and `"tableOfFigures"` (its Table of Figures dialog).
  */
 export type ToolbarDialogName =
   | "symbol"
+  | "caption"
+  | "tableOfFigures"
   | "dateTime"
   | "layout"
   | "layoutWrapping"
@@ -2649,6 +2657,19 @@ const RIBBON_ITEMS: readonly Item[] = [
     enabled: hasTextblock,
     render: StyleGallery,
   },
+  // References ▸ Captions (35.3): Word's Caption and Table of Figures dialogs.
+  {
+    key: "caption",
+    label: "Insert caption",
+    text: "Insert Caption",
+    dialog: "caption",
+  },
+  {
+    key: "tableOfFigures",
+    label: "Insert table of figures",
+    text: "Insert Table of Figures",
+    dialog: "tableOfFigures",
+  },
   // Insert ▸ Date & Time (35.2): Word's dialog of the language's formats.
   {
     key: "dateTime",
@@ -2931,6 +2952,8 @@ export type ToolbarItemName =
   | "pageNumber"
   | "date"
   | "dateTime"
+  | "caption"
+  | "tableOfFigures"
   | "symbol"
   | "crossReference"
   | "fieldCodes"
@@ -3000,6 +3023,8 @@ type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView
 type ToolbarColorName = "textColor" | "highlight" | "cellShading" | "pageColor" | "shading";
 type ToolbarDialogItemName =
   | "dateTime"
+  | "caption"
+  | "tableOfFigures"
   | "pageBorders"
   | "paragraphSettings"
   | "fontSettings"
@@ -3267,7 +3292,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
           ...group("Footnotes", large(t.footnote), t.endnote, t.goToNote, t.notes),
           launcher: t.noteOptions,
         },
-        group("Captions", t.crossReference),
+        group("Captions", large(t.caption), t.tableOfFigures, t.crossReference),
       ],
     },
     {
@@ -3419,6 +3444,8 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   lineNumbers: (state) => sectionAt(state) !== null,
   symbol: (state) => isWord(state) && insertSymbol(" ")(state),
   dateTime: (state) => isWord(state) && insertPageBreak(state),
+  caption: (state) => insertCaption()(state),
+  tableOfFigures: (state) => insertTableOfFigures()(state),
   layout: (state) => objectLayoutEnabled(state),
   layoutWrapping: (state) => objectLayoutEnabled(state),
   layoutSize: (state) => objectLayoutEnabled(state),
@@ -4150,6 +4177,8 @@ export function FoliToolbar({
   const [wordDialog, setWordDialog] = useState<{
     name:
       | "symbol"
+      | "caption"
+      | "tableOfFigures"
       | "dateTime"
       | "paragraph"
       | "font"
@@ -4265,6 +4294,8 @@ export function FoliToolbar({
       if (name === "noteOptions") setNoteDialog({ restore });
       else if (
         name === "symbol" ||
+        name === "caption" ||
+        name === "tableOfFigures" ||
         name === "dateTime" ||
         name === "paragraph" ||
         name === "font" ||
@@ -5215,6 +5246,40 @@ export function FoliToolbar({
           <SymbolDialog
             editor={editor}
             fonts={fontOptions(editor.state).map((option) => option.value)}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "caption" && !disabled && (
+          <CaptionDialog
+            editor={editor}
+            layout={() => editor.storyView?.fieldLayout ?? null}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "tableOfFigures" && !disabled && (
+          <TableOfFiguresDialog
+            editor={editor}
+            onInsert={(options) => {
+              const view = editor.storyView;
+              const done = editor.run(
+                insertTableOfFigures({ ...options, layout: view?.fieldLayout ?? null }),
+              );
+              // Its own lines moved the captions: their page numbers follow, in the same step.
+              const only = {
+                only: (field: Field) => field.parent?.name === "TOC",
+                continues: true,
+              };
+              if (done) view ? view.updateFields(only, editor) : updateFields(editor, only);
+              return done;
+            }}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

@@ -175,3 +175,53 @@ describe("Insert ▸ Date & Time (35.2)", () => {
     expect(titles).toContain("HH:mm");
   });
 });
+
+describe("References ▸ Captions (35.3)", () => {
+  const openReferences = () => {
+    const editor = open();
+    fireEvent.click(screen.getByRole("tab", { name: "References" }));
+    return editor;
+  };
+
+  it("inserts Word's caption from the dialog: label, number, text, numbering", () => {
+    const editor = openReferences();
+    fireEvent.click(screen.getByRole("button", { name: "Insert Caption" }));
+    const dialog = screen.getByRole("dialog", { name: "Caption" });
+    // Nothing selected: no object to go above.
+    expect((within(dialog).getByLabelText("Position") as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Table" } });
+    fireEvent.change(within(dialog).getByLabelText("Numbering"), {
+      target: { value: "ALPHABETIC" },
+    });
+    expect(dialog.textContent).toContain("Table A");
+    fireEvent.change(within(dialog).getByLabelText("Caption"), { target: { value: ": Totals" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const caption = editor.state.doc.child(1);
+    expect(caption.attrs.style).toBe("Caption");
+    expect(caption.textContent).toBe("Table A: Totals");
+    editor.run(undo);
+    expect(editor.state.doc.childCount).toBe(1);
+  });
+
+  it("adds a new label, and lists the captions in a table of figures", () => {
+    const editor = openReferences();
+    fireEvent.click(screen.getByRole("button", { name: "Insert Caption" }));
+    let dialog = screen.getByRole("dialog", { name: "Caption" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "New Label…" }));
+    fireEvent.change(within(dialog).getByLabelText("New label"), { target: { value: "Chart" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect((within(dialog).getByLabelText("Label") as HTMLSelectElement).value).toBe("Chart");
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(1).textContent).toBe("Chart 1");
+    editor.select(1);
+    fireEvent.click(screen.getByRole("button", { name: "Insert Table of Figures" }));
+    dialog = screen.getByRole("dialog", { name: "Table of Figures" });
+    fireEvent.change(within(dialog).getByLabelText("Caption label"), {
+      target: { value: "Chart" },
+    });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.child(0).attrs.style).toBe("TableofFigures");
+    expect(editor.state.doc.child(0).textContent).toContain("Chart 1");
+  });
+});

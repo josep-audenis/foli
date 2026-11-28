@@ -110,6 +110,8 @@ export {
   toggleFieldCodes,
 } from "./fields.js";
 export {
+  type CaptionNumbering,
+  type CaptionOptions,
   type CrossReference,
   type CrossReferenceTargets,
   crossReferenceTargets,
@@ -122,13 +124,17 @@ export {
   formatDatePicture,
   formatNumericPicture,
   type InsertFieldOptions,
+  insertCaption,
   insertCrossReference,
   insertDate,
   insertField,
   insertPageNumber,
   insertTableOfContents,
+  insertTableOfFigures,
   parseFieldInstruction,
+  sequenceName,
   type TableOfContentsOptions,
+  type TableOfFiguresOptions,
   type UpdateFieldsOptions,
   updateFields,
 } from "./fieldupdate.js";
