@@ -266,16 +266,29 @@ const known = new WeakMap<Node, { key: string; scope: Scope; lines: Line[] }>();
 const MATH = /^<(?:[\w.-]+:)?oMath(?:Para)?[\s>]/;
 const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
 
-/** An OMML equation's characters: its runs' text (`m:t`), structure left out. @internal */
-export function equationText(xml: string): string {
+/**
+ * An OMML equation's characters: its runs' text (`m:t`), structure left out, without Word's
+ * alignment marks (`&` in an equation array) and, with `hideDeleted`, without text a tracked
+ * change deleted (`w:del`, `w:moveFrom`). @internal
+ */
+export function equationText(xml: string, hideDeleted = false): string {
+  let source = xml;
+  if (hideDeleted)
+    source = source.replace(/<((?:[\w.-]+:)?(?:del|moveFrom))[\s>][\s\S]*?<\/\1>/g, "");
+  // In an equation array, `&` (written `&amp;`) marks where the lines align.
+  source = source.replace(/<(?:[\w.-]+:)?eqArr[\s>][\s\S]*?<\/(?:[\w.-]+:)?eqArr>/g, (array) =>
+    array.replace(/&amp;/g, ""),
+  );
   let out = "";
-  for (const m of xml.matchAll(/<(?:[\w.-]+:)?t(?:\s[^>]*)?>([^<]*)<\/(?:[\w.-]+:)?t>/g))
-    out += String(m[1]).replace(/&(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/gi, (_, e: string) =>
-      e[0] === "#"
-        ? String.fromCodePoint(
-            Number.parseInt(e.slice(e[1] === "x" ? 2 : 1), e[1] === "x" ? 16 : 10),
-          )
-        : (ENTITIES[e.toLowerCase()] ?? ""),
+  for (const m of source.matchAll(/<(?:[\w.-]+:)?t(?:\s[^>]*)?>([^<]*)<\/(?:[\w.-]+:)?t>/g))
+    out += String(m[1]).replace(
+      /&(lt|gt|amp|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);/g,
+      (_, e: string) => {
+        if (e[0] !== "#") return ENTITIES[e] ?? "";
+        const code =
+          e[1] === "x" ? Number.parseInt(e.slice(2), 16) : Number.parseInt(e.slice(1), 10);
+        return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+      },
     );
   return out;
 }
@@ -317,9 +330,12 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
       else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
       // Word's equation kept as its OMML (35.4): found by its characters, never replaced.
-      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? "")))
-        add(equationText(String(child.attrs.xml)), at, true);
-      else if (!isUnseen(child)) text += BARRIER;
+      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? ""))) {
+        const value = equationText(String(child.attrs.xml), scope.hideDeleted);
+        // An empty one still parts the words around it, as any other object.
+        if (value) add(value, at, true);
+        else text += BARRIER;
+      } else if (!isUnseen(child)) text += BARRIER;
     });
     if (text) lines.push({ text, pieces });
     return false;

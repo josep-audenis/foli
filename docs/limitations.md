@@ -978,7 +978,9 @@ Details in the [package README](../packages/docx/README.md).
 - Equations (35.4) are drawn by the browser's MathML from Word's OMML: the layout is the
   browser's, close to Word's but not the same (spacing, the size of operators, where a long
   equation breaks: Word breaks one over lines, the browser does not). Delimiters around a matrix
-  or cases may not stretch to their height in every engine. A box, border box and phantom are
-  drawn as their content; an equation's own run formatting (color, size) inside it is not
-  drawn, the paragraph's is. Until 35.5 an equation is kept whole as the file's OMML: it is
-  shown and found, not edited.
+  or cases may not stretch to their height in every engine. A box and a border box are drawn as
+  their content (no border); an equation's own run formatting (color, size) inside it is not
+  drawn, the paragraph's is; a display equation is centered whatever its `m:oMathParaPr`
+  justification says. Text a tracked change deleted inside an equation is not drawn in any
+  review view (Word shows it struck through). Until 35.5 an equation is kept whole as the file's
+  OMML: it is shown and found, not edited.

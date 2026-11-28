@@ -5597,6 +5597,33 @@ export class EditorView {
     return geometry;
   }
 
+  /**
+   * A press on an equation (35.4) puts the caret before or after it, by the side of its glyphs it
+   * landed on: a display equation fills its line, and the browser would put the caret in the
+   * drawing, where nothing can be typed.
+   */
+  private equationMouseDown(event: MouseEvent): boolean {
+    const span = (event.target as Element | null)?.closest?.("[data-foli-math]");
+    if (!span || !this.host.contains(span) || event.shiftKey) return false;
+    const pos = this.posFromDOM(span, 0);
+    if (pos === null) return false;
+    let left = Number.POSITIVE_INFINITY;
+    let right = Number.NEGATIVE_INFINITY;
+    for (const child of span.querySelector("math")?.children ?? []) {
+      const r = child.getBoundingClientRect();
+      left = Math.min(left, r.left);
+      right = Math.max(right, r.right);
+    }
+    const box = span.getBoundingClientRect();
+    const middle = left <= right ? (left + right) / 2 : (box.left + box.right) / 2;
+    event.preventDefault();
+    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+    const at = event.clientX < middle ? pos : pos + 1;
+    this.dispatch(this.state.tr.setSelection(TextSelection.create(this.state.doc, at)));
+    this.writeSelection(true);
+    return true;
+  }
+
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that
@@ -5609,6 +5636,7 @@ export class EditorView {
     if (event.timeStamp - this.touchedResize < 1000 && target?.closest?.("[data-foli-resize]"))
       return;
     if (this.pictureMouseDown(event)) return;
+    if (this.equationMouseDown(event)) return;
     // A click puts a caret where it lands, even on the one a cell selection wrote.
     if (!event.shiftKey) this.cellCaret = null;
     // A header row drawn again is not document content: the caret goes below it.

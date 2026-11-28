@@ -4895,17 +4895,22 @@ equations (`m:oMath`) kept opaque; no symbol picker.
   pages, read-only pages and `exportPdf` (the PDF is printed by a browser, so MathML prints as
   shown; checked here); the text of an equation for find and screen readers. Own converter, or
   a dependency with its license checked; no editor engine. Built: the view's own converter
-  (`word/math.ts`, no dependency): runs as identifiers, numbers and operators (Word's hyphen as
-  the minus sign, `m:sty`, normal text), fractions (bar, no bar, linear), scripts and pre-scripts,
-  radicals, n-ary operators with their limits, delimiters, functions, limits, accents, bars,
-  group characters, matrices and equation arrays; a display equation (`m:oMathPara`) a centered
-  block, in Word's math font; its characters as the MathML's `alttext`. Drawn on the editing
-  pages (`edit.ts`) and by `renderDocument` (`blocks.ts`): print and `exportPdf` print it as shown
-  (`pdf.spec.ts`: 13's print and export give the same pages and characters). Core's find sees an
-  equation's characters (never replacing them). A Word-made corpus document,
-  `13-equations.docx` (`build-word-corpus.ps1`, Word's reference with its text): its eleven
-  equations written back byte for byte. `math.test.ts` (view), `equations.test.ts` (docx),
-  `word-equations.spec.ts` (editing and read-only pages, placement, axe; three engines).
+  (`word/math.ts`, no dependency, MathML Core only): runs as identifiers, numbers and operators
+  (a function's name one word; Word's hyphen as the minus sign, an apostrophe a prime; bold,
+  script, double-struck… as Unicode's mathematical letters), fractions (bar, no bar, linear),
+  scripts and pre-scripts, radicals, n-ary operators with Word's limits (integrals beside),
+  delimiters with separators, functions, limits, accents (their spacing forms), bars, group
+  characters, matrices, equation arrays (alignment marks not drawn), phantoms; tracked deletions
+  not drawn; a display equation (`m:oMathPara`) a centered block in Word's math font. The MathML
+  is what assistive technology reads. Drawn on the editing pages (`edit.ts`: one position, a
+  press beside it puts the caret before or after it) and by `renderDocument` (`blocks.ts`):
+  print and `exportPdf` print it as shown (`pdf.spec.ts`: 13's print and export give the same
+  pages and characters). Core's find sees an equation's characters (never replacing them; not
+  deleted ones when the view hides them). A Word-made corpus document, `13-equations.docx`
+  (`build-word-corpus.ps1`, Word's reference with its text): its eleven equations written back
+  byte for byte. `math.test.ts` (view: each element and its defaults), `find-equations.test.ts`,
+  `equations.test.ts` (docx), `word-equations.spec.ts` (editing and read-only pages, placement,
+  pressing, typing and arrows beside equations, axe; three engines).
 - [ ] 35.5 Equation editing: an equation's linear form (UnicodeMath) in a box, written back as
   OMML (an equation node in the model: schema bump with migration); Insert ▸ Equation with
   Word's common ones. Own parser and writer, or a dependency with its license checked; no

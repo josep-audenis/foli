@@ -31,7 +31,6 @@ const drawn = (page: Page, root: string) =>
       tags: [
         ...new Set(maths.flatMap((m) => [...m.querySelectorAll("*")].map((e) => e.localName))),
       ],
-      alt: maths.map((m) => m.getAttribute("alttext")),
     };
   }, root);
 
@@ -42,7 +41,6 @@ test("draws Word's equations as MathML on the editing pages; axe", async ({ page
   expect(math.display).toBe(10);
   for (const tag of ["mfrac", "msqrt", "mroot", "msup", "msubsup", "munderover", "mtable", "mo"])
     expect(math.tags, tag).toContain(tag);
-  expect(math.alt[0]).toBe("x=-b±b2-4ac2a");
   // A fraction is drawn as one: its numerator above its denominator.
   const fraction = await page.evaluate(() => {
     const f = document.querySelector("section.foli-page mfrac") as Element;
@@ -67,6 +65,41 @@ test("draws Word's equations as MathML on the editing pages; axe", async ({ page
   expect(placement.sentence).toBe(true);
   const results = await new AxeBuilder({ page }).include("section.foli-page").analyze();
   expect(results.violations).toEqual([]);
+});
+
+test("a press beside an equation puts the caret there: typing and arrows go around it", async ({
+  page,
+}) => {
+  await open(page);
+  const text = (index: number) =>
+    page.evaluate((i) => window.foliEdit.editor.state.doc.child(i).textContent, index);
+  const box = async (selector: string) => {
+    await page.locator(selector).first().scrollIntoViewIfNeeded();
+    const b = await page.locator(selector).first().boundingBox();
+    if (!b) throw new Error(selector);
+    return b;
+  };
+  // Right of a display equation's glyphs, on its line: after it.
+  const display = await box('section.foli-page [data-foli-math="display"] math');
+  await page.mouse.click(display.x + display.width - 2, display.y + display.height / 2);
+  await page.keyboard.type("Q");
+  await expect.poll(() => text(1)).toBe("Q");
+  await page.keyboard.press("Backspace");
+  await expect.poll(() => text(1)).toBe("");
+  // Left of the inline equation: in its sentence, before it.
+  const inline = await box('section.foli-page [data-foli-math="inline"] math');
+  await page.mouse.click(inline.x - 1, inline.y + inline.height / 2);
+  await page.keyboard.type("Z");
+  await expect
+    .poll(() => text(11))
+    .toBe("The sides of a right triangle give Z, as Pythagoras showed.");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("W");
+  // Over the equation (one position), then past the comma.
+  await expect
+    .poll(() => text(11))
+    .toBe("The sides of a right triangle give Z,W as Pythagoras showed.");
 });
 
 test("renderDocument draws them too (print, exportPdf)", async ({ page }) => {
