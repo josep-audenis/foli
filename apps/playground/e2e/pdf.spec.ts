@@ -323,7 +323,7 @@ for (const name of readdirSync(CORPUS).filter((n) => n.endsWith(".docx")))
     // The playground's own page around the editor is not printed (styling.md, "Print").
     await page.addStyleTag({
       content:
-        "@media print{header,#toolbar,#navigation,#comments{display:none!important}#editor{display:block!important;padding:0!important}}",
+        "@media print{header,#toolbar,#ruler,#vruler,#navigation,#comments,#status,#menu,#mini{display:none!important}#body,#editor{display:block!important}#editor{padding:0!important}}",
     });
     // What `view.print()` does before the browser's dialog.
     await page.evaluate(() => window.foliEdit.view.updateFields());
