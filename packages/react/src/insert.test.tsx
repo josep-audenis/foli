@@ -214,6 +214,13 @@ describe("References ▸ Captions (35.3)", () => {
     expect((within(dialog).getByLabelText("Label") as HTMLSelectElement).value).toBe("Chart");
     fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
     expect(editor.state.doc.child(1).textContent).toBe("Chart 1");
+    // Before that caption the next one is the first: the lead says so, as the field will.
+    editor.select(1);
+    fireEvent.click(screen.getByRole("button", { name: "Insert Caption" }));
+    dialog = screen.getByRole("dialog", { name: "Caption" });
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Chart" } });
+    expect(dialog.textContent).toContain("Chart 1");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     editor.select(1);
     fireEvent.click(screen.getByRole("button", { name: "Insert Table of Figures" }));
     dialog = screen.getByRole("dialog", { name: "Table of Figures" });

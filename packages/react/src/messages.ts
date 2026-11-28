@@ -51,6 +51,7 @@ export const toolbarMessages = [
   "Accept all",
   "Accept all changes",
   "Accept the change here, or the changes selected",
+  "Add label",
   "Add line numbering",
   "Add link",
   "Add repeating item",

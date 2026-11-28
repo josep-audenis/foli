@@ -25,6 +25,7 @@ import { closeHistory, joinHistory } from "./history.js";
 import { freshId, idsOf } from "./ids.js";
 import { marksAt, NodeSelection, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
+import { CellSelection } from "./tables.js";
 import { trackState, trackTransaction, untracked } from "./track.js";
 import {
   otherTrees,
@@ -1280,7 +1281,6 @@ function styleLevel(word: WordContext, id: string | null | undefined): number | 
   return outline !== null && outline < 9 ? outline + 1 : null;
 }
 
-/** The headings a table of contents lists, as its switches say. */
 /**
  * A table of figures' entries (`\c "Figure"`): each paragraph holding a `SEQ` of that label, its
  * whole text one entry, as Word lists captions.
@@ -1313,9 +1313,10 @@ function figureEntries(tree: Node, word: WordContext, label: string): Entry[] {
   return out;
 }
 
+/** The headings a table of contents lists, as its switches say (a label's captions with `\c`). */
 function contentsEntries(tree: Node, word: WordContext, { switches }: FieldInstruction): Entry[] {
   const figures = switches.get("c")?.[0];
-  if (figures !== undefined) return figureEntries(tree, word, figures);
+  if (figures) return figureEntries(tree, word, figures);
   const hasSource = switches.has("o") || switches.has("u") || switches.has("t");
   const [low, high] = levelRange(switches.get("o")?.[0]) as [number, number];
   const custom = new Map<string, number>();
@@ -1411,9 +1412,14 @@ function rebuildContents(run: Run, index: number): void {
       skip(run, field, "unsupported-switch", `\\${letter}`);
       return;
     }
+  // Word's table of figures by style (`\t "Caption" \c`, no label) is kept as it is.
+  const figures = !!switches.get("c")?.[0];
+  if (switches.has("c") && !figures) {
+    skip(run, field, "unsupported-switch", "\\c");
+    return;
+  }
   const schema = tr.doc.type.schema;
   const entries = contentsEntries(tr.doc, word, instruction);
-  const figures = switches.has("c");
   const none = figures ? NO_FIGURES : NO_ENTRIES;
   const separator = switches.get("p")?.[0] || "\t";
   const noPages = levelRange(switches.get("n")?.[0]);
@@ -1945,7 +1951,7 @@ export interface CaptionOptions {
 }
 
 /** A label as `SEQ`'s identifier: Word joins its words with underscores. */
-export const sequenceName = (label: string) => label.trim().replace(/\s+/g, "_");
+export const sequenceName = (label: string) => label.trim().replace(/"/g, "").replace(/\s+/g, "_");
 
 /**
  * Word's Insert Caption: a paragraph in the Caption style holding the label, a `SEQ` field of it
@@ -1960,7 +1966,9 @@ export function insertCaption(options: CaptionOptions = {}): Command {
   return (state, dispatch) => {
     const word = wordContext(state);
     const label = (options.label ?? "Figure").trim();
-    if (!word || !label || !state.selection.$from.parent.isTextblock) return false;
+    const cells = state.selection instanceof CellSelection;
+    if (!word || !sequenceName(label) || !(cells || state.selection.$from.parent.isTextblock))
+      return false;
     const style = ensureStyle(word, "caption");
     if (!style) return false;
     if (!dispatch) return true;
@@ -1977,11 +1985,21 @@ export function insertCaption(options: CaptionOptions = {}): Command {
             depth = d;
             break;
           }
-      const beside = isObject || depth !== $from.depth;
+      const inTable = depth !== $from.depth;
+      const beside = isObject || inTable;
       const above = beside && position === "above";
       const at = above ? $from.before(depth) : $from.after(depth);
       const paragraph = tr.doc.type.schema.nodes.paragraph as NodeType;
-      tr.insert(at, paragraph.create({ style: style.id, ...(above ? { keepNext: true } : {}) }));
+      // Beside a paragraph, in the block content controls it is in, as a new paragraph there would be.
+      const controls = inTable ? null : ($from.parent.attrs.controls ?? null);
+      tr.insert(
+        at,
+        paragraph.create({
+          style: style.id,
+          ...(above ? { keepNext: true } : {}),
+          ...(controls ? { controls } : {}),
+        }),
+      );
       const schema = tr.doc.type.schema;
       let pos = at + 1;
       if (!excludeLabel) {
@@ -2015,6 +2033,6 @@ export interface TableOfFiguresOptions {
  */
 export function insertTableOfFigures(options: TableOfFiguresOptions = {}): Command {
   const { label = "Figure", hyperlinks = true, layout } = options;
-  const name = sequenceName(label).replace(/"/g, "");
+  const name = sequenceName(label);
   return tableOfContentsAt(`TOC${hyperlinks ? " \\h" : ""} \\z \\c "${name}"`, layout);
 }

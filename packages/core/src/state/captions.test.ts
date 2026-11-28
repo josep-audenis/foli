@@ -12,6 +12,7 @@ import {
 import { undo } from "./history.js";
 import { insertPicture } from "./pictures.js";
 import { NodeSelection } from "./selection.js";
+import { CellSelection } from "./tables.js";
 
 const text = (value: string): NodeJSON => ({ type: "text", text: value });
 const p = (...content: string[]): NodeJSON => ({
@@ -136,5 +137,71 @@ describe("insertTableOfFigures (35.3)", () => {
     editor.select(1);
     editor.run(insertTableOfFigures({ label: "Equation" }));
     expect(fieldsIn(editor.state.doc)[0]?.result).toBe("No table of figures entries found.");
+  });
+});
+
+describe("captions: review cases (35.3)", () => {
+  it("keeps Word's table of figures by style (`\\c` with no label) as it is", () => {
+    const fieldOf = (code: string, shown: string): NodeJSON[] => [
+      { type: "fieldStart" },
+      { type: "fieldCode", attrs: { text: ` ${code} ` } },
+      { type: "fieldSeparator" },
+      { type: "text", text: shown },
+      { type: "fieldEnd" },
+    ];
+    const editor = editorOf([
+      { type: "paragraph", content: fieldOf(String.raw`TOC \h \z \t "Caption" \c`, "kept") },
+      p("after"),
+    ]);
+    const report = updateFields(editor, { layout: pagesEvery(1000) });
+    expect(fieldsIn(editor.state.doc)[0]?.result).toBe("kept");
+    expect(report.skipped).toMatchObject([{ reason: "unsupported-switch", detail: String.raw`\c` }]);
+  });
+
+  it("lists a label with quotes, as its SEQ names it", () => {
+    const editor = editorOf([p(), p("text")]);
+    editor.select(3);
+    editor.run(insertCaption({ label: 'My "Fig"' }));
+    expect(fieldsIn(editor.state.doc)[0]?.instruction).toBe(String.raw`SEQ My_Fig \* ARABIC`);
+    editor.select(1);
+    editor.run(insertTableOfFigures({ label: 'My "Fig"', layout: pagesEvery(1000) }));
+    const toc = fieldsIn(editor.state.doc).find((f) => f.name === "TOC");
+    expect(toc?.instruction).toBe(String.raw`TOC \h \z \c "My_Fig"`);
+    expect(toc?.result).toBe('My "Fig" 1\t1');
+  });
+
+  it("captions a table its cells are selected in", () => {
+    const cell = (value: string): NodeJSON => ({ type: "tableCell", content: [p(value)] });
+    const table: NodeJSON = {
+      type: "table",
+      attrs: { grid: [2000, 2000] },
+      content: [{ type: "tableRow", content: [cell("a"), cell("b")] }],
+    };
+    const editor = editorOf([p("intro"), table, p()]);
+    let first = 0;
+    let last = 0;
+    editor.state.doc.descendants((n, pos) => {
+      if (n.type.name === "tableCell") {
+        if (!first) first = pos;
+        last = pos;
+      }
+    });
+    editor.dispatch(
+      editor.state.tr.setSelection(CellSelection.create(editor.state.doc, first, last)),
+    );
+    expect(editor.run(insertCaption({ label: "Table", position: "above" }))).toBe(true);
+    const all = blocks(editor);
+    expect(all[1]?.attrs?.style).toBe("Caption");
+    expect(all[2]?.type).toBe("table");
+  });
+
+  it("stays in the content controls of the paragraph it follows", () => {
+    const editor = editorOf([
+      { type: "paragraph", attrs: { controls: ["c1"] }, content: [text("in")] },
+      { type: "paragraph", attrs: { controls: ["c1"] }, content: [text("also")] },
+    ]);
+    editor.select(2);
+    editor.run(insertCaption());
+    expect(blocks(editor)[1]?.attrs).toEqual({ style: "Caption", controls: ["c1"] });
   });
 });

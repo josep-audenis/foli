@@ -656,6 +656,7 @@ export function DateTimeDialog({
 // ---------- References ▸ Insert Caption, Insert Table of Figures (35.3) ----------
 
 /** Word's own labels, then the document's (its captions' `SEQ` names). */
+// As [value, label] pairs: the toolbar's messages are collected from those.
 const CAPTION_LABELS: string[] = (
   [
     ["Equation", "Equation"],
@@ -674,13 +675,15 @@ const CAPTION_NUMBERINGS = [
 
 /** The labels a document's captions use, Word's own first. */
 function captionLabels(editor: Editor): string[] {
-  const found = new Set(CAPTION_LABELS);
+  const found = [...CAPTION_LABELS];
   for (const field of fieldsIn(editor.state.doc))
     if (field.name === "SEQ") {
       const name = parseFieldInstruction(field.instruction).args[0];
-      if (name) found.add(name.replace(/_/g, " "));
+      // As its `SEQ` names it (Word's own labels too: "figure" is Figure).
+      if (name && !found.some((l) => sequenceName(l).toLowerCase() === name.toLowerCase()))
+        found.push(name);
     }
-  return [...found];
+  return found;
 }
 
 /** Whether the caption has something to go above or below (a selected object, a table). */
@@ -725,14 +728,13 @@ export function CaptionDialog({
     if (newLabel !== null) newBox.current?.focus();
   }, [newLabel]);
   // What Word's box shows before the typed text: the label and the number the caption gets.
-  const count = fieldsIn(editor.state.doc).filter(
-    (f) =>
-      f.name === "SEQ" &&
-      !f.deleted &&
-      (parseFieldInstruction(f.instruction).args[0] ?? "").toLowerCase() ===
-        sequenceName(label).toLowerCase(),
-  ).length;
-  const shownNumber = formatNumber(count + 1, NUMBER_FORMATS[numbering]);
+  // The number the caption gets, as inserting it would give it (a dry run of the command).
+  let shownNumber = formatNumber(1, NUMBER_FORMATS[numbering]);
+  insertCaption({ label, numbering, excludeLabel: true })(editor.state, (tr) => {
+    const end = tr.selection.from;
+    const placed = fieldsIn(tr.doc).find((f) => f.name === "SEQ" && f.to === end);
+    if (placed) shownNumber = placed.result;
+  });
   const lead = exclude ? shownNumber : `${label} ${shownNumber}`;
   const apply = (event: FormEvent) => {
     event.preventDefault();
@@ -750,14 +752,17 @@ export function CaptionDialog({
       ),
     );
   };
-  const addLabel = () => {
-    const name = (newLabel ?? "").trim();
+  const labelBox = useRef<HTMLSelectElement>(null);
+  const endNewLabel = (name: string) => {
     if (name) {
       if (!labels.includes(name)) setLabels([...labels, name]);
       setLabel(name);
     }
     setNewLabel(null);
+    // The box it went to keeps the focus (its field is gone).
+    queueMicrotask(() => labelBox.current?.focus());
   };
+  const addLabel = () => endNewLabel(sequenceName(newLabel ?? "") ? (newLabel ?? "").trim() : "");
   return (
     <div
       role="dialog"
@@ -766,7 +771,7 @@ export function CaptionDialog({
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.preventDefault();
-        if (newLabel !== null) setNewLabel(null);
+        if (newLabel !== null) endNewLabel("");
         else onClose(false);
       }}
     >
@@ -790,7 +795,12 @@ export function CaptionDialog({
             </span>
           </div>
           <Field id={`${id}-label`} label={t("Label")}>
-            <select id={`${id}-label`} value={label} onChange={(e) => setLabel(e.target.value)}>
+            <select
+              ref={labelBox}
+              id={`${id}-label`}
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            >
               {labels.map((name) => (
                 <option key={name} value={name}>
                   {CAPTION_LABELS.includes(name) ? t(name as ToolbarMessage) : name}
@@ -844,6 +854,12 @@ export function CaptionDialog({
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
               />
+              <button type="button" onClick={addLabel}>
+                {t("Add label")}
+              </button>
+              <button type="button" onClick={() => endNewLabel("")}>
+                {t("Cancel")}
+              </button>
             </Field>
           )}
         </div>
