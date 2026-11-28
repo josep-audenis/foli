@@ -182,7 +182,8 @@ export function mathElement(omml: Element, doc: Document): Element | null {
           while (/^\p{L}/u.test(pieces[i + 1] ?? "")) piece += pieces[++i];
         const shown = look(piece);
         const attrs: Record<string, string> =
-          style === "p" || (shown === piece && [...piece].length > 1)
+          // Several letters (marks aside) are a word, upright; one letter with an accent stays italic.
+          style === "p" || (shown === piece && [...piece.replace(/\p{M}/gu, "")].length > 1)
             ? { mathvariant: "normal" }
             : {};
         // A letter in a style Unicode has a letter for is that letter, drawn as it is.
@@ -347,8 +348,8 @@ export function mathElement(omml: Element, doc: Document): Element | null {
     }
   }
   const math = make("math");
-  // Drawn, not text to type in: a press goes to the equation's span, which the editor places.
-  math.setAttribute("style", "pointer-events: none; user-select: none");
+  // Drawn, not text to type in: a press on it goes before or after it (the view places it).
+  math.setAttribute("style", "user-select: none");
   if (name === "oMathPara") {
     math.setAttribute("display", "block");
     const equations = kids(omml, "oMath");

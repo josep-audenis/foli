@@ -102,6 +102,23 @@ test("a press beside an equation puts the caret there: typing and arrows go arou
     .toBe("The sides of a right triangle give Z,W as Pythagoras showed.");
 });
 
+test("a drag from text over equations selects across them", async ({ page }) => {
+  await open(page);
+  const title = page.locator("section.foli-page h1, section.foli-page p").first();
+  const from = await title.boundingBox();
+  const target = page.locator('section.foli-page [data-foli-math="display"] math').nth(3);
+  await target.scrollIntoViewIfNeeded();
+  const to = await target.boundingBox();
+  if (!from || !to) throw new Error("no boxes");
+  await page.mouse.move(from.x + 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width - 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const selection = await page.evaluate(() => window.foliEdit.editor.state.selection.toJSON());
+  // Past the first three display equations at least.
+  expect(Math.max(selection.anchor, selection.head)).toBeGreaterThan(20);
+});
+
 test("renderDocument draws them too (print, exportPdf)", async ({ page }) => {
   await page.goto("/word.html");
   await page.waitForFunction(() => "foliWord" in window);

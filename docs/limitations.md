@@ -982,5 +982,6 @@ Details in the [package README](../packages/docx/README.md).
   their content (no border); an equation's own run formatting (color, size) inside it is not
   drawn, the paragraph's is; a display equation is centered whatever its `m:oMathParaPr`
   justification says. Text a tracked change deleted inside an equation is not drawn in any
-  review view (Word shows it struck through). Until 35.5 an equation is kept whole as the file's
+  review view (Word shows it struck through). Bold Greek and sans-serif italic letters in an equation are
+  drawn in the plain style. Until 35.5 an equation is kept whole as the file's
   OMML: it is shown and found, not edited.

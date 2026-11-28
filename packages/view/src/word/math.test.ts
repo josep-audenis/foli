@@ -134,7 +134,7 @@ describe("OMML as MathML (35.4)", () => {
   it("makes a display equation a block, and is not a place to type or press", () => {
     const m = math(r("x"), true);
     expect(m.getAttribute("display")).toBe("block");
-    expect(m.getAttribute("style")).toContain("pointer-events: none");
+    expect(m.getAttribute("style")).toContain("user-select: none");
     expect(math(r("x")).getAttribute("display")).toBeNull();
   });
 

@@ -274,7 +274,11 @@ const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"'
 export function equationText(xml: string, hideDeleted = false): string {
   let source = xml;
   if (hideDeleted)
-    source = source.replace(/<((?:[\w.-]+:)?(?:del|moveFrom))[\s>][\s\S]*?<\/\1>/g, "");
+    // Not a self-closing one (`m:ctrlPr`'s deletion mark): it holds no text.
+    source = source.replace(
+      /<((?:[\w.-]+:)?(?:del|moveFrom))(?:\s[^>]*?)?(?<!\/)>[\s\S]*?<\/\1>/g,
+      "",
+    );
   // In an equation array, `&` (written `&amp;`) marks where the lines align.
   source = source.replace(/<(?:[\w.-]+:)?eqArr[\s>][\s\S]*?<\/(?:[\w.-]+:)?eqArr>/g, (array) =>
     array.replace(/&amp;/g, ""),

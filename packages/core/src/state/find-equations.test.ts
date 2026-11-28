@@ -31,6 +31,9 @@ describe("find in equations (35.4)", () => {
     const deleted = `<m:oMath>${r("a")}<w:del w:id="1">${r("q")}</w:del></m:oMath>`;
     expect(equationText(deleted)).toBe("aq");
     expect(equationText(deleted, true)).toBe("a");
+    // A self-closing deletion mark (in `m:ctrlPr`) holds nothing: the text after it stays.
+    const marked = `<m:oMath><m:sSup><m:sSupPr><m:ctrlPr><w:del w:id="2"/></m:ctrlPr></m:sSupPr><m:e>${r("y")}</m:e><m:sup/></m:sSup><w:del w:id="3">${r("q")}</w:del>${r("z")}</m:oMath>`;
+    expect(equationText(marked, true)).toBe("yz");
   });
 
   it("finds them, and an empty one still parts the words around it", () => {

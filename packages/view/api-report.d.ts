@@ -882,6 +882,13 @@ export declare class EditorView {
      * drawing, where nothing can be typed.
      */
     private equationMouseDown;
+    /**
+     * A drag (the browser's selection) over an equation: the selection's head goes before or after
+     * it, as a press does; the browser cannot put it in the drawing.
+     */
+    private dragOverEquation;
+    /** The equation under a pointer event, and the position on the side of its glyphs it is on. */
+    private equationSide;
     private onMouseDown;
     /**
      * A click on a link in the document does not navigate (it places the caret, also in read-only
