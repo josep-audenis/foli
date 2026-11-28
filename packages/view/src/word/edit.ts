@@ -516,16 +516,17 @@ export class WordRenderer {
           leafElement(span);
           return;
         }
+        case "equation":
         case "opaqueInline": {
           const span = this.#run(run, child.marks, line);
           const xml = parseOpaque(String(child.attrs.xml ?? ""), doc);
-          // Word's equation (35.4): drawn as MathML, one position as the opaque run it is.
+          // Word's equation (35.4, an `equation` from 35.5): drawn as MathML, one position.
           const math = isMath(xml) ? mathElement(xml, doc) : null;
           if (math) {
             span.style.fontFamily = MATH_FONT;
             span.append(math);
             span.dataset.foliMath = xml?.localName === "oMathPara" ? "display" : "inline";
-            span.dataset.foliOpaque = String(child.attrs.label ?? "");
+            if (name === "opaqueInline") span.dataset.foliOpaque = String(child.attrs.label ?? "");
             span.setAttribute("contenteditable", "false");
             leafElement(span);
             return;

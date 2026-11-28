@@ -6,7 +6,7 @@ const borders = { top: { style: "single", size: 4, space: 24 }, offsetFrom: "pag
 
 describe("page decoration (schema 9)", () => {
   it("needs schema 9 for a page color, page borders or line numbers", () => {
-    expect(SCHEMA_VERSION).toBe(11);
+    expect(SCHEMA_VERSION).toBe(12);
     const plain = createDocument();
     expect(plain.schemaVersion).toBe(5);
     expect(createDocument(undefined, { pageBorders: borders }).schemaVersion).toBe(9);

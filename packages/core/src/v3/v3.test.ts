@@ -427,14 +427,14 @@ describe("schema v3 envelope", () => {
       ],
       [{ content: { type: "paragraph" } }, /root node must be of type "doc"/],
       [
-        { schemaVersion: 12 },
-        /Unsupported schemaVersion: 12 \(.*reads 1 to 11; .*saved by a newer one\)/,
+        { schemaVersion: 13 },
+        /Unsupported schemaVersion: 13 \(.*reads 1 to 12; .*saved by a newer one\)/,
       ],
       [
         { schemaVersion: 0 },
-        /Unsupported schemaVersion: 0 \(this version of @folijs\/core reads 1 to 11\)$/,
+        /Unsupported schemaVersion: 0 \(this version of @folijs\/core reads 1 to 12\)$/,
       ],
-      [{ schemaVersion: 3.5 }, /reads 1 to 11\)$/],
+      [{ schemaVersion: 3.5 }, /reads 1 to 12\)$/],
     ];
     for (const [overrides, message] of bad) {
       expect(() => parseDocument(v3(overrides)), JSON.stringify(overrides)).toThrow(message);
@@ -475,7 +475,7 @@ describe("schema v3 envelope", () => {
 describe("createDocument", () => {
   it("makes a valid current-schema document on A4 with the editor's styles", () => {
     const made = createDocument();
-    expect(SCHEMA_VERSION).toBe(11);
+    expect(SCHEMA_VERSION).toBe(12);
     // The lowest version its content needs (ADR-0008).
     expect(made.schemaVersion).toBe(5);
     expect(parseDocument(made)).toEqual(made);

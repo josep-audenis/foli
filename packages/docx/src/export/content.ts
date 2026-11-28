@@ -417,6 +417,7 @@ function markerXml(node: NodeJSON, context: WriteContext): string {
     case ELEMENT:
       return String(a.xml);
     case "opaqueInline":
+    case "equation":
       return verbatim(a.xml, context);
     // Their partner is gone (an edit): the content around them stays.
     case "controlStart":

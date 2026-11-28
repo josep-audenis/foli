@@ -41,6 +41,7 @@ import {
   insertControl,
   insertCrossReference,
   insertDate,
+  insertEquation,
   insertHardBreak,
   insertHorizontalRule,
   insertNote,
@@ -97,6 +98,7 @@ import {
   type ShapeLook,
   type StorySide,
   sectionAt,
+  selectedEquation,
   selectedObject,
   selectedPicture,
   selectedTextBox,
@@ -159,7 +161,13 @@ import {
   watermarkOf,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
-import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
+import {
+  type EditorViewOptions,
+  EMU_PER_PX,
+  measureImageFile,
+  textWidthEmu,
+  unicodeMathToOmml,
+} from "@folijs/view";
 import {
   type FormEvent,
   Fragment,
@@ -191,6 +199,9 @@ import {
 import {
   CaptionDialog,
   DateTimeDialog,
+  displayHere,
+  EQUATION_GALLERY,
+  EquationDialog,
   insertingSymbol,
   recentSymbols,
   SymbolDialog,
@@ -515,10 +526,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
  * selected paragraphs), `"lineNumbers"` (its Line Numbers dialog, the caret's section),
  * `"symbol"` (its Symbol dialog: symbols by font and subset, special characters), `"dateTime"`
  * (its Date and Time dialog: the language's formats, as a field or as text), `"caption"` (its
- * Caption dialog) and `"tableOfFigures"` (its Table of Figures dialog).
+ * Caption dialog), `"tableOfFigures"` (its Table of Figures dialog) and `"equation"` (an
+ * equation's linear form: a new one at the selection, or the selected one).
  */
 export type ToolbarDialogName =
   | "symbol"
+  | "equation"
   | "caption"
   | "tableOfFigures"
   | "dateTime"
@@ -2374,6 +2387,12 @@ const rotate =
     );
   };
 const pictureSelected = (state: EditorState) => selectedPicture(state) !== null;
+/** An equation with nothing in it: whether one may go at the selection. */
+const EMPTY_EQUATION = "<m:oMath/>";
+/** Where Insert ▸ Equation applies: a place for a new one, or a selected one to edit. */
+const equationApplies = (state: EditorState) =>
+  insertEquation(EMPTY_EQUATION)(state) || selectedEquation(state) !== null;
+
 const isWord = (state: EditorState) => wordContext(state) !== null;
 // The table entries' cheap checks: a dry run of an insertion would build it after every change.
 const rowsOf = { enabled: inTable };
@@ -2656,6 +2675,36 @@ const RIBBON_ITEMS: readonly Item[] = [
     label: "Styles",
     enabled: hasTextblock,
     render: StyleGallery,
+  },
+  // Insert ▸ Equation (35.5): Word's gallery, a new equation or the selected one in its linear form.
+  {
+    key: "equation",
+    label: "Equation",
+    text: "Equation",
+    enabled: equationApplies,
+    actions: () => [
+      ...EQUATION_GALLERY.map(({ name, linear }, i) => ({
+        key: `equation-${i}`,
+        label: name,
+        command: ((state, dispatch) =>
+          insertEquation(unicodeMathToOmml(linear, displayHere(state)))(
+            state,
+            dispatch,
+          )) as Command,
+      })),
+      {
+        key: "newEquation",
+        label: "Insert New Equation…",
+        command: (state: EditorState) => insertEquation(EMPTY_EQUATION)(state),
+        dialog: "equation" as const,
+      },
+      {
+        key: "editEquation",
+        label: "Edit Equation…",
+        command: (state: EditorState) => selectedEquation(state) !== null,
+        dialog: "equation" as const,
+      },
+    ],
   },
   // References ▸ Captions (35.3): Word's Caption and Table of Figures dialogs.
   {
@@ -2951,6 +3000,7 @@ export type ToolbarItemName =
   | "updateFields"
   | "pageNumber"
   | "date"
+  | "equation"
   | "dateTime"
   | "caption"
   | "tableOfFigures"
@@ -3001,6 +3051,7 @@ export type ToolbarItemName =
 
 /** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
+  | "equation"
   | "symbol"
   | "lineNumbers"
   | "watermark"
@@ -3240,7 +3291,7 @@ export const wordRibbonTabs: readonly ToolbarTab[] = (() => {
         group("Links", t.link, t.crossReference),
         group("Header & Footer", t.headerFooter, t.pageNumber, t.date),
         group("Text", large(t.textBox), t.controls, t.controlProperties, t.fields, t.dateTime),
-        group("Symbols", t.symbol),
+        group("Symbols", large(t.equation), t.symbol),
       ],
     },
     {
@@ -3444,6 +3495,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   lineNumbers: (state) => sectionAt(state) !== null,
   symbol: (state) => isWord(state) && insertSymbol(" ")(state),
   dateTime: (state) => isWord(state) && insertPageBreak(state),
+  equation: (state) => equationApplies(state),
   caption: (state) => insertCaption()(state),
   tableOfFigures: (state) => insertTableOfFigures()(state),
   layout: (state) => objectLayoutEnabled(state),
@@ -4177,6 +4229,7 @@ export function FoliToolbar({
   const [wordDialog, setWordDialog] = useState<{
     name:
       | "symbol"
+      | "equation"
       | "caption"
       | "tableOfFigures"
       | "dateTime"
@@ -4294,6 +4347,7 @@ export function FoliToolbar({
       if (name === "noteOptions") setNoteDialog({ restore });
       else if (
         name === "symbol" ||
+        name === "equation" ||
         name === "caption" ||
         name === "tableOfFigures" ||
         name === "dateTime" ||
@@ -5246,6 +5300,16 @@ export function FoliToolbar({
           <SymbolDialog
             editor={editor}
             fonts={fontOptions(editor.state).map((option) => option.value)}
+            onClose={(applied) => {
+              const { restore } = wordDialog;
+              setWordDialog(null);
+              closed(applied, restore);
+            }}
+          />
+        )}
+        {wordDialog?.name === "equation" && !disabled && (
+          <EquationDialog
+            editor={editor}
             onClose={(applied) => {
               const { restore } = wordDialog;
               setWordDialog(null);

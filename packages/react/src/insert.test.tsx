@@ -232,3 +232,46 @@ describe("References ▸ Captions (35.3)", () => {
     expect(editor.state.doc.child(0).textContent).toContain("Chart 1");
   });
 });
+
+describe("Insert ▸ Equation (35.5)", () => {
+  it("inserts Word's gallery equation as OMML, a display one in an empty paragraph", () => {
+    const editor = open();
+    editor.run((state, dispatch) => {
+      dispatch?.(state.tr.insert(state.doc.content.size, state.schema.node("paragraph")));
+      return true;
+    });
+    editor.select(editor.state.doc.content.size - 1);
+    fireEvent.click(screen.getByRole("button", { name: /^Equation/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pythagorean Theorem" }));
+    const node = editor.state.doc.child(1).firstChild;
+    expect(node?.type.name).toBe("equation");
+    expect(String(node?.attrs.xml)).toMatch(/^<m:oMathPara><m:oMath><m:sSup>/);
+    editor.run(undo);
+    expect(editor.state.doc.child(1).childCount).toBe(0);
+  });
+
+  it("writes a typed linear form, and edits the selected equation in it", () => {
+    const editor = open();
+    fireEvent.click(screen.getByRole("button", { name: /^Equation/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Insert New Equation…" }));
+    let dialog = screen.getByRole("dialog", { name: "Equation" });
+    const box = within(dialog).getByLabelText("Linear form");
+    // In a sentence: inline.
+    expect(
+      (within(dialog).getByLabelText("Display (on its own line)") as HTMLInputElement).checked,
+    ).toBe(false);
+    fireEvent.change(box, { target: { value: "x^2/2" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    const xml = String(editor.state.doc.child(0).child(1).attrs.xml);
+    expect(xml).toMatch(/^<m:oMath><m:f><m:num><m:sSup>/);
+    // Selected after insertion: Edit Equation… shows its linear form.
+    fireEvent.click(screen.getByRole("button", { name: /^Equation/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit Equation…" }));
+    dialog = screen.getByRole("dialog", { name: "Equation" });
+    const again = within(dialog).getByLabelText("Linear form") as HTMLTextAreaElement;
+    expect(again.value).toBe("x^2/2");
+    fireEvent.change(again, { target: { value: "x^3/3" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(String(editor.state.doc.child(0).child(1).attrs.xml)).toContain("<m:t>3</m:t>");
+  });
+});

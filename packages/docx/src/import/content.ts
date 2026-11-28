@@ -73,6 +73,7 @@ export function preservedIn(root: XmlElement): WeakSet<XmlElement> {
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
+const MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
 const MAX_TABLE_DEPTH = 64;
 
 /** Labels of the opaque elements that show something; anything else unknown shows its name. */
@@ -439,6 +440,13 @@ function inlines(
   };
   for (const el of nodes) {
     if (el.kind !== "element") continue;
+    // Word's equation (schema 12, ADR-0018): its OMML as the file has it.
+    if (el.ns === MATH_NS && (el.local === "oMath" || el.local === "oMathPara")) {
+      const equation = valid(node("equation", { xml: sourceOf(context, el) }), el, context);
+      if (equation) out.push(equation);
+      else opaque(el);
+      continue;
+    }
     if (!isW(el)) {
       opaque(el, INLINE_LABELS, el.local === "AlternateContent" ? "alternate content" : el.local);
       continue;

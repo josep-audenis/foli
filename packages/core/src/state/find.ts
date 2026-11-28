@@ -330,7 +330,10 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
       else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
       // Word's equation kept as its OMML (35.4): found by its characters, never replaced.
-      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? ""))) {
+      else if (
+        name === "equation" ||
+        (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? "")))
+      ) {
         const value = equationText(String(child.attrs.xml), scope.hideDeleted);
         // An empty one still parts the words around it, as any other object.
         if (value) add(value, at, true);
