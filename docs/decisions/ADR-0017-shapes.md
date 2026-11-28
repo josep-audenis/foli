@@ -1,7 +1,9 @@
 # ADR-0017: Shapes as drawn anchors with DrawingML's geometry (schema 11)
 
 - **Status:** Accepted when merged, task 34.1 (2026-11-27), by an agent's review, as the owner
-  asked for Phase 34 (one PR per task, reviewed, merged).
+  asked for Phase 34 (one PR per task, reviewed, merged). Implemented in Phase 34 (34.1–34.6) as
+  decided, plus: a file's custom dash kept as `custom` (34.5), and Word's `a:shade` and `a:tint`
+  taken in linear light (34.6).
 - **Context:** until Phase 34 a shape was opaque: the run's `mc:AlternateContent` (Word's
   DrawingML `wps:wsp` with its VML copy for Word 2007) or a bare `w:drawing`, kept verbatim, not
   drawn. Phase 33 made Word's plain text box (an upright rectangle holding text) a `textBox`

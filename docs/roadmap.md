@@ -45,7 +45,7 @@ place that says what is in progress; check it before starting work.
 | 31 Ruler                      | In review                | `phase-31/ruler`          | 31.1–31.6 merged (#330–#335); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 32 Page decoration            | In review                | `phase-32/design`         | 32.1–32.6 merged (#337–#342); bench as before the phase (Chromium, busy machine); the release waits for the owner                                                                             |
 | 33 Text boxes & layout        | In review                | `phase-33/textboxes`      | 33.1–33.6 merged (#343–#349); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
-| 34 Shapes                     | In progress              | `phase-34/shapes`         | Claimed 2026-11-27 (the owner assigned it; 33 is merged on `main`, waiting for its release)                                                                                                   |
+| 34 Shapes                     | In review                | `phase-34/shapes`         | 34.1–34.6 merged (#351–#356); bench as before the phase but `exportPdf` (one more corpus file), busy machine                                                                                  |
 | 35 Insert extras              | Blocked by 29            | —                         | Planned 2026-11-26, nothing built; 35.6 needs 34                                                                                                                                              |
 | 36 Tables as Word's           | Ready                    | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
 | 37 File tab & views           | Blocked by 29            | —                         | Planned 2026-11-26, nothing built                                                                                                                                                             |
@@ -4819,6 +4819,37 @@ paths; text in shapes through Phase 33's stories.
   written back unchanged unless edited; new shapes open in Word.
 
 - `pnpm check` green; axe finds no new violation.
+
+Closed 2026-11-28: 34.1–34.6 merged (#351, #352, #353, #354, #355, #356), each reviewed by a
+subagent and fixed before merging (34.1's review found one-stop gradients, path commands without
+their arguments and unknown preset or dash names written into invalid DrawingML; 34.2's a
+header copy's SVG ids shared with the hidden copy, arcs bent in a scaled path and a custom path
+in the wrong units; 34.3's a line arrow pointing back at its start and a shape drawn in a second
+column landing in the first; 34.4's an aligned shape moved twice the drag and a shape with text
+that could not be dragged; 34.5's a file's custom dash that Solid could not replace). Acceptance:
+every shape of the corpus's poster (12, Word-made: 32 presets, an adjusted, a flipped, a
+gradient, a dashed, a text-holding shape, lines with arrows, a freeform, a shape wrapped
+square, a header's line) agrees by ink with Word's PDF of it, 0.988 to 1.0 against the 0.9
+tolerance, and each preset of its grid is within 1.5 px of Word's place in three engines
+(`shapes.word.ts`, `word-shapes.spec.ts`); written back unchanged its shapes are byte for byte
+the file's and Word reads them as it reads the original; edited (turned, flipped, refilled,
+adjusted, recolored, dotted, moved, arrows, text) and with new shapes (one holding text), Word 16
+opens it without repair and reads every shape as Foli wrote it (`shape-roundtrip.mjs`). The run
+found Word shading theme colors in linear light, now followed. `pnpm check` green on every
+push; axe on the poster's pages, the Shapes gallery, a selected shape and the Shape Format tab
+finds nothing. The full e2e run (2026-11-28, three engines): 1311 passed; failing only `pdf.spec`'s
+print against `exportPdf` for 04 and 08 (failing on `main` before this phase) and three Firefox
+caret tests that timed out while a `pnpm check` ran beside them and pass alone.
+`pnpm bench --engines chromium` (2026-11-28, `main` after #356, a busy machine): `exportPdf` of the
+corpus 1231 ms and 1301 ms against a 675 ms baseline (past its threshold), the corpus now twelve
+documents: the poster takes 135 ms of it, the other eleven 1036 ms (Phase 32's close measured
+1036 ms on this machine, Phase 33's 943–967). Layout, typing, reflow and find within their
+ranges. Firefox and WebKit not benched; a quiet machine's run is still owed. Not done
+(limitations.md): effects (shadows, glow, 3-D) kept but not drawn; groups, canvases, picture and
+pattern fills, linked boxes and vertical text kept opaque; presets beyond the ~50 drawn shown as
+their box; no gradients, effects or Format Shape pane in Shape Format; shapes inserted in the
+body only; no keyboard way to adjust a shape; a touch does not drag a shape; shape names in
+English.
 ## Phase 35 — Insert extras · L → next minor
 
 What Word's Insert tab has and Foli does not, short of shapes and charts.
