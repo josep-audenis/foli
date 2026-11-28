@@ -1022,6 +1022,13 @@ hideDeleted })` gives each reference's number, `noteTexts(numbers)` them by stor
 what is in force. Deleting a reference deletes its note in the same transaction; while tracking
 both are recorded, as Word does, and settled together.
 
+Symbols (35.1): `insertSymbol(text, font?)` inserts `text` at the selection as typed, in `font`
+when given (its `w:ascii` and `w:hAnsi`, the other fonts kept: Word's Symbol dialog's way), one
+undo step. `toolbarItems.symbol` is Insert ▸ Symbol: Word's twenty recent symbols (the last
+inserted first, for the page's life) and More Symbols…, Word's Symbol dialog (`"symbol"`): a
+font, a Unicode subset and its characters, the recent ones, the character code in hex, and
+Special Characters with their keys; Insert keeps it open, as Word's.
+
 Text boxes (Phase 33, ADR-0016): `insertTextBox({ width?, height?, inline? })` adds a box (2 by 1
 inches, floating, wrapped square, white with a thin black line) and its story at the end of the
 selection, one undo step, the box selected; not in a story. `selectedTextBox(state)` gives the

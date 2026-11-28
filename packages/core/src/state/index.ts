@@ -26,6 +26,7 @@ export {
   insertColumnBreak,
   insertHardBreak,
   insertPageBreak,
+  insertSymbol,
   insertTab,
   insertText,
   isMarkActive,

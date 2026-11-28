@@ -191,5 +191,10 @@ describe("keyName for Word's punctuation keys", () => {
     expect(key({ key: ";", code: "Comma", ctrlKey: true, shiftKey: true })).toBe("Mod-Shift-<");
     // Without Ctrl, the character typed.
     expect(key({ key: ";", code: "Comma" })).toBe(";");
+    // Word's em dash and ellipsis (35.1).
+    expect(key({ key: "-", code: "NumpadSubtract", ctrlKey: true, altKey: true })).toBe(
+      "Mod-Alt--",
+    );
+    expect(key({ key: ".", code: "Period", ctrlKey: true, altKey: true })).toBe("Mod-Alt-.");
   });
 });

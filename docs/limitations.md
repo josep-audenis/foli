@@ -943,3 +943,15 @@ Details in the [package README](../packages/docx/README.md).
   are not checked, beyond the variable names existing.
 - Benchmarks run by hand on the owner's machine against its baseline (`pnpm bench`), not in a
   hosted CI; the browser ones run on the dev server.
+
+## Insert extras (Phase 35)
+
+- Insert ▸ Symbol inserts a character of a font as text in that font (`w:rFonts`), as Word does
+  for a Unicode font. A symbol font's own characters (Symbol, Wingdings: Word's `w:sym`) are not
+  offered: the dialog's subsets are Unicode blocks, drawn in the font chosen, and a file's
+  `w:sym` stays opaque. The fonts are the font box's. The recent symbols are kept while the page
+  is open, not across visits (Word keeps them in the user's settings). En Dash, Optional Hyphen
+  and the other special characters without a key in the dialog have none in Foli: Word's
+  Ctrl+Num - and Ctrl+- are left to the browser (zoom out). A character code outside the
+  dialog's 24 subsets is not taken (Word takes any code of the font). A recent symbol inserted in
+  a font shows in that font in the menu; its font is in its name.

@@ -89,7 +89,8 @@ function TriCheck({
 }
 
 /** A labelled field over its control. */
-function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+/** @internal */
+export function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="foli-setup-field">
       <label htmlFor={id}>{label}</label>
@@ -102,7 +103,8 @@ function Field({ id, label, children }: { id: string; label: string; children: R
  * A dialog's tabs (WAI-ARIA tabs, automatic activation): the tab list and the shown panel; the
  * others stay mounted (hidden), so what was typed there stays.
  */
-function Tabs({
+/** @internal */
+export function Tabs({
   id,
   tabs,
   selected,

@@ -7234,6 +7234,9 @@ export function keyName(event: KeyboardEvent): string {
   // by the key's place, as a US keyboard types it, whatever the layout types there.
   else if (mod && !altGraph && event.code in US_PUNCTUATION)
     key = (US_PUNCTUATION[event.code] as readonly [string, string])[event.shiftKey ? 1 : 0];
+  // Cmd+Option+Minus (Word's em dash): Option types an en dash there; named by the key.
+  else if (IS_MAC && mod && event.altKey && event.code === "Minus")
+    key = event.shiftKey ? "_" : "-";
   let name = key;
   if (event.shiftKey && key !== "Shift") name = `Shift-${name}`;
   if (event.altKey) name = `Alt-${name}`;

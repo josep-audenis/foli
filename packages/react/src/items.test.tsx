@@ -180,6 +180,7 @@ const NAMES = {
   shading: 1,
   borders: 1,
   lineNumbers: 1,
+  symbol: 1,
 } satisfies Record<ToolbarItemName, 1>;
 
 /** Deletes the selection: a dry run says no at a caret. */

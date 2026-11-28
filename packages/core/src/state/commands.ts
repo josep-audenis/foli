@@ -14,7 +14,7 @@ import { TransformError } from "../transform/index.js";
 import type { SectionJSON } from "../v3/document.js";
 import { attempt } from "./attempt.js";
 import { fieldOfPart, fieldSelection, isFieldPart } from "./fields.js";
-import { redo, undo } from "./history.js";
+import { closeHistory, redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
 import { keepLastMark, typedMarks } from "./mark.js";
 import { absorbSection } from "./sections.js";
@@ -133,6 +133,39 @@ export function insertText(text: string): Command {
       tr.insertText(text, $pos.pos, $pos.pos, allowed);
       tr.setSelection(TextSelection.create(tr.doc, $pos.pos + text.length));
     });
+  };
+}
+
+/**
+ * Insert ▸ Symbol (35.1): `text` at the selection as typed, in `font` when given, as Word's Symbol
+ * dialog writes a symbol of a font: its Latin fonts (`w:ascii`, `w:hAnsi`) set to it, the run's
+ * other fonts kept. Without a font (Word's "(normal text)") it is the text's own font.
+ */
+export function insertSymbol(text: string, font?: string | null): Command {
+  return (state, dispatch) => {
+    const type = font ? state.schema.marks.font : undefined;
+    return insertText(text)(
+      state,
+      dispatch &&
+        ((tr) => {
+          if (type) {
+            const to = tr.selection.from;
+            const from = to - text.length;
+            const own = tr.doc.nodeAt(from)?.marks.find((m) => m.type === type);
+            const attrs = {
+              ...own?.attrs,
+              ascii: font,
+              hAnsi: font,
+              hint: null,
+              asciiTheme: null,
+              hAnsiTheme: null,
+            };
+            tr.addMark(from, to, type.create(attrs));
+          }
+          // A step of its own, as Word's: not joined to typing around it.
+          dispatch(tr.setMeta(closeHistory, true));
+        }),
+    );
   };
 }
 
@@ -643,6 +676,14 @@ export function baseKeymap(): Plugin {
       "Ctrl- ": clearFormatting(),
       "Mod-Shift->": stepFontSize(1),
       "Mod-Shift-<": stepFontSize(-1),
+      // Word's special characters (Insert ▸ Symbol ▸ Special Characters, 35.1).
+      "Mod-Alt--": insertText("—"),
+      "Mod-Shift-_": insertText("‑"),
+      "Mod-Shift- ": insertText(" "),
+      "Mod-Alt-c": insertText("©"),
+      "Mod-Alt-r": insertText("®"),
+      "Mod-Alt-t": insertText("™"),
+      "Mod-Alt-.": insertText("…"),
       "Mod-k": openLinkEditor,
       "Mod-a": selectAll,
       // Up/Down from a caret need the view's line geometry: it runs arrowAcrossLeaf(dir, "line").
