@@ -63,6 +63,21 @@ function verbatim(xml: unknown, context: WriteContext): string {
   return text;
 }
 
+const MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+
+/**
+ * An equation's OMML (35.5): as it is, declaring the math namespace on its own start tag when the
+ * part does not (a file whose producer left it out, or that names it otherwise).
+ */
+function equationXml(xml: string, context: WriteContext): string {
+  const prefix = /^<([\w.-]+):/.exec(xml)?.[1];
+  const text =
+    prefix && !context.namespaces.prefixes.has(prefix)
+      ? xml.replace(/^(<[\w.-]+:oMath(?:Para)?)/, `$1 xmlns:${prefix}="${MATH_NS}"`)
+      : xml;
+  return verbatim(text, context);
+}
+
 /** A control around `inner` (`w:sdtPr`, `w:sdtEndPr`, then the content, as `w:sdt` requires). */
 function controlXml(id: string, inner: string, context: WriteContext): string {
   const { properties } = context.controls.parts(id, context.namespaces);
@@ -418,6 +433,8 @@ function markerXml(node: NodeJSON, context: WriteContext): string {
       return String(a.xml);
     case "opaqueInline":
       return verbatim(a.xml, context);
+    case "equation":
+      return equationXml(String(a.xml ?? ""), context);
     // Their partner is gone (an edit): the content around them stays.
     case "controlStart":
     case "controlEnd":

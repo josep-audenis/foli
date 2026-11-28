@@ -22,7 +22,7 @@ export const INSTRUCTIONS = `These tools read and edit Word documents (.docx). E
 Work on what read shows. read gives the document a line per block:
   [b7] Clause, 1.1, changed: text
 [b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1: row and grid column; c1-2 a cell spanning two; "merged down" or "merged up" a vertical merge, its text in the top cell), its style, its list number, "changed" if it has tracked changes, its comments; after the colon, its text. ↵ is a line break. A line "table, 3 rows, 2 columns" is a table: its cells' blocks follow, indented. A line "not editable: …" is content you cannot change.
-Words in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: …] is a content control to fill with fill_control; «Name» is a merge field to fill with update_fields.
+Words in brackets ([picture], [note], [equation: …], [empty: Offer date]) are not text: never put them in find. [empty: …] is a content control to fill with fill_control; «Name» is a merge field to fill with update_fields.
 A handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.
 read shows the body; read with headers also shows the headers and footers after the body (in a read in parts, after its last part), their handles h1, f1…, which the same tools edit: no comments, breaks or notes go there, and their content controls are not filled. The text of notes ([note]) is not shown.`;
 

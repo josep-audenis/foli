@@ -269,7 +269,7 @@ const ENTITIES: Record<string, string> = { lt: "<", gt: ">", amp: "&", quot: '"'
 /**
  * An OMML equation's characters: its runs' text (`m:t`), structure left out, without Word's
  * alignment marks (`&` in an equation array) and, with `hideDeleted`, without text a tracked
- * change deleted (`w:del`, `w:moveFrom`). @internal
+ * change deleted (`w:del`, `w:moveFrom`). For `@folijs/core/internal`.
  */
 export function equationText(xml: string, hideDeleted = false): string {
   let source = xml;
@@ -334,7 +334,10 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
       else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
       // Word's equation kept as its OMML (35.4): found by its characters, never replaced.
-      else if (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? ""))) {
+      else if (
+        name === "equation" ||
+        (name === "opaqueInline" && MATH.test(String(child.attrs.xml ?? "")))
+      ) {
         const value = equationText(String(child.attrs.xml), scope.hideDeleted);
         // An empty one still parts the words around it, as any other object.
         if (value) add(value, at, true);

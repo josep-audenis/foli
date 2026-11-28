@@ -1145,7 +1145,14 @@ export function isMarker(context: WordContext | null, node: Node | null | undefi
   return context !== null && !!node && MARKERS.has(node.type.name);
 }
 
-const OPAQUE = new Set(["opaqueInline", "opaqueBlock", "foreignInline", "foreignBlock"]);
+const OPAQUE = new Set([
+  "opaqueInline",
+  "opaqueBlock",
+  "foreignInline",
+  "foreignBlock",
+  // An equation (35.5) is selected before it is deleted, as Word's.
+  "equation",
+]);
 
 /**
  * Opaque content (and foreign nodes, ADR-0008): deleted only once selected, as Word selects a field before deleting it.

@@ -27,7 +27,7 @@ function text(paragraph: NodeJSON): string {
       if (n.type === "picture") return n.attrs?.float ? "" : "/";
       if (n.type === "opaqueInline" && String(n.attrs?.xml).includes("<wp:inline")) return "/";
       // An equation's characters, as Word's Range.Text gives them (its structure left out).
-      if (n.type === "opaqueInline" && /^<m:oMath/.test(String(n.attrs?.xml)))
+      if (n.type === "equation")
         return [...String(n.attrs?.xml).matchAll(/<m:t(?:\s[^>]*)?>([^<]*)<\/m:t>/g)]
           .map((m) =>
             String(m[1]).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"),

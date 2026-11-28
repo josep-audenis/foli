@@ -7,18 +7,24 @@ import {
   type CaptionNumbering,
   type Command,
   type Editor,
+  type EditorState,
   type FieldLayout,
   fieldsIn,
   formatDatePicture,
   insertCaption,
   insertDate,
+  insertEquation,
   insertSymbol,
   insertText,
+  isDisplayEquation,
   parseFieldInstruction,
+  selectedEquation,
   sequenceName,
+  setEquation,
   type TableOfFiguresOptions,
 } from "@folijs/core";
 import { formatNumber } from "@folijs/core/internal";
+import { equationElement, ommlToUnicodeMath, unicodeMathToOmml } from "@folijs/view";
 import {
   type FormEvent,
   type KeyboardEvent,
@@ -966,6 +972,160 @@ export function TableOfFiguresDialog({
             {t("Cancel")}
           </button>
         </div>
+      </form>
+    </div>
+  );
+}
+
+// ---------- Insert ▸ Equation (35.5) ----------
+
+/** Word's equation gallery: its built-in equations' names and linear forms. @internal */
+export const EQUATION_GALLERY: readonly { name: ToolbarMessage; linear: string }[] = [
+  { name: "Area of Circle", linear: "A=πr^2" },
+  { name: "Binomial Theorem", linear: "(x+a)^n=∑_(k=0)^n▒(n¦k) x^k a^(n-k)" },
+  { name: "Expansion of a Sum", linear: "(1+x)^n=1+nx/1!+(n(n-1)x^2)/2!+⋯" },
+  {
+    name: "Fourier Series",
+    linear: "f(x)=a_0+∑_(n=1)^∞▒(a_n cos⁡〖nπx/L〗+b_n sin⁡〖nπx/L〗)",
+  },
+  { name: "Pythagorean Theorem", linear: "a^2+b^2=c^2" },
+  { name: "Quadratic Formula", linear: "x=(-b±√(b^2-4ac))/2a" },
+  { name: "Taylor Expansion", linear: "e^x=1+x/1!+x^2/2!+x^3/3!+⋯,  -∞<x<∞" },
+  { name: "Trig Identity 1", linear: "sin⁡α±sin⁡β=2 sin⁡〖1/2(α±β)〗 cos⁡〖1/2(α∓β)〗" },
+  { name: "Trig Identity 2", linear: "cos⁡α+cos⁡β=2 cos⁡〖1/2(α+β)〗 cos⁡〖1/2(α-β)〗" },
+];
+
+/** Whether an equation inserted at the selection is a display one: alone in its paragraph. @internal */
+export const displayHere = (state: EditorState) => {
+  const { $from, $to } = state.selection;
+  return (
+    $from.parent === $to.parent &&
+    $from.parent.content.size === $to.parentOffset - $from.parentOffset
+  );
+};
+
+/**
+ * The Equation dialog: an equation's linear form (Word's UnicodeMath) in a box, drawn as it will
+ * be shown while typing, and Display (on its own line). OK writes it as OMML: a new equation at
+ * the selection (`insertEquation`), or the selected one changed (`setEquation`); unchanged, the
+ * file's OMML stays as it is.
+ * @internal
+ */
+export function EquationDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [selected] = useState(() => selectedEquation(editor.state));
+  const doc = typeof document === "undefined" ? null : document;
+  const [initial] = useState(() => {
+    try {
+      return selected && doc ? ommlToUnicodeMath(String(selected.node.attrs.xml), doc) : "";
+    } catch {
+      return "";
+    }
+  });
+  const [linear, setLinear] = useState(initial);
+  const [display, setDisplay] = useState(() =>
+    selected ? isDisplayEquation(String(selected.node.attrs.xml)) : displayHere(editor.state),
+  );
+  const [error, setError] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const preview = useRef<HTMLDivElement>(null);
+  useEffect(() => box.current?.focus(), []);
+  // A linear form too deeply nested to read is an error to show, not a crash.
+  let xml = "";
+  try {
+    xml = linear.trim() ? unicodeMathToOmml(linear, display) : "";
+  } catch {
+    xml = "";
+  }
+  useEffect(() => {
+    const target = preview.current;
+    if (!target || !doc) return;
+    target.replaceChildren();
+    const math = xml ? equationElement(xml, doc) : null;
+    if (math) target.append(math);
+  }, [xml, doc]);
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (!xml) return setError(true);
+    // Unchanged: the equation keeps the OMML it has.
+    if (
+      selected &&
+      linear === initial &&
+      display === isDisplayEquation(String(selected.node.attrs.xml))
+    )
+      return onClose(false);
+    const done = editor.run(selected ? setEquation(selected.pos, xml) : insertEquation(xml));
+    if (!done) return setError(true);
+    onClose(true);
+  };
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Equation")}
+      className="foli-link-dialog foli-word-dialog foli-equation-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-dialog-panel">
+          <Field id={`${id}-linear`} label={t("Linear form")}>
+            <textarea
+              ref={box}
+              id={`${id}-linear`}
+              rows={3}
+              spellCheck={false}
+              value={linear}
+              aria-invalid={error || undefined}
+              aria-describedby={error ? `${id}-error` : undefined}
+              onChange={(event) => {
+                setLinear(event.target.value);
+                setError(false);
+              }}
+              onKeyDown={(event) => {
+                // Enter writes it, as Word's box builds it up; Shift+Enter a new line.
+                // Not the Enter that ends an input method's composition.
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                if (event.key === "Enter" && !event.shiftKey) apply(event);
+              }}
+            />
+          </Field>
+          <div className="foli-setup-field foli-setup-check">
+            <input
+              id={`${id}-display`}
+              type="checkbox"
+              checked={display}
+              // A new one in a sentence stays in its line (Word draws a display one there inline).
+              disabled={!selected && !displayHere(editor.state)}
+              onChange={(event) => setDisplay(event.target.checked)}
+            />
+            <label htmlFor={`${id}-display`}>{t("Display (on its own line)")}</label>
+          </div>
+          <fieldset className="foli-dialog-section foli-equation-preview-box">
+            <legend>{t("Preview")}</legend>
+            <div ref={preview} className="foli-equation-preview" />
+          </fieldset>
+        </div>
+        <div className="foli-dialog-buttons">
+          <button type="submit">{t("OK")}</button>
+          <button type="button" onClick={() => onClose(false)}>
+            {t("Cancel")}
+          </button>
+        </div>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {t("The equation cannot be written here.")}
+          </p>
+        )}
       </form>
     </div>
   );

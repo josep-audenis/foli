@@ -4,10 +4,16 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createEditor, findAll } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  findAll,
+  insertEquation,
+  SCHEMA_VERSION,
+} from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx } from "./index.js";
-import { inflateEntry, readZip } from "./zip.js";
+import { deflateEntry, inflateEntry, readZip, writeZip } from "./zip.js";
 
 const file = join(import.meta.dirname, "..", "..", "..", "corpus", "word", "13-equations.docx");
 
@@ -34,5 +40,42 @@ describe("equations in .docx (35.4)", () => {
     expect(findAll(editor, "4ac")).toHaveLength(1);
     expect(findAll(editor, "x<0")).toHaveLength(1);
     expect(findAll(editor, "Pythagoras")).toHaveLength(1);
+  });
+});
+
+describe("new equations in .docx (35.5)", () => {
+  it("declare the math namespace where the file's part does not", async () => {
+    // The corpus's 05 with its document part declaring no `m:`, as some producers write it.
+    const letter = join(
+      import.meta.dirname,
+      "..",
+      "..",
+      "..",
+      "corpus",
+      "word",
+      "05-business-letter.docx",
+    );
+    const entries = await Promise.all(
+      readZip(new Uint8Array(readFileSync(letter))).map(async (entry) => {
+        if (entry.name !== "word/document.xml") return entry;
+        const text = new TextDecoder().decode(await inflateEntry(entry));
+        const without = text.replace(/ xmlns:m="[^"]*"/, "");
+        return deflateEntry(entry.name, new TextEncoder().encode(without), entry);
+      }),
+    );
+    const { document, package: pkg } = await importDocx(writeZip(entries));
+    const editor = createEditor({ document });
+    editor.select(1);
+    expect(editor.run(insertEquation("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>"))).toBe(true);
+    const out = await exportDocx(editor.getDocument(), pkg);
+    expect(await body(out)).toContain(
+      '<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">',
+    );
+    const back = createEditor({ document: (await importDocx(out)).document });
+    let found = 0;
+    back.state.doc.descendants((n) => {
+      if (n.type.name === "equation") found++;
+    });
+    expect(found).toBe(1);
   });
 });

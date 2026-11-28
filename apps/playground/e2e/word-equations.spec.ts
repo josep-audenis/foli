@@ -128,3 +128,80 @@ test("renderDocument draws them too (print, exportPdf)", async ({ page }) => {
   expect(math.count).toBe(11);
   expect(math.tags).toContain("mfrac");
 });
+
+test.describe("Insert ▸ Equation (35.5)", () => {
+  async function ribbon(page: Page): Promise<void> {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto("/edit.html");
+    await page.waitForFunction(() => "foliEdit" in window);
+    await page.getByRole("tab", { name: "Insert" }).click();
+  }
+  /** A new empty paragraph at the end, the caret in it. */
+  const newParagraph = (page: Page) =>
+    page.evaluate(() => {
+      const { editor } = window.foliEdit;
+      editor.run((state, dispatch) => {
+        dispatch?.(state.tr.insert(state.doc.content.size, state.schema.node("paragraph")));
+        return true;
+      });
+      editor.select(editor.state.doc.content.size - 1);
+    });
+
+  test("inserts Word's gallery and a typed equation, edited in its box, saved as OMML; axe", async ({
+    page,
+  }) => {
+    await ribbon(page);
+    const names = [
+      "Area of Circle",
+      "Binomial Theorem",
+      "Expansion of a Sum",
+      "Fourier Series",
+      "Pythagorean Theorem",
+      "Quadratic Formula",
+      "Taylor Expansion",
+      "Trig Identity 1",
+      "Trig Identity 2",
+    ];
+    for (const name of names) {
+      await newParagraph(page);
+      await page.getByRole("button", { name: "Equation", exact: true }).click();
+      await page.getByRole("menuitem", { name }).click();
+    }
+    await expect(page.locator('section.foli-page [data-foli-math="display"] math')).toHaveCount(9);
+    // A typed one in a sentence: inline.
+    await page.evaluate(() => window.foliEdit.editor.select(2));
+    await page.getByRole("button", { name: "Equation", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Insert New Equation…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Equation" });
+    await dialog.getByLabel("Linear form").fill("E=mc^2");
+    await expect(dialog.locator(".foli-equation-preview math msup")).toHaveCount(1);
+    const results = await new AxeBuilder({ page }).include(".foli-equation-dialog").analyze();
+    expect(results.violations).toEqual([]);
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator('section.foli-page [data-foli-math="inline"] math')).toHaveCount(1);
+    // Edited: the selected equation's linear form.
+    await page.getByRole("button", { name: "Equation", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit Equation…" }).click();
+    await expect(dialog.getByLabel("Linear form")).toHaveValue("E=mc^2");
+    await dialog.getByLabel("Linear form").fill("E=mc^2+p");
+    await dialog.getByRole("button", { name: "OK" }).click();
+    const xml = await page.evaluate(() => {
+      let found = "";
+      window.foliEdit.editor.state.doc.descendants((n) => {
+        if (n.type.name === "equation" && !String(n.attrs.xml).startsWith("<m:oMathPara"))
+          found = String(n.attrs.xml);
+      });
+      return found;
+    });
+    expect(xml).toContain("<m:t>+p</m:t>");
+    await page.keyboard.press("ControlOrMeta+z");
+    // For Word to open (FOLI_EQUATIONS_OUT): the saved file.
+    const out = process.env.FOLI_EQUATIONS_OUT;
+    if (out) {
+      const download = page.waitForEvent("download");
+      await page.locator("#save").click();
+      await (await download).saveAs(out);
+    }
+  });
+});
