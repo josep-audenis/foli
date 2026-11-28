@@ -19,7 +19,15 @@ import {
   type TableOfFiguresOptions,
 } from "@folijs/core";
 import { formatNumber } from "@folijs/core/internal";
-import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type ToolbarMessage, useT } from "./messages.js";
 import { Field, Tabs } from "./WordDialogs.js";
 
@@ -679,9 +687,9 @@ function captionLabels(editor: Editor): string[] {
   for (const field of fieldsIn(editor.state.doc))
     if (field.name === "SEQ") {
       const name = parseFieldInstruction(field.instruction).args[0];
-      // As its `SEQ` names it (Word's own labels too: "figure" is Figure).
+      // Word's own labels once ("figure" is Figure); a label's words as Word wrote them.
       if (name && !found.some((l) => sequenceName(l).toLowerCase() === name.toLowerCase()))
-        found.push(name);
+        found.push(name.replace(/_/g, " "));
     }
   return found;
 }
@@ -727,14 +735,18 @@ export function CaptionDialog({
   useEffect(() => {
     if (newLabel !== null) newBox.current?.focus();
   }, [newLabel]);
-  // What Word's box shows before the typed text: the label and the number the caption gets.
-  // The number the caption gets, as inserting it would give it (a dry run of the command).
-  let shownNumber = formatNumber(1, NUMBER_FORMATS[numbering]);
-  insertCaption({ label, numbering, excludeLabel: true })(editor.state, (tr) => {
-    const end = tr.selection.from;
-    const placed = fieldsIn(tr.doc).find((f) => f.name === "SEQ" && f.to === end);
-    if (placed) shownNumber = placed.result;
-  });
+  // What Word's box shows before the typed text: the label and the number the caption gets, as
+  // inserting it would give it (a dry run of the command, once per label and numbering).
+  const state = editor.state;
+  const shownNumber = useMemo(() => {
+    let shown = formatNumber(1, NUMBER_FORMATS[numbering]);
+    insertCaption({ label, numbering, excludeLabel: true })(state, (tr) => {
+      const end = tr.selection.from;
+      const placed = fieldsIn(tr.doc).find((f) => f.name === "SEQ" && f.to === end);
+      if (placed) shown = placed.result;
+    });
+    return shown;
+  }, [state, label, numbering]);
   const lead = exclude ? shownNumber : `${label} ${shownNumber}`;
   const apply = (event: FormEvent) => {
     event.preventDefault();
